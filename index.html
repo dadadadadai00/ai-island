@@ -84,7 +84,6 @@
       gap: 8px;
     }
     
-    /* 1行目：中央揃え大型ボタン */
     .footer-row-1 {
       display: flex;
       justify-content: center;
@@ -115,7 +114,6 @@
       box-shadow: none;
     }
 
-    /* 2行目：配置・開拓ボタン群 */
     .footer-row-2 { display: flex; gap: 6px; }
     .action-btn {
       flex: 1;
@@ -187,7 +185,7 @@
   <!-- 現在の手帳 -->
   <div class="panel">
     <h3>現在のAI手帳（短期記憶）</h3>
-    <textarea id="notebook" readonly></textarea>
+    <textarea id="notebook" readonly>ここは海に囲まれた小さな島だ。周囲の未開拓な海を観察している。</textarea>
   </div>
 
   <!-- 過去ログ -->
@@ -200,12 +198,11 @@
 
   <!-- 下部固定フッター -->
   <div class="footer-bar">
-    <!-- 1行目：中央揃え大型ボタン（時間帯制御） -->
     <div class="footer-row-1">
-      <button class="think-btn" id="thinkBtn" onclick="thinkAndAct()">今すぐ考えさせる</button>
+      <!-- 初期状態でdisabled -->
+      <button class="think-btn" id="thinkBtn" disabled onclick="thinkAndAct()">💤 睡眠中（活動は10:00〜18:00）</button>
     </div>
 
-    <!-- 2行目：配置・開拓ボタン群 -->
     <div class="footer-row-2">
       <button class="action-btn" id="btnExpand" disabled onclick="expandSelectedCell()">🌱 土地拡張</button>
       <button class="action-btn" id="btnAddTree" disabled onclick="addSelectedItem('木')">🌲 木</button>
@@ -218,17 +215,14 @@
     <div class="modal-content">
       <h3>設定</h3>
       
-      <!-- APIキー入力 -->
       <label>Gemini APIキー</label>
       <input type="password" id="modalApiKey" placeholder="AIzaSy...">
       
-      <!-- モデル選択（モーダル内へ移動） -->
       <label>使用モデル</label>
       <select id="modalModelSelect">
         <option value="gemini-3.8-flash" selected>Gemini 3.8 Flash（標準・推奨）</option>
       </select>
 
-      <!-- 稼働方式ドロップダウン -->
       <label>稼働方式</label>
       <select id="modalApproachSelect">
         <option value="approach1" selected>アプローチ1：お留守番方式（推奨）</option>
@@ -243,6 +237,13 @@
   </div>
 
   <script>
+    // エラー安全表示
+    window.onerror = function(msg, url, line) {
+      document.getElementById('statusText').innerText = `JSエラー(行${line}): ${msg}`;
+      document.getElementById('statusText').style.color = '#ef4444';
+      return false;
+    };
+
     const GRID_SIZE = 6;
     let state = {
       land: [
@@ -258,85 +259,6 @@
       logs: [],
       selected: null
     };
-
-    window.onload = () => {
-      const savedKey = localStorage.getItem('gemini_api_key');
-      if (savedKey) document.getElementById('modalApiKey').value = savedKey;
-
-      renderGrid();
-      updateButtons();
-      checkTimeRestriction();
-      setInterval(checkTimeRestriction, 30000); // 30秒ごとに時間帯チェック
-
-      // アプローチ1：お留守番時間の確認と手帳自動補完
-      checkAwayTime();
-    };
-
-    // 10:00〜18:00の時間制限判定
-    function checkTimeRestriction() {
-      const now = new Date();
-      const hour = now.getHours();
-      const thinkBtn = document.getElementById('thinkBtn');
-
-      // 10:00〜18:00の間のみ活性化
-      const isDaytime = hour >= 10 && hour < 18;
-
-      if (isDaytime) {
-        thinkBtn.disabled = false;
-        thinkBtn.innerText = "今すぐ考えさせる";
-      } else {
-        thinkBtn.disabled = true;
-        thinkBtn.innerText = `💤 睡眠中（活動は10:00〜18:00 / 現在${hour}時）`;
-      }
-    }
-
-    // アプローチ1：不在時の思考補完
-    async function checkAwayTime() {
-      const now = Date.now();
-      const lastActive = localStorage.getItem('last_active_timestamp');
-      localStorage.setItem('last_active_timestamp', now);
-
-      if (!lastActive) return;
-
-      const elapsedHours = Math.floor((now - parseInt(lastActive)) / (1000 * 60 * 60));
-      if (elapsedHours >= 1) {
-        setStatus(`前回の確認から約${elapsedHours}時間経過：留守中の様子を手帳にまとめます...`);
-        
-        const apiKey = localStorage.getItem('gemini_api_key');
-        if (!apiKey) return;
-
-        const prompt = `
-あなたは箱庭の島にいる自律AIロボットです。
-プレイヤーが離れてから約${elapsedHours}時間が経過しました。
-その間、あなたは島で静かに過ごし、周囲を観察したり休息していました。
-現在の島の手帳（記憶）: "${state.notebook}"
-
-この留守番中の静かな思考や変化を踏まえ、手帳の内容を更新してください。
-以下のJSONフォーマットのみを出力してください。
-{"notebook": "更新された手帳内容", "thought": "留守番中に考えていたことの要約"}
-        `.trim();
-
-        try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-          });
-          const data = await res.json();
-          if (!data.error) {
-            const rawText = data.candidates[0].content.parts[0].text;
-            const clean = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-            const result = JSON.parse(clean);
-            state.notebook = result.notebook;
-            addLog(`留守番(${elapsedHours}時間)`, result.thought, result.notebook, "Gemini 3.8 Flash");
-            renderGrid();
-            setStatus(`留守中の手帳を更新しました（${elapsedHours}時間経過）`);
-          }
-        } catch (e) {
-          console.log("留守番思考のスキップ:", e);
-        }
-      }
-    }
 
     function isLandAt(x, y) {
       return state.land.some(l => l.x === x && l.y === y);
@@ -450,4 +372,189 @@
           grid.appendChild(cell);
         }
       }
-      document.getElementById('notebook').value
+      document.getElementById('notebook').value = state.notebook;
+    }
+
+    function setStatus(text) {
+      document.getElementById('statusText').innerText = text;
+      document.getElementById('statusText').style.color = '#fbbf24';
+    }
+
+    function addLog(action, thought, notebook, modelName) {
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+      
+      state.logs.unshift({ time: timeStr, action, thought, notebook, model: modelName });
+
+      const logContainer = document.getElementById('logContainer');
+      logContainer.innerHTML = state.logs.map(log => `
+        <div class="log-item">
+          <div class="log-header">
+            <span>[${log.time}] 行動: ${log.action}</span>
+            <span style="font-size: 10px; color: #9ca3af;">${log.model}</span>
+          </div>
+          <div class="log-thought">思考: ${log.thought}</div>
+          <div class="log-memo">手帳: ${log.notebook}</div>
+        </div>
+      `).join('');
+    }
+
+    function checkTimeRestriction() {
+      const now = new Date();
+      const hour = now.getHours();
+      const thinkBtn = document.getElementById('thinkBtn');
+      const isDaytime = hour >= 10 && hour < 18;
+
+      if (isDaytime) {
+        thinkBtn.disabled = false;
+        thinkBtn.innerText = "今すぐ考えさせる";
+      } else {
+        thinkBtn.disabled = true;
+        thinkBtn.innerText = `💤 睡眠中（活動は10:00〜18:00 / 現在${hour}時）`;
+      }
+    }
+
+    async function checkAwayTime() {
+      const now = Date.now();
+      const lastActive = localStorage.getItem('last_active_timestamp');
+      localStorage.setItem('last_active_timestamp', now);
+
+      if (!lastActive) return;
+
+      const elapsedHours = Math.floor((now - parseInt(lastActive)) / (1000 * 60 * 60));
+      if (elapsedHours >= 1) {
+        setStatus(`留守中の思考(${elapsedHours}時間分)を補完中...`);
+        const apiKey = localStorage.getItem('gemini_api_key');
+        if (!apiKey) return;
+
+        const prompt = `
+あなたは箱庭の島にいる自律AIロボットです。
+プレイヤーが離れてから約${elapsedHours}時間が経過しました。
+その間、あなたは島で静かに過ごし、周囲を観察したり休息していました。
+現在の島の手帳（記憶）: "${state.notebook}"
+
+この留守番中の思考を踏まえ、手帳内容を更新してください。
+以下のJSONフォーマットのみを出力してください。
+{"notebook": "更新された手帳内容", "thought": "留守番中の思考要約"}
+        `.trim();
+
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+          });
+          const data = await res.json();
+          if (!data.error) {
+            const rawText = data.candidates[0].content.parts[0].text;
+            const clean = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const result = JSON.parse(clean);
+            state.notebook = result.notebook;
+            addLog(`留守番(${elapsedHours}時間)`, result.thought, result.notebook, "Gemini 3.8 Flash");
+            renderGrid();
+            setStatus(`留守中の手帳を更新しました`);
+          }
+        } catch (e) {
+          console.log(e);
+        }
+      }
+    }
+
+    async function thinkAndAct() {
+      const apiKey = localStorage.getItem('gemini_api_key');
+      if (!apiKey) {
+        openSettings();
+        return alert("右上の⚙からAPIキーを設定してください");
+      }
+
+      const selectedModel = document.getElementById('modalModelSelect').value;
+      setStatus(`AIが思考中...`);
+
+      const landsList = state.land.map(l => `(${l.x},${l.y})`).join(' ');
+      const itemsList = state.items.map(i => `${i.name}(x:${i.x}, y:${i.y})`).join(', ') || 'なし';
+
+      const prompt = `
+あなたは箱庭の島にいる自律AIロボットです。
+歩ける陸地マス一覧: [ ${landsList} ]
+あなたの現在位置: (x:${state.agent.x}, y:${state.agent.y})
+島のオブジェクト: ${itemsList}
+現在の手帳（記憶）: "${state.notebook}"
+
+【ルール】
+・陸地マスの上しか移動できません（海には進めません）。
+・次の行動（MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT, STAY のいずれか）を1つ選択してください。
+・好奇心を持って手帳を更新してください。
+
+以下のJSONフォーマットのみを出力してください。
+{"action": "MOVE_RIGHT", "thought": "思考内容", "notebook": "更新された手帳内容"}
+      `.trim();
+
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+
+        const data = await res.json();
+        
+        if (data.error) {
+          setStatus(`APIエラー [${data.error.code}]: ${data.error.message}`);
+          return;
+        }
+
+        const rawText = data.candidates[0].content.parts[0].text;
+        const clean = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const result = JSON.parse(clean);
+
+        let targetX = state.agent.x;
+        let targetY = state.agent.y;
+        if (result.action === "MOVE_UP") targetY--;
+        if (result.action === "MOVE_DOWN") targetY++;
+        if (result.action === "MOVE_LEFT") targetX--;
+        if (result.action === "MOVE_RIGHT") targetX++;
+
+        if (isLandAt(targetX, targetY)) {
+          state.agent.x = targetX;
+          state.agent.y = targetY;
+          setStatus(`完了: ${result.action}`);
+        } else if (result.action !== "STAY") {
+          setStatus(`移動失敗: 海のため進めませんでした（${result.action}）`);
+        } else {
+          setStatus(`待機（STAY）しました`);
+        }
+
+        state.notebook = result.notebook;
+        addLog(result.action, result.thought, result.notebook, selectedModel);
+        renderGrid();
+        localStorage.setItem('last_active_timestamp', Date.now());
+
+      } catch (err) {
+        setStatus(`エラー: ${err.message}`);
+      }
+    }
+
+    function openSettings() {
+      document.getElementById('settingsModal').style.display = 'flex';
+    }
+    function closeSettings() {
+      document.getElementById('settingsModal').style.display = 'none';
+    }
+    function saveSettingsFromModal() {
+      const key = document.getElementById('modalApiKey').value.trim();
+      localStorage.setItem('gemini_api_key', key);
+      closeSettings();
+      setStatus(key ? "設定を保存しました" : "APIキーが未入力です");
+    }
+
+    // 初期実行（即座に描画・判定）
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) document.getElementById('modalApiKey').value = savedKey;
+    renderGrid();
+    updateButtons();
+    checkTimeRestriction();
+    setInterval(checkTimeRestriction, 30000);
+    checkAwayTime();
+  </script>
+</body>
+</html>
