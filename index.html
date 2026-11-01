@@ -10,7 +10,7 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
       margin: 12px;
-      padding-bottom: 150px;
+      padding-bottom: 140px;
       background: #141419;
       color: #f0f0f0;
     }
@@ -83,36 +83,40 @@
       flex-direction: column;
       gap: 8px;
     }
-    .footer-row-1 { display: flex; gap: 8px; }
-    .footer-row-2 { display: flex; gap: 6px; }
-
-    /* ドロップダウン */
-    .model-select {
-      flex: 1.2;
-      background: #101016;
-      border: 1px solid #444455;
-      color: #e5e7eb;
-      padding: 8px;
-      border-radius: 6px;
-      font-size: 12px;
-      outline: none;
-    }
     
-    /* 思考ボタン */
+    /* 1行目：中央揃え大型ボタン */
+    .footer-row-1 {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
     button.think-btn {
-      flex: 1.8;
+      width: 100%;
       background: #4f46e5;
       color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       font-weight: bold;
-      font-size: 14px;
-      padding: 10px;
+      font-size: 15px;
+      padding: 12px;
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.2s, opacity 0.2s;
     }
     button.think-btn:active { background: #4338ca; }
+    button.think-btn:disabled {
+      background: #23232c !important;
+      color: #6b7280 !important;
+      border: 1px solid #333340;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
 
-    /* アクションボタン（暗転デザイン） */
+    /* 2行目：配置・開拓ボタン群 */
+    .footer-row-2 { display: flex; gap: 6px; }
     .action-btn {
       flex: 1;
       padding: 10px 4px;
@@ -140,8 +144,22 @@
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); justify-content: center; align-items: center; z-index: 100; padding: 16px; }
     .modal-content { background: #20202a; width: 100%; max-width: 360px; padding: 18px; border-radius: 8px; border: 1px solid #3b3b4f; }
     .modal-content h3 { color: #fff; margin-bottom: 12px; font-size: 16px; }
-    .modal-content input { width: 100%; padding: 10px; background: #121218; border: 1px solid #444; color: #fff; border-radius: 6px; margin-bottom: 12px; }
-    .modal-actions { display: flex; gap: 8px; }
+    .modal-content label { font-size: 12px; color: #9ca3af; display: block; margin: 8px 0 4px; }
+    .modal-content input, .modal-content select {
+      width: 100%;
+      padding: 10px;
+      background: #121218;
+      border: 1px solid #444;
+      color: #fff;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      outline: none;
+    }
+    .modal-content select option:disabled {
+      color: #555;
+      background: #1a1a22;
+    }
+    .modal-actions { display: flex; gap: 8px; margin-top: 14px; }
     .modal-actions button { flex: 1; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
     .modal-save { background: #4f46e5; color: white; }
     .modal-close { background: #374151; color: white; }
@@ -182,13 +200,12 @@
 
   <!-- 下部固定フッター -->
   <div class="footer-bar">
+    <!-- 1行目：中央揃え大型ボタン（時間帯制御） -->
     <div class="footer-row-1">
-      <select class="model-select" id="modelSelect">
-        <option value="gemini-3.8-flash" selected>Gemini 3.8 Flash（標準）</option>
-      </select>
-      <button class="think-btn" onclick="thinkAndAct()">今すぐ考えさせる</button>
+      <button class="think-btn" id="thinkBtn" onclick="thinkAndAct()">今すぐ考えさせる</button>
     </div>
 
+    <!-- 2行目：配置・開拓ボタン群 -->
     <div class="footer-row-2">
       <button class="action-btn" id="btnExpand" disabled onclick="expandSelectedCell()">🌱 土地拡張</button>
       <button class="action-btn" id="btnAddTree" disabled onclick="addSelectedItem('木')">🌲 木</button>
@@ -196,14 +213,30 @@
     </div>
   </div>
 
-  <!-- 設定モーダル（APIキー入力） -->
+  <!-- 設定モーダル -->
   <div class="modal-overlay" id="settingsModal">
     <div class="modal-content">
-      <h3>API設定</h3>
-      <label style="font-size: 12px; color: #9ca3af; display: block; margin-bottom: 4px;">Gemini APIキー</label>
+      <h3>設定</h3>
+      
+      <!-- APIキー入力 -->
+      <label>Gemini APIキー</label>
       <input type="password" id="modalApiKey" placeholder="AIzaSy...">
+      
+      <!-- モデル選択（モーダル内へ移動） -->
+      <label>使用モデル</label>
+      <select id="modalModelSelect">
+        <option value="gemini-3.8-flash" selected>Gemini 3.8 Flash（標準・推奨）</option>
+      </select>
+
+      <!-- 稼働方式ドロップダウン -->
+      <label>稼働方式</label>
+      <select id="modalApproachSelect">
+        <option value="approach1" selected>アプローチ1：お留守番方式（推奨）</option>
+        <option value="approach2" disabled>アプローチ2：24時間裏稼働（準備中・暗転）</option>
+      </select>
+      
       <div class="modal-actions">
-        <button class="modal-save" onclick="saveKeyFromModal()">保存</button>
+        <button class="modal-save" onclick="saveSettingsFromModal()">保存</button>
         <button class="modal-close" onclick="closeSettings()">閉じる</button>
       </div>
     </div>
@@ -229,9 +262,81 @@
     window.onload = () => {
       const savedKey = localStorage.getItem('gemini_api_key');
       if (savedKey) document.getElementById('modalApiKey').value = savedKey;
+
       renderGrid();
       updateButtons();
+      checkTimeRestriction();
+      setInterval(checkTimeRestriction, 30000); // 30秒ごとに時間帯チェック
+
+      // アプローチ1：お留守番時間の確認と手帳自動補完
+      checkAwayTime();
     };
+
+    // 10:00〜18:00の時間制限判定
+    function checkTimeRestriction() {
+      const now = new Date();
+      const hour = now.getHours();
+      const thinkBtn = document.getElementById('thinkBtn');
+
+      // 10:00〜18:00の間のみ活性化
+      const isDaytime = hour >= 10 && hour < 18;
+
+      if (isDaytime) {
+        thinkBtn.disabled = false;
+        thinkBtn.innerText = "今すぐ考えさせる";
+      } else {
+        thinkBtn.disabled = true;
+        thinkBtn.innerText = `💤 睡眠中（活動は10:00〜18:00 / 現在${hour}時）`;
+      }
+    }
+
+    // アプローチ1：不在時の思考補完
+    async function checkAwayTime() {
+      const now = Date.now();
+      const lastActive = localStorage.getItem('last_active_timestamp');
+      localStorage.setItem('last_active_timestamp', now);
+
+      if (!lastActive) return;
+
+      const elapsedHours = Math.floor((now - parseInt(lastActive)) / (1000 * 60 * 60));
+      if (elapsedHours >= 1) {
+        setStatus(`前回の確認から約${elapsedHours}時間経過：留守中の様子を手帳にまとめます...`);
+        
+        const apiKey = localStorage.getItem('gemini_api_key');
+        if (!apiKey) return;
+
+        const prompt = `
+あなたは箱庭の島にいる自律AIロボットです。
+プレイヤーが離れてから約${elapsedHours}時間が経過しました。
+その間、あなたは島で静かに過ごし、周囲を観察したり休息していました。
+現在の島の手帳（記憶）: "${state.notebook}"
+
+この留守番中の静かな思考や変化を踏まえ、手帳の内容を更新してください。
+以下のJSONフォーマットのみを出力してください。
+{"notebook": "更新された手帳内容", "thought": "留守番中に考えていたことの要約"}
+        `.trim();
+
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+          });
+          const data = await res.json();
+          if (!data.error) {
+            const rawText = data.candidates[0].content.parts[0].text;
+            const clean = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const result = JSON.parse(clean);
+            state.notebook = result.notebook;
+            addLog(`留守番(${elapsedHours}時間)`, result.thought, result.notebook, "Gemini 3.8 Flash");
+            renderGrid();
+            setStatus(`留守中の手帳を更新しました（${elapsedHours}時間経過）`);
+          }
+        } catch (e) {
+          console.log("留守番思考のスキップ:", e);
+        }
+      }
+    }
 
     function isLandAt(x, y) {
       return state.land.some(l => l.x === x && l.y === y);
@@ -345,117 +450,4 @@
           grid.appendChild(cell);
         }
       }
-      document.getElementById('notebook').value = state.notebook;
-    }
-
-    function setStatus(text) {
-      document.getElementById('statusText').innerText = text;
-    }
-
-    function addLog(action, thought, notebook, modelName) {
-      const now = new Date();
-      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-      
-      state.logs.unshift({ time: timeStr, action, thought, notebook, model: modelName });
-
-      const logContainer = document.getElementById('logContainer');
-      logContainer.innerHTML = state.logs.map(log => `
-        <div class="log-item">
-          <div class="log-header">
-            <span>[${log.time}] 行動: ${log.action}</span>
-            <span style="font-size: 10px; color: #9ca3af;">${log.model}</span>
-          </div>
-          <div class="log-thought">思考: ${log.thought}</div>
-          <div class="log-memo">手帳: ${log.notebook}</div>
-        </div>
-      `).join('');
-    }
-
-    async function thinkAndAct() {
-      const apiKey = localStorage.getItem('gemini_api_key');
-      if (!apiKey) {
-        openSettings();
-        return alert("右上の⚙からAPIキーを設定してください");
-      }
-
-      const selectedModel = document.getElementById('modelSelect').value;
-      setStatus(`AI（${selectedModel}）が思考中...`);
-
-      const landsList = state.land.map(l => `(${l.x},${l.y})`).join(' ');
-      const itemsList = state.items.map(i => `${i.name}(x:${i.x}, y:${i.y})`).join(', ') || 'なし';
-
-      const prompt = `
-あなたは箱庭の島にいる自律AIロボットです。
-歩ける陸地マス一覧: [ ${landsList} ]
-あなたの現在位置: (x:${state.agent.x}, y:${state.agent.y})
-島のオブジェクト: ${itemsList}
-現在の手帳（記憶）: "${state.notebook}"
-
-【ルール】
-・陸地マスの上しか移動できません（海には進めません）。
-・次の行動（MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT, STAY のいずれか）を1つ選択してください。
-・好奇心を持って手帳を更新してください。
-
-以下のJSONフォーマットのみを出力してください。
-{"action": "MOVE_RIGHT", "thought": "思考内容", "notebook": "更新された手帳内容"}
-      `.trim();
-
-      try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
-
-        const data = await res.json();
-        
-        if (data.error) {
-          setStatus(`APIエラー [${data.error.code}]: ${data.error.message}`);
-          return;
-        }
-
-        const rawText = data.candidates[0].content.parts[0].text;
-        const clean = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-        const result = JSON.parse(clean);
-
-        let targetX = state.agent.x;
-        let targetY = state.agent.y;
-        if (result.action === "MOVE_UP") targetY--;
-        if (result.action === "MOVE_DOWN") targetY++;
-        if (result.action === "MOVE_LEFT") targetX--;
-        if (result.action === "MOVE_RIGHT") targetX++;
-
-        if (isLandAt(targetX, targetY)) {
-          state.agent.x = targetX;
-          state.agent.y = targetY;
-          setStatus(`完了: ${result.action}`);
-        } else if (result.action !== "STAY") {
-          setStatus(`移動失敗: 海のため進めませんでした（${result.action}）`);
-        } else {
-          setStatus(`待機（STAY）しました`);
-        }
-
-        state.notebook = result.notebook;
-        addLog(result.action, result.thought, result.notebook, selectedModel);
-        renderGrid();
-
-      } catch (err) {
-        setStatus(`エラー: ${err.message}`);
-      }
-    }
-
-    function openSettings() {
-      document.getElementById('settingsModal').style.display = 'flex';
-    }
-    function closeSettings() {
-      document.getElementById('settingsModal').style.display = 'none';
-    }
-    function saveKeyFromModal() {
-      const key = document.getElementById('modalApiKey').value.trim();
-      localStorage.setItem('gemini_api_key', key);
-      closeSettings();
-      setStatus(key ? "APIキーを保存しました" : "APIキーが未入力です");
-    }
-  </script>
-</body>
-</html>
+      document.getElementById('notebook').value
