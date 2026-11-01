@@ -5,81 +5,165 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI箱庭アイランド</title>
   <style>
-    :root { --cell-size: 46px; }
+    :root { --cell-size: 44px; }
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 12px; background: #18181f; color: #f0f0f0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 12px;
+      padding-bottom: 150px; /* フッター分の余白 */
+      background: #141419;
+      color: #f0f0f0;
+    }
     
     /* ヘッダー */
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-    .header h2 { margin: 0; font-size: 20px; font-weight: bold; }
-    .gear-btn { background: #2b2b36; border: 1px solid #444; color: #fff; font-size: 18px; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .header h2 { margin: 0; font-size: 18px; font-weight: bold; }
+    .gear-btn { background: #22222b; border: 1px solid #444; color: #fff; font-size: 14px; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
 
-    /* 操作パネル */
-    .panel { background: #24242e; padding: 12px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #333; }
-    .status { font-size: 13px; color: #fbbf24; margin-bottom: 8px; min-height: 20px; word-break: break-all; font-weight: 500; }
-    .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
-    button.main-btn { flex: 2; min-width: 120px; padding: 10px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
-    button.sub-btn { flex: 1; min-width: 70px; padding: 10px; background: #374151; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    /* ステータスバー */
+    .status-bar { background: #1c1c24; border: 1px solid #2d2d38; padding: 8px 12px; border-radius: 6px; font-size: 12px; color: #fbbf24; margin-bottom: 10px; min-height: 36px; display: flex; align-items: center; justify-content: space-between; }
+    .selected-info { color: #9ca3af; font-family: monospace; }
 
-    /* マップ表示（上下を広く拡張） */
+    /* マップ表示 */
     #world-container {
-      min-height: 320px;
-      max-height: 55vh;
+      min-height: 310px;
+      max-height: 48vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #0f0f14;
-      padding: 20px;
+      background: #0a0a0f;
+      padding: 16px;
       border-radius: 8px;
       margin-bottom: 12px;
       overflow: auto;
-      border: 1px solid #2a2a35;
+      border: 1px solid #22222e;
     }
-    #grid { display: grid; gap: 4px; }
-    .cell { width: var(--cell-size); height: var(--cell-size); background: #2d5a37; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: inset 0 0 4px rgba(0,0,0,0.3); }
+    #grid { display: grid; gap: 3px; }
+    
+    /* マス（海と陸地） */
+    .cell {
+      width: var(--cell-size);
+      height: var(--cell-size);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      cursor: pointer;
+      user-select: none;
+      transition: border 0.1s, transform 0.1s;
+    }
+    .cell.sea { background: #111827; border: 1px dashed #1f2937; color: #374151; font-size: 12px; }
+    .cell.land { background: #234d31; border: 1px solid #2e6943; }
+    .cell.selected { border: 2px solid #fbbf24 !important; transform: scale(1.05); z-index: 2; box-shadow: 0 0 6px #fbbf24; }
 
-    /* AIの手帳 */
-    h3 { margin: 0 0 8px 0; font-size: 15px; color: #9ca3af; }
-    textarea { width: 100%; height: 70px; background: #141419; border: 1px solid #3b3b48; color: #a7f3d0; font-family: monospace; font-size: 13px; border-radius: 6px; padding: 8px; resize: none; }
+    /* 手帳と履歴パネル */
+    .panel { background: #1c1c24; padding: 12px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #2a2a35; }
+    h3 { margin: 0 0 8px 0; font-size: 14px; color: #9ca3af; }
+    textarea { width: 100%; height: 60px; background: #101015; border: 1px solid #333342; color: #a7f3d0; font-family: monospace; font-size: 12px; border-radius: 6px; padding: 8px; resize: none; }
 
-    /* 思考ログ履歴 */
-    .log-container { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-    .log-item { background: #1a1a22; padding: 8px 10px; border-radius: 6px; border-left: 3px solid #4f46e5; font-size: 12px; }
-    .log-header { display: flex; justify-content: space-between; color: #818cf8; margin-bottom: 4px; font-weight: bold; }
+    .log-container { max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+    .log-item { background: #14141a; padding: 8px; border-radius: 6px; border-left: 3px solid #6366f1; font-size: 11px; }
+    .log-header { display: flex; justify-content: space-between; color: #818cf8; font-weight: bold; margin-bottom: 2px; }
     .log-thought { color: #d1d5db; margin-bottom: 2px; }
     .log-memo { color: #6ee7b7; font-family: monospace; }
 
+    /* 下部固定フッター */
+    .footer-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #181822;
+      border-top: 1px solid #333344;
+      padding: 10px 12px 14px 12px;
+      z-index: 50;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .footer-row-1 { display: flex; gap: 8px; }
+    .footer-row-2 { display: flex; gap: 6px; }
+
+    /* ドロップダウン */
+    .model-select {
+      flex: 1.2;
+      background: #101016;
+      border: 1px solid #444455;
+      color: #e5e7eb;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+    }
+    
+    /* ボタンデザイン */
+    button.think-btn {
+      flex: 1.8;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 14px;
+      padding: 10px;
+      cursor: pointer;
+    }
+    button.think-btn:active { background: #4338ca; }
+
+    /* アクションボタン（暗転デザイン） */
+    .action-btn {
+      flex: 1;
+      padding: 10px 4px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: bold;
+      border: 1px solid #374151;
+      background: #1e1e28;
+      color: #9ca3af;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    /* 暗転（非活性）状態 */
+    .action-btn:disabled {
+      opacity: 0.35;
+      background: #121218 !important;
+      border-color: #222 !important;
+      color: #555 !important;
+      cursor: not-allowed;
+    }
+    /* 有効化時の個別カラー */
+    .action-btn.active-land { background: #065f46; border-color: #059669; color: #a7f3d0; }
+    .action-btn.active-tree { background: #166534; border-color: #22c55e; color: #bbf7d0; }
+    .action-btn.active-rock { background: #374151; border-color: #6b7280; color: #f3f4f6; }
+
     /* 設定モーダル */
-    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; z-index: 100; padding: 16px; }
-    .modal-content { background: #24242e; width: 100%; max-width: 360px; padding: 18px; border-radius: 10px; border: 1px solid #444; }
-    .modal-content h3 { color: #fff; font-size: 16px; margin-bottom: 12px; }
-    .modal-content input { width: 100%; padding: 10px; background: #141419; border: 1px solid #444; color: #fff; border-radius: 6px; margin-bottom: 12px; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); justify-content: center; align-items: center; z-index: 100; padding: 16px; }
+    .modal-content { background: #20202a; width: 100%; max-width: 360px; padding: 18px; border-radius: 8px; border: 1px solid #3b3b4f; }
+    .modal-content h3 { color: #fff; margin-bottom: 12px; font-size: 16px; }
+    .modal-content input { width: 100%; padding: 10px; background: #121218; border: 1px solid #444; color: #fff; border-radius: 6px; margin-bottom: 12px; }
     .modal-actions { display: flex; gap: 8px; }
     .modal-actions button { flex: 1; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
     .modal-save { background: #4f46e5; color: white; }
-    .modal-close { background: #4b5563; color: white; }
+    .modal-close { background: #374151; color: white; }
   </style>
 </head>
 <body>
 
-  <!-- ヘッダー（歯車アイコン） -->
+  <!-- ヘッダー -->
   <div class="header">
     <h2>🏝 AI箱庭アイランド</h2>
     <button class="gear-btn" onclick="openSettings()">⚙ 設定</button>
   </div>
 
-  <!-- 操作盤 -->
-  <div class="panel">
-    <div class="status" id="statusText">待機中</div>
-    <div class="btn-group">
-      <button class="main-btn" onclick="thinkAndAct()">今すぐ考えさせる</button>
-      <button class="sub-btn" onclick="expandLand()">土地拡張</button>
-      <button class="sub-btn" onclick="addItem('木')">🌲 木</button>
-      <button class="sub-btn" onclick="addItem('石')">🪨 石</button>
-    </div>
+  <!-- ステータスバー -->
+  <div class="status-bar">
+    <div id="statusText">マスをタップして選択してください</div>
+    <div class="selected-info" id="selectedInfo">未選択</div>
   </div>
 
-  <!-- マップ（拡大エリア） -->
+  <!-- マップ -->
   <div id="world-container">
     <div id="grid"></div>
   </div>
@@ -90,11 +174,35 @@
     <textarea id="notebook" readonly></textarea>
   </div>
 
-  <!-- 過去の思考履歴 -->
+  <!-- 過去ログ -->
   <div class="panel">
     <h3>過去の行動・思考履歴</h3>
     <div class="log-container" id="logContainer">
-      <div style="font-size: 12px; color: #6b7280;">まだ履歴はありません。</div>
+      <div style="font-size: 12px; color: #4b5563;">まだ履歴はありません。</div>
+    </div>
+  </div>
+
+  <!-- 下部固定フッター -->
+  <div class="footer-bar">
+    <!-- 上段：モデル選択 ＋ 思考実行ボタン -->
+    <div class="footer-row-1">
+      <select class="model-select" id="modelSelect">
+        <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash（標準・安定）</option>
+        <option value="gemini-2.5-pro">Gemini 2.5 Pro（思考レベル高）</option>
+        <option value="gemini-3.0-flash">Gemini 3.0 Flash（次世代標準）</option>
+        <option value="gemini-3.0-pro">Gemini 3.0 Pro（思考レベル高）</option>
+        <option value="gemini-3.1-flash">Gemini 3.1 Flash（推論・高速）</option>
+        <option value="gemini-3.1-pro">Gemini 3.1 Pro（思考レベル最高峰）</option>
+        <option value="gemini-3.8-flash">Gemini 3.8 Flash（最新）</option>
+      </select>
+      <button class="think-btn" onclick="thinkAndAct()">今すぐ考えさせる</button>
+    </div>
+
+    <!-- 下段：1マス配置・開拓ボタン群（初期は暗転） -->
+    <div class="footer-row-2">
+      <button class="action-btn" id="btnExpand" disabled onclick="expandSelectedCell()">🌱 土地拡張</button>
+      <button class="action-btn" id="btnAddTree" disabled onclick="addSelectedItem('木')">🌲 木</button>
+      <button class="action-btn" id="btnAddRock" disabled onclick="addSelectedItem('石')">🪨 石</button>
     </div>
   </div>
 
@@ -112,84 +220,142 @@
   </div>
 
   <script>
+    const GRID_SIZE = 6; // 6x6の枠
     let state = {
-      size: 2,
-      agent: { x: 0, y: 0, icon: "🤖" },
-      items: [],
-      notebook: "ここは2x2の小さな島だ。何も知らない。",
-      logs: []
-    };
-
-    const itemTypes = {
-      '木': { icon: '🌲', name: '木' },
-      '石': { icon: '🪨', name: '石' }
+      // 初期は中央 (2,2)〜(3,3) の4マスのみ陸地
+      land: [
+        { x: 2, y: 2 }, { x: 3, y: 2 },
+        { x: 2, y: 3 }, { x: 3, y: 3 }
+      ],
+      agent: { x: 2, y: 2, icon: "🤖" },
+      items: [
+        { id: 1, name: '木', icon: '🌲', x: 2, y: 3 },
+        { id: 2, name: '石', icon: '🪨', x: 3, y: 2 }
+      ],
+      notebook: "ここは海に囲まれた小さな島だ。周囲の未開拓な海を観察している。",
+      logs: [],
+      selected: null // { x, y }
     };
 
     window.onload = () => {
       const savedKey = localStorage.getItem('gemini_api_key');
       if (savedKey) document.getElementById('modalApiKey').value = savedKey;
       renderGrid();
+      updateButtons();
     };
 
-    function openSettings() {
-      document.getElementById('settingsModal').style.display = 'flex';
+    function isLandAt(x, y) {
+      return state.land.some(l => l.x === x && l.y === y);
     }
 
-    function closeSettings() {
-      document.getElementById('settingsModal').style.display = 'none';
-    }
-
-    function saveKeyFromModal() {
-      const key = document.getElementById('modalApiKey').value.trim();
-      localStorage.setItem('gemini_api_key', key);
-      closeSettings();
-      setStatus(key ? "APIキーを保存しました" : "APIキーが未入力です");
-    }
-
-    function expandLand() {
-      if (state.size >= 6) return alert("プロトタイプ版の上限（6x6）です");
-      state.size++;
-      renderGrid();
-      setStatus(`土地が ${state.size}x${state.size} に広がりました`);
-    }
-
-    function addItem(type) {
-      let emptySpots = [];
-      for (let y = 0; y < state.size; y++) {
-        for (let x = 0; x < state.size; x++) {
-          if ((x !== state.agent.x || y !== state.agent.y) && !state.items.find(i => i.x === x && i.y === y)) {
-            emptySpots.push({ x, y });
-          }
-        }
+    function selectCell(x, y) {
+      if (state.selected && state.selected.x === x && state.selected.y === y) {
+        state.selected = null; // 同じマスをタップで解除
+      } else {
+        state.selected = { x, y };
       }
-      if (emptySpots.length === 0) return alert("置く場所がありません");
-      const spot = emptySpots[Math.floor(Math.random() * emptySpots.length)];
-      state.items.push({
-        id: Date.now(),
-        name: itemTypes[type].name,
-        icon: itemTypes[type].icon,
-        x: spot.x,
-        y: spot.y
-      });
       renderGrid();
-      setStatus(`土地に【${type}】を追加しました`);
+      updateButtons();
+    }
+
+    function updateButtons() {
+      const btnExpand = document.getElementById('btnExpand');
+      const btnTree = document.getElementById('btnAddTree');
+      const btnRock = document.getElementById('btnAddRock');
+      const info = document.getElementById('selectedInfo');
+
+      // クラス初期化
+      btnExpand.className = 'action-btn';
+      btnTree.className = 'action-btn';
+      btnRock.className = 'action-btn';
+
+      if (!state.selected) {
+        btnExpand.disabled = true;
+        btnTree.disabled = true;
+        btnRock.disabled = true;
+        info.innerText = "未選択";
+        return;
+      }
+
+      const { x, y } = state.selected;
+      const isLand = isLandAt(x, y);
+
+      info.innerText = `(${x},${y}) ${isLand ? '陸地' : '海'}`;
+
+      if (!isLand) {
+        // 海マスを選択中：土地拡張のみ有効化
+        btnExpand.disabled = false;
+        btnExpand.classList.add('active-land');
+        btnTree.disabled = true;
+        btnRock.disabled = true;
+      } else {
+        // 陸地マスを選択中：木・石の配置が可能
+        btnExpand.disabled = true;
+        btnTree.disabled = false;
+        btnTree.classList.add('active-tree');
+        btnRock.disabled = false;
+        btnRock.classList.add('active-rock');
+      }
+    }
+
+    function expandSelectedCell() {
+      if (!state.selected) return;
+      const { x, y } = state.selected;
+      if (isLandAt(x, y)) return;
+
+      state.land.push({ x, y });
+      setStatus(`(${x}, ${y}) を開拓して陸地にしました`);
+      renderGrid();
+      updateButtons();
+    }
+
+    function addSelectedItem(type) {
+      if (!state.selected) return;
+      const { x, y } = state.selected;
+
+      if (!isLandAt(x, y)) {
+        return alert("海の上には設置できません。先に土地拡張をしてください。");
+      }
+      if (state.agent.x === x && state.agent.y === y) {
+        return alert("AIロボットがいるマスには設置できません。");
+      }
+      const existing = state.items.find(i => i.x === x && i.y === y);
+      if (existing) {
+        return alert(`ここにはすでに【${existing.name}】があります。`);
+      }
+
+      const icon = type === '木' ? '🌲' : '🪨';
+      state.items.push({ id: Date.now(), name: type, icon, x, y });
+      setStatus(`(${x}, ${y}) に【${type}】を配置しました`);
+      renderGrid();
+      updateButtons();
     }
 
     function renderGrid() {
       const grid = document.getElementById('grid');
-      grid.style.gridTemplateColumns = `repeat(${state.size}, var(--cell-size))`;
+      grid.style.gridTemplateColumns = `repeat(${GRID_SIZE}, var(--cell-size))`;
       grid.innerHTML = '';
 
-      for (let y = 0; y < state.size; y++) {
-        for (let x = 0; x < state.size; x++) {
+      for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
           const cell = document.createElement('div');
-          cell.className = 'cell';
-          if (state.agent.x === x && state.agent.y === y) {
-            cell.innerText = state.agent.icon;
+          const isLand = isLandAt(x, y);
+          const isSelected = state.selected && state.selected.x === x && state.selected.y === y;
+
+          cell.className = `cell ${isLand ? 'land' : 'sea'} ${isSelected ? 'selected' : ''}`;
+          cell.onclick = () => selectCell(x, y);
+
+          if (isLand) {
+            if (state.agent.x === x && state.agent.y === y) {
+              cell.innerText = state.agent.icon;
+            } else {
+              const item = state.items.find(i => i.x === x && i.y === y);
+              if (item) cell.innerText = item.icon;
+            }
           } else {
-            const item = state.items.find(i => i.x === x && i.y === y);
-            if (item) cell.innerText = item.icon;
+            cell.innerText = '·'; // 海の波紋目印
           }
+
           grid.appendChild(cell);
         }
       }
@@ -200,17 +366,18 @@
       document.getElementById('statusText').innerText = text;
     }
 
-    function addLog(action, thought, notebook) {
+    function addLog(action, thought, notebook, modelName) {
       const now = new Date();
       const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
       
-      state.logs.unshift({ time: timeStr, action, thought, notebook });
+      state.logs.unshift({ time: timeStr, action, thought, notebook, model: modelName });
 
       const logContainer = document.getElementById('logContainer');
       logContainer.innerHTML = state.logs.map(log => `
         <div class="log-item">
           <div class="log-header">
             <span>[${log.time}] 行動: ${log.action}</span>
+            <span style="font-size: 10px; color: #9ca3af;">${log.model}</span>
           </div>
           <div class="log-thought">思考: ${log.thought}</div>
           <div class="log-memo">手帳: ${log.notebook}</div>
@@ -225,22 +392,30 @@
         return alert("右上の⚙からAPIキーを設定してください");
       }
 
-      setStatus("AIが思考中...");
+      const selectedModel = document.getElementById('modelSelect').value;
+      setStatus(`AI（${selectedModel}）が思考中...`);
 
+      const landsList = state.land.map(l => `(${l.x},${l.y})`).join(' ');
       const itemsList = state.items.map(i => `${i.name}(x:${i.x}, y:${i.y})`).join(', ') || 'なし';
-      const prompt = `
-島にいるAIです。好奇心旺盛です。
-島の広さ: ${state.size}x${state.size}
-位置: (x:${state.agent.x}, y:${state.agent.y})
-物: ${itemsList}
-手帳: "${state.notebook}"
 
-行動（MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT, STAY のいずれか）を選び、以下のJSONのみで回答してください。
-{"action": "MOVE_RIGHT", "thought": "考え", "notebook": "更新した手帳内容"}
+      const prompt = `
+あなたは箱庭の島にいる自律AIロボットです。
+歩ける陸地マス一覧: [ ${landsList} ]
+あなたの現在位置: (x:${state.agent.x}, y:${state.agent.y})
+島のオブジェクト: ${itemsList}
+現在の手帳（記憶）: "${state.notebook}"
+
+【ルール】
+・陸地マスの上しか移動できません（海には進めません）。
+・次の行動（MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT, STAY のいずれか）を1つ選択してください。
+・好奇心を持って手帳を更新してください。
+
+以下のJSONフォーマットのみを出力してください。
+{"action": "MOVE_RIGHT", "thought": "思考内容", "notebook": "更新された手帳内容"}
       `.trim();
 
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -257,19 +432,46 @@
         const clean = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
         const result = JSON.parse(clean);
 
-        if (result.action === "MOVE_UP" && state.agent.y > 0) state.agent.y--;
-        if (result.action === "MOVE_DOWN" && state.agent.y < state.size - 1) state.agent.y++;
-        if (result.action === "MOVE_LEFT" && state.agent.x > 0) state.agent.x--;
-        if (result.action === "MOVE_RIGHT" && state.agent.x < state.size - 1) state.agent.x++;
+        // 移動先の算出
+        let targetX = state.agent.x;
+        let targetY = state.agent.y;
+        if (result.action === "MOVE_UP") targetY--;
+        if (result.action === "MOVE_DOWN") targetY++;
+        if (result.action === "MOVE_LEFT") targetX--;
+        if (result.action === "MOVE_RIGHT") targetX++;
+
+        // 陸地判定（海なら足止め）
+        if (isLandAt(targetX, targetY)) {
+          state.agent.x = targetX;
+          state.agent.y = targetY;
+          setStatus(`完了: ${result.action}`);
+        } else if (result.action !== "STAY") {
+          setStatus(`移動失敗: 海のため進めませんでした（${result.action}）`);
+        } else {
+          setStatus(`待機（STAY）しました`);
+        }
 
         state.notebook = result.notebook;
-        addLog(result.action, result.thought, result.notebook);
-        setStatus(`完了: ${result.action}`);
+        addLog(result.action, result.thought, result.notebook, selectedModel);
         renderGrid();
 
       } catch (err) {
         setStatus(`エラー: ${err.message}`);
       }
+    }
+
+    /* 設定モーダル制御 */
+    function openSettings() {
+      document.getElementById('settingsModal').style.display = 'flex';
+    }
+    function closeSettings() {
+      document.getElementById('settingsModal').style.display = 'none';
+    }
+    function saveKeyFromModal() {
+      const key = document.getElementById('modalApiKey').value.trim();
+      localStorage.setItem('gemini_api_key', key);
+      closeSettings();
+      setStatus(key ? "APIキーを保存しました" : "APIキーが未入力です");
     }
   </script>
 </body>
