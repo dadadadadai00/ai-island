@@ -6,31 +6,28 @@
   <title>AI箱庭アイランド</title>
   <style>
     :root { --cell-size: 44px; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 12px; background: #1e1e24; color: #f0f0f0; }
+    body { font-family: sans-serif; margin: 12px; background: #1e1e24; color: #f0f0f0; }
     h3 { margin: 8px 0; font-size: 18px; }
     .panel { background: #2b2b36; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
-    input[type="password"] { width: 100%; padding: 8px; box-sizing: border-box; background: #18181f; border: 1px solid #444; color: #fff; border-radius: 4px; margin-bottom: 6px; }
+    input[type="text"] { width: 100%; padding: 8px; box-sizing: border-box; background: #18181f; border: 1px solid #444; color: #fff; border-radius: 4px; margin-bottom: 6px; }
     .btn-group { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
     button { flex: 1; min-width: 80px; padding: 10px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
     button.sub { background: #374151; font-weight: normal; }
-    button:active { opacity: 0.8; }
     
-    /* マップ表示 */
     #world-container { overflow: auto; max-height: 50vh; display: flex; justify-content: center; background: #141419; padding: 16px; border-radius: 8px; margin-bottom: 12px; }
     #grid { display: grid; gap: 2px; }
-    .cell { width: var(--cell-size); height: var(--cell-size); background: #3a5a40; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 20px; position: relative; }
-    .cell.empty { background: #283618; opacity: 0.3; }
+    .cell { width: var(--cell-size); height: var(--cell-size); background: #3a5a40; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
 
-    /* ログと手帳 */
-    .status { font-size: 12px; color: #9ca3af; margin-bottom: 6px; min-height: 18px; }
+    .status { font-size: 12px; color: #fbbf24; margin-bottom: 6px; min-height: 18px; word-break: break-all; }
     textarea { width: 100%; height: 90px; box-sizing: border-box; background: #18181f; border: 1px solid #444; color: #a7f3d0; font-family: monospace; font-size: 12px; border-radius: 4px; padding: 8px; }
   </style>
 </head>
 <body>
 
   <div class="panel">
-    <input type="password" id="apiKey" placeholder="Gemini APIキーを入力（自動保存）" onchange="saveKey()">
-    <div class="status" id="statusText">準備完了</div>
+    <!-- キーが正しく入っているか見えるように text に変更 -->
+    <input type="text" id="apiKey" placeholder="Gemini APIキーを入力" oninput="saveKey()">
+    <div class="status" id="statusText">待機中</div>
     <div class="btn-group">
       <button onclick="thinkAndAct()">今すぐ考えさせる</button>
       <button class="sub" onclick="expandLand()">土地を広げる</button>
@@ -49,11 +46,10 @@
   </div>
 
   <script>
-    // 初期状態：2x2の土地
     let state = {
       size: 2,
       agent: { x: 0, y: 0, icon: "🤖" },
-      items: [], // { id, name, icon, x, y }
+      items: [],
       notebook: "ここは2x2の小さな島だ。何も知らない。"
     };
 
@@ -62,20 +58,16 @@
       '石': { icon: '🪨', name: '石' }
     };
 
-    // 初期化とAPIキー読み込み
     window.onload = () => {
       const savedKey = localStorage.getItem('gemini_api_key');
       if (savedKey) document.getElementById('apiKey').value = savedKey;
       renderGrid();
-      // 10分ごとに自動実行
-      setInterval(thinkAndAct, 600000);
     };
 
     function saveKey() {
-      localStorage.setItem('gemini_api_key', document.getElementById('apiKey').value);
+      localStorage.setItem('gemini_api_key', document.getElementById('apiKey').value.trim());
     }
 
-    // 土地を1マスずつ拡大
     function expandLand() {
       if (state.size >= 6) return alert("プロトタイプ版の上限（6x6）です");
       state.size++;
@@ -83,7 +75,6 @@
       setStatus(`土地が ${state.size}x${state.size} に広がりました`);
     }
 
-    // アイテムを空いているランダム位置に追加
     function addItem(type) {
       let emptySpots = [];
       for (let y = 0; y < state.size; y++) {
@@ -106,7 +97,6 @@
       setStatus(`土地に【${type}】を追加しました`);
     }
 
-    // グリッド描画
     function renderGrid() {
       const grid = document.getElementById('grid');
       grid.style.gridTemplateColumns = `repeat(${state.size}, var(--cell-size))`;
@@ -116,12 +106,9 @@
         for (let x = 0; x < state.size; x++) {
           const cell = document.createElement('div');
           cell.className = 'cell';
-
-          // キャラクター描画
           if (state.agent.x === x && state.agent.y === y) {
             cell.innerText = state.agent.icon;
           } else {
-            // アイテム描画
             const item = state.items.find(i => i.x === x && i.y === y);
             if (item) cell.innerText = item.icon;
           }
@@ -135,38 +122,22 @@
       document.getElementById('statusText').innerText = text;
     }
 
-    // AI思考ループ
     async function thinkAndAct() {
-      const apiKey = document.getElementById('apiKey').value;
+      const apiKey = document.getElementById('apiKey').value.trim();
       if (!apiKey) return alert("APIキーを入力してください");
 
-      setStatus("AIが思考中...");
+      setStatus("AIに通信中...");
 
-      // 周囲状況の言語化
       const itemsList = state.items.map(i => `${i.name}(x:${i.x}, y:${i.y})`).join(', ') || 'なし';
       const prompt = `
-あなたはマイクラ風の世界に置かれたAIです。好奇心旺盛で飽きっぽいです。
-目的や仕事はありません。自由に探索し、物を調べたり遊んだりしてください。
+島にいるAIです。好奇心旺盛です。
+島の広さ: ${state.size}x${state.size}
+位置: (x:${state.agent.x}, y:${state.agent.y})
+物: ${itemsList}
+手帳: "${state.notebook}"
 
-【現在の世界】
-- 島の広さ: ${state.size}x${state.size}（座標は x:0〜${state.size - 1}, y:0〜${state.size - 1}）
-- あなたの位置: (x:${state.agent.x}, y:${state.agent.y})
-- 落ちている物: ${itemsList}
-- あなたの手帳の記録:
-"${state.notebook}"
-
-【選べる行動】
-- "MOVE_UP", "MOVE_DOWN", "MOVE_LEFT", "MOVE_RIGHT"（1マス移動）
-- "INTERACT"（足元や隣にある物を調べる・触る）
-- "STAY"（何もしない）
-
-必ず以下のJSONフォーマットのみを出力してください：
-{
-  "action": "MOVE_RIGHT",
-  "target_item": "触るアイテム名（なければ空文字）",
-  "thought": "今考えていること（短く）",
-  "notebook": "新しく更新された手帳の全内容（次の自分に残すメモや発見したこと）"
-}
+行動（MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT, STAY のいずれか）を選び、以下のJSONのみで回答してください。
+{"action": "MOVE_RIGHT", "thought": "考え", "notebook": "更新した手帳内容"}
       `.trim();
 
       try {
@@ -177,11 +148,17 @@
         });
 
         const data = await res.json();
-        const text = data.candidates[0].content.parts[0].text;
-        const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        // APIエラー時の詳細表示
+        if (data.error) {
+          setStatus(`APIエラー [${data.error.code}]: ${data.error.message}`);
+          return;
+        }
+
+        const rawText = data.candidates[0].content.parts[0].text;
+        const clean = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
         const result = JSON.parse(clean);
 
-        // 行動の反映
         if (result.action === "MOVE_UP" && state.agent.y > 0) state.agent.y--;
         if (result.action === "MOVE_DOWN" && state.agent.y < state.size - 1) state.agent.y++;
         if (result.action === "MOVE_LEFT" && state.agent.x > 0) state.agent.x--;
@@ -192,7 +169,7 @@
         renderGrid();
 
       } catch (err) {
-        setStatus("エラー: 通信またはAIの応答解析に失敗しました");
+        setStatus(`JSエラー: ${err.message}`);
       }
     }
   </script>
