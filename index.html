@@ -25,7 +25,6 @@
 <body>
 
   <div class="panel">
-    <!-- キーが正しく入っているか見えるように text に変更 -->
     <input type="text" id="apiKey" placeholder="Gemini APIキーを入力" oninput="saveKey()">
     <div class="status" id="statusText">待機中</div>
     <div class="btn-group">
@@ -141,7 +140,7 @@
       `.trim();
 
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -149,7 +148,6 @@
 
         const data = await res.json();
         
-        // APIエラー時の詳細表示
         if (data.error) {
           setStatus(`APIエラー [${data.error.code}]: ${data.error.message}`);
           return;
