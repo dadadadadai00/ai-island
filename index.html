@@ -84,7 +84,6 @@
       gap: 8px;
     }
     
-    /* 1行目：操作メニュー（土地拡張・木・石・削除） */
     .footer-row-actions { display: flex; gap: 6px; }
     .action-btn {
       flex: 1;
@@ -111,7 +110,6 @@
     .action-btn.active-rock { background: #374151; border-color: #6b7280; color: #f3f4f6; }
     .action-btn.active-delete { background: #7f1d1d; border-color: #dc2626; color: #fecaca; }
 
-    /* 2行目：大型思考ボタン */
     .footer-row-think { display: flex; justify-content: center; width: 100%; }
     button.think-btn {
       width: 100%;
@@ -185,7 +183,7 @@
   <!-- 手帳 -->
   <div class="panel">
     <h3>現在のAI手帳（短期記憶）</h3>
-    <textarea id="notebook" readonly>ここは海に囲まれた小さな島だ。周囲の未開拓な海を観察している。</textarea>
+    <textarea id="notebook" readonly></textarea>
   </div>
 
   <!-- 過去ログ -->
@@ -205,7 +203,7 @@
       <button class="action-btn" id="btnDelete" disabled onclick="handleDeleteClick()">🗑 削除</button>
     </div>
     <div class="footer-row-think">
-      <button class="think-btn" id="thinkBtn" disabled onclick="thinkAndAct()">💤 睡眠中（活動は10:00〜18:00）</button>
+      <button class="think-btn" id="thinkBtn" disabled onclick="thinkAndAct()">読込中...</button>
     </div>
   </div>
 
@@ -214,4 +212,208 @@
     <div class="modal-content">
       <div class="modal-header">
         <h3>設定</h3>
-        <button class="
+        <button class="reset-btn" onclick="resetGame()">初期化</button>
+      </div>
+      
+      <label>Gemini APIキー</label>
+      <input type="password" id="modalApiKey" placeholder="AIzaSy...">
+      
+      <label>使用モデル</label>
+      <select id="modalModelSelect">
+        <option value="gemini-3.8-flash" selected>Gemini 3.8 Flash（標準・推奨）</option>
+      </select>
+
+      <label>稼働方式</label>
+      <select id="modalApproachSelect">
+        <option value="approach1" selected>アプローチ1：お留守番方式（推奨）</option>
+        <option value="approach2" disabled>アプローチ2：24時間裏稼働（準備中・暗転）</option>
+      </select>
+      
+      <div class="modal-actions">
+        <button class="modal-save" onclick="saveSettingsFromModal()">保存</button>
+        <button class="modal-close" onclick="closeSettings()">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 削除モーダル -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal-content" style="max-width: 320px; text-align: center;">
+      <h3 style="margin-top: 0; font-size: 15px; color: #fff;">削除内容を選択</h3>
+      <p id="deleteModalDesc" style="font-size: 12px; color: #9ca3af; margin-bottom: 14px;"></p>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button id="btnDeleteItemOnly" onclick="deleteItemOnly()" style="padding: 10px; background: #374151; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;"></button>
+        <button id="btnDeleteLandAndItem" onclick="deleteLandAndItem()" style="padding: 10px; background: #dc2626; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">🏝 土地ごと削除（一括）</button>
+        <button onclick="closeDeleteModal()" style="padding: 8px; background: transparent; color: #9ca3af; border: 1px solid #444; border-radius: 6px; cursor: pointer; margin-top: 4px;">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- エラー診断用スクリプト（独立動作） -->
+  <script>
+    window.onerror = function(msg, url, line) {
+      var el = document.getElementById('statusText');
+      if (el) {
+        el.innerText = 'JSエラー(行' + line + '): ' + msg;
+        el.style.color = '#ef4444';
+      }
+      return false;
+    };
+  </script>
+
+  <!-- メインスクリプト -->
+  <script>
+    const GRID_SIZE = 6;
+    const defaultState = {
+      land: [
+        { x: 2, y: 2 }, { x: 3, y: 2 },
+        { x: 2, y: 3 }, { x: 3, y: 3 }
+      ],
+      agent: { x: 2, y: 2, icon: "🤖" },
+      items: [
+        { id: 1, name: '木', icon: '🌲', x: 2, y: 3 },
+        { id: 2, name: '石', icon: '🪨', x: 3, y: 2 }
+      ],
+      notebook: "ここは海に囲まれた小さな島だ。周囲の未開拓な海を観察している。",
+      logs: [],
+      selected: null
+    };
+
+    let state = JSON.parse(JSON.stringify(defaultState));
+
+    function isLandAt(x, y) {
+      return state.land.some(l => l.x === x && l.y === y);
+    }
+
+    function selectCell(x, y) {
+      if (state.selected && state.selected.x === x && state.selected.y === y) {
+        state.selected = null;
+      } else {
+        state.selected = { x, y };
+      }
+      renderGrid();
+      updateButtons();
+    }
+
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('.cell') || e.target.closest('.footer-bar') || e.target.closest('.header') || e.target.closest('.modal-content')) {
+        return;
+      }
+      if (state.selected) {
+        state.selected = null;
+        renderGrid();
+        updateButtons();
+      }
+    });
+
+    function updateButtons() {
+      const btnExpand = document.getElementById('btnExpand');
+      const btnTree = document.getElementById('btnAddTree');
+      const btnRock = document.getElementById('btnAddRock');
+      const btnDelete = document.getElementById('btnDelete');
+      const info = document.getElementById('selectedInfo');
+
+      btnExpand.className = 'action-btn';
+      btnTree.className = 'action-btn';
+      btnRock.className = 'action-btn';
+      btnDelete.className = 'action-btn';
+
+      if (!state.selected) {
+        btnExpand.disabled = true;
+        btnTree.disabled = true;
+        btnRock.disabled = true;
+        btnDelete.disabled = true;
+        info.innerText = "未選択";
+        return;
+      }
+
+      const { x, y } = state.selected;
+      const isLand = isLandAt(x, y);
+
+      info.innerText = `(${x},${y}) ${isLand ? '陸地' : '海'}`;
+
+      if (!isLand) {
+        btnExpand.disabled = false;
+        btnExpand.classList.add('active-land');
+        btnTree.disabled = true;
+        btnRock.disabled = true;
+        btnDelete.disabled = true;
+      } else {
+        btnExpand.disabled = true;
+        btnTree.disabled = false;
+        btnTree.classList.add('active-tree');
+        btnRock.disabled = false;
+        btnRock.classList.add('active-rock');
+        btnDelete.disabled = false;
+        btnDelete.classList.add('active-delete');
+      }
+    }
+
+    function expandSelectedCell() {
+      if (!state.selected) return;
+      const { x, y } = state.selected;
+      if (isLandAt(x, y)) return;
+
+      state.land.push({ x, y });
+      setStatus(`(${x}, ${y}) を開拓して陸地にしました`);
+      renderGrid();
+      updateButtons();
+    }
+
+    function addSelectedItem(type) {
+      if (!state.selected) return;
+      const { x, y } = state.selected;
+
+      if (!isLandAt(x, y)) return alert("海の上には設置できません。");
+      if (state.agent.x === x && state.agent.y === y) return alert("AIロボットがいるマスには設置できません。");
+      
+      const existing = state.items.find(i => i.x === x && i.y === y);
+      if (existing) return alert(`ここにはすでに【${existing.name}】があります。`);
+
+      const icon = type === '木' ? '🌲' : '🪨';
+      state.items.push({ id: Date.now(), name: type, icon, x, y });
+      setStatus(`(${x}, ${y}) に【${type}】を配置しました`);
+      renderGrid();
+      updateButtons();
+    }
+
+    function handleDeleteClick() {
+      if (!state.selected) return;
+      const { x, y } = state.selected;
+      if (!isLandAt(x, y)) return;
+
+      const item = state.items.find(i => i.x === x && i.y === y);
+      const isAgentHere = (state.agent.x === x && state.agent.y === y);
+
+      if (item) {
+        document.getElementById('deleteModalDesc').innerText = `(${x}, ${y}) には【${item.name}】と土地があります。`;
+        document.getElementById('btnDeleteItemOnly').innerText = `${item.icon} ${item.name}のみ削除`;
+        
+        const btnLandAll = document.getElementById('btnDeleteLandAndItem');
+        if (isAgentHere) {
+          btnLandAll.disabled = true;
+          btnLandAll.innerText = "🏝 土地ごと削除（ロボットがいるため不可）";
+          btnLandAll.style.opacity = "0.4";
+        } else {
+          btnLandAll.disabled = false;
+          btnLandAll.innerText = `🏝 土地ごと削除（${item.name}も消去）`;
+          btnLandAll.style.opacity = "1";
+        }
+
+        document.getElementById('deleteModal').style.display = 'flex';
+      } else {
+        if (isAgentHere) return alert("AIロボットがいるマスの土地は海に戻せません。");
+        if (confirm(`(${x}, ${y}) の土地を削除して海に戻しますか？`)) {
+          state.land = state.land.filter(l => !(l.x === x && l.y === y));
+          state.selected = null;
+          setStatus(`(${x}, ${y}) の土地を削除して海に戻しました`);
+          renderGrid();
+          updateButtons();
+        }
+      }
+    }
+
+    function deleteItemOnly() {
+      if (!state.selected) return;
+      const { x, y } = state.selected;
+      state
