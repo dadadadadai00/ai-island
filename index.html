@@ -16,9 +16,10 @@
     .nav-btn { background: #22222b; border: 1px solid #444; color: #fff; padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
     .btn-status { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; font-weight: bold; }
 
-    /* もちものバー */
+    /* もちもの・でんちバー */
     .inv-bar { display: flex; justify-content: space-around; background: #1f1f2e; border: 1px solid #333348; border-radius: 6px; padding: 6px; margin-bottom: 8px; font-size: 13px; font-weight: bold; }
     .inv-item { display: flex; align-items: center; gap: 4px; }
+    .battery-item { color: #60a5fa; }
 
     /* ステータスバー & マップ */
     .status-bar { background: #1c1c24; border: 1px solid #2d2d38; padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fbbf24; margin-bottom: 8px; min-height: 34px; display: flex; justify-content: space-between; align-items: center; }
@@ -67,8 +68,9 @@
     </div>
   </div>
 
-  <!-- もちものバー -->
+  <!-- もちもの・でんちバー -->
   <div class="inv-bar">
+    <div class="inv-item battery-item">🔋 <span id="barBattery">20</span>/20</div>
     <div class="inv-item">🪵 <span id="barWood">0</span></div>
     <div class="inv-item">🪨 <span id="barStone">0</span></div>
     <div class="inv-item">🔥 <span id="barFire">0</span></div>
@@ -111,7 +113,7 @@
         <button onclick="closeStatusModal()" style="background:#374151; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">とじる</button>
       </div>
       <div class="status-card">
-        <div>⚡ <strong>たいりょく:</strong> <span id="stHp" style="color:#34d399;">100 / 100</span></div>
+        <div>🔋 <strong>でんち:</strong> <span id="stBattery" style="color:#60a5fa;">20 / 20</span></div>
         <div>🎯 <strong>いまの目標:</strong> <span id="stGoal" style="color:#fbbf24;">木や石をあつめて、島におうちを建てよう！</span></div>
       </div>
       <div class="status-card">
@@ -169,8 +171,9 @@
   <script>
     const GRID_SIZE = 6;
     const defaultState = {
+      battery: 20,
       land: [{x:2,y:2},{x:3,y:2},{x:2,y:3},{x:3,y:3}],
-      agent: { x:2, y:2, icon:"🤖", hp:100, goal:"島で木や石をあつめて、たき火やおうちを作ろう！" },
+      agent: { x:2, y:2, icon:"🤖", goal:"島で木や石をあつめて、たき火やおうちを作ろう！" },
       inventory: { wood: 0, stone: 0, fire: 0, house: 0 },
       items: [{id:1,name:'木',icon:'🌲',x:2,y:3},{id:2,name:'石',icon:'🪨',x:3,y:2}],
       notebook: "ここは海に囲まれた小さな島だ。まずは木や石をあつめて生活の準備をしよう。",
@@ -180,8 +183,22 @@
 
     let state = JSON.parse(JSON.stringify(defaultState));
 
+    function syncBattery() {
+      const today = new Date().toDateString();
+      const savedDate = localStorage.getItem('island_battery_date');
+      let savedCount = localStorage.getItem('island_battery_count');
+
+      if (savedDate !== today || savedCount === null) {
+        state.battery = 20;
+        localStorage.setItem('island_battery_count', 20);
+        localStorage.setItem('island_battery_date', today);
+      } else {
+        state.battery = parseInt(savedCount, 10);
+      }
+    }
+
     function openStatusModal() {
-      document.getElementById('stHp').innerText = `${state.agent.hp} / 100`;
+      document.getElementById('stBattery').innerText = `${state.battery} / 20`;
       document.getElementById('stGoal').innerText = state.agent.goal;
       document.getElementById('stWood').innerText = state.inventory.wood;
       document.getElementById('stStone').innerText = state.inventory.stone;
@@ -307,12 +324,16 @@
     }
 
     function resetGame() {
-      if (!confirm("はじめからやり直す？\n（あつめた材料や手帳もリセットされます）")) return;
+      if (!confirm("はじめからやり直す？\n（あつめた材料や手帳、でんちもリセットされます）")) return;
       state = JSON.parse(JSON.stringify(defaultState));
+      localStorage.setItem('island_battery_count', 20);
+      localStorage.setItem('island_battery_date', new Date().toDateString());
       localStorage.removeItem('last_active_timestamp');
+      syncBattery();
       renderGrid();
       updateButtons();
       updateLogDisplay();
+      checkTimeRestriction();
       closeSettings();
       setStatus("リセットしました！");
     }
@@ -340,6 +361,7 @@
         }
       }
       document.getElementById('notebook').value = state.notebook;
+      document.getElementById('barBattery').innerText = state.battery;
       document.getElementById('barWood').innerText = state.inventory.wood;
       document.getElementById('barStone').innerText = state.inventory.stone;
       document.getElementById('barFire').innerText = state.inventory.fire;
@@ -367,21 +389,33 @@
     }
 
     function checkTimeRestriction() {
+      syncBattery();
       const h = new Date().getHours(), btn = document.getElementById('thinkBtn');
+
+      if (state.battery <= 0) {
+        btn.disabled = true;
+        btn.innerText = "🪫 でんちぎれ（あした充電されるよ）";
+        return;
+      }
+
       const isDay = (h >= 10 && h < 18);
       btn.disabled = !isDay;
-      btn.innerText = isDay ? "今すぐ考えさせる" : `💤 睡眠中（活動は10:00〜18:00 / 現在${h}時）`;
+      btn.innerText = isDay ? `今すぐ考えさせる（🔋 あと${state.battery}回）` : `💤 睡眠中（活動は10:00〜18:00 / 現在${h}時）`;
     }
 
-    /* 連打防止 ＆ 自動再試行（リトライ）機能付きの思考処理 */
     async function thinkAndAct() {
+      syncBattery();
+      if (state.battery <= 0) {
+        checkTimeRestriction();
+        return setStatus("🪫 でんちがなくなりました。あした充電されるよ！");
+      }
+
       const btn = document.getElementById('thinkBtn');
       if (btn.disabled) return;
 
       const key = localStorage.getItem('gemini_api_key');
       if (!key) { openSettings(); return alert("設定からAPIキーを入力してください"); }
 
-      // ① 連打防止：ボタンを即座に暗転ロック
       btn.disabled = true;
       btn.innerText = "⏳ 考え中...";
 
@@ -403,7 +437,6 @@
 目的: たき火やおうちを作って島を開拓しよう！
 出力はJSONのみ: {"action":"MOVE_RIGHT","thought":"思考","notebook":"更新後の手帳"}`.trim();
 
-      // ② 自動再試行ループ（最大3回、3秒間隔）
       const maxRetries = 3;
       let attempt = 0;
       let success = false;
@@ -425,7 +458,6 @@
           });
           const data = await res.json();
 
-          // 混雑エラー判定
           if (data.error) {
             const isHighDemand = data.error.code === 503 || (data.error.message && data.error.message.includes('high demand'));
             if (isHighDemand && attempt < maxRetries) {
@@ -439,7 +471,6 @@
           const resJson = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim());
           const act = resJson.action;
 
-          // アクション判定
           if (act === "CHOP_TREE") {
             const tree = state.items.find(i => i.name === '木' && Math.abs(i.x - state.agent.x) <= 1 && Math.abs(i.y - state.agent.y) <= 1);
             if (tree) {
@@ -478,6 +509,10 @@
             else { setStatus(`その場でひと休みしたよ`); }
           }
 
+          // 成功時にでんちを1消費
+          state.battery = Math.max(0, state.battery - 1);
+          localStorage.setItem('island_battery_count', state.battery);
+
           state.notebook = resJson.notebook;
           addLog(act, resJson.thought, resJson.notebook);
           renderGrid();
@@ -493,12 +528,12 @@
         }
       }
 
-      // ③ ロック解除（現在の時刻判定に基づきボタンを通常に戻す）
       checkTimeRestriction();
     }
 
     const savedKey = localStorage.getItem('gemini_api_key');
     if (savedKey) document.getElementById('modalApiKey').value = savedKey;
+    syncBattery();
     renderGrid();
     updateButtons();
     updateLogDisplay();
