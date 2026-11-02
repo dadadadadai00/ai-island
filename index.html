@@ -45,8 +45,9 @@
     .action-btn.active-tree { background: #166534; border-color: #22c55e; color: #bbf7d0; }
     .action-btn.active-rock { background: #374151; border-color: #6b7280; color: #f3f4f6; }
     .action-btn.active-delete { background: #7f1d1d; border-color: #dc2626; color: #fecaca; }
-    .think-btn { width: 100%; background: #4f46e5; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 15px; padding: 12px; cursor: pointer; }
-    .think-btn:disabled { background: #23232c !important; color: #6b7280 !important; cursor: not-allowed; }
+    
+    .think-btn { width: 100%; background: #4f46e5; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 15px; padding: 12px; cursor: pointer; transition: all 0.2s; }
+    .think-btn:disabled { background: #23232c !important; color: #6b7280 !important; cursor: not-allowed; opacity: 0.6; }
 
     /* モーダル */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); justify-content: center; align-items: center; z-index: 100; padding: 16px; }
@@ -66,7 +67,7 @@
     </div>
   </div>
 
-  <!-- もちものバー（子ども向け簡単表示） -->
+  <!-- もちものバー -->
   <div class="inv-bar">
     <div class="inv-item">🪵 <span id="barWood">0</span></div>
     <div class="inv-item">🪨 <span id="barStone">0</span></div>
@@ -372,11 +373,18 @@
       btn.innerText = isDay ? "今すぐ考えさせる" : `💤 睡眠中（活動は10:00〜18:00 / 現在${h}時）`;
     }
 
+    /* 連打防止 ＆ 自動再試行（リトライ）機能付きの思考処理 */
     async function thinkAndAct() {
+      const btn = document.getElementById('thinkBtn');
+      if (btn.disabled) return;
+
       const key = localStorage.getItem('gemini_api_key');
       if (!key) { openSettings(); return alert("設定からAPIキーを入力してください"); }
-      setStatus("AIロボが考え中...");
-      
+
+      // ① 連打防止：ボタンを即座に暗転ロック
+      btn.disabled = true;
+      btn.innerText = "⏳ 考え中...";
+
       const lands = state.land.map(l => `(${l.x},${l.y})`).join(' ');
       const items = state.items.map(i => `${i.name}(${i.x},${i.y})`).join(',') || 'なし';
       const inv = `木材:${state.inventory.wood}, 石材:${state.inventory.stone}, たき火:${state.inventory.fire}, おうち:${state.inventory.house}`;
@@ -395,61 +403,98 @@
 目的: たき火やおうちを作って島を開拓しよう！
 出力はJSONのみ: {"action":"MOVE_RIGHT","thought":"思考","notebook":"更新後の手帳"}`.trim();
 
-      try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`, {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({contents:[{parts:[{text:prompt}]}]})
-        });
-        const data = await res.json();
-        if (data.error) return setStatus(`エラー: ${data.error.message}`);
-        const resJson = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim());
-        const act = resJson.action;
+      // ② 自動再試行ループ（最大3回、3秒間隔）
+      const maxRetries = 3;
+      let attempt = 0;
+      let success = false;
 
-        // アクション実行
-        if (act === "CHOP_TREE") {
-          const tree = state.items.find(i => i.name === '木' && Math.abs(i.x - state.agent.x) <= 1 && Math.abs(i.y - state.agent.y) <= 1);
-          if (tree) {
-            state.items = state.items.filter(i => i.id !== tree.id);
-            state.inventory.wood++;
-            setStatus(`🪵 木を切って木材をゲットしたよ！`);
-          } else { setStatus(`近くに木がありませんでした`); }
-        } else if (act === "MINE_ROCK") {
-          const rock = state.items.find(i => i.name === '石' && Math.abs(i.x - state.agent.x) <= 1 && Math.abs(i.y - state.agent.y) <= 1);
-          if (rock) {
-            state.items = state.items.filter(i => i.id !== rock.id);
-            state.inventory.stone++;
-            setStatus(`🪨 石を掘って石材をゲットしたよ！`);
-          } else { setStatus(`近くに石がありませんでした`); }
-        } else if (act === "CRAFT_FIRE") {
-          if (state.inventory.wood >= 2) {
-            state.inventory.wood -= 2;
-            state.inventory.fire++;
-            state.items.push({ id: Date.now(), name: 'たき火', icon: '🔥', x: state.agent.x, y: state.agent.y });
-            setStatus(`🔥 あたたかい「たき火」を作ったよ！`);
-          } else { setStatus(`木材が足りなくてたき火が作れなかった...`); }
-        } else if (act === "CRAFT_HOUSE") {
-          if (state.inventory.wood >= 3 && state.inventory.stone >= 2) {
-            state.inventory.wood -= 3;
-            state.inventory.stone -= 2;
-            state.inventory.house++;
-            state.items.push({ id: Date.now(), name: 'おうち', icon: '🏠', x: state.agent.x, y: state.agent.y });
-            setStatus(`🏠 すてきな「おうち」が完成したよ！やったね！`);
-          } else { setStatus(`材料が足りなくておうちが作れなかった...`); }
-        } else {
-          // 移動
-          let tx = state.agent.x, ty = state.agent.y;
-          if (act==="MOVE_UP") ty--; if (act==="MOVE_DOWN") ty++;
-          if (act==="MOVE_LEFT") tx--; if (act==="MOVE_RIGHT") tx++;
-          if (isLandAt(tx, ty)) { state.agent.x = tx; state.agent.y = ty; setStatus(`トコトコ移動したよ（${act}）`); }
-          else if (act !== "STAY") { setStatus(`海だから進めなかったよ（${act}）`); }
-          else { setStatus(`その場でひと休みしたよ`); }
+      while (attempt <= maxRetries && !success) {
+        try {
+          if (attempt > 0) {
+            setStatus(`混雑中... 自動で再チャレンジ中（${attempt}/${maxRetries}）`);
+            btn.innerText = `⏳ 再試行中（${attempt}/${maxRetries}）...`;
+            await new Promise(r => setTimeout(r, 3000));
+          } else {
+            setStatus("AIロボが考え中...");
+          }
+
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({contents:[{parts:[{text:prompt}]}]})
+          });
+          const data = await res.json();
+
+          // 混雑エラー判定
+          if (data.error) {
+            const isHighDemand = data.error.code === 503 || (data.error.message && data.error.message.includes('high demand'));
+            if (isHighDemand && attempt < maxRetries) {
+              attempt++;
+              continue;
+            }
+            setStatus(`エラー: ${data.error.message}`);
+            break;
+          }
+
+          const resJson = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim());
+          const act = resJson.action;
+
+          // アクション判定
+          if (act === "CHOP_TREE") {
+            const tree = state.items.find(i => i.name === '木' && Math.abs(i.x - state.agent.x) <= 1 && Math.abs(i.y - state.agent.y) <= 1);
+            if (tree) {
+              state.items = state.items.filter(i => i.id !== tree.id);
+              state.inventory.wood++;
+              setStatus(`🪵 木を切って木材をゲットしたよ！`);
+            } else { setStatus(`近くに木がありませんでした`); }
+          } else if (act === "MINE_ROCK") {
+            const rock = state.items.find(i => i.name === '石' && Math.abs(i.x - state.agent.x) <= 1 && Math.abs(i.y - state.agent.y) <= 1);
+            if (rock) {
+              state.items = state.items.filter(i => i.id !== rock.id);
+              state.inventory.stone++;
+              setStatus(`🪨 石を掘って石材をゲットしたよ！`);
+            } else { setStatus(`近くに石がありませんでした`); }
+          } else if (act === "CRAFT_FIRE") {
+            if (state.inventory.wood >= 2) {
+              state.inventory.wood -= 2;
+              state.inventory.fire++;
+              state.items.push({ id: Date.now(), name: 'たき火', icon: '🔥', x: state.agent.x, y: state.agent.y });
+              setStatus(`🔥 あたたかい「たき火」を作ったよ！`);
+            } else { setStatus(`木材が足りなくてたき火が作れなかった...`); }
+          } else if (act === "CRAFT_HOUSE") {
+            if (state.inventory.wood >= 3 && state.inventory.stone >= 2) {
+              state.inventory.wood -= 3;
+              state.inventory.stone -= 2;
+              state.inventory.house++;
+              state.items.push({ id: Date.now(), name: 'おうち', icon: '🏠', x: state.agent.x, y: state.agent.y });
+              setStatus(`🏠 すてきな「おうち」が完成したよ！やったね！`);
+            } else { setStatus(`材料が足りなくておうちが作れなかった...`); }
+          } else {
+            let tx = state.agent.x, ty = state.agent.y;
+            if (act==="MOVE_UP") ty--; if (act==="MOVE_DOWN") ty++;
+            if (act==="MOVE_LEFT") tx--; if (act==="MOVE_RIGHT") tx++;
+            if (isLandAt(tx, ty)) { state.agent.x = tx; state.agent.y = ty; setStatus(`トコトコ移動したよ（${act}）`); }
+            else if (act !== "STAY") { setStatus(`海だから進めなかったよ（${act}）`); }
+            else { setStatus(`その場でひと休みしたよ`); }
+          }
+
+          state.notebook = resJson.notebook;
+          addLog(act, resJson.thought, resJson.notebook);
+          renderGrid();
+          success = true;
+
+        } catch (err) {
+          if (attempt < maxRetries) {
+            attempt++;
+            continue;
+          }
+          setStatus(`エラー: ${err.message}`);
+          break;
         }
+      }
 
-        state.notebook = resJson.notebook;
-        addLog(act, resJson.thought, resJson.notebook);
-        renderGrid();
-      } catch (err) { setStatus(`エラー: ${err.message}`); }
+      // ③ ロック解除（現在の時刻判定に基づきボタンを通常に戻す）
+      checkTimeRestriction();
     }
 
     const savedKey = localStorage.getItem('gemini_api_key');
