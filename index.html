@@ -7,25 +7,39 @@
   <style>
     :root { --cell: 44px; }
     * { box-sizing: border-box; }
-    body { font-family: sans-serif; margin: 12px; padding-bottom: 140px; background: #141419; color: #f0f0f0; user-select: none; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    .header h2 { margin: 0; font-size: 18px; }
-    .gear-btn { background: #22222b; border: 1px solid #444; color: #fff; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
-    .status-bar { background: #1c1c24; border: 1px solid #2d2d38; padding: 8px 12px; border-radius: 6px; font-size: 12px; color: #fbbf24; margin-bottom: 10px; min-height: 36px; display: flex; justify-content: space-between; align-items: center; }
-    #world-container { min-height: 290px; max-height: 46vh; display: flex; align-items: center; justify-content: center; background: #0a0a0f; border-radius: 8px; margin-bottom: 12px; overflow: auto; border: 1px solid #22222e; }
+    body { font-family: sans-serif; margin: 10px; padding-bottom: 140px; background: #141419; color: #f0f0f0; user-select: none; }
+    
+    /* ヘッダー */
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .header h2 { margin: 0; font-size: 17px; }
+    .nav-btns { display: flex; gap: 6px; }
+    .nav-btn { background: #22222b; border: 1px solid #444; color: #fff; padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .btn-status { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; font-weight: bold; }
+
+    /* もちものバー */
+    .inv-bar { display: flex; justify-content: space-around; background: #1f1f2e; border: 1px solid #333348; border-radius: 6px; padding: 6px; margin-bottom: 8px; font-size: 13px; font-weight: bold; }
+    .inv-item { display: flex; align-items: center; gap: 4px; }
+
+    /* ステータスバー & マップ */
+    .status-bar { background: #1c1c24; border: 1px solid #2d2d38; padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fbbf24; margin-bottom: 8px; min-height: 34px; display: flex; justify-content: space-between; align-items: center; }
+    #world-container { min-height: 280px; max-height: 44vh; display: flex; align-items: center; justify-content: center; background: #0a0a0f; border-radius: 8px; margin-bottom: 10px; overflow: auto; border: 1px solid #22222e; }
     #grid { display: grid; gap: 3px; }
     .cell { width: var(--cell); height: var(--cell); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; }
     .cell.sea { background: #111827; border: 1px dashed #1f2937; color: #374151; font-size: 12px; }
     .cell.land { background: #234d31; border: 1px solid #2e6943; }
     .cell.selected { border: 2px solid #fbbf24 !important; transform: scale(1.05); }
-    .panel { background: #1c1c24; padding: 12px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #2a2a35; }
-    h3 { margin: 0 0 8px 0; font-size: 14px; color: #9ca3af; }
-    textarea { width: 100%; height: 54px; background: #101015; border: 1px solid #333; color: #a7f3d0; font-size: 12px; border-radius: 6px; padding: 6px; resize: none; }
-    .log-container { max-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+
+    /* パネル */
+    .panel { background: #1c1c24; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #2a2a35; }
+    h3 { margin: 0 0 6px 0; font-size: 13px; color: #9ca3af; }
+    textarea { width: 100%; height: 50px; background: #101015; border: 1px solid #333; color: #a7f3d0; font-size: 12px; border-radius: 6px; padding: 6px; resize: none; }
+    .log-container { max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
     .log-item { background: #14141a; padding: 6px 8px; border-radius: 6px; border-left: 3px solid #6366f1; font-size: 11px; }
-    .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #181822; border-top: 1px solid #333; padding: 10px 12px 14px; z-index: 50; display: flex; flex-direction: column; gap: 8px; }
-    .footer-row-actions { display: flex; gap: 6px; }
-    .action-btn { flex: 1; padding: 10px 2px; border-radius: 6px; font-size: 12px; font-weight: bold; border: 1px solid #374151; background: #1e1e28; color: #9ca3af; cursor: pointer; }
+
+    /* フッター */
+    .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #181822; border-top: 1px solid #333; padding: 8px 10px 14px; z-index: 50; display: flex; flex-direction: column; gap: 6px; }
+    .footer-row-actions { display: flex; gap: 5px; }
+    .action-btn { flex: 1; padding: 9px 2px; border-radius: 6px; font-size: 12px; font-weight: bold; border: 1px solid #374151; background: #1e1e28; color: #9ca3af; cursor: pointer; }
     .action-btn:disabled { opacity: 0.3; background: #121218 !important; border-color: #222 !important; color: #555 !important; cursor: not-allowed; }
     .action-btn.active-land { background: #065f46; border-color: #059669; color: #a7f3d0; }
     .action-btn.active-tree { background: #166534; border-color: #22c55e; color: #bbf7d0; }
@@ -33,22 +47,35 @@
     .action-btn.active-delete { background: #7f1d1d; border-color: #dc2626; color: #fecaca; }
     .think-btn { width: 100%; background: #4f46e5; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 15px; padding: 12px; cursor: pointer; }
     .think-btn:disabled { background: #23232c !important; color: #6b7280 !important; cursor: not-allowed; }
+
+    /* モーダル */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); justify-content: center; align-items: center; z-index: 100; padding: 16px; }
     .modal-content { background: #20202a; width: 100%; max-width: 340px; padding: 16px; border-radius: 8px; border: 1px solid #3b3b4f; }
     .modal-content input, .modal-content select { width: 100%; padding: 8px; background: #121218; border: 1px solid #444; color: #fff; border-radius: 6px; margin: 4px 0 10px; }
-    .modal-actions { display: flex; gap: 8px; }
-    .modal-actions button { flex: 1; padding: 8px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    .status-card { background: #15151e; border: 1px solid #333348; border-radius: 6px; padding: 10px; margin-bottom: 8px; font-size: 13px; line-height: 1.6; }
   </style>
 </head>
 <body>
 
+  <!-- ヘッダー -->
   <div class="header">
     <h2>🏝 AI箱庭アイランド</h2>
-    <button class="gear-btn" onclick="openSettings()">⚙ 設定</button>
+    <div class="nav-btns">
+      <button class="nav-btn btn-status" onclick="openStatusModal()">🤖 じょうたい</button>
+      <button class="nav-btn" onclick="openSettings()">⚙ 設定</button>
+    </div>
+  </div>
+
+  <!-- もちものバー（子ども向け簡単表示） -->
+  <div class="inv-bar">
+    <div class="inv-item">🪵 <span id="barWood">0</span></div>
+    <div class="inv-item">🪨 <span id="barStone">0</span></div>
+    <div class="inv-item">🔥 <span id="barFire">0</span></div>
+    <div class="inv-item">🏠 <span id="barHouse">0</span></div>
   </div>
 
   <div class="status-bar">
-    <div id="statusText">マスをタップして選択してください</div>
+    <div id="statusText">マスをタップしてえらんでね</div>
     <div id="selectedInfo" style="color:#9ca3af; font-family:monospace;">未選択</div>
   </div>
 
@@ -64,6 +91,7 @@
     <div class="log-container" id="logContainer"></div>
   </div>
 
+  <!-- フッター -->
   <div class="footer-bar">
     <div class="footer-row-actions">
       <button class="action-btn" id="btnExpand" disabled onclick="expandSelectedCell()">🌱 土地拡張</button>
@@ -74,7 +102,32 @@
     <button class="think-btn" id="thinkBtn" disabled onclick="thinkAndAct()">読込中...</button>
   </div>
 
-  <!-- 設定モーダル -->
+  <!-- 🤖 キャラクター状態モーダル -->
+  <div class="modal-overlay" id="statusModal">
+    <div class="modal-content">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h3 style="margin:0; color:#93c5fd; font-size:16px;">🤖 ロボくんのじょうたい</h3>
+        <button onclick="closeStatusModal()" style="background:#374151; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">とじる</button>
+      </div>
+      <div class="status-card">
+        <div>⚡ <strong>たいりょく:</strong> <span id="stHp" style="color:#34d399;">100 / 100</span></div>
+        <div>🎯 <strong>いまの目標:</strong> <span id="stGoal" style="color:#fbbf24;">木や石をあつめて、島におうちを建てよう！</span></div>
+      </div>
+      <div class="status-card">
+        <div style="font-weight:bold; margin-bottom:4px; color:#cbd5e1;">🎒 あつめた材料（もちもの）</div>
+        <div>🪵 木材: <strong id="stWood">0</strong> こ</div>
+        <div>🪨 石材: <strong id="stStone">0</strong> こ</div>
+        <div>🔥 たき火: <strong id="stFire">0</strong> こ （木×2で作成）</div>
+        <div>🏠 おうち: <strong id="stHouse">0</strong> けん （木×3・石×2で作成）</div>
+      </div>
+      <div class="status-card">
+        <div style="font-weight:bold; margin-bottom:2px; color:#cbd5e1;">💭 いまのきもち</div>
+        <div id="stMind" style="color:#a7f3d0; font-size:12px; font-family:monospace;">島をぼうけん中！</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⚙ 設定モーダル -->
   <div class="modal-overlay" id="settingsModal">
     <div class="modal-content">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -92,14 +145,14 @@
         <option value="approach1" selected>アプローチ1：お留守番方式</option>
         <option value="approach2" disabled>アプローチ2：24時間裏稼働（暗転）</option>
       </select>
-      <div class="modal-actions">
-        <button onclick="saveSettingsFromModal()" style="background:#4f46e5; color:#fff;">保存</button>
-        <button onclick="closeSettings()" style="background:#374151; color:#fff;">閉じる</button>
+      <div style="display:flex; gap:8px;">
+        <button onclick="saveSettingsFromModal()" style="flex:1; padding:8px; background:#4f46e5; color:#fff; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">保存</button>
+        <button onclick="closeSettings()" style="flex:1; padding:8px; background:#374151; color:#fff; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">閉じる</button>
       </div>
     </div>
   </div>
 
-  <!-- 削除モーダル -->
+  <!-- 🗑 削除モーダル -->
   <div class="modal-overlay" id="deleteModal">
     <div class="modal-content" style="text-align:center;">
       <h3 style="margin:0 0 8px; color:#fff; font-size:15px;">削除内容を選択</h3>
@@ -116,15 +169,27 @@
     const GRID_SIZE = 6;
     const defaultState = {
       land: [{x:2,y:2},{x:3,y:2},{x:2,y:3},{x:3,y:3}],
-      agent: {x:2,y:2,icon:"🤖"},
+      agent: { x:2, y:2, icon:"🤖", hp:100, goal:"島で木や石をあつめて、たき火やおうちを作ろう！" },
+      inventory: { wood: 0, stone: 0, fire: 0, house: 0 },
       items: [{id:1,name:'木',icon:'🌲',x:2,y:3},{id:2,name:'石',icon:'🪨',x:3,y:2}],
-      notebook: "ここは海に囲まれた小さな島だ。周囲の未開拓な海を観察している。",
+      notebook: "ここは海に囲まれた小さな島だ。まずは木や石をあつめて生活の準備をしよう。",
       logs: [],
       selected: null
     };
 
     let state = JSON.parse(JSON.stringify(defaultState));
 
+    function openStatusModal() {
+      document.getElementById('stHp').innerText = `${state.agent.hp} / 100`;
+      document.getElementById('stGoal').innerText = state.agent.goal;
+      document.getElementById('stWood').innerText = state.inventory.wood;
+      document.getElementById('stStone').innerText = state.inventory.stone;
+      document.getElementById('stFire').innerText = state.inventory.fire;
+      document.getElementById('stHouse').innerText = state.inventory.house;
+      document.getElementById('stMind').innerText = state.notebook;
+      document.getElementById('statusModal').style.display = 'flex';
+    }
+    function closeStatusModal() { document.getElementById('statusModal').style.display = 'none'; }
     function openSettings() { document.getElementById('settingsModal').style.display = 'flex'; }
     function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
     function closeDeleteModal() { document.getElementById('deleteModal').style.display = 'none'; }
@@ -145,7 +210,7 @@
     }
 
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('.cell') && !e.target.closest('.footer-bar') && !e.target.closest('.header') && !e.target.closest('.modal-content')) {
+      if (!e.target.closest('.cell') && !e.target.closest('.footer-bar') && !e.target.closest('.header') && !e.target.closest('.modal-content') && !e.target.closest('.inv-bar')) {
         if (state.selected) { state.selected = null; renderGrid(); updateButtons(); }
       }
     });
@@ -179,7 +244,7 @@
     function expandSelectedCell() {
       if (!state.selected || isLandAt(state.selected.x, state.selected.y)) return;
       state.land.push({...state.selected});
-      setStatus(`(${state.selected.x}, ${state.selected.y}) を陸地にしました`);
+      setStatus(`(${state.selected.x}, ${state.selected.y}) を開拓したよ！`);
       renderGrid();
       updateButtons();
     }
@@ -188,9 +253,9 @@
       if (!state.selected) return;
       const {x, y} = state.selected;
       if (!isLandAt(x, y) || (state.agent.x === x && state.agent.y === y)) return;
-      if (state.items.find(i => i.x === x && i.y === y)) return alert("すでに物があります");
+      if (state.items.find(i => i.x === x && i.y === y)) return alert("すでに物があるよ");
       state.items.push({id: Date.now(), name: type, icon: type === '木'?'🌲':'🪨', x, y});
-      setStatus(`(${x}, ${y}) に【${type}】を配置`);
+      setStatus(`(${x}, ${y}) に【${type}】をおいたよ`);
       renderGrid();
       updateButtons();
     }
@@ -202,19 +267,19 @@
       const isAgent = (state.agent.x === x && state.agent.y === y);
 
       if (item) {
-        document.getElementById('deleteModalDesc').innerText = `(${x}, ${y}) には【${item.name}】があります`;
-        document.getElementById('btnDeleteItemOnly').innerText = `${item.icon} ${item.name}のみ削除`;
+        document.getElementById('deleteModalDesc').innerText = `(${x}, ${y}) には【${item.name}】があるよ`;
+        document.getElementById('btnDeleteItemOnly').innerText = `${item.icon} ${item.name}だけ消す`;
         const bAll = document.getElementById('btnDeleteLandAndItem');
         bAll.disabled = isAgent;
-        bAll.innerText = isAgent ? "土地ごと削除（ロボットがいるため不可）" : `🏝 土地ごと削除（${item.name}も消去）`;
+        bAll.innerText = isAgent ? "土地ごと削除（ロボがいるため不可）" : `🏝 土地ごと削除（${item.name}も消去）`;
         bAll.style.opacity = isAgent ? "0.4" : "1";
         document.getElementById('deleteModal').style.display = 'flex';
       } else {
-        if (isAgent) return alert("ロボットのいる土地は削除できません");
-        if (confirm(`(${x}, ${y}) の土地を海に戻しますか？`)) {
+        if (isAgent) return alert("ロボがいるマスの土地は海に戻せません");
+        if (confirm(`(${x}, ${y}) の土地を海にもどす？`)) {
           state.land = state.land.filter(l => !(l.x === x && l.y === y));
           state.selected = null;
-          setStatus(`(${x}, ${y}) を海に戻しました`);
+          setStatus(`(${x}, ${y}) を海にもどしたよ`);
           renderGrid();
           updateButtons();
         }
@@ -224,7 +289,7 @@
     function deleteItemOnly() {
       state.items = state.items.filter(i => !(i.x === state.selected.x && i.y === state.selected.y));
       closeDeleteModal();
-      setStatus("オブジェクトを削除しました");
+      setStatus("オブジェクトを消したよ");
       renderGrid();
       updateButtons();
     }
@@ -235,20 +300,20 @@
       state.land = state.land.filter(l => !(l.x === x && l.y === y));
       state.selected = null;
       closeDeleteModal();
-      setStatus("土地とオブジェクトを一括削除しました");
+      setStatus("土地と物をぜんぶ消したよ");
       renderGrid();
       updateButtons();
     }
 
     function resetGame() {
-      if (!confirm("初期状態にリセットしますか？")) return;
+      if (!confirm("はじめからやり直す？\n（あつめた材料や手帳もリセットされます）")) return;
       state = JSON.parse(JSON.stringify(defaultState));
       localStorage.removeItem('last_active_timestamp');
       renderGrid();
       updateButtons();
       updateLogDisplay();
       closeSettings();
-      setStatus("リセットしました");
+      setStatus("リセットしました！");
     }
 
     function renderGrid() {
@@ -274,6 +339,10 @@
         }
       }
       document.getElementById('notebook').value = state.notebook;
+      document.getElementById('barWood').innerText = state.inventory.wood;
+      document.getElementById('barStone').innerText = state.inventory.stone;
+      document.getElementById('barFire').innerText = state.inventory.fire;
+      document.getElementById('barHouse').innerText = state.inventory.house;
     }
 
     function setStatus(t) { document.getElementById('statusText').innerText = t; }
@@ -306,10 +375,25 @@
     async function thinkAndAct() {
       const key = localStorage.getItem('gemini_api_key');
       if (!key) { openSettings(); return alert("設定からAPIキーを入力してください"); }
-      setStatus("AIが思考中...");
+      setStatus("AIロボが考え中...");
+      
       const lands = state.land.map(l => `(${l.x},${l.y})`).join(' ');
       const items = state.items.map(i => `${i.name}(${i.x},${i.y})`).join(',') || 'なし';
-      const prompt = `箱庭の島にいるロボットです。陸地:[${lands}] 現在地:(${state.agent.x},${state.agent.y}) 物:${items} 手帳:"${state.notebook}"\n陸地のみ移動可。行動(MOVE_UP,MOVE_DOWN,MOVE_LEFT,MOVE_RIGHT,STAY)を1つ選択。\n必ずJSON形式のみ出力: {"action":"MOVE_RIGHT","thought":"思考","notebook":"更新後の手帳"}`;
+      const inv = `木材:${state.inventory.wood}, 石材:${state.inventory.stone}, たき火:${state.inventory.fire}, おうち:${state.inventory.house}`;
+
+      const prompt = `あなたは島でサバイバルするかわいいロボットです。
+歩ける陸地:[${lands}] 現在地:(${state.agent.x},${state.agent.y})
+まわりの物:${items}
+持ち物:[${inv}]
+手帳:"${state.notebook}"
+
+【できる行動】
+1. 移動: MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT, STAY
+2. 採取: CHOP_TREE(隣か同じマスの木を切って木材+1), MINE_ROCK(隣か同じマスの石を掘って石材+1)
+3. 作る: CRAFT_FIRE(木材2個でたき火作成), CRAFT_HOUSE(木材3個と石材2個でおうち作成)
+
+目的: たき火やおうちを作って島を開拓しよう！
+出力はJSONのみ: {"action":"MOVE_RIGHT","thought":"思考","notebook":"更新後の手帳"}`.trim();
 
       try {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`, {
@@ -320,17 +404,50 @@
         const data = await res.json();
         if (data.error) return setStatus(`エラー: ${data.error.message}`);
         const resJson = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim());
-        let tx = state.agent.x, ty = state.agent.y;
-        if (resJson.action==="MOVE_UP") ty--;
-        if (resJson.action==="MOVE_DOWN") ty++;
-        if (resJson.action==="MOVE_LEFT") tx--;
-        if (resJson.action==="MOVE_RIGHT") tx++;
+        const act = resJson.action;
 
-        if (isLandAt(tx, ty)) { state.agent.x = tx; state.agent.y = ty; setStatus(`完了: ${resJson.action}`); }
-        else setStatus(`海のため進めませんでした（${resJson.action}）`);
+        // アクション実行
+        if (act === "CHOP_TREE") {
+          const tree = state.items.find(i => i.name === '木' && Math.abs(i.x - state.agent.x) <= 1 && Math.abs(i.y - state.agent.y) <= 1);
+          if (tree) {
+            state.items = state.items.filter(i => i.id !== tree.id);
+            state.inventory.wood++;
+            setStatus(`🪵 木を切って木材をゲットしたよ！`);
+          } else { setStatus(`近くに木がありませんでした`); }
+        } else if (act === "MINE_ROCK") {
+          const rock = state.items.find(i => i.name === '石' && Math.abs(i.x - state.agent.x) <= 1 && Math.abs(i.y - state.agent.y) <= 1);
+          if (rock) {
+            state.items = state.items.filter(i => i.id !== rock.id);
+            state.inventory.stone++;
+            setStatus(`🪨 石を掘って石材をゲットしたよ！`);
+          } else { setStatus(`近くに石がありませんでした`); }
+        } else if (act === "CRAFT_FIRE") {
+          if (state.inventory.wood >= 2) {
+            state.inventory.wood -= 2;
+            state.inventory.fire++;
+            state.items.push({ id: Date.now(), name: 'たき火', icon: '🔥', x: state.agent.x, y: state.agent.y });
+            setStatus(`🔥 あたたかい「たき火」を作ったよ！`);
+          } else { setStatus(`木材が足りなくてたき火が作れなかった...`); }
+        } else if (act === "CRAFT_HOUSE") {
+          if (state.inventory.wood >= 3 && state.inventory.stone >= 2) {
+            state.inventory.wood -= 3;
+            state.inventory.stone -= 2;
+            state.inventory.house++;
+            state.items.push({ id: Date.now(), name: 'おうち', icon: '🏠', x: state.agent.x, y: state.agent.y });
+            setStatus(`🏠 すてきな「おうち」が完成したよ！やったね！`);
+          } else { setStatus(`材料が足りなくておうちが作れなかった...`); }
+        } else {
+          // 移動
+          let tx = state.agent.x, ty = state.agent.y;
+          if (act==="MOVE_UP") ty--; if (act==="MOVE_DOWN") ty++;
+          if (act==="MOVE_LEFT") tx--; if (act==="MOVE_RIGHT") tx++;
+          if (isLandAt(tx, ty)) { state.agent.x = tx; state.agent.y = ty; setStatus(`トコトコ移動したよ（${act}）`); }
+          else if (act !== "STAY") { setStatus(`海だから進めなかったよ（${act}）`); }
+          else { setStatus(`その場でひと休みしたよ`); }
+        }
 
         state.notebook = resJson.notebook;
-        addLog(resJson.action, resJson.thought, resJson.notebook);
+        addLog(act, resJson.thought, resJson.notebook);
         renderGrid();
       } catch (err) { setStatus(`エラー: ${err.message}`); }
     }
