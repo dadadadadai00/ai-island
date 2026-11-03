@@ -24,7 +24,7 @@
     .gauge-bar { height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
     .gauge-fill { height: 100%; width: 50%; transition: width 0.3s ease; }
     .hud-sub { display: flex; justify-content: space-between; align-items: center; font-size: 10px; font-weight: bold; }
-    .mode-badge { padding: 2px 6px; border-radius: 4px; font-size: 9px; }
+    .mode-badge { padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; }
     .badge-api { background: rgba(56,189,248,0.2); color: #38bdf8; border: 1px solid #38bdf8; }
     .badge-test { background: rgba(234,179,8,0.2); color: #eab308; border: 1px solid #eab308; }
 
@@ -98,7 +98,6 @@
     .toggle-label { font-size: 12px; font-weight: bold; color: #e2e8f0; }
     .toggle-sub { font-size: 10px; color: #94a3b8; }
     
-    /* スイッチ本体 */
     .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
     .switch input { opacity: 0; width: 0; height: 0; }
     .slider {
@@ -187,7 +186,6 @@
         <div class="close-cross" onclick="closeSettingModal()">✕</div>
       </div>
       
-      <!-- API思考トグルスイッチ -->
       <div class="toggle-row">
         <div>
           <div class="toggle-label">Gemini APIで思考させる</div>
@@ -222,13 +220,20 @@
       diary: '【1日目の朝】\n目が覚めた。手帳には何も書かれていない。生き延びよう。',
       selectedDrop: { icon: '🍎', name: 'リンゴ', sense: '甘い匂い' },
       charaGrid: { x: 0, y: 0, z: -1 },
-      // 認知・記憶した範囲（メンタルマップ）初期2x2x2
-      knownVoxels: {
-        "0,0,-1": true, "0,0,0": true, "1,0,-1": true, "1,0,0": true,
-        "0,-1,-1": true, "0,-1,0": true, "1,-1,-1": true, "1,-1,0": true
-      },
+      // 認知・記憶した範囲（メンタルマップ）
+      knownVoxels: {},
+      inheritedLandmark: null, // 日記から継承した目標地点
       isBusy: false
     };
+
+    // 初期縄張り：初期位置周囲 2x2x2
+    for (let dx = 0; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 0; dy++) {
+        for (let dz = -1; dz <= 0; dz++) {
+          STATE.knownVoxels[`${dx},${dy},${dz}`] = true;
+        }
+      }
+    }
 
     // --- Three.js 初期化 ---
     const container = document.getElementById('c3d');
@@ -249,11 +254,21 @@
     const worldGroup = new THREE.Group();
     scene.add(worldGroup);
 
-    // --- 掘削可能ボクセルマップ（手前z>0全カット・水槽断面） ---
+    // --- 掘削可能ボクセルマップ ＆ フォグ・オブ・ウォー（明暗切替） ---
     const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
-    const matGrass = new THREE.MeshLambertMaterial({ color: 0x48bb78 });
-    const matDirt = new THREE.MeshLambertMaterial({ color: 0x784f33 });
-    const matStone = new THREE.MeshLambertMaterial({ color: 0x475569 });
+
+    // 通常の鮮やかな色
+    const COLOR_DEF = {
+      grass: 0x48bb78,
+      dirt: 0x784f33,
+      stone: 0x475569
+    };
+    // 未知・未踏の暗闇色（暗灰色に沈めてGPU負荷ゼロ）
+    const COLOR_FOG = {
+      grass: 0x0f2316,
+      dirt: 0x1f140d,
+      stone: 0x13171c
+    };
 
     const voxelMap = {};
     const interactiveBlocks = [];
@@ -262,24 +277,49 @@
       for (let z = -4; z <= 0; z++) {
         // 地表 (y=0) : x=0, z=-1 はタテ穴
         if (!(x === 0 && z === -1)) {
-          createBlock(x, 0, z, matGrass, 'grass');
+          createBlock(x, 0, z, 'grass');
         }
         // 地下 (-1 〜 -5)
         for (let y = -1; y >= -5; y--) {
           if (x === 0 && z === -1 && y >= -3) continue; // タテ穴空洞
           if (Math.abs(x) <= 2 && y <= -2 && y >= -4 && z >= -2) continue; // 初期地下空洞
-          createBlock(x, y, z, y >= -2 ? matDirt : matStone, 'dirt');
+          createBlock(x, y, z, y >= -2 ? 'dirt' : 'stone');
         }
       }
     }
 
-    function createBlock(x, y, z, mat, type) {
+    function createBlock(x, y, z, type) {
+      const isKnown = isVoxelLit(x, y, z);
+      const colorHex = isKnown ? COLOR_DEF[type] : COLOR_FOG[type];
+      const mat = new THREE.MeshLambertMaterial({ color: colorHex });
+      
       const b = new THREE.Mesh(boxGeo, mat);
       b.position.set(x, y, z);
       b.userData = { gx: x, gy: y, gz: z, type: type };
       worldGroup.add(b);
       voxelMap[`${x},${y},${z}`] = b;
       interactiveBlocks.push(b);
+    }
+
+    // ブロックが照らされている（訪問済みマスの周囲）か判定
+    function isVoxelLit(bx, by, bz) {
+      for (let ox = -1; ox <= 1; ox++) {
+        for (let oy = -1; oy <= 1; oy++) {
+          for (let oz = -1; oz <= 1; oz++) {
+            if (STATE.knownVoxels[`${bx+ox},${by+oy},${bz+oz}`]) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    // マップ全体の明暗（フォグ）を更新（色を再設定するだけ）
+    function refreshFogOfWar() {
+      for (const key in voxelMap) {
+        const b = voxelMap[key];
+        const lit = isVoxelLit(b.userData.gx, b.userData.gy, b.userData.gz);
+        b.material.color.setHex(lit ? COLOR_DEF[b.userData.type] : COLOR_FOG[b.userData.type]);
+      }
     }
 
     function removeBlock(x, y, z) {
@@ -292,7 +332,7 @@
       }
     }
 
-    // ハシゴ（タテ穴内の垂直移動を可能にする物理装置）
+    // ハシゴ
     const ladderMat = new THREE.MeshLambertMaterial({ color: 0xb45309 });
     for (let y = 0; y >= -3; y--) {
       const s = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.1), ladderMat);
@@ -308,7 +348,7 @@
     glass.position.set(0, -2.5, 0.5);
     scene.add(glass);
 
-    // ドロップされた物理アイテム管理
+    // 物理アイテム管理
     const droppedItems = [];
 
     // --- キャラクター構造 ---
@@ -369,7 +409,7 @@
       document.getElementById('btn-v-ant').classList.toggle('active', mode === 'antfarm');
     }
 
-    // --- タッチ操作（1本指ドラッグ回転 ＆ 2本指ピンチズーム） ---
+    // --- タッチ操作（ドラッグ回転 ＆ ピンチズーム） ---
     let touchMode = 'none', prevX = 0, prevDist = 0, touchStartTime = 0;
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
@@ -408,18 +448,14 @@
 
     // --- 厳密な物理法則判定（重力・足場・ハシゴ） ---
     function isPhysicallyWalkable(x, y, z) {
-      // 1. そのマス自体が空洞であること（ブロックに埋まらない）
       if (voxelMap[`${x},${y},${z}`]) return false;
-      // 2. 範囲外制限（水槽の枠外に出ない）
       if (x < -4 || x > 4 || z < -4 || z > 0 || y > 1 || y < -5) return false;
-      // 3. 足場があるか（直下にブロックがあるか、またはタテ穴ハシゴがあるか）
       const hasFooting = voxelMap[`${x},${y-1},${z}`];
       const hasLadder = (x === 0 && z === -1 && y >= -3);
       const isFloor = (y === -5);
       return (hasFooting || hasLadder || isFloor);
     }
 
-    // 周囲6方向から物理的に移動可能なマス一覧を取得
     function getValidMoveNeighbors(cx, cy, cz) {
       const candidates = [];
       const deltas = [
@@ -433,7 +469,6 @@
 
       for (const d of deltas) {
         const tx = cx + d.dx, ty = cy + d.dy, tz = cz + d.dz;
-        // 上下移動はハシゴのあるマスでのみ許可
         if (d.dy !== 0) {
           const onLadder = (cx === 0 && cz === -1 && cy >= -3 && ty >= -3 && ty <= 0);
           if (!onLadder) continue;
@@ -470,11 +505,9 @@
       else STATE.testCount--;
       updateHUD();
 
-      // アイテム出現
       dropPhysicalItem(gx, gy, gz, STATE.selectedDrop);
       setToast(`【${STATE.selectedDrop.name}】を投下！(${STATE.selectedDrop.sense}が発生)`);
 
-      // キャラクターが知覚して思考・行動
       await charaReactToDrop(gx, gy, gz, STATE.selectedDrop);
 
       if ((STATE.useApi ? STATE.geminiCount : STATE.testCount) === 0) {
@@ -498,7 +531,6 @@
       if (STATE.isBusy) return;
       STATE.isBusy = true;
 
-      // 刺激の方向と物理情報を算出
       const cx = STATE.charaGrid.x, cy = STATE.charaGrid.y, cz = STATE.charaGrid.z;
       const dist = Math.hypot(dropX - cx, dropY - cy, dropZ - cz).toFixed(1);
       const dirX = dropX > cx ? '東(右)' : (dropX < cx ? '西(左)' : '');
@@ -506,7 +538,6 @@
       const dirY = dropY > cy ? '上' : (dropY < cy ? '下' : '');
       const stimulusDirection = `${dirX}${dirZ}${dirY}` || 'すぐそば';
 
-      // 物理的に移動可能な候補マスを取得
       const validMoves = getValidMoveNeighbors(cx, cy, cz);
       
       let decision = null;
@@ -516,34 +547,31 @@
         decision = getMockThought(drop, stimulusDirection, dist, validMoves);
       }
 
-      // 思考と日記の反映
       setThought(decision.thought);
       recordDiary(decision.diary);
 
-      // 移動実行（物理1ブロック移動）
       if (decision.chosenMove) {
         const dest = decision.chosenMove;
         await moveTo(dest.x, dest.y + 0.5, dest.z, 500);
         STATE.charaGrid = { x: dest.x, y: dest.y, z: dest.z };
         
-        // 記憶縄張りの拡張（Mental Map）
+        // 縄張りの開拓とフォグ更新
         STATE.knownVoxels[`${dest.x},${dest.y},${dest.z}`] = true;
+        refreshFogOfWar();
         updateHUD();
 
-        // 偶然アイテムのマスに到達したら拾う
         checkItemPickup(dest.x, dest.y, dest.z);
       }
 
       STATE.isBusy = false;
     }
 
-    // Gemini APIによる自律思考
     async function callGeminiThought(drop, direction, dist, validMoves) {
       const apiKey = localStorage.getItem('gemini_api_key');
       const prompt = `あなたは箱庭で生きるロボットです。視界は1マスしか見えません。
 ステータス: 体力=${STATE.hp}, 疲労=${STATE.fatigue}, 空腹=${STATE.hunger}, 性格=「${STATE.trait}」。
 現在位置: (${STATE.charaGrid.x}, ${STATE.charaGrid.y}, ${STATE.charaGrid.z})。
-【物理刺激】: ${direction}の距離${dist}ブロックで「${drop.sense}」を感知した！
+【知覚刺激】: ${direction}の距離${dist}ブロックで「${drop.sense}」を感知した！
 【移動可能な隣接空洞マス】: ${JSON.stringify(validMoves.map((m, i) => ({ id: i, direction: m.name, pos: [m.x, m.y, m.z] })))}。
 重力と物理法則を守り、知覚した刺激にどう反応してどの隣接マスへ1ブロック動くか（または動かないか）を決めてください。
 以下のJSONフォーマットのみを出力してください:
@@ -563,16 +591,14 @@
       }
     }
 
-    // 内蔵モック思考（テスト枠用）
     function getMockThought(drop, direction, dist, validMoves) {
       if (validMoves.length === 0) {
-        return { thought: `「${direction}から${drop.sense}がするが、壁に囲まれて動けない！」`, diary: '物音を聞いたが身動きが取れなかった。', chosenMove: null };
+        return { thought: `「${direction}から${drop.sense}がするが、身動きが取れない！」`, diary: '物音を聞いたが動けなかった。', chosenMove: null };
       }
-      // 刺激の方向へ近づくか、ビビって別のマスへ1ブロック
       const move = validMoves[Math.floor(Math.random() * validMoves.length)];
       return {
-        thought: `「${direction}から${drop.sense}だ！気になるから${move.name}へ1歩寄ってみよう。」`,
-        diary: `${direction}の気配を感じ、足場を確かめながら${move.name}へ進んだ。`,
+        thought: `「${direction}から${drop.sense}だ！${move.name}へ1歩寄ってみよう。」`,
+        diary: `${direction}の気配を感じ、${move.name}へ進んだ。`,
         chosenMove: move
       };
     }
@@ -584,8 +610,8 @@
         worldGroup.remove(target.mesh);
         droppedItems.splice(idx, 1);
         equipItem(target.drop.name);
-        setThought(`「足元に【${target.drop.name}】が落ちていた！手に取ったぞ！」`);
-        recordDiary(`足元にあった${target.drop.name}を拾い上げた。`);
+        setThought(`「足元に【${target.drop.name}】を発見！拾い上げたぞ！」`);
+        recordDiary(`足元にあった${target.drop.name}を手に入れた。`);
       }
     }
 
@@ -597,20 +623,32 @@
       document.getElementById('prof-hand').innerText = name;
     }
 
-    // 自律うろつき（アイテム投下がない平時、記憶した縄張り内のみをトコトコ移動）
+    // 平時の自律うろつき（記憶した縄張り内のみをトコトコ移動。日記の目標地点があれば目指す）
     setInterval(async () => {
       if (STATE.isBusy) return;
       const valid = getValidMoveNeighbors(STATE.charaGrid.x, STATE.charaGrid.y, STATE.charaGrid.z);
-      // 記憶している（訪問済み）マスを優先
-      const knownMoves = valid.filter(m => STATE.knownVoxels[`${m.x},${m.y},${m.z}`]);
-      const pool = knownMoves.length > 0 ? knownMoves : valid;
-      if (pool.length > 0 && Math.random() < 0.6) {
+      if (valid.length === 0) return;
+
+      // 日記の目標地点がある場合、その方向へ進む
+      let targetMove = null;
+      if (STATE.inheritedLandmark) {
+        const lm = STATE.inheritedLandmark;
+        valid.sort((a, b) => Math.hypot(a.x - lm.x, a.y - lm.y, a.z - lm.z) - Math.hypot(b.x - lm.x, b.y - lm.y, b.z - lm.z));
+        targetMove = valid[0];
+      } else {
+        const knownMoves = valid.filter(m => STATE.knownVoxels[`${m.x},${m.y},${m.z}`]);
+        const pool = knownMoves.length > 0 ? knownMoves : valid;
+        targetMove = pool[Math.floor(Math.random() * pool.length)];
+      }
+
+      if (targetMove && Math.random() < 0.6) {
         STATE.isBusy = true;
-        const target = pool[Math.floor(Math.random() * pool.length)];
-        await moveTo(target.x, target.y + 0.5, target.z, 600);
-        STATE.charaGrid = { x: target.x, y: target.y, z: target.z };
-        STATE.knownVoxels[`${target.x},${target.y},${target.z}`] = true;
-        checkItemPickup(target.x, target.y, target.z);
+        await moveTo(targetMove.x, targetMove.y + 0.5, targetMove.z, 600);
+        STATE.charaGrid = { x: targetMove.x, y: targetMove.y, z: targetMove.z };
+        STATE.knownVoxels[`${targetMove.x},${targetMove.y},${targetMove.z}`] = true;
+        
+        refreshFogOfWar();
+        checkItemPickup(targetMove.x, targetMove.y, targetMove.z);
         updateHUD();
         STATE.isBusy = false;
       }
@@ -659,19 +697,26 @@
       });
     }
 
-    // --- 夜のサイクル（記憶リセット） ---
+    // --- 夜のサイクル（記憶リセット ＆ 日記による地点継承） ---
     function triggerNightCycle() {
       setTimeout(() => {
-        alert('🌙 20回の枠を使い切りました。ロボは夜の眠りにつき、記憶をリセットします...');
+        alert('🌙 20回の枠を使い切りました。ロボは眠りにつき、記憶をリセットします...');
         STATE.day++;
         if (STATE.useApi) STATE.geminiCount = 20;
         else STATE.testCount = 20;
-        
-        // 記憶リセット：縄張りは現在地周辺のみに再圧縮
+
+        // 重要地点（現在地または地下の隠れ家）を日記に刻み、翌朝の継承地点にする
+        const landmarkPos = { x: STATE.charaGrid.x, y: STATE.charaGrid.y, z: STATE.charaGrid.z };
+        STATE.inheritedLandmark = landmarkPos;
+
+        // 記憶リセット：縄張りは全消去し、現在地と「日記に書かれた地点」のみ点灯
         STATE.knownVoxels = {};
         STATE.knownVoxels[`${STATE.charaGrid.x},${STATE.charaGrid.y},${STATE.charaGrid.z}`] = true;
+        STATE.knownVoxels[`${landmarkPos.x},${landmarkPos.y},${landmarkPos.z}`] = true;
 
-        STATE.diary += `\n\n【${STATE.day}日目の朝】\n昨日の記憶がない。手帳を頼りに生き延びよう。`;
+        refreshFogOfWar();
+
+        STATE.diary += `\n\n【${STATE.day}日目の朝】\n記憶がない。だが手帳に『地点(${landmarkPos.x}, ${landmarkPos.y}, ${landmarkPos.z})は安全』とメモがある。そこを目指そう。`;
         updateHUD();
         openBookModal();
       }, 1000);
@@ -740,8 +785,9 @@
       setToast(STATE.useApi ? '⚡ Gemini API思考モードに切り替えました' : '🧪 テスト思考モードに切り替えました');
     }
 
-    // 初期化時の保存設定復元
+    // 初期化時の保存設定復元＆初期フォグ描画
     STATE.useApi = localStorage.getItem('use_gemini_api') === 'true';
+    refreshFogOfWar();
     updateHUD();
 
     window.addEventListener('resize', () => {
