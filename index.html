@@ -62,4 +62,149 @@
     }
     .slot-backpack { position: absolute; right: -12px; top: 4px; font-size: 20px; z-index: 2; }
 
-    /* 仕草アニメーション
+    /* 仕草アニメーション */
+    .act-idle { animation: animIdle 2s ease-in-out infinite; }
+    .act-walk { animation: animWalk 0.4s ease-in-out infinite alternate; }
+    .act-panic { animation: animPanic 0.15s ease-in-out infinite alternate; }
+    .act-sleep { transform: rotate(85deg) translate(20px, -20px) !important; }
+
+    @keyframes animIdle {
+      0%, 100% { transform: translateY(0) scale(1, 1); }
+      50% { transform: translateY(-4px) scale(0.98, 1.02); }
+    }
+    @keyframes animWalk {
+      0% { transform: translateY(0) rotate(-6deg); }
+      100% { transform: translateY(-8px) rotate(6deg); }
+    }
+    @keyframes animPanic {
+      0% { transform: translateY(-8px) scale(1.1, 0.9); }
+      100% { transform: translateY(-16px) scale(0.9, 1.1) rotate(4deg); }
+    }
+
+    /* コントロールパネル */
+    .controls {
+      width: 100%; max-width: 360px; background: #1a1b26;
+      border: 1px solid #2e334a; border-radius: 12px; padding: 12px;
+      display: flex; flex-direction: column; gap: 8px; font-size: 12px;
+    }
+    .control-row { display: flex; align-items: center; justify-content: space-between; }
+    .btn-group { display: flex; gap: 4px; }
+    .c-btn {
+      padding: 6px 9px; background: #24283b; border: 1px solid #414868;
+      color: #cfc9c2; border-radius: 6px; font-size: 11px; cursor: pointer;
+    }
+    .c-btn.active { background: #3d59a1; border-color: #7aa2f7; color: #fff; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <h2>🤖 キャラクター表現テスト</h2>
+
+  <div class="stage">
+    <div class="pedestal"></div>
+    <div class="shadow" id="shadow"></div>
+    <div class="chara-root dir-front-left act-idle" id="chara">
+      <div class="slot-hat" id="slotHat">🍃</div>
+      <div class="head">
+        <div class="slot-face" id="slotFace">👀</div>
+      </div>
+      <div class="body">
+        <div class="slot-right-hand" id="slotHand">🍎</div>
+        <div class="slot-backpack" id="slotBack">🎒</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="control-row">
+      <span>🧭 むき</span>
+      <div class="btn-group">
+        <button class="c-btn active" onclick="setDir('front-left', this)">手前左</button>
+        <button class="c-btn" onclick="setDir('front-right', this)">手前右</button>
+        <button class="c-btn" onclick="setDir('back-left', this)">奥左</button>
+        <button class="c-btn" onclick="setDir('back-right', this)">奥右</button>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <span>🎭 しぐさ</span>
+      <div class="btn-group">
+        <button class="c-btn active" onclick="setAct('idle', this)">待機</button>
+        <button class="c-btn" onclick="setAct('walk', this)">歩行</button>
+        <button class="c-btn" onclick="setAct('panic', this)">あわて</button>
+        <button class="c-btn" onclick="setAct('sleep', this)">睡眠</button>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <span>😀 ひょうじょう</span>
+      <div class="btn-group">
+        <button class="c-btn active" onclick="setFace('👀', this)">通常</button>
+        <button class="c-btn" onclick="setFace('😱', this)">恐怖</button>
+        <button class="c-btn" onclick="setFace('😵', this)">疲労</button>
+        <button class="c-btn" onclick="setFace('😴', this)">眠気</button>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <span>👒 あたま装備</span>
+      <div class="btn-group">
+        <button class="c-btn active" onclick="setHat('🍃', this)">はっぱ</button>
+        <button class="c-btn" onclick="setHat('👑', this)">王冠</button>
+        <button class="c-btn" onclick="setHat('🧢', this)">ぼうし</button>
+        <button class="c-btn" onclick="setHat('', this)">なし</button>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <span>🍎 もちもの</span>
+      <div class="btn-group">
+        <button class="c-btn active" onclick="setHand('🍎', this)">リンゴ</button>
+        <button class="c-btn" onclick="setHand('🔥', this)">たいまつ</button>
+        <button class="c-btn" onclick="setHand('🪵', this)">木の棒</button>
+        <button class="c-btn" onclick="setHand('', this)">なし</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const chara = document.getElementById('chara');
+    let currentDir = 'dir-front-left';
+    let currentAct = 'act-idle';
+
+    function setDir(dir, btn) {
+      chara.classList.remove(currentDir);
+      currentDir = `dir-${dir}`;
+      chara.classList.add(currentDir);
+      setActive(btn);
+    }
+
+    function setAct(act, btn) {
+      chara.classList.remove(currentAct);
+      currentAct = `act-${act}`;
+      chara.classList.add(currentAct);
+      setActive(btn);
+    }
+
+    function setFace(icon, btn) {
+      document.getElementById('slotFace').innerText = icon;
+      setActive(btn);
+    }
+
+    function setHat(icon, btn) {
+      document.getElementById('slotHat').innerText = icon;
+      setActive(btn);
+    }
+
+    function setHand(icon, btn) {
+      document.getElementById('slotHand').innerText = icon;
+      setActive(btn);
+    }
+
+    function setActive(btn) {
+      btn.parentElement.querySelectorAll('.c-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+  </script>
+</body>
+</html>
