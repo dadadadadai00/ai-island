@@ -6,77 +6,110 @@
   <title>ボクセルAI観察水槽</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-    body { background: #07090e; color: #c5c6c7; font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+    html, body { width: 100%; height: 100dvh; overflow: hidden; background: #07090e; font-family: -apple-system, sans-serif; }
     
-    /* 5ゲージヘッダー */
-    .header { background: #0f111a; padding: 6px 12px; border-bottom: 1px solid #1f2638; z-index: 100; font-size: 11px; flex-shrink: 0; }
+    /* 3D全画面キャンバス */
+    #stage-container { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+    #c3d { width: 100%; height: 100%; display: block; }
+
+    /* 上部：極小シースルーゲージ */
+    .top-hud {
+      position: absolute; top: 10px; left: 10px; right: 10px; z-index: 10;
+      background: rgba(10, 12, 18, 0.75); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 6px 10px;
+    }
     .status-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 4px; }
     .gauge-wrap { display: flex; flex-direction: column; gap: 2px; }
-    .gauge-label { font-size: 9px; color: #8892b0; text-align: center; }
-    .gauge-bar { height: 6px; background: #1c2235; border-radius: 3px; overflow: hidden; }
+    .gauge-label { font-size: 8px; color: #94a3b8; text-align: center; }
+    .gauge-bar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
     .gauge-fill { height: 100%; width: 50%; transition: width 0.3s ease; }
-    .sub-bar { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #a5b4fc; }
+    .hud-sub { display: flex; justify-content: space-between; font-size: 10px; color: #38bdf8; font-weight: bold; }
 
-    /* 3Dステージ */
-    #stage-container { position: relative; flex: 1; width: 100%; overflow: hidden; background: radial-gradient(circle at center, #141724 0%, #05060a 100%); }
-    #c3d { width: 100%; height: 100%; display: block; }
+    /* 画面右上：クイック視点切り替えアイコン */
+    .view-switchers {
+      position: absolute; top: 75px; right: 10px; z-index: 10;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .icon-btn {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(15, 20, 32, 0.85); border: 1px solid rgba(255,255,255,0.15);
+      color: #fff; font-size: 16px; display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5); backdrop-filter: blur(4px); cursor: pointer;
+    }
+    .icon-btn.active { border-color: #38bdf8; background: #1e3a8a; }
+
+    /* 画面下部：ドラマ通知バー & 操作アクション */
+    .bottom-bar {
+      position: absolute; bottom: 16px; left: 12px; right: 12px; z-index: 10;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .story-toast {
+      background: rgba(10, 12, 18, 0.85); backdrop-filter: blur(8px);
+      border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px;
+      padding: 8px 12px; font-size: 11px; line-height: 1.4; color: #f8fafc;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .tag { color: #38bdf8; font-weight: bold; margin-right: 4px; }
     
-    /* 押しやすく改善したカメラ切り替えタブ（画面下寄り・親指エリア） */
-    .cam-tabs {
-      position: absolute; bottom: 8px; left: 8px; right: 8px;
-      display: flex; gap: 6px; z-index: 50;
+    .action-dock { display: flex; gap: 8px; }
+    .dock-btn {
+      flex: 1; padding: 12px 0; border: none; border-radius: 12px;
+      font-size: 13px; font-weight: bold; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4); backdrop-filter: blur(6px);
     }
-    .cam-tab {
-      flex: 1; padding: 8px 0; background: rgba(18, 22, 36, 0.88); border: 1px solid #374151;
-      border-radius: 8px; color: #94a3b8; font-size: 11px; font-weight: bold; text-align: center;
-      cursor: pointer; backdrop-filter: blur(4px);
-    }
-    .cam-tab.active { background: #3b82f6; border-color: #60a5fa; color: #fff; box-shadow: 0 0 10px rgba(59,130,246,0.4); }
+    .btn-main { background: linear-gradient(135deg, #2563eb, #38bdf8); color: #fff; }
+    .btn-sub { flex: 0 0 54px; background: rgba(20, 24, 38, 0.85); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 18px; }
 
-    /* 虫眼鏡レンズ枠 */
-    .lens-overlay {
-      position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.3s;
-      background: radial-gradient(circle at center, transparent 38%, rgba(5,7,14,0.7) 65%, rgba(0,0,0,0.95) 85%);
+    /* スライドアップ式 差し入れトレイ */
+    .sheet-drawer {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+      display: none; align-items: flex-end;
     }
-    .lens-overlay.active { opacity: 1; }
-
-    /* 操作・ドラマパネル */
-    .bottom-sheet { background: #0f111a; border-top: 1px solid #1f2638; padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; z-index: 100; flex-shrink: 0; }
-    .story-box {
-      background: #08090f; border: 1px solid #232a3d; border-radius: 6px; padding: 6px 10px;
-      font-size: 12px; line-height: 1.4; color: #f1f5f9; min-height: 44px; max-height: 56px; overflow-y: auto;
+    .drawer-content {
+      width: 100%; background: #0f121d; border-radius: 20px 20px 0 0;
+      border-top: 1px solid #2d3748; padding: 16px 16px 28px;
+      display: flex; flex-direction: column; gap: 12px;
+      animation: slideUp 0.25s ease-out;
     }
-    .story-tag { color: #60a5fa; font-weight: bold; margin-right: 4px; }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .drawer-title { font-size: 13px; font-weight: bold; color: #94a3b8; display: flex; justify-content: space-between; }
     
-    .item-select { display: flex; gap: 6px; }
-    .item-btn {
-      flex: 1; padding: 6px 0; background: #161a29; border: 1px solid #283147; border-radius: 6px;
-      color: #fff; font-size: 11px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer;
+    .item-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .item-card {
+      background: #181d2f; border: 1px solid #2d3748; border-radius: 10px;
+      padding: 10px 0; display: flex; flex-direction: column; align-items: center; gap: 4px;
+      color: #fff; font-size: 11px; cursor: pointer;
     }
-    .item-btn.selected { border-color: #3b82f6; background: #1e293b; }
+    .item-card.selected { border-color: #38bdf8; background: #1e293b; }
+    .item-card span:first-child { font-size: 22px; }
 
-    .action-row { display: flex; gap: 8px; }
-    .act-btn {
-      flex: 1; padding: 10px 0; background: linear-gradient(135deg, #2563eb, #38bdf8);
-      border: none; border-radius: 8px; color: #fff; font-weight: bold; font-size: 13px; cursor: pointer;
+    /* 全画面ブック型 日記モーダル */
+    .book-modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200;
+      display: none; align-items: center; justify-content: center; padding: 16px;
     }
-    .act-btn:disabled { background: #282f44; color: #64748b; }
-    .sub-btn { background: #1a2030; color: #94a3b8; border: 1px solid #2d3748; padding: 0 12px; border-radius: 8px; font-size: 11px; }
-
-    /* モーダル */
-    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
-    .modal-card { background: #141724; border: 1px solid #2d3748; border-radius: 12px; padding: 14px; width: 100%; max-width: 320px; }
-    .modal-title { font-size: 13px; color: #60a5fa; margin-bottom: 8px; font-weight: bold; }
-    .diary-text { font-size: 11px; line-height: 1.5; color: #cbd5e1; background: #0a0c14; padding: 8px; border-radius: 6px; max-height: 140px; overflow-y: auto; white-space: pre-wrap; }
-    .close-btn { width: 100%; margin-top: 10px; padding: 8px; background: #1e293b; border: 1px solid #3b82f6; color: #fff; border-radius: 6px; }
-    input[type="password"] { width: 100%; padding: 8px; background: #0a0c14; border: 1px solid #2d3748; color: #fff; border-radius: 6px; margin: 8px 0; font-size: 11px; }
+    .book-page {
+      width: 100%; max-width: 340px; background: #161a29; border: 1px solid #334155;
+      border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .book-title { font-size: 14px; font-weight: bold; color: #38bdf8; display: flex; justify-content: space-between; align-items: center; }
+    .book-body {
+      background: #0b0d14; border-radius: 8px; padding: 12px; font-size: 12px; line-height: 1.6;
+      color: #cbd5e1; max-height: 240px; overflow-y: auto; white-space: pre-wrap;
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-  <!-- 5ゲージ -->
-  <div class="header">
+  <!-- 3D観察モニター -->
+  <div id="stage-container">
+    <div id="c3d"></div>
+  </div>
+
+  <!-- 上部ステータス -->
+  <div class="top-hud">
     <div class="status-row">
       <div class="gauge-wrap"><div class="gauge-label">❤️体力</div><div class="gauge-bar"><div class="gauge-fill" id="g-hp" style="background:#ef4444;"></div></div></div>
       <div class="gauge-wrap"><div class="gauge-label">☕疲労</div><div class="gauge-bar"><div class="gauge-fill" id="g-fatigue" style="background:#f59e0b;"></div></div></div>
@@ -84,119 +117,111 @@
       <div class="gauge-wrap"><div class="gauge-label">💤睡眠</div><div class="gauge-bar"><div class="gauge-fill" id="g-sleep" style="background:#8b5cf6;"></div></div></div>
       <div class="gauge-wrap"><div class="gauge-label">✨充実</div><div class="gauge-bar"><div class="gauge-fill" id="g-morale" style="background:#10b981;"></div></div></div>
     </div>
-    <div class="sub-bar">
-      <span>AI思考: <b id="ui-mode" style="color:#38bdf8;">内蔵モック</b></span>
-      <span>現在地: <b id="ui-loc" style="color:#48bb78;">地上</b></span>
-      <span>残り: <b id="ui-energy">20</b>回</span>
+    <div class="hud-sub">
+      <span id="ui-loc">現在地: 地上</span>
+      <span id="ui-energy">残り: 20回</span>
     </div>
   </div>
 
-  <!-- 3Dステージ＆カメラ切り替え -->
-  <div id="stage-container">
-    <div id="c3d"></div>
-    <div class="lens-overlay" id="lensOverlay"></div>
-    
-    <div class="cam-tabs">
-      <div class="cam-tab active" onclick="setCamera('surface', this)">🌲 地上全景</div>
-      <div class="cam-tab" onclick="setCamera('zoom', this)">🔍 虫眼鏡ズーム</div>
-      <div class="cam-tab" onclick="setCamera('antfarm', this)">⛏️ アリの巣断面</div>
+  <!-- 右上クイック視点切り替え -->
+  <div class="view-switchers">
+    <div class="icon-btn active" id="btn-view-sur" onclick="switchView('surface')">🌲</div>
+    <div class="icon-btn" id="btn-view-ant" onclick="switchView('antfarm')">⛏️</div>
+  </div>
+
+  <!-- 画面下部 ドック -->
+  <div class="bottom-bar">
+    <div class="story-toast" id="storyToast">
+      <span class="tag">[観察中]</span>地上をお化けがうろついています。ピンチを救うアイテムを差し入れましょう。
+    </div>
+    <div class="action-dock">
+      <button class="dock-btn btn-sub" onclick="openDiary()">📖</button>
+      <button class="dock-btn btn-main" onclick="openDrawer()">🎁 アイテムを差し入れる</button>
+      <button class="dock-btn btn-sub" onclick="openKeyModal()">⚙️</button>
     </div>
   </div>
 
-  <!-- 操作部 -->
-  <div class="bottom-sheet">
-    <div class="story-box" id="storyBox">
-      <span class="story-tag">[観察開始]</span>地上にお化けが徘徊しています。アイテムを差し入れてください。
-    </div>
-
-    <div class="item-select">
-      <div class="item-btn selected" onclick="selectItem('🍎 リンゴ', this)"><span>🍎</span><span>リンゴ</span></div>
-      <div class="item-btn" onclick="selectItem('🪢 ロープ', this)"><span>🪢</span><span>ロープ</span></div>
-      <div class="item-btn" onclick="selectItem('🔥 たいまつ', this)"><span>🔥</span><span>たいまつ</span></div>
-      <div class="item-btn" onclick="selectItem('🪨 石ころ', this)"><span>🪨</span><span>石ころ</span></div>
-    </div>
-
-    <div class="action-row">
-      <button class="act-btn" id="actBtn" onclick="dispatchAction()">運命を見届ける (差し入れ)</button>
-      <button class="sub-btn" onclick="openDiary()">📖 日記</button>
-      <button class="sub-btn" onclick="openKeyModal()">⚙️ API</button>
+  <!-- 差し入れトレイ（下からスライド） -->
+  <div class="sheet-drawer" id="itemDrawer" onclick="closeDrawer(event)">
+    <div class="drawer-content" onclick="event.stopPropagation()">
+      <div class="drawer-title">
+        <span>差し入れるアイテムを選択</span>
+        <span style="cursor:pointer;" onclick="closeDrawer()">✕ 閉じる</span>
+      </div>
+      <div class="item-grid">
+        <div class="item-card selected" onclick="selectItem('🍎 リンゴ', this)"><span>🍎</span><span>リンゴ</span></div>
+        <div class="item-card" onclick="selectItem('🪢 ロープ', this)"><span>🪢</span><span>ロープ</span></div>
+        <div class="item-card" onclick="selectItem('🔥 たいまつ', this)"><span>🔥</span><span>たいまつ</span></div>
+        <div class="item-card" onclick="selectItem('🪨 石ころ', this)"><span>🪨</span><span>石ころ</span></div>
+      </div>
+      <button class="dock-btn btn-main" id="dispatchBtn" onclick="dispatchAction()">このアイテムを投下して見届ける</button>
     </div>
   </div>
 
   <!-- 日記モーダル -->
-  <div class="modal" id="diaryModal">
-    <div class="modal-card">
-      <div class="modal-title">📖 記録された日記</div>
-      <div class="diary-text" id="diaryContent">昨日の日記はまだ白紙だ。</div>
-      <button class="close-btn" onclick="closeDiary()">閉じる</button>
+  <div class="book-modal" id="diaryModal">
+    <div class="book-page">
+      <div class="book-title"><span>📖 観察日記・記憶の手帳</span><span style="cursor:pointer;" onclick="closeDiary()">✕</span></div>
+      <div class="book-body" id="diaryText">記録はまだありません。</div>
     </div>
   </div>
 
-  <!-- APIキー設定モーダル -->
-  <div class="modal" id="keyModal">
-    <div class="modal-card">
-      <div class="modal-title">⚙️ Gemini API設定</div>
-      <div style="font-size:11px;color:#8892b0;line-height:1.4;">APIキーを入力すると、Geminiがリアルタイムに道具の使い方と運命を自律思考します。</div>
-      <input type="password" id="keyInput" placeholder="AIzaSy...">
-      <div style="display:flex;gap:6px;">
-        <button class="act-btn" style="flex:1;" onclick="saveKey()">保存して接続</button>
-        <button class="sub-btn" onclick="closeKeyModal()">閉じる</button>
-      </div>
+  <!-- API設定モーダル -->
+  <div class="book-modal" id="keyModal">
+    <div class="book-page">
+      <div class="book-title"><span>⚙️ Gemini API設定</span><span style="cursor:pointer;" onclick="closeKeyModal()">✕</span></div>
+      <div style="font-size:11px;color:#94a3b8;">APIキーを入力すると、本物のGeminiがリアルタイムに物理作戦と思考を展開します。</div>
+      <input type="password" id="keyInput" placeholder="AIzaSy..." style="width:100%;padding:10px;background:#07090e;border:1px solid #334155;color:#fff;border-radius:8px;font-size:12px;">
+      <button class="dock-btn btn-main" onclick="saveKey()">保存して接続</button>
     </div>
   </div>
 
   <script>
     const STATE = {
-      hp: 75, fatigue: 20, hunger: 30, sleep: 20, morale: 80,
+      hp: 80, fatigue: 20, hunger: 30, sleep: 20, morale: 80,
       energy: 20,
       selectedItem: '🍎 リンゴ',
-      diary: '【初日】何もない島で目が覚めた。頭がぼんやりしている。',
-      location: 'surface', // 'surface' or 'underground'
+      diary: '【観察1日目】この箱庭で目が覚めた。頭がぼんやりしている。',
+      location: 'surface',
       isBusy: false
     };
 
-    // --- Three.js 初期化 ---
+    // --- Three.js & レンダラー設定 ---
     const container = document.getElementById('c3d');
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0c14);
+    scene.background = new THREE.Color(0x06070b);
 
-    const camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
     const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'low-power' });
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
-    const ambLight = new THREE.AmbientLight(0xffffff, 0.8);
+    const ambLight = new THREE.AmbientLight(0xffffff, 0.85);
     scene.add(ambLight);
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
     dirLight.position.set(10, 20, 10);
     scene.add(dirLight);
 
-    // --- 完全な水槽断面マップ（手前半分を全撤去して中を露出） ---
+    // --- 完全な水槽断面マップ（手前z>0全カット） ---
     const boxGeo = new THREE.BoxGeometry(0.95, 0.95, 0.95);
     const matGrass = new THREE.MeshLambertMaterial({ color: 0x48bb78 });
     const matDirt = new THREE.MeshLambertMaterial({ color: 0x784f33 });
     const matStone = new THREE.MeshLambertMaterial({ color: 0x475569 });
     const matOre = new THREE.MeshLambertMaterial({ color: 0x38bdf8 });
 
-    const mapGroup = new THREE.Group();
-    scene.add(mapGroup);
+    const worldGroup = new THREE.Group();
+    scene.add(worldGroup);
 
-    // X: -4〜4 (幅9), Y: 0〜-5 (深さ6層), Z: -4〜0 (奥半分だけ配置・手前z>0は完全オープン)
     for (let x = -4; x <= 4; x++) {
       for (let z = -4; z <= 0; z++) {
-        // 地表（緑）: x=0, z=-1 は地下への「タテ穴」として空けておく
         if (!(x === 0 && z === -1)) {
           const grass = new THREE.Mesh(boxGeo, matGrass);
           grass.position.set(x, 0, z);
-          mapGroup.add(grass);
+          worldGroup.add(grass);
         }
-
-        // 地下層 (-1 〜 -5)
         for (let y = -1; y >= -5; y--) {
-          // タテ穴通路 (x=0, z=-1) は地下-3まで空洞
           if (x === 0 && z === -1 && y >= -3) continue;
-          // 地下小部屋（空洞）: x: -2〜2, y: -3〜-4, z: -2〜0
           if (Math.abs(x) <= 2 && y <= -2 && y >= -4 && z >= -2) continue;
 
           let mat = matStone;
@@ -205,20 +230,20 @@
 
           const block = new THREE.Mesh(boxGeo, mat);
           block.position.set(x, y, z);
-          mapGroup.add(block);
+          worldGroup.add(block);
         }
       }
     }
 
-    // 地下へ続くハシゴ（木製ボクセル）
+    // ハシゴ
     const ladderMat = new THREE.MeshLambertMaterial({ color: 0xb45309 });
     for (let y = 0; y >= -3; y--) {
       const step = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.1), ladderMat);
       step.position.set(0, y - 0.2, -1.4);
-      mapGroup.add(step);
+      worldGroup.add(step);
     }
 
-    // 水槽のガラス枠（前面境界線を示す半透明ライン）
+    // 水槽前面ガラス
     const glass = new THREE.Mesh(
       new THREE.PlaneGeometry(9, 6),
       new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.08, side: THREE.DoubleSide })
@@ -228,56 +253,35 @@
 
     // --- キャラクター構造 ---
     const chara = new THREE.Group();
-    scene.add(chara);
+    worldGroup.add(chara);
 
     const bodyM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x3b82f6 }));
-    bodyM.scale.set(0.5, 0.5, 0.35);
-    bodyM.position.y = 0.5;
-    chara.add(bodyM);
+    bodyM.scale.set(0.5, 0.5, 0.35); bodyM.position.y = 0.5; chara.add(bodyM);
 
     const headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x93c5fd }));
-    headM.scale.set(0.42, 0.4, 0.4);
-    headM.position.y = 0.85;
-    chara.add(headM);
+    headM.scale.set(0.42, 0.4, 0.4); headM.position.y = 0.85; chara.add(headM);
 
-    // 腕
     const armGeo = new THREE.BoxGeometry(0.16, 0.38, 0.16);
     const armMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
-    const rArm = new THREE.Mesh(armGeo, armMat);
-    rArm.position.set(0.35, 0.5, 0);
-    chara.add(rArm);
-    const lArm = new THREE.Mesh(armGeo, armMat);
-    lArm.position.set(-0.35, 0.5, 0);
-    chara.add(lArm);
+    const rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.35, 0.5, 0); chara.add(rArm);
+    const lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.35, 0.5, 0); chara.add(lArm);
 
-    // 持ち物
     const itemSlot = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshLambertMaterial({ color: 0xef4444 }));
-    itemSlot.position.set(0, -0.22, 0.12);
-    rArm.add(itemSlot);
+    itemSlot.position.set(0, -0.22, 0.12); rArm.add(itemSlot);
 
-    // 足
     const legGeo = new THREE.BoxGeometry(0.18, 0.32, 0.18);
     const bootGeo = new THREE.BoxGeometry(0.2, 0.14, 0.26);
     const legMat = new THREE.MeshLambertMaterial({ color: 0x1e3a8a });
     const bootMat = new THREE.MeshLambertMaterial({ color: 0x78350f });
 
-    const rLegG = new THREE.Group();
-    rLegG.position.set(0.16, 0.25, 0);
-    const rLeg = new THREE.Mesh(legGeo, legMat);
-    const rBoot = new THREE.Mesh(bootGeo, bootMat);
-    rBoot.position.set(0, -0.14, 0.04);
-    rLegG.add(rLeg, rBoot);
-    chara.add(rLegG);
+    const rLegG = new THREE.Group(); rLegG.position.set(0.16, 0.25, 0);
+    const rLeg = new THREE.Mesh(legGeo, legMat); const rBoot = new THREE.Mesh(bootGeo, bootMat);
+    rBoot.position.set(0, -0.14, 0.04); rLegG.add(rLeg, rBoot); chara.add(rLegG);
 
-    const lLegG = new THREE.Group();
-    lLegG.position.set(-0.16, 0.25, 0);
-    const lLeg = new THREE.Mesh(legGeo, legMat);
-    const lBoot = new THREE.Mesh(bootGeo, bootMat);
-    lBoot.position.set(0, -0.14, 0.04);
-    lLegG.add(lLeg, lBoot);
-    chara.add(lLegG);
+    const lLegG = new THREE.Group(); lLegG.position.set(-0.16, 0.25, 0);
+    const lLeg = new THREE.Mesh(legGeo, legMat); const lBoot = new THREE.Mesh(bootGeo, bootMat);
+    lBoot.position.set(0, -0.14, 0.04); lLegG.add(lLeg, lBoot); chara.add(lLegG);
 
-    // 初期位置（地上）
     chara.position.set(-1.5, 0.5, -0.5);
 
     // お化け
@@ -286,29 +290,62 @@
       new THREE.MeshLambertMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.8 })
     );
     ghost.position.set(2, 1.2, -0.5);
-    scene.add(ghost);
+    worldGroup.add(ghost);
 
-    // --- カメラ設定（引き距離を拡大し全体像を確保） ---
-    const CAMERAS = {
-      surface: { pos: new THREE.Vector3(0, 8, 12), look: new THREE.Vector3(0, 0, -1), lens: false },
-      zoom: { pos: new THREE.Vector3(0, 2, 4.5), look: new THREE.Vector3(0, 0.5, -0.5), lens: true },
-      // アリの巣断面：しっかり引いて地上〜地下5層（全高7マス・全幅9マス）を完全に捉える
-      antfarm: { pos: new THREE.Vector3(0, -2.5, 11), look: new THREE.Vector3(0, -2.5, 0), lens: false }
+    // --- カメラ設定 ---
+    const VIEWS = {
+      surface: { pos: new THREE.Vector3(0, 9, 13), look: new THREE.Vector3(0, 0, -1) },
+      antfarm: { pos: new THREE.Vector3(0, -2.5, 12), look: new THREE.Vector3(0, -2.5, 0) }
     };
 
-    let targetCamPos = CAMERAS.surface.pos.clone();
-    let targetCamLook = CAMERAS.surface.look.clone();
+    let targetCamPos = VIEWS.surface.pos.clone();
+    let targetCamLook = VIEWS.surface.look.clone();
     let curCamLook = targetCamLook.clone();
     camera.position.copy(targetCamPos);
 
-    function setCamera(mode, btn) {
-      targetCamPos.copy(CAMERAS[mode].pos);
-      targetCamLook.copy(CAMERAS[mode].look);
-
-      document.querySelectorAll('.cam-tab').forEach(t => t.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('lensOverlay').classList.toggle('active', CAMERAS[mode].lens);
+    function switchView(viewKey) {
+      targetCamPos.copy(VIEWS[viewKey].pos);
+      targetCamLook.copy(VIEWS[viewKey].look);
+      document.getElementById('btn-view-sur').classList.toggle('active', viewKey === 'surface');
+      document.getElementById('btn-view-ant').classList.toggle('active', viewKey === 'antfarm');
     }
+
+    // --- 1本指ドラッグ（回転）＆ 2本指ピンチイン/アウト（ズーム） ---
+    let touchMode = 'none';
+    let prevTouchX = 0, prevTouchY = 0, initialPinchDist = 0;
+
+    window.addEventListener('touchstart', e => {
+      if (e.touches.length === 1) {
+        touchMode = 'rotate';
+        prevTouchX = e.touches[0].clientX;
+        prevTouchY = e.touches[0].clientY;
+      } else if (e.touches.length === 2) {
+        touchMode = 'pinch';
+        initialPinchDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', e => {
+      if (touchMode === 'rotate' && e.touches.length === 1) {
+        const dx = e.touches[0].clientX - prevTouchX;
+        worldGroup.rotation.y += dx * 0.007;
+        prevTouchX = e.touches[0].clientX;
+      } else if (touchMode === 'pinch' && e.touches.length === 2) {
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const factor = (initialPinchDist - dist) * 0.02;
+        camera.fov = Math.max(20, Math.min(65, camera.fov + factor));
+        camera.updateProjectionMatrix();
+        initialPinchDist = dist;
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', () => { touchMode = 'none'; });
 
     // --- メインループ ---
     let animClock = 0;
@@ -339,58 +376,59 @@
     }
     animate();
 
-    // --- アクション・階段降下アニメーション ---
+    // --- 操作・トレイ管理 ---
+    function openDrawer() { document.getElementById('itemDrawer').style.display = 'flex'; }
+    function closeDrawer() { document.getElementById('itemDrawer').style.display = 'none'; }
+    function openDiary() { document.getElementById('diaryText').innerText = STATE.diary; document.getElementById('diaryModal').style.display = 'flex'; }
+    function closeDiary() { document.getElementById('diaryModal').style.display = 'none'; }
+    function openKeyModal() { document.getElementById('keyInput').value = localStorage.getItem('gemini_api_key') || ''; document.getElementById('keyModal').style.display = 'flex'; }
+    function closeKeyModal() { document.getElementById('keyModal').style.display = 'none'; }
+    function saveKey() {
+      localStorage.setItem('gemini_api_key', document.getElementById('keyInput').value.trim());
+      closeKeyModal();
+    }
+
     function selectItem(name, el) {
       STATE.selectedItem = name;
-      document.querySelectorAll('.item-btn').forEach(b => b.classList.remove('selected'));
+      document.querySelectorAll('.item-card').forEach(c => c.classList.remove('selected'));
       el.classList.add('selected');
       const colors = { '🍎 リンゴ': 0xef4444, '🪢 ロープ': 0xd97706, '🔥 たいまつ': 0xf59e0b, '🪨 石ころ': 0x64748b };
       itemSlot.material.color.setHex(colors[name] || 0xffffff);
     }
 
+    // --- アクション実行（思考・ハシゴ移動） ---
     async function dispatchAction() {
       if (STATE.isBusy || STATE.energy <= 0) return;
+      closeDrawer();
       STATE.isBusy = true;
       STATE.energy--;
       updateUI();
 
-      const storyEl = document.getElementById('storyBox');
+      const toast = document.getElementById('storyToast');
       const key = localStorage.getItem('gemini_api_key');
-      
-      storyEl.innerHTML = `<span class="story-tag">[${key ? 'Gemini思考中' : '内蔵AI思考'}]</span>${STATE.selectedItem}をどう使うか考えています...`;
+      toast.innerHTML = `<span class="tag">[${key ? 'Gemini思考中' : '内蔵AI思考'}]</span>${STATE.selectedItem}をどう活用するか考えています...`;
 
-      // AI思考の取得
-      let res = null;
-      if (key) {
-        res = await callGeminiAPI(key);
-      } else {
-        res = getLocalMock();
-      }
+      let res = key ? await callGeminiAPI(key) : getLocalMock();
 
-      // 行動アニメーション（地上 ⇄ 地下の物理移動）
+      // 移動アニメーション
       isWalking = true;
-
       if (res.targetLoc === 'underground' && STATE.location === 'surface') {
-        // 地上から穴へ歩き、ハシゴを降りる
-        storyEl.innerHTML = `<span class="story-tag">[行動]</span>お化けから逃げるため、タテ穴のハシゴへ向かっています...`;
+        toast.innerHTML = `<span class="tag">[移動]</span>お化けから逃れるため、タテ穴からハシゴで地下へ！`;
         await moveTo(0, 0.5, -0.8, 800);
-        storyEl.innerHTML = `<span class="story-tag">[降下]</span>ハシゴを降りて地下小部屋へ潜入中！`;
-        setCamera('antfarm', document.querySelectorAll('.cam-tab')[2]);
+        switchView('antfarm');
         await moveTo(0, -3.2, -0.8, 1000);
         STATE.location = 'underground';
       } else if (res.targetLoc === 'surface' && STATE.location === 'underground') {
-        // 地下から地上へ登る
-        storyEl.innerHTML = `<span class="story-tag">[行動]</span>地上を確認するため、ハシゴをよじ登っています...`;
+        toast.innerHTML = `<span class="tag">[移動]</span>ハシゴを登って地上へ戻っています...`;
         await moveTo(0, 0.5, -0.8, 1000);
-        setCamera('surface', document.querySelectorAll('.cam-tab')[0]);
+        switchView('surface');
         await moveTo(-1.5, 0.5, -0.5, 800);
         STATE.location = 'surface';
       }
-
       isWalking = false;
 
-      // 結果の反映
-      storyEl.innerHTML = `<span class="story-tag">[結果]</span>${res.story}`;
+      // 結果反映
+      toast.innerHTML = `<span class="tag">[結果]</span>${res.story}`;
       STATE.hp = Math.max(0, Math.min(100, STATE.hp + res.delta.hp));
       STATE.fatigue = Math.max(0, Math.min(100, STATE.fatigue + res.delta.fatigue));
       STATE.hunger = Math.max(0, Math.min(100, STATE.hunger + res.delta.hunger));
@@ -402,7 +440,6 @@
       updateUI();
     }
 
-    // 座標移動ヘルパー
     function moveTo(tx, ty, tz, duration) {
       return new Promise(resolve => {
         const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z;
@@ -419,14 +456,11 @@
       });
     }
 
-    // Gemini API 呼び出し（本物の思考）
     async function callGeminiAPI(key) {
-      const prompt = `あなたは箱庭世界に住むロボットです。
-ステータス: 体力=${STATE.hp}, 疲労=${STATE.fatigue}, 空腹=${STATE.hunger}, 睡眠不足=${STATE.sleep}, 充実=${STATE.morale}。
-現在地: ${STATE.location === 'surface' ? '地上(お化けが接近中)' : '地下の小部屋(暗闇)'}。
-人間から【${STATE.selectedItem}】を受け取りました。
-この道具の物理的な特性（重さ、火、長さ等）を考慮し、どう機転を利かせて危機を切り抜けたかのショートドラマ(45文字程度)と、移動先("surface"または"underground")、5ゲージの増減(-20〜+20)をJSON形式だけで出力してください。
-JSON形式: {"story":"...", "targetLoc":"underground", "delta":{"hp":0,"fatigue":0,"hunger":0,"sleep":0,"morale":0}}`;
+      const prompt = `あなたは箱庭のロボットです。体力=${STATE.hp}, 疲労=${STATE.fatigue}, 空腹=${STATE.hunger}, 睡眠=${STATE.sleep}, 充実=${STATE.morale}。
+現在地: ${STATE.location}。お化けがいます。人間から【${STATE.selectedItem}】を受け取りました。
+どう物理的に切り抜けたかを45字程度の物語にし、移動先("surface"か"underground")と5ステータス増減(-20〜20)をJSONで出力してください。
+{"story":"...", "targetLoc":"underground", "delta":{"hp":0,"fatigue":0,"hunger":0,"sleep":0,"morale":0}}`;
 
       try {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
@@ -435,60 +469,43 @@ JSON形式: {"story":"...", "targetLoc":"underground", "delta":{"hp":0,"fatigue"
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
         const data = await res.json();
-        const text = data.candidates[0].content.parts[0].text;
-        return JSON.parse(text.match(/\{[\s\S]*\}/)[0]);
+        return JSON.parse(data.candidates[0].content.parts[0].text.match(/\{[\s\S]*\}/)[0]);
       } catch (e) {
         return getLocalMock();
       }
     }
 
-    // 内蔵モック（API未入力用）
     function getLocalMock() {
-      const isSur = STATE.location === 'surface';
-      if (isSur) {
+      if (STATE.location === 'surface') {
         return {
-          story: `${STATE.selectedItem}をお化けに投げつけ、慌ててタテ穴のハシゴから地下へ逃げ込んだ！`,
+          story: `${STATE.selectedItem}を投げつけ、慌ててタテ穴のハシゴから地下へ避難した！`,
           targetLoc: 'underground',
           delta: { hp: -5, fatigue: 15, hunger: 10, sleep: 5, morale: -5 }
         };
       } else {
         return {
-          story: `地下で${STATE.selectedItem}を使い一息ついた後、静かになった地上へハシゴを登って戻った。`,
+          story: `地下で${STATE.selectedItem}を使い落ち着きを取り戻し、地上へハシゴを登った。`,
           targetLoc: 'surface',
           delta: { hp: 5, fatigue: -10, hunger: 5, sleep: -10, morale: 15 }
         };
       }
     }
 
-    // UI更新
     function updateUI() {
       document.getElementById('g-hp').style.width = STATE.hp + '%';
       document.getElementById('g-fatigue').style.width = STATE.fatigue + '%';
       document.getElementById('g-hunger').style.width = STATE.hunger + '%';
       document.getElementById('g-sleep').style.width = STATE.sleep + '%';
       document.getElementById('g-morale').style.width = STATE.morale + '%';
-      document.getElementById('ui-energy').innerText = STATE.energy;
-      document.getElementById('ui-loc').innerText = STATE.location === 'surface' ? '地上' : '地下小部屋';
-      document.getElementById('ui-mode').innerText = localStorage.getItem('gemini_api_key') ? 'Gemini 2.5 Flash' : '内蔵モック';
-      document.getElementById('actBtn').disabled = STATE.energy <= 0 || STATE.isBusy;
+      document.getElementById('ui-energy').innerText = `残り: ${STATE.energy}回`;
+      document.getElementById('ui-loc').innerText = `現在地: ${STATE.location === 'surface' ? '地上' : '地下'}`;
     }
     updateUI();
 
-    // モーダル管理
-    function openDiary() { document.getElementById('diaryContent').innerText = STATE.diary; document.getElementById('diaryModal').style.display = 'flex'; }
-    function closeDiary() { document.getElementById('diaryModal').style.display = 'none'; }
-    function openKeyModal() { document.getElementById('keyInput').value = localStorage.getItem('gemini_api_key') || ''; document.getElementById('keyModal').style.display = 'flex'; }
-    function closeKeyModal() { document.getElementById('keyModal').style.display = 'none'; }
-    function saveKey() {
-      localStorage.setItem('gemini_api_key', document.getElementById('keyInput').value.trim());
-      closeKeyModal();
-      updateUI();
-    }
-
     window.addEventListener('resize', () => {
-      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setSize(window.innerWidth, window.innerHeight);
     });
   </script>
 </body>
