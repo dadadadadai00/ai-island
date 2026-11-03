@@ -2,162 +2,64 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>カイロ風ダイヤモンドマップ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>キャラクター骨組みテスト</title>
   <style>
-    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    * { box-sizing: border-box; user-select: none; margin: 0; padding: 0; }
     body {
-      margin: 0;
-      background: #181926;
-      color: #cad3f5;
-      font-family: sans-serif;
-      overflow-x: hidden;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      padding: 16px 8px;
+      background: #12131a; color: #eee; font-family: sans-serif;
+      display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 12px;
     }
-    h2 { margin: 0 0 4px; font-size: 17px; color: #8aadf4; }
-    .subtitle { font-size: 12px; color: #a5adcb; margin-bottom: 10px; }
-    
-    .status-panel {
-      background: #24273a;
-      border: 1px solid #363a4f;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: bold;
-      color: #eed49f;
-      margin-bottom: 10px;
-    }
+    h2 { font-size: 15px; color: #818cf8; margin-bottom: 8px; }
 
-    /* 3Dステージ */
-    .viewport {
-      width: 100%;
-      max-width: 400px;
-      height: 420px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      perspective: 1200px;
-      overflow: hidden;
-      background: radial-gradient(circle at center, #1e2030 0%, #11121d 100%);
-      border-radius: 16px;
-      border: 1px solid #363a4f;
+    /* ステージ台座（斜め立体） */
+    .stage {
+      width: 220px; height: 180px; position: relative;
+      display: flex; align-items: center; justify-content: center;
+      perspective: 600px; margin-bottom: 12px;
     }
-
-    /* ダイヤモンドグリッド（斜め45度・傾斜60度） */
-    .iso-map {
-      display: grid;
-      grid-template-columns: repeat(10, 26px);
-      grid-template-rows: repeat(10, 26px);
-      gap: 3px;
+    .pedestal {
+      width: 140px; height: 140px; background: #222538;
+      border: 3px solid #3b4261; border-radius: 20px;
       transform: rotateX(60deg) rotateZ(-45deg);
-      transform-style: preserve-3d;
-      padding: 20px;
-      position: relative;
+      box-shadow: 0 10px 0 #181926, 0 20px 25px rgba(0,0,0,0.5);
+    }
+    .shadow {
+      position: absolute; bottom: 35px; width: 60px; height: 24px;
+      background: rgba(0,0,0,0.4); border-radius: 50%;
+      filter: blur(2px); transition: all 0.2s;
     }
 
-    /* タイル（おもちゃ風クリーン立体） */
-    .tile {
-      width: 26px;
-      height: 26px;
-      background: linear-gradient(135deg, #a6da95, #8bd5ca);
-      border-radius: 6px;
-      box-shadow: 0 4px 0 #5b8266, 0 6px 8px rgba(0,0,0,0.3);
-      cursor: pointer;
-      transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
-    }
-    .tile.water {
-      background: linear-gradient(135deg, #7dc4e4, #91d7e3);
-      box-shadow: 0 3px 0 #3a708c, 0 5px 8px rgba(0,0,0,0.3);
-    }
-    .tile.mountain {
-      background: linear-gradient(135deg, #ee99a0, #ed8796);
-      box-shadow: 0 5px 0 #9f5360, 0 8px 10px rgba(0,0,0,0.3);
-      transform: translateZ(4px);
-    }
-    .tile:active, .tile.selected {
-      background: #eed49f !important;
-      box-shadow: 0 8px 0 #c6a052, 0 12px 14px rgba(0,0,0,0.4) !important;
-      transform: translateZ(8px) !important;
+    /* キャラクター本体 */
+    .chara-root {
+      position: absolute; bottom: 45px; width: 64px; height: 80px;
+      display: flex; flex-direction: column; align-items: center;
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
-    /* スルスル動くキャラクター */
-    #chara {
-      position: absolute;
-      width: 26px;
-      height: 26px;
-      font-size: 22px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      z-index: 50;
-      transform: translateZ(12px) rotateZ(45deg) rotateX(-60deg);
-      transition: left 0.3s cubic-bezier(0.25, 1, 0.5, 1), top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-      filter: drop-shadow(0 6px 3px rgba(0,0,0,0.4));
+    /* 向き（4方向の反転・角度） */
+    .dir-front-left { transform: scaleX(1); }
+    .dir-front-right { transform: scaleX(-1); }
+    .dir-back-left { transform: scaleX(1) scaleY(0.95); filter: brightness(0.85); }
+    .dir-back-right { transform: scaleX(-1) scaleY(0.95); filter: brightness(0.85); }
+
+    /* 各スロットの構造 */
+    .slot-hat { position: absolute; top: -18px; font-size: 24px; z-index: 10; transition: transform 0.15s; }
+    .head {
+      width: 48px; height: 42px; background: linear-gradient(135deg, #60a5fa, #3b82f6);
+      border-radius: 14px; position: relative; display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 0 #1d4ed8; z-index: 5;
     }
-  </style>
-</head>
-<body>
-
-  <h2>🏝 カイロ風 ダイヤモンドマップ</h2>
-  <div class="subtitle">マスをタップするとロボがスルスル歩きます</div>
-  <div class="status-panel" id="status">選択座標: なし</div>
-
-  <div class="viewport">
-    <div class="iso-map" id="map">
-      <div id="chara">🤖</div>
-    </div>
-  </div>
-
-  <script>
-    const MAP_SIZE = 10;
-    const mapEl = document.getElementById('map');
-    const statusEl = document.getElementById('status');
-    const charaEl = document.getElementById('chara');
-
-    let selectedTile = null;
-
-    // 10x10 マップ生成
-    for (let y = 0; y < MAP_SIZE; y++) {
-      for (let x = 0; x < MAP_SIZE; x++) {
-        const tile = document.createElement('div');
-        tile.className = 'tile';
-        
-        // アクセント（水辺と小山）
-        if ((x === 0 || y === 0 || x === 9 || y === 9) && (x + y) % 3 === 0) {
-          tile.classList.add('water');
-        } else if ((x === 2 && y === 3) || (x === 7 && y === 6)) {
-          tile.classList.add('mountain');
-        }
-
-        tile.onclick = () => onTileClick(x, y, tile);
-        mapEl.appendChild(tile);
-      }
+    .slot-face { font-size: 20px; }
+    .body {
+      width: 38px; height: 32px; background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+      border-radius: 10px; margin-top: -4px; position: relative;
+      box-shadow: 0 3px 0 #94a3b8; z-index: 4;
     }
-
-    function onTileClick(x, y, el) {
-      if (selectedTile) selectedTile.classList.remove('selected');
-      selectedTile = el;
-      el.classList.add('selected');
-
-      statusEl.innerText = `選択座標: (${x}, ${y}) へ移動中！`;
-      moveChara(x, y);
+    .slot-right-hand {
+      position: absolute; left: -14px; top: 6px; font-size: 20px;
+      transform-origin: top right; z-index: 6;
     }
+    .slot-backpack { position: absolute; right: -12px; top: 4px; font-size: 20px; z-index: 2; }
 
-    function moveChara(x, y) {
-      const step = 29; // 1マス 26px + 隙間 3px
-      const left = 20 + x * step;
-      const top = 20 + y * step;
-      charaEl.style.left = `${left}px`;
-      charaEl.style.top = `${top}px`;
-    }
-
-    // 初期配置 (5, 5)
-    moveChara(5, 5);
-  </script>
-</body>
-</html>
+    /* 仕草アニメーション
