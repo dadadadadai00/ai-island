@@ -3,112 +3,99 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ボクセルAI観察水槽</title>
+  <title>ボクセルAI生態観察水槽</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100dvh; overflow: hidden; background: #07090e; font-family: -apple-system, sans-serif; }
     
-    /* 3D全画面キャンバス */
-    #stage-container { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+    /* 3D全画面ステージ */
+    #stage { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
     #c3d { width: 100%; height: 100%; display: block; }
 
-    /* 上部：極小シースルーゲージ */
+    /* 上部：5大ステータスバー（常時表示） */
     .top-hud {
-      position: absolute; top: 10px; left: 10px; right: 10px; z-index: 10;
-      background: rgba(10, 12, 18, 0.75); backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 6px 10px;
+      position: absolute; top: 8px; left: 8px; right: 8px; z-index: 10;
+      background: rgba(13, 16, 27, 0.85); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 6px 10px;
     }
     .status-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 4px; }
     .gauge-wrap { display: flex; flex-direction: column; gap: 2px; }
     .gauge-label { font-size: 8px; color: #94a3b8; text-align: center; }
-    .gauge-bar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+    .gauge-bar { height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
     .gauge-fill { height: 100%; width: 50%; transition: width 0.3s ease; }
     .hud-sub { display: flex; justify-content: space-between; font-size: 10px; color: #38bdf8; font-weight: bold; }
 
-    /* 画面右上：クイック視点切り替えアイコン */
-    .view-switchers {
-      position: absolute; top: 75px; right: 10px; z-index: 10;
+    /* カメラ＆観察アシストボタン（画面右上） */
+    .view-controls {
+      position: absolute; top: 68px; right: 8px; z-index: 10;
       display: flex; flex-direction: column; gap: 8px;
     }
-    .icon-btn {
-      width: 40px; height: 40px; border-radius: 50%;
-      background: rgba(15, 20, 32, 0.85); border: 1px solid rgba(255,255,255,0.15);
-      color: #fff; font-size: 16px; display: flex; align-items: center; justify-content: center;
+    .hud-icon-btn {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: rgba(15, 20, 32, 0.85); border: 1px solid rgba(255,255,255,0.2);
+      color: #fff; font-size: 15px; display: flex; align-items: center; justify-content: center;
       box-shadow: 0 4px 10px rgba(0,0,0,0.5); backdrop-filter: blur(4px); cursor: pointer;
     }
-    .icon-btn.active { border-color: #38bdf8; background: #1e3a8a; }
+    .hud-icon-btn.active { border-color: #38bdf8; background: #1e3a8a; }
 
-    /* 画面下部：ドラマ通知バー & 操作アクション */
-    .bottom-bar {
-      position: absolute; bottom: 16px; left: 12px; right: 12px; z-index: 10;
-      display: flex; flex-direction: column; gap: 8px;
+    /* 下部：神の手（アイテム選択パレット） */
+    .bottom-hud {
+      position: absolute; bottom: 12px; left: 8px; right: 8px; z-index: 10;
+      display: flex; flex-direction: column; gap: 6px; pointer-events: none;
     }
-    .story-toast {
-      background: rgba(10, 12, 18, 0.85); backdrop-filter: blur(8px);
-      border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px;
-      padding: 8px 12px; font-size: 11px; line-height: 1.4; color: #f8fafc;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    .toast-msg {
+      align-self: center; background: rgba(10, 12, 18, 0.85); border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 20px; padding: 4px 12px; font-size: 11px; color: #e2e8f0; backdrop-filter: blur(4px);
     }
-    .tag { color: #38bdf8; font-weight: bold; margin-right: 4px; }
-    
-    .action-dock { display: flex; gap: 8px; }
-    .dock-btn {
-      flex: 1; padding: 12px 0; border: none; border-radius: 12px;
-      font-size: 13px; font-weight: bold; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.4); backdrop-filter: blur(6px);
+    .item-palette {
+      display: flex; gap: 6px; justify-content: center; pointer-events: auto;
     }
-    .btn-main { background: linear-gradient(135deg, #2563eb, #38bdf8); color: #fff; }
-    .btn-sub { flex: 0 0 54px; background: rgba(20, 24, 38, 0.85); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 18px; }
+    .palette-item {
+      width: 50px; height: 50px; background: rgba(18, 24, 38, 0.9); border: 2px solid #334155;
+      border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-size: 18px; color: #fff; cursor: pointer; backdrop-filter: blur(6px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4); transition: transform 0.15s, border-color 0.15s;
+    }
+    .palette-item span:last-child { font-size: 8px; color: #94a3b8; }
+    .palette-item.selected { border-color: #38bdf8; transform: translateY(-4px); background: #1e293b; }
 
-    /* スライドアップ式 差し入れトレイ */
-    .sheet-drawer {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
-      display: none; align-items: flex-end;
-    }
-    .drawer-content {
-      width: 100%; background: #0f121d; border-radius: 20px 20px 0 0;
-      border-top: 1px solid #2d3748; padding: 16px 16px 28px;
-      display: flex; flex-direction: column; gap: 12px;
-      animation: slideUp 0.25s ease-out;
-    }
-    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-    .drawer-title { font-size: 13px; font-weight: bold; color: #94a3b8; display: flex; justify-content: space-between; }
-    
-    .item-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-    .item-card {
-      background: #181d2f; border: 1px solid #2d3748; border-radius: 10px;
-      padding: 10px 0; display: flex; flex-direction: column; align-items: center; gap: 4px;
-      color: #fff; font-size: 11px; cursor: pointer;
-    }
-    .item-card.selected { border-color: #38bdf8; background: #1e293b; }
-    .item-card span:first-child { font-size: 22px; }
-
-    /* 全画面ブック型 日記モーダル */
+    /* 全画面手帳モーダル（キャラクター状態 ＆ 観察日記） */
     .book-modal {
       position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200;
-      display: none; align-items: center; justify-content: center; padding: 16px;
+      display: none; align-items: center; justify-content: center; padding: 14px;
     }
-    .book-page {
-      width: 100%; max-width: 340px; background: #161a29; border: 1px solid #334155;
+    .book-card {
+      width: 100%; max-width: 360px; background: #131722; border: 1px solid #334155;
       border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
     }
-    .book-title { font-size: 14px; font-weight: bold; color: #38bdf8; display: flex; justify-content: space-between; align-items: center; }
-    .book-body {
-      background: #0b0d14; border-radius: 8px; padding: 12px; font-size: 12px; line-height: 1.6;
-      color: #cbd5e1; max-height: 240px; overflow-y: auto; white-space: pre-wrap;
+    .book-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #242c3d; padding-bottom: 8px; }
+    .book-title { font-size: 14px; font-weight: bold; color: #38bdf8; }
+    .close-cross { font-size: 18px; color: #94a3b8; cursor: pointer; }
+
+    /* 状態カルテ部 */
+    .status-profile {
+      background: #0b0d14; border-radius: 8px; padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px;
+    }
+    .prof-item { color: #94a3b8; }
+    .prof-item b { color: #f1f5f9; }
+
+    /* 心の声・日記部 */
+    .thought-bubble {
+      background: #182030; border-left: 3px solid #38bdf8; padding: 8px; border-radius: 4px; font-size: 11px; line-height: 1.4; color: #bae6fd;
+    }
+    .diary-records {
+      background: #0b0d14; border-radius: 8px; padding: 10px; font-size: 11px; line-height: 1.5;
+      color: #cbd5e1; max-height: 140px; overflow-y: auto; white-space: pre-wrap;
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-  <!-- 3D観察モニター -->
-  <div id="stage-container">
-    <div id="c3d"></div>
-  </div>
+  <div id="stage"><div id="c3d"></div></div>
 
-  <!-- 上部ステータス -->
+  <!-- 上部ステータスバー -->
   <div class="top-hud">
     <div class="status-row">
       <div class="gauge-wrap"><div class="gauge-label">❤️体力</div><div class="gauge-bar"><div class="gauge-fill" id="g-hp" style="background:#ef4444;"></div></div></div>
@@ -118,78 +105,95 @@
       <div class="gauge-wrap"><div class="gauge-label">✨充実</div><div class="gauge-bar"><div class="gauge-fill" id="g-morale" style="background:#10b981;"></div></div></div>
     </div>
     <div class="hud-sub">
-      <span id="ui-loc">現在地: 地上</span>
-      <span id="ui-energy">残り: 20回</span>
+      <span id="ui-day">📅 観察 1日目</span>
+      <span id="ui-drops">神の手(残): 20回</span>
     </div>
   </div>
 
-  <!-- 右上クイック視点切り替え -->
-  <div class="view-switchers">
-    <div class="icon-btn active" id="btn-view-sur" onclick="switchView('surface')">🌲</div>
-    <div class="icon-btn" id="btn-view-ant" onclick="switchView('antfarm')">⛏️</div>
+  <!-- クイック視点切り替え＆手帳ボタン -->
+  <div class="view-controls">
+    <div class="hud-icon-btn active" id="btn-v-sur" onclick="setView('surface')">🌲</div>
+    <div class="hud-icon-btn" id="btn-v-ant" onclick="setView('antfarm')">⛏️</div>
+    <div class="hud-icon-btn" onclick="openBookModal()">📖</div>
+    <div class="hud-icon-btn" onclick="openKeyModal()">⚙️</div>
   </div>
 
-  <!-- 画面下部 ドック -->
-  <div class="bottom-bar">
-    <div class="story-toast" id="storyToast">
-      <span class="tag">[観察中]</span>地上をお化けがうろついています。ピンチを救うアイテムを差し入れましょう。
-    </div>
-    <div class="action-dock">
-      <button class="dock-btn btn-sub" onclick="openDiary()">📖</button>
-      <button class="dock-btn btn-main" onclick="openDrawer()">🎁 アイテムを差し入れる</button>
-      <button class="dock-btn btn-sub" onclick="openKeyModal()">⚙️</button>
+  <!-- 下部：ポコンと置くアイテムパレット -->
+  <div class="bottom-hud">
+    <div class="toast-msg" id="toastMsg">地面をタップして【リンゴ】を落とせます</div>
+    <div class="item-palette">
+      <div class="palette-item selected" onclick="pickDropItem('🍎', 'リンゴ', this)"><span>🍎</span><span>リンゴ</span></div>
+      <div class="palette-item" onclick="pickDropItem('⛏️', 'ツルハシ', this)"><span>⛏️</span><span>ツルハシ</span></div>
+      <div class="palette-item" onclick="pickDropItem('🔥', 'たいまつ', this)"><span>🔥</span><span>たいまつ</span></div>
+      <div class="palette-item" onclick="pickDropItem('🪨', '石ころ', this)"><span>🪨</span><span>石ころ</span></div>
     </div>
   </div>
 
-  <!-- 差し入れトレイ（下からスライド） -->
-  <div class="sheet-drawer" id="itemDrawer" onclick="closeDrawer(event)">
-    <div class="drawer-content" onclick="event.stopPropagation()">
-      <div class="drawer-title">
-        <span>差し入れるアイテムを選択</span>
-        <span style="cursor:pointer;" onclick="closeDrawer()">✕ 閉じる</span>
+  <!-- キャラクター状態 ＆ 観察日記モーダル -->
+  <div class="book-modal" id="bookModal">
+    <div class="book-card">
+      <div class="book-head">
+        <div class="book-title">📋 ロボの状態カルテ ＆ 観察手帳</div>
+        <div class="close-cross" onclick="closeBookModal()">✕</div>
       </div>
-      <div class="item-grid">
-        <div class="item-card selected" onclick="selectItem('🍎 リンゴ', this)"><span>🍎</span><span>リンゴ</span></div>
-        <div class="item-card" onclick="selectItem('🪢 ロープ', this)"><span>🪢</span><span>ロープ</span></div>
-        <div class="item-card" onclick="selectItem('🔥 たいまつ', this)"><span>🔥</span><span>たいまつ</span></div>
-        <div class="item-card" onclick="selectItem('🪨 石ころ', this)"><span>🪨</span><span>石ころ</span></div>
+      
+      <!-- ステータスカルテ -->
+      <div class="status-profile">
+        <div class="prof-item">性格傾向: <b id="prof-trait">ビビリでてんねん</b></div>
+        <div class="prof-item">現在地: <b id="prof-loc">地上 (X:0, Y:0)</b></div>
+        <div class="prof-item">右手の装備: <b id="prof-hand">素手</b></div>
+        <div class="prof-item">今日の思い込み: <b id="prof-belief">白いヤツが怖い</b></div>
       </div>
-      <button class="dock-btn btn-main" id="dispatchBtn" onclick="dispatchAction()">このアイテムを投下して見届ける</button>
-    </div>
-  </div>
 
-  <!-- 日記モーダル -->
-  <div class="book-modal" id="diaryModal">
-    <div class="book-page">
-      <div class="book-title"><span>📖 観察日記・記憶の手帳</span><span style="cursor:pointer;" onclick="closeDiary()">✕</span></div>
-      <div class="book-body" id="diaryText">記録はまだありません。</div>
+      <!-- 今の心の声 -->
+      <div class="thought-bubble" id="prof-thought">
+        「まわりがよく見えない…どこからか冷たい風がする。何か食べたいな。」
+      </div>
+
+      <div style="font-size:11px;font-weight:bold;color:#94a3b8;margin-top:2px;">📖 蓄積された日記（記憶の残骸）</div>
+      <div class="diary-records" id="prof-diary">
+【1日目の朝】
+目が覚めた。ここはどこだろう？
+手帳には何も書かれていない。とにかく生き延びよう。
+      </div>
     </div>
   </div>
 
   <!-- API設定モーダル -->
   <div class="book-modal" id="keyModal">
-    <div class="book-page">
-      <div class="book-title"><span>⚙️ Gemini API設定</span><span style="cursor:pointer;" onclick="closeKeyModal()">✕</span></div>
-      <div style="font-size:11px;color:#94a3b8;">APIキーを入力すると、本物のGeminiがリアルタイムに物理作戦と思考を展開します。</div>
-      <input type="password" id="keyInput" placeholder="AIzaSy..." style="width:100%;padding:10px;background:#07090e;border:1px solid #334155;color:#fff;border-radius:8px;font-size:12px;">
-      <button class="dock-btn btn-main" onclick="saveKey()">保存して接続</button>
+    <div class="book-card">
+      <div class="book-head">
+        <div class="book-title">⚙️ Gemini API設定</div>
+        <div class="close-cross" onclick="closeKeyModal()">✕</div>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;line-height:1.4;">
+        キーを設定すると、視界1マスの発見や掘削の判断を本物のGeminiが自律思考します（空欄でも内蔵モック思考で完全に遊べます）。
+      </div>
+      <input type="password" id="keyInput" placeholder="AIzaSy..." style="width:100%;padding:10px;background:#0b0d14;border:1px solid #334155;color:#fff;border-radius:8px;font-size:12px;">
+      <button style="padding:10px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;" onclick="saveKey()">保存</button>
     </div>
   </div>
 
   <script>
+    // --- ゲーム状態管理 ---
     const STATE = {
-      hp: 80, fatigue: 20, hunger: 30, sleep: 20, morale: 80,
-      energy: 20,
-      selectedItem: '🍎 リンゴ',
-      diary: '【観察1日目】この箱庭で目が覚めた。頭がぼんやりしている。',
-      location: 'surface',
+      day: 1,
+      dropsLeft: 20,
+      hp: 80, fatigue: 20, hunger: 30, sleep: 20, morale: 75,
+      trait: 'ビビリでてんねん',
+      belief: '白いヤツが怖い',
+      handItem: '素手',
+      currentThought: '「まわりがよく見えない…何か食べるものはないかな？」',
+      diary: '【1日目の朝】\n目が覚めた。手帳には何も書かれていない。生き延びなければ。',
+      selectedDrop: { icon: '🍎', name: 'リンゴ' },
+      charaGrid: { x: 0, y: 0, z: -1 }, // 内部座標 (y: 0=地上, -1〜-5=地下)
       isBusy: false
     };
 
-    // --- Three.js & レンダラー設定 ---
+    // --- Three.js 初期化 ---
     const container = document.getElementById('c3d');
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x06070b);
+    scene.background = new THREE.Color(0x06080e);
 
     const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
     const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'low-power' });
@@ -197,59 +201,78 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
-    const ambLight = new THREE.AmbientLight(0xffffff, 0.85);
-    scene.add(ambLight);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
     dirLight.position.set(10, 20, 10);
     scene.add(dirLight);
 
-    // --- 完全な水槽断面マップ（手前z>0全カット） ---
-    const boxGeo = new THREE.BoxGeometry(0.95, 0.95, 0.95);
-    const matGrass = new THREE.MeshLambertMaterial({ color: 0x48bb78 });
-    const matDirt = new THREE.MeshLambertMaterial({ color: 0x784f33 });
-    const matStone = new THREE.MeshLambertMaterial({ color: 0x475569 });
-    const matOre = new THREE.MeshLambertMaterial({ color: 0x38bdf8 });
-
     const worldGroup = new THREE.Group();
     scene.add(worldGroup);
 
+    // --- 掘削可能なボクセルマップ（手前z>0全カット） ---
+    const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+    const matGrass = new THREE.MeshLambertMaterial({ color: 0x48bb78 });
+    const matDirt = new THREE.MeshLambertMaterial({ color: 0x784f33 });
+    const matStone = new THREE.MeshLambertMaterial({ color: 0x475569 });
+
+    // ブロック辞書（キー: "x,y,z"）
+    const voxelMap = {};
+    const interactiveBlocks = [];
+
     for (let x = -4; x <= 4; x++) {
       for (let z = -4; z <= 0; z++) {
-        if (!(x === 0 && z === -1)) {
-          const grass = new THREE.Mesh(boxGeo, matGrass);
-          grass.position.set(x, 0, z);
-          worldGroup.add(grass);
+        // 地表 (y=0)
+        const isHole = (x === 0 && z === -1);
+        if (!isHole) {
+          createBlock(x, 0, z, matGrass, 'grass');
         }
+        // 地下 (-1 〜 -5)
         for (let y = -1; y >= -5; y--) {
-          if (x === 0 && z === -1 && y >= -3) continue;
-          if (Math.abs(x) <= 2 && y <= -2 && y >= -4 && z >= -2) continue;
+          if (x === 0 && z === -1 && y >= -3) continue; // タテ穴
+          if (Math.abs(x) <= 2 && y <= -2 && y >= -4 && z >= -2) continue; // 初期空洞
 
-          let mat = matStone;
-          if (y >= -2) mat = matDirt;
-          else if (x === -2 && y === -4 && z === -3) mat = matOre;
-
-          const block = new THREE.Mesh(boxGeo, mat);
-          block.position.set(x, y, z);
-          worldGroup.add(block);
+          createBlock(x, y, z, y >= -2 ? matDirt : matStone, 'dirt');
         }
+      }
+    }
+
+    function createBlock(x, y, z, mat, type) {
+      const b = new THREE.Mesh(boxGeo, mat);
+      b.position.set(x, y, z);
+      b.userData = { gx: x, gy: y, gz: z, type: type };
+      worldGroup.add(b);
+      voxelMap[`${x},${y},${z}`] = b;
+      interactiveBlocks.push(b);
+    }
+
+    function removeBlock(x, y, z) {
+      const key = `${x},${y},${z}`;
+      if (voxelMap[key]) {
+        worldGroup.remove(voxelMap[key]);
+        const idx = interactiveBlocks.indexOf(voxelMap[key]);
+        if (idx !== -1) interactiveBlocks.splice(idx, 1);
+        delete voxelMap[key];
       }
     }
 
     // ハシゴ
     const ladderMat = new THREE.MeshLambertMaterial({ color: 0xb45309 });
     for (let y = 0; y >= -3; y--) {
-      const step = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.1), ladderMat);
-      step.position.set(0, y - 0.2, -1.4);
-      worldGroup.add(step);
+      const s = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.1), ladderMat);
+      s.position.set(0, y - 0.2, -1.4);
+      worldGroup.add(s);
     }
 
-    // 水槽前面ガラス
+    // 水槽前面ガラス枠
     const glass = new THREE.Mesh(
       new THREE.PlaneGeometry(9, 6),
       new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.08, side: THREE.DoubleSide })
     );
     glass.position.set(0, -2.5, 0.5);
     scene.add(glass);
+
+    // --- ドロップアイテム群の管理 ---
+    const droppedItems = []; // { mesh, gx, gy, gz, item }
 
     // --- キャラクター構造 ---
     const chara = new THREE.Group();
@@ -266,7 +289,7 @@
     const rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.35, 0.5, 0); chara.add(rArm);
     const lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.35, 0.5, 0); chara.add(lArm);
 
-    const itemSlot = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshLambertMaterial({ color: 0xef4444 }));
+    const itemSlot = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshLambertMaterial({ color: 0xef4444, visible: false }));
     itemSlot.position.set(0, -0.22, 0.12); rArm.add(itemSlot);
 
     const legGeo = new THREE.BoxGeometry(0.18, 0.32, 0.18);
@@ -282,75 +305,305 @@
     const lLeg = new THREE.Mesh(legGeo, legMat); const lBoot = new THREE.Mesh(bootGeo, bootMat);
     lBoot.position.set(0, -0.14, 0.04); lLegG.add(lLeg, lBoot); chara.add(lLegG);
 
-    chara.position.set(-1.5, 0.5, -0.5);
+    // キャラ初期位置
+    chara.position.set(0, 0.5, -1);
 
     // お化け
     const ghost = new THREE.Mesh(
       new THREE.BoxGeometry(0.65, 0.8, 0.65),
-      new THREE.MeshLambertMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.8 })
+      new THREE.MeshLambertMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.75 })
     );
     ghost.position.set(2, 1.2, -0.5);
     worldGroup.add(ghost);
 
-    // --- カメラ設定 ---
+    // --- カメラ＆タッチ操作（回転＆ピンチズーム） ---
     const VIEWS = {
       surface: { pos: new THREE.Vector3(0, 9, 13), look: new THREE.Vector3(0, 0, -1) },
       antfarm: { pos: new THREE.Vector3(0, -2.5, 12), look: new THREE.Vector3(0, -2.5, 0) }
     };
-
     let targetCamPos = VIEWS.surface.pos.clone();
     let targetCamLook = VIEWS.surface.look.clone();
     let curCamLook = targetCamLook.clone();
     camera.position.copy(targetCamPos);
 
-    function switchView(viewKey) {
-      targetCamPos.copy(VIEWS[viewKey].pos);
-      targetCamLook.copy(VIEWS[viewKey].look);
-      document.getElementById('btn-view-sur').classList.toggle('active', viewKey === 'surface');
-      document.getElementById('btn-view-ant').classList.toggle('active', viewKey === 'antfarm');
+    function setView(mode) {
+      targetCamPos.copy(VIEWS[mode].pos);
+      targetCamLook.copy(VIEWS[mode].look);
+      document.getElementById('btn-v-sur').classList.toggle('active', mode === 'surface');
+      document.getElementById('btn-v-ant').classList.toggle('active', mode === 'antfarm');
     }
 
-    // --- 1本指ドラッグ（回転）＆ 2本指ピンチイン/アウト（ズーム） ---
-    let touchMode = 'none';
-    let prevTouchX = 0, prevTouchY = 0, initialPinchDist = 0;
+    let touchMode = 'none', prevX = 0, prevDist = 0, touchStartTime = 0;
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
 
     window.addEventListener('touchstart', e => {
+      touchStartTime = performance.now();
       if (e.touches.length === 1) {
-        touchMode = 'rotate';
-        prevTouchX = e.touches[0].clientX;
-        prevTouchY = e.touches[0].clientY;
+        touchMode = 'drag';
+        prevX = e.touches[0].clientX;
       } else if (e.touches.length === 2) {
         touchMode = 'pinch';
-        initialPinchDist = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        );
+        prevDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       }
     }, { passive: true });
 
     window.addEventListener('touchmove', e => {
-      if (touchMode === 'rotate' && e.touches.length === 1) {
-        const dx = e.touches[0].clientX - prevTouchX;
+      if (touchMode === 'drag' && e.touches.length === 1) {
+        const dx = e.touches[0].clientX - prevX;
         worldGroup.rotation.y += dx * 0.007;
-        prevTouchX = e.touches[0].clientX;
+        prevX = e.touches[0].clientX;
       } else if (touchMode === 'pinch' && e.touches.length === 2) {
-        const dist = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        );
-        const factor = (initialPinchDist - dist) * 0.02;
+        const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        const factor = (prevDist - d) * 0.02;
         camera.fov = Math.max(20, Math.min(65, camera.fov + factor));
         camera.updateProjectionMatrix();
-        initialPinchDist = dist;
+        prevDist = d;
       }
     }, { passive: true });
 
-    window.addEventListener('touchend', () => { touchMode = 'none'; });
+    window.addEventListener('touchend', e => {
+      // 短いタップの場合はブロックタップ判定（アイテム投下）
+      if (performance.now() - touchStartTime < 250 && touchMode === 'drag' && e.changedTouches.length === 1) {
+        handleTapToDrop(e.changedTouches[0]);
+      }
+      touchMode = 'none';
+    });
 
-    // --- メインループ ---
+    // --- 神の手：マップタップでアイテム投下 ---
+    function handleTapToDrop(touch) {
+      if (STATE.dropsLeft <= 0) {
+        setToast('今日の奇跡（アイテム投下）は使い切りました');
+        return;
+      }
+      mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      const hits = raycaster.intersectObjects(interactiveBlocks);
+      if (hits.length > 0) {
+        const hit = hits[0];
+        const gx = hit.object.userData.gx;
+        const gy = hit.object.userData.gy + 1; // ブロックの上
+        const gz = hit.object.userData.gz;
+
+        dropItemAt(gx, gy, gz, STATE.selectedDrop);
+        STATE.dropsLeft--;
+        updateHUD();
+        setToast(`X:${gx}, Y:${gy} に【${STATE.selectedDrop.name}】をポコンと落としました`);
+
+        if (STATE.dropsLeft === 0) {
+          triggerNightCycle();
+        }
+      }
+    }
+
+    function dropItemAt(x, y, z, item) {
+      const colors = { 'リンゴ': 0xef4444, 'ツルハシ': 0x64748b, 'たいまつ': 0xf59e0b, '石ころ': 0x334155 };
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.3, 0.3, 0.3),
+        new THREE.MeshLambertMaterial({ color: colors[item.name] || 0xffffff })
+      );
+      mesh.position.set(x, y + 0.15, z);
+      worldGroup.add(mesh);
+      droppedItems.push({ mesh, gx: x, gy: y, gz: z, item: item.name });
+    }
+
+    function pickDropItem(icon, name, el) {
+      STATE.selectedDrop = { icon, name };
+      document.querySelectorAll('.palette-item').forEach(p => p.classList.remove('selected'));
+      el.classList.add('selected');
+      setToast(`地面をタップして【${name}】を落とせます`);
+    }
+
+    // --- キャラクターの自律生態ループ（1×1×1の視界で行動） ---
     let animClock = 0;
     let isWalking = false;
 
+    setInterval(async () => {
+      if (STATE.isBusy) return;
+      await charaSenseAndAct();
+    }, 2800);
+
+    async function charaSenseAndAct() {
+      STATE.isBusy = true;
+
+      // 1. 足元または目の前のアイテム判定
+      const foundIdx = droppedItems.findIndex(d => Math.abs(d.gx - STATE.charaGrid.x) <= 1 && Math.abs(d.gy - STATE.charaGrid.y) <= 1 && Math.abs(d.gz - STATE.charaGrid.z) <= 1);
+      
+      if (foundIdx !== -1) {
+        // アイテム発見！
+        const target = droppedItems[foundIdx];
+        await moveTo(target.gx, target.gy + 0.5, target.gz, 600);
+        STATE.charaGrid = { x: target.gx, y: target.gy, z: target.gz };
+
+        worldGroup.remove(target.mesh);
+        droppedItems.splice(foundIdx, 1);
+
+        // AI思考
+        await triggerAIEncounter(target.item);
+        STATE.isBusy = false;
+        return;
+      }
+
+      // 2. お化け接近判定（気配にビビる）
+      const distGhost = Math.hypot(chara.position.x - ghost.position.x, chara.position.z - ghost.position.z);
+      if (distGhost < 2.5 && STATE.charaGrid.y >= 0) {
+        setThought('「ヒエッ！冷たい気配がする！タテ穴へ逃げろ！」');
+        // タテ穴から地下へ逃げ込む
+        await moveTo(0, 0.5, -1, 600);
+        await moveTo(0, -2.5, -1, 800);
+        STATE.charaGrid = { x: 0, y: -3, z: -1 };
+        STATE.morale = Math.max(0, STATE.morale - 15);
+        STATE.fatigue = Math.min(100, STATE.fatigue + 10);
+        updateHUD();
+        STATE.isBusy = false;
+        return;
+      }
+
+      // 3. 地下でツルハシを持っていれば壁を掘る
+      if (STATE.charaGrid.y < 0 && STATE.handItem === 'ツルハシ') {
+        const digX = STATE.charaGrid.x + (Math.random() > 0.5 ? 1 : -1);
+        const digY = STATE.charaGrid.y;
+        const digZ = STATE.charaGrid.z;
+        if (voxelMap[`${digX},${digY},${digZ}`]) {
+          setThought(`「ここにツルハシを振ってみよう…カンカン！」`);
+          isWalking = true;
+          rArm.rotation.x = -1.2;
+          await new Promise(r => setTimeout(r, 600));
+          removeBlock(digX, digY, digZ);
+          isWalking = false;
+          rArm.rotation.x = 0;
+          STATE.fatigue = Math.min(100, STATE.fatigue + 8);
+          STATE.hunger = Math.min(100, STATE.hunger + 5);
+          updateHUD();
+          STATE.isBusy = false;
+          return;
+        }
+      }
+
+      // 4. 通常の徘徊（1歩トコトコ）
+      const dirs = [{x:1,z:0}, {x:-1,z:0}, {x:0,z:1}, {x:0,z:-1}];
+      const d = dirs[Math.floor(Math.random() * dirs.length)];
+      const nx = Math.max(-3, Math.min(3, STATE.charaGrid.x + d.x));
+      const nz = Math.max(-3, Math.min(0, STATE.charaGrid.z + d.z));
+      
+      // 移動先にブロックが詰まっていないか
+      if (!voxelMap[`${nx},${STATE.charaGrid.y},${nz}`]) {
+        await moveTo(nx, STATE.charaGrid.y + 0.5, nz, 500);
+        STATE.charaGrid.x = nx;
+        STATE.charaGrid.z = nz;
+      }
+
+      STATE.isBusy = false;
+    }
+
+    // AI遭遇思考（Gemini または モック）
+    async function triggerAIEncounter(itemName) {
+      const key = localStorage.getItem('gemini_api_key');
+      let story = '', thought = '';
+
+      if (key) {
+        const prompt = `あなたは「${STATE.trait}」な自律ロボです。視界1マスで足元に【${itemName}】を発見しました。
+ステータス: 体力=${STATE.hp}, 疲労=${STATE.fatigue}, 空腹=${STATE.hunger}, 充実=${STATE.morale}。
+思い込み:「${STATE.belief}」。
+このアイテムの正体をどう勘違い/解釈し、どう使ったかを、心の声(30字)と、日記の1行(40字)でJSON出力してください。
+{"thought":"...", "diary":"...", "equip":true/false, "delta":{"hp":0,"hunger":0,"morale":0}}`;
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+          });
+          const d = await res.json();
+          const parsed = JSON.parse(d.candidates[0].content.parts[0].text.match(/\{[\s\S]*\}/)[0]);
+          thought = parsed.thought;
+          story = parsed.diary;
+          if (parsed.equip) equipItem(itemName);
+          applyDelta(parsed.delta);
+        } catch(e) {
+          useLocalEncounter(itemName);
+          return;
+        }
+      } else {
+        useLocalEncounter(itemName);
+        return;
+      }
+
+      setThought(thought);
+      recordDiary(story);
+    }
+
+    function useLocalEncounter(itemName) {
+      if (itemName === 'リンゴ') {
+        setThought('「赤い丸い塊だ！かじってみたら甘くて元気が出た！」');
+        recordDiary('地面に赤い果実が落ちていた。食べたら空腹が癒えた。');
+        STATE.hunger = Math.max(0, STATE.hunger - 30);
+        STATE.hp = Math.min(100, STATE.hp + 10);
+      } else if (itemName === 'ツルハシ') {
+        equipItem('ツルハシ');
+        setThought('「鋭い鉄のクチバシを拾ったぞ。これで壁が砕けそうだ！」');
+        recordDiary('硬い鉄の棒を見つけた。地下の壁を掘り崩せる。');
+        STATE.morale = Math.min(100, STATE.morale + 20);
+      } else if (itemName === 'たいまつ') {
+        equipItem('たいまつ');
+        setThought('「暖かい光だ！これを持っていれば暗闇もお化けも怖くない！」');
+        recordDiary('光を放つ棒を手に入れた。ヤツはおそらく光を嫌う。');
+        STATE.morale = Math.min(100, STATE.morale + 25);
+      } else {
+        setThought('「硬い石ころだ。投げたらお化けをすり抜けて悲しかった…」');
+        recordDiary('石ころは白いヤツには効かない。隠れるのが一番だ。');
+        STATE.morale = Math.max(0, STATE.morale - 10);
+      }
+      updateHUD();
+    }
+
+    function equipItem(name) {
+      STATE.handItem = name;
+      itemSlot.material.visible = true;
+      const c = { 'ツルハシ': 0x64748b, 'たいまつ': 0xf59e0b, 'リンゴ': 0xef4444, '石ころ': 0x334155 };
+      itemSlot.material.color.setHex(c[name] || 0xffffff);
+      document.getElementById('prof-hand').innerText = name;
+    }
+
+    function applyDelta(delta) {
+      if (!delta) return;
+      if (delta.hp) STATE.hp = Math.max(0, Math.min(100, STATE.hp + delta.hp));
+      if (delta.hunger) STATE.hunger = Math.max(0, Math.min(100, STATE.hunger + delta.hunger));
+      if (delta.morale) STATE.morale = Math.max(0, Math.min(100, STATE.morale + delta.morale));
+      updateHUD();
+    }
+
+    function setThought(t) {
+      STATE.currentThought = t;
+      document.getElementById('prof-thought').innerText = t;
+      setToast(t);
+    }
+
+    function recordDiary(text) {
+      STATE.diary += `\n・${text}`;
+      document.getElementById('prof-diary').innerText = STATE.diary;
+    }
+
+    // --- 夜のサイクル（記憶リセット） ---
+    function triggerNightCycle() {
+      setTimeout(() => {
+        alert('🌙 1日の奇跡（20回）を使い果たしました。ロボは地下の隠れ家で眠りにつき、記憶を失います...');
+        STATE.day++;
+        STATE.dropsLeft = 20;
+        STATE.sleep = 0;
+        STATE.fatigue = 10;
+        STATE.hunger = 45;
+
+        // 記憶リセットと新しい思い込み
+        STATE.belief = '過去の日記に記された知恵';
+        STATE.diary += `\n\n【${STATE.day}日目の朝】\n記憶がない。手帳を読み返して行動を始めよう。`;
+        
+        updateHUD();
+        openBookModal();
+      }, 1000);
+    }
+
+    // --- メインアニメーション ---
     function animate() {
       requestAnimationFrame(animate);
       animClock += 0.04;
@@ -359,7 +612,7 @@
       curCamLook.lerp(targetCamLook, 0.06);
       camera.lookAt(curCamLook);
 
-      ghost.position.y = (STATE.location === 'surface' ? 1.1 : -2.2) + Math.sin(animClock * 1.5) * 0.15;
+      ghost.position.y = 1.1 + Math.sin(animClock * 1.5) * 0.15;
 
       if (isWalking) {
         rArm.rotation.x = Math.sin(animClock * 8) * 0.7;
@@ -367,7 +620,6 @@
         rLegG.rotation.x = -Math.sin(animClock * 8) * 0.7;
         lLegG.rotation.x = Math.sin(animClock * 8) * 0.7;
       } else {
-        rArm.rotation.x = 0; lArm.rotation.x = 0;
         rLegG.rotation.x = 0; lLegG.rotation.x = 0;
         bodyM.scale.y = 0.5 + Math.sin(animClock * 2) * 0.02;
       }
@@ -376,131 +628,56 @@
     }
     animate();
 
-    // --- 操作・トレイ管理 ---
-    function openDrawer() { document.getElementById('itemDrawer').style.display = 'flex'; }
-    function closeDrawer() { document.getElementById('itemDrawer').style.display = 'none'; }
-    function openDiary() { document.getElementById('diaryText').innerText = STATE.diary; document.getElementById('diaryModal').style.display = 'flex'; }
-    function closeDiary() { document.getElementById('diaryModal').style.display = 'none'; }
-    function openKeyModal() { document.getElementById('keyInput').value = localStorage.getItem('gemini_api_key') || ''; document.getElementById('keyModal').style.display = 'flex'; }
-    function closeKeyModal() { document.getElementById('keyModal').style.display = 'none'; }
-    function saveKey() {
-      localStorage.setItem('gemini_api_key', document.getElementById('keyInput').value.trim());
-      closeKeyModal();
-    }
-
-    function selectItem(name, el) {
-      STATE.selectedItem = name;
-      document.querySelectorAll('.item-card').forEach(c => c.classList.remove('selected'));
-      el.classList.add('selected');
-      const colors = { '🍎 リンゴ': 0xef4444, '🪢 ロープ': 0xd97706, '🔥 たいまつ': 0xf59e0b, '🪨 石ころ': 0x64748b };
-      itemSlot.material.color.setHex(colors[name] || 0xffffff);
-    }
-
-    // --- アクション実行（思考・ハシゴ移動） ---
-    async function dispatchAction() {
-      if (STATE.isBusy || STATE.energy <= 0) return;
-      closeDrawer();
-      STATE.isBusy = true;
-      STATE.energy--;
-      updateUI();
-
-      const toast = document.getElementById('storyToast');
-      const key = localStorage.getItem('gemini_api_key');
-      toast.innerHTML = `<span class="tag">[${key ? 'Gemini思考中' : '内蔵AI思考'}]</span>${STATE.selectedItem}をどう活用するか考えています...`;
-
-      let res = key ? await callGeminiAPI(key) : getLocalMock();
-
-      // 移動アニメーション
-      isWalking = true;
-      if (res.targetLoc === 'underground' && STATE.location === 'surface') {
-        toast.innerHTML = `<span class="tag">[移動]</span>お化けから逃れるため、タテ穴からハシゴで地下へ！`;
-        await moveTo(0, 0.5, -0.8, 800);
-        switchView('antfarm');
-        await moveTo(0, -3.2, -0.8, 1000);
-        STATE.location = 'underground';
-      } else if (res.targetLoc === 'surface' && STATE.location === 'underground') {
-        toast.innerHTML = `<span class="tag">[移動]</span>ハシゴを登って地上へ戻っています...`;
-        await moveTo(0, 0.5, -0.8, 1000);
-        switchView('surface');
-        await moveTo(-1.5, 0.5, -0.5, 800);
-        STATE.location = 'surface';
-      }
-      isWalking = false;
-
-      // 結果反映
-      toast.innerHTML = `<span class="tag">[結果]</span>${res.story}`;
-      STATE.hp = Math.max(0, Math.min(100, STATE.hp + res.delta.hp));
-      STATE.fatigue = Math.max(0, Math.min(100, STATE.fatigue + res.delta.fatigue));
-      STATE.hunger = Math.max(0, Math.min(100, STATE.hunger + res.delta.hunger));
-      STATE.sleep = Math.max(0, Math.min(100, STATE.sleep + res.delta.sleep));
-      STATE.morale = Math.max(0, Math.min(100, STATE.morale + res.delta.morale));
-
-      STATE.diary += `\n・[${STATE.location === 'underground' ? '地下' : '地上'}] ${res.story}`;
-      STATE.isBusy = false;
-      updateUI();
-    }
-
-    function moveTo(tx, ty, tz, duration) {
+    function moveTo(tx, ty, tz, dur) {
       return new Promise(resolve => {
+        isWalking = true;
         const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z;
         const start = performance.now();
-        function step(now) {
-          const p = Math.min((now - start) / duration, 1);
+        function s(now) {
+          const p = Math.min((now - start) / dur, 1);
           chara.position.x = sx + (tx - sx) * p;
           chara.position.y = sy + (ty - sy) * p;
           chara.position.z = sz + (tz - sz) * p;
-          if (p < 1) requestAnimationFrame(step);
-          else resolve();
+          if (p < 1) requestAnimationFrame(s);
+          else { isWalking = false; resolve(); }
         }
-        requestAnimationFrame(step);
+        requestAnimationFrame(s);
       });
     }
 
-    async function callGeminiAPI(key) {
-      const prompt = `あなたは箱庭のロボットです。体力=${STATE.hp}, 疲労=${STATE.fatigue}, 空腹=${STATE.hunger}, 睡眠=${STATE.sleep}, 充実=${STATE.morale}。
-現在地: ${STATE.location}。お化けがいます。人間から【${STATE.selectedItem}】を受け取りました。
-どう物理的に切り抜けたかを45字程度の物語にし、移動先("surface"か"underground")と5ステータス増減(-20〜20)をJSONで出力してください。
-{"story":"...", "targetLoc":"underground", "delta":{"hp":0,"fatigue":0,"hunger":0,"sleep":0,"morale":0}}`;
-
-      try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
-        const data = await res.json();
-        return JSON.parse(data.candidates[0].content.parts[0].text.match(/\{[\s\S]*\}/)[0]);
-      } catch (e) {
-        return getLocalMock();
-      }
-    }
-
-    function getLocalMock() {
-      if (STATE.location === 'surface') {
-        return {
-          story: `${STATE.selectedItem}を投げつけ、慌ててタテ穴のハシゴから地下へ避難した！`,
-          targetLoc: 'underground',
-          delta: { hp: -5, fatigue: 15, hunger: 10, sleep: 5, morale: -5 }
-        };
-      } else {
-        return {
-          story: `地下で${STATE.selectedItem}を使い落ち着きを取り戻し、地上へハシゴを登った。`,
-          targetLoc: 'surface',
-          delta: { hp: 5, fatigue: -10, hunger: 5, sleep: -10, morale: 15 }
-        };
-      }
-    }
-
-    function updateUI() {
+    // --- UI更新＆モーダル操作 ---
+    function updateHUD() {
       document.getElementById('g-hp').style.width = STATE.hp + '%';
       document.getElementById('g-fatigue').style.width = STATE.fatigue + '%';
       document.getElementById('g-hunger').style.width = STATE.hunger + '%';
       document.getElementById('g-sleep').style.width = STATE.sleep + '%';
       document.getElementById('g-morale').style.width = STATE.morale + '%';
-      document.getElementById('ui-energy').innerText = `残り: ${STATE.energy}回`;
-      document.getElementById('ui-loc').innerText = `現在地: ${STATE.location === 'surface' ? '地上' : '地下'}`;
+      document.getElementById('ui-day').innerText = `📅 観察 ${STATE.day}日目`;
+      document.getElementById('ui-drops').innerText = `神の手(残): ${STATE.dropsLeft}回`;
+      document.getElementById('prof-loc').innerText = `${STATE.charaGrid.y < 0 ? '地下巣穴' : '地上'} (X:${STATE.charaGrid.x}, Y:${STATE.charaGrid.y})`;
     }
-    updateUI();
+    updateHUD();
+
+    function setToast(msg) {
+      const el = document.getElementById('toastMsg');
+      el.innerText = msg;
+    }
+
+    function openBookModal() {
+      document.getElementById('prof-diary').innerText = STATE.diary;
+      document.getElementById('prof-thought').innerText = STATE.currentThought;
+      document.getElementById('bookModal').style.display = 'flex';
+    }
+    function closeBookModal() { document.getElementById('bookModal').style.display = 'none'; }
+    function openKeyModal() {
+      document.getElementById('keyInput').value = localStorage.getItem('gemini_api_key') || '';
+      document.getElementById('keyModal').style.display = 'flex';
+    }
+    function closeKeyModal() { document.getElementById('keyModal').style.display = 'none'; }
+    function saveKey() {
+      localStorage.setItem('gemini_api_key', document.getElementById('keyInput').value.trim());
+      closeKeyModal();
+    }
 
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
