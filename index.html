@@ -12,10 +12,10 @@
     #stage { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
     #c3d { width: 100%; height: 100%; display: block; }
 
-    /* 上部：5大ステータスバー（常時表示） */
+    /* 上部HUD：5大ステータス ＆ カウントダウン */
     .top-hud {
       position: absolute; top: 8px; left: 8px; right: 8px; z-index: 10;
-      background: rgba(13, 16, 27, 0.85); backdrop-filter: blur(8px);
+      background: rgba(13, 16, 27, 0.88); backdrop-filter: blur(8px);
       border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 6px 10px;
     }
     .status-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 4px; }
@@ -23,9 +23,12 @@
     .gauge-label { font-size: 8px; color: #94a3b8; text-align: center; }
     .gauge-bar { height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
     .gauge-fill { height: 100%; width: 50%; transition: width 0.3s ease; }
-    .hud-sub { display: flex; justify-content: space-between; font-size: 10px; color: #38bdf8; font-weight: bold; }
+    .hud-sub { display: flex; justify-content: space-between; align-items: center; font-size: 10px; font-weight: bold; }
+    .mode-badge { padding: 2px 6px; border-radius: 4px; font-size: 9px; }
+    .badge-api { background: rgba(56,189,248,0.2); color: #38bdf8; border: 1px solid #38bdf8; }
+    .badge-test { background: rgba(234,179,8,0.2); color: #eab308; border: 1px solid #eab308; }
 
-    /* カメラ＆観察アシストボタン（画面右上） */
+    /* 右上アイコンボタン群 */
     .view-controls {
       position: absolute; top: 68px; right: 8px; z-index: 10;
       display: flex; flex-direction: column; gap: 8px;
@@ -38,20 +41,20 @@
     }
     .hud-icon-btn.active { border-color: #38bdf8; background: #1e3a8a; }
 
-    /* 下部：神の手（アイテム選択パレット） */
+    /* 下部HUD：神の手（アイテム投下パレット） */
     .bottom-hud {
       position: absolute; bottom: 12px; left: 8px; right: 8px; z-index: 10;
       display: flex; flex-direction: column; gap: 6px; pointer-events: none;
     }
     .toast-msg {
-      align-self: center; background: rgba(10, 12, 18, 0.85); border: 1px solid rgba(56, 189, 248, 0.4);
-      border-radius: 20px; padding: 4px 12px; font-size: 11px; color: #e2e8f0; backdrop-filter: blur(4px);
+      align-self: center; background: rgba(10, 12, 18, 0.9); border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 20px; padding: 4px 14px; font-size: 11px; color: #f8fafc; backdrop-filter: blur(4px);
     }
     .item-palette {
       display: flex; gap: 6px; justify-content: center; pointer-events: auto;
     }
     .palette-item {
-      width: 50px; height: 50px; background: rgba(18, 24, 38, 0.9); border: 2px solid #334155;
+      width: 52px; height: 52px; background: rgba(18, 24, 38, 0.9); border: 2px solid #334155;
       border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center;
       font-size: 18px; color: #fff; cursor: pointer; backdrop-filter: blur(6px);
       box-shadow: 0 4px 12px rgba(0,0,0,0.4); transition: transform 0.15s, border-color 0.15s;
@@ -59,7 +62,7 @@
     .palette-item span:last-child { font-size: 8px; color: #94a3b8; }
     .palette-item.selected { border-color: #38bdf8; transform: translateY(-4px); background: #1e293b; }
 
-    /* 全画面手帳モーダル（キャラクター状態 ＆ 観察日記） */
+    /* 手帳モーダル（キャラクター状態 ＆ 観察日記） */
     .book-modal {
       position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200;
       display: none; align-items: center; justify-content: center; padding: 14px;
@@ -73,21 +76,41 @@
     .book-title { font-size: 14px; font-weight: bold; color: #38bdf8; }
     .close-cross { font-size: 18px; color: #94a3b8; cursor: pointer; }
 
-    /* 状態カルテ部 */
     .status-profile {
       background: #0b0d14; border-radius: 8px; padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px;
     }
     .prof-item { color: #94a3b8; }
     .prof-item b { color: #f1f5f9; }
 
-    /* 心の声・日記部 */
     .thought-bubble {
       background: #182030; border-left: 3px solid #38bdf8; padding: 8px; border-radius: 4px; font-size: 11px; line-height: 1.4; color: #bae6fd;
     }
     .diary-records {
       background: #0b0d14; border-radius: 8px; padding: 10px; font-size: 11px; line-height: 1.5;
-      color: #cbd5e1; max-height: 140px; overflow-y: auto; white-space: pre-wrap;
+      color: #cbd5e1; max-height: 130px; overflow-y: auto; white-space: pre-wrap;
     }
+
+    /* 設定モーダル（トグルスイッチ ＆ API設定） */
+    .toggle-row {
+      display: flex; justify-content: space-between; align-items: center;
+      background: #0b0d14; padding: 10px 12px; border-radius: 8px; border: 1px solid #242c3d;
+    }
+    .toggle-label { font-size: 12px; font-weight: bold; color: #e2e8f0; }
+    .toggle-sub { font-size: 10px; color: #94a3b8; }
+    
+    /* スイッチ本体 */
+    .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; inset: 0; background-color: #334155;
+      transition: .3s; border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+      background-color: white; transition: .3s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: #38bdf8; }
+    input:checked + .slider:before { transform: translateX(20px); }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
@@ -106,71 +129,82 @@
     </div>
     <div class="hud-sub">
       <span id="ui-day">📅 観察 1日目</span>
-      <span id="ui-drops">神の手(残): 20回</span>
+      <span id="ui-count-badge" class="mode-badge badge-test">🧪 TEST残: 20/20</span>
+      <span id="ui-mental-size" style="color:#94a3b8;">縄張り: 8マス</span>
     </div>
   </div>
 
-  <!-- クイック視点切り替え＆手帳ボタン -->
+  <!-- クイック視点切り替え＆モーダル呼び出しボタン -->
   <div class="view-controls">
     <div class="hud-icon-btn active" id="btn-v-sur" onclick="setView('surface')">🌲</div>
     <div class="hud-icon-btn" id="btn-v-ant" onclick="setView('antfarm')">⛏️</div>
     <div class="hud-icon-btn" onclick="openBookModal()">📖</div>
-    <div class="hud-icon-btn" onclick="openKeyModal()">⚙️</div>
+    <div class="hud-icon-btn" onclick="openSettingModal()">⚙️</div>
   </div>
 
-  <!-- 下部：ポコンと置くアイテムパレット -->
+  <!-- 下部：ポコンと落とすアイテムパレット -->
   <div class="bottom-hud">
-    <div class="toast-msg" id="toastMsg">地面をタップして【リンゴ】を落とせます</div>
+    <div class="toast-msg" id="toastMsg">マップをタップして【リンゴ】を落とせます</div>
     <div class="item-palette">
-      <div class="palette-item selected" onclick="pickDropItem('🍎', 'リンゴ', this)"><span>🍎</span><span>リンゴ</span></div>
-      <div class="palette-item" onclick="pickDropItem('⛏️', 'ツルハシ', this)"><span>⛏️</span><span>ツルハシ</span></div>
-      <div class="palette-item" onclick="pickDropItem('🔥', 'たいまつ', this)"><span>🔥</span><span>たいまつ</span></div>
-      <div class="palette-item" onclick="pickDropItem('🪨', '石ころ', this)"><span>🪨</span><span>石ころ</span></div>
+      <div class="palette-item selected" onclick="pickDropItem('🍎', 'リンゴ', '甘い匂い', this)"><span>🍎</span><span>リンゴ</span></div>
+      <div class="palette-item" onclick="pickDropItem('⛏️', 'ツルハシ', '金属の重い音', this)"><span>⛏️</span><span>ツルハシ</span></div>
+      <div class="palette-item" onclick="pickDropItem('🔥', 'たいまつ', 'パチパチ光る炎', this)"><span>🔥</span><span>たいまつ</span></div>
+      <div class="palette-item" onclick="pickDropItem('🪨', '石ころ', 'ゴトッという音', this)"><span>🪨</span><span>石ころ</span></div>
     </div>
   </div>
 
-  <!-- キャラクター状態 ＆ 観察日記モーダル -->
+  <!-- キャラクター状態カルテ ＆ 観察手帳モーダル -->
   <div class="book-modal" id="bookModal">
     <div class="book-card">
       <div class="book-head">
-        <div class="book-title">📋 ロボの状態カルテ ＆ 観察手帳</div>
+        <div class="book-title">📋 ロボのカルテ ＆ 観察手帳</div>
         <div class="close-cross" onclick="closeBookModal()">✕</div>
       </div>
       
-      <!-- ステータスカルテ -->
       <div class="status-profile">
         <div class="prof-item">性格傾向: <b id="prof-trait">ビビリでてんねん</b></div>
-        <div class="prof-item">現在地: <b id="prof-loc">地上 (X:0, Y:0)</b></div>
-        <div class="prof-item">右手の装備: <b id="prof-hand">素手</b></div>
-        <div class="prof-item">今日の思い込み: <b id="prof-belief">白いヤツが怖い</b></div>
+        <div class="prof-item">現在地: <b id="prof-loc">地上 (0, 0, -1)</b></div>
+        <div class="prof-item">右手スロット: <b id="prof-hand">素手</b></div>
+        <div class="prof-item">記憶縄張り: <b id="prof-area">8マス</b></div>
       </div>
 
-      <!-- 今の心の声 -->
       <div class="thought-bubble" id="prof-thought">
         「まわりがよく見えない…どこからか冷たい風がする。何か食べたいな。」
       </div>
 
       <div style="font-size:11px;font-weight:bold;color:#94a3b8;margin-top:2px;">📖 蓄積された日記（記憶の残骸）</div>
-      <div class="diary-records" id="prof-diary">
-【1日目の朝】
+      <div class="diary-records" id="prof-diary">【1日目の朝】
 目が覚めた。ここはどこだろう？
-手帳には何も書かれていない。とにかく生き延びよう。
-      </div>
+手帳には何も書かれていない。とにかく生き延びよう。</div>
     </div>
   </div>
 
-  <!-- API設定モーダル -->
-  <div class="book-modal" id="keyModal">
+  <!-- 設定モーダル（トグルスイッチ ＆ APIキー） -->
+  <div class="book-modal" id="settingModal">
     <div class="book-card">
       <div class="book-head">
-        <div class="book-title">⚙️ Gemini API設定</div>
-        <div class="close-cross" onclick="closeKeyModal()">✕</div>
+        <div class="book-title">⚙️ 思考システム設定</div>
+        <div class="close-cross" onclick="closeSettingModal()">✕</div>
       </div>
+      
+      <!-- API思考トグルスイッチ -->
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Gemini APIで思考させる</div>
+          <div class="toggle-sub">ON: 本番API(残20) / OFF: テスト思考(残20)</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="apiToggle" onchange="toggleApiMode(this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+
       <div style="font-size:11px;color:#94a3b8;line-height:1.4;">
-        キーを設定すると、視界1マスの発見や掘削の判断を本物のGeminiが自律思考します（空欄でも内蔵モック思考で完全に遊べます）。
+        APIキーを入力してトグルをONにすると、物理法則と周囲の知覚を元に本物のGeminiが自律的に1ブロックの移動と行動を決定します。
       </div>
-      <input type="password" id="keyInput" placeholder="AIzaSy..." style="width:100%;padding:10px;background:#0b0d14;border:1px solid #334155;color:#fff;border-radius:8px;font-size:12px;">
-      <button style="padding:10px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;" onclick="saveKey()">保存</button>
+      <input type="password" id="keyInput" placeholder="Gemini API Key (AIzaSy...)" style="width:100%;padding:10px;background:#0b0d14;border:1px solid #334155;color:#fff;border-radius:8px;font-size:12px;">
+      
+      <button style="padding:10px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;" onclick="saveSettings()">設定を保存</button>
     </div>
   </div>
 
@@ -178,15 +212,21 @@
     // --- ゲーム状態管理 ---
     const STATE = {
       day: 1,
-      dropsLeft: 20,
+      useApi: false,
+      geminiCount: 20,
+      testCount: 20,
       hp: 80, fatigue: 20, hunger: 30, sleep: 20, morale: 75,
       trait: 'ビビリでてんねん',
-      belief: '白いヤツが怖い',
       handItem: '素手',
-      currentThought: '「まわりがよく見えない…何か食べるものはないかな？」',
-      diary: '【1日目の朝】\n目が覚めた。手帳には何も書かれていない。生き延びなければ。',
-      selectedDrop: { icon: '🍎', name: 'リンゴ' },
-      charaGrid: { x: 0, y: 0, z: -1 }, // 内部座標 (y: 0=地上, -1〜-5=地下)
+      currentThought: '「まわりがよく見えない…どこからか冷たい風がする。」',
+      diary: '【1日目の朝】\n目が覚めた。手帳には何も書かれていない。生き延びよう。',
+      selectedDrop: { icon: '🍎', name: 'リンゴ', sense: '甘い匂い' },
+      charaGrid: { x: 0, y: 0, z: -1 },
+      // 認知・記憶した範囲（メンタルマップ）初期2x2x2
+      knownVoxels: {
+        "0,0,-1": true, "0,0,0": true, "1,0,-1": true, "1,0,0": true,
+        "0,-1,-1": true, "0,-1,0": true, "1,-1,-1": true, "1,-1,0": true
+      },
       isBusy: false
     };
 
@@ -209,28 +249,25 @@
     const worldGroup = new THREE.Group();
     scene.add(worldGroup);
 
-    // --- 掘削可能なボクセルマップ（手前z>0全カット） ---
+    // --- 掘削可能ボクセルマップ（手前z>0全カット・水槽断面） ---
     const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
     const matGrass = new THREE.MeshLambertMaterial({ color: 0x48bb78 });
     const matDirt = new THREE.MeshLambertMaterial({ color: 0x784f33 });
     const matStone = new THREE.MeshLambertMaterial({ color: 0x475569 });
 
-    // ブロック辞書（キー: "x,y,z"）
     const voxelMap = {};
     const interactiveBlocks = [];
 
     for (let x = -4; x <= 4; x++) {
       for (let z = -4; z <= 0; z++) {
-        // 地表 (y=0)
-        const isHole = (x === 0 && z === -1);
-        if (!isHole) {
+        // 地表 (y=0) : x=0, z=-1 はタテ穴
+        if (!(x === 0 && z === -1)) {
           createBlock(x, 0, z, matGrass, 'grass');
         }
         // 地下 (-1 〜 -5)
         for (let y = -1; y >= -5; y--) {
-          if (x === 0 && z === -1 && y >= -3) continue; // タテ穴
-          if (Math.abs(x) <= 2 && y <= -2 && y >= -4 && z >= -2) continue; // 初期空洞
-
+          if (x === 0 && z === -1 && y >= -3) continue; // タテ穴空洞
+          if (Math.abs(x) <= 2 && y <= -2 && y >= -4 && z >= -2) continue; // 初期地下空洞
           createBlock(x, y, z, y >= -2 ? matDirt : matStone, 'dirt');
         }
       }
@@ -255,7 +292,7 @@
       }
     }
 
-    // ハシゴ
+    // ハシゴ（タテ穴内の垂直移動を可能にする物理装置）
     const ladderMat = new THREE.MeshLambertMaterial({ color: 0xb45309 });
     for (let y = 0; y >= -3; y--) {
       const s = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.1), ladderMat);
@@ -271,8 +308,8 @@
     glass.position.set(0, -2.5, 0.5);
     scene.add(glass);
 
-    // --- ドロップアイテム群の管理 ---
-    const droppedItems = []; // { mesh, gx, gy, gz, item }
+    // ドロップされた物理アイテム管理
+    const droppedItems = [];
 
     // --- キャラクター構造 ---
     const chara = new THREE.Group();
@@ -305,7 +342,6 @@
     const lLeg = new THREE.Mesh(legGeo, legMat); const lBoot = new THREE.Mesh(bootGeo, bootMat);
     lBoot.position.set(0, -0.14, 0.04); lLegG.add(lLeg, lBoot); chara.add(lLegG);
 
-    // キャラ初期位置
     chara.position.set(0, 0.5, -1);
 
     // お化け
@@ -316,7 +352,7 @@
     ghost.position.set(2, 1.2, -0.5);
     worldGroup.add(ghost);
 
-    // --- カメラ＆タッチ操作（回転＆ピンチズーム） ---
+    // --- カメラ設定 ---
     const VIEWS = {
       surface: { pos: new THREE.Vector3(0, 9, 13), look: new THREE.Vector3(0, 0, -1) },
       antfarm: { pos: new THREE.Vector3(0, -2.5, 12), look: new THREE.Vector3(0, -2.5, 0) }
@@ -333,6 +369,7 @@
       document.getElementById('btn-v-ant').classList.toggle('active', mode === 'antfarm');
     }
 
+    // --- タッチ操作（1本指ドラッグ回転 ＆ 2本指ピンチズーム） ---
     let touchMode = 'none', prevX = 0, prevDist = 0, touchStartTime = 0;
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
@@ -363,198 +400,193 @@
     }, { passive: true });
 
     window.addEventListener('touchend', e => {
-      // 短いタップの場合はブロックタップ判定（アイテム投下）
       if (performance.now() - touchStartTime < 250 && touchMode === 'drag' && e.changedTouches.length === 1) {
-        handleTapToDrop(e.changedTouches[0]);
+        handleTapDrop(e.changedTouches[0]);
       }
       touchMode = 'none';
     });
 
+    // --- 厳密な物理法則判定（重力・足場・ハシゴ） ---
+    function isPhysicallyWalkable(x, y, z) {
+      // 1. そのマス自体が空洞であること（ブロックに埋まらない）
+      if (voxelMap[`${x},${y},${z}`]) return false;
+      // 2. 範囲外制限（水槽の枠外に出ない）
+      if (x < -4 || x > 4 || z < -4 || z > 0 || y > 1 || y < -5) return false;
+      // 3. 足場があるか（直下にブロックがあるか、またはタテ穴ハシゴがあるか）
+      const hasFooting = voxelMap[`${x},${y-1},${z}`];
+      const hasLadder = (x === 0 && z === -1 && y >= -3);
+      const isFloor = (y === -5);
+      return (hasFooting || hasLadder || isFloor);
+    }
+
+    // 周囲6方向から物理的に移動可能なマス一覧を取得
+    function getValidMoveNeighbors(cx, cy, cz) {
+      const candidates = [];
+      const deltas = [
+        { dx: 1, dy: 0, dz: 0, name: '右' },
+        { dx: -1, dy: 0, dz: 0, name: '左' },
+        { dx: 0, dy: 0, dz: 1, name: '手前' },
+        { dx: 0, dy: 0, dz: -1, name: '奥' },
+        { dx: 0, dy: 1, dz: 0, name: 'ハシゴを登る' },
+        { dx: 0, dy: -1, dz: 0, name: 'ハシゴを降りる' }
+      ];
+
+      for (const d of deltas) {
+        const tx = cx + d.dx, ty = cy + d.dy, tz = cz + d.dz;
+        // 上下移動はハシゴのあるマスでのみ許可
+        if (d.dy !== 0) {
+          const onLadder = (cx === 0 && cz === -1 && cy >= -3 && ty >= -3 && ty <= 0);
+          if (!onLadder) continue;
+        }
+        if (isPhysicallyWalkable(tx, ty, tz)) {
+          candidates.push({ x: tx, y: ty, z: tz, name: d.name });
+        }
+      }
+      return candidates;
+    }
+
     // --- 神の手：マップタップでアイテム投下 ---
-    function handleTapToDrop(touch) {
-      if (STATE.dropsLeft <= 0) {
-        setToast('今日の奇跡（アイテム投下）は使い切りました');
+    async function handleTapDrop(touch) {
+      const activeCount = STATE.useApi ? STATE.geminiCount : STATE.testCount;
+      if (activeCount <= 0) {
+        setToast('今日の活動枠（20回）を使い切りました');
         return;
       }
+
       mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
 
       const hits = raycaster.intersectObjects(interactiveBlocks);
-      if (hits.length > 0) {
-        const hit = hits[0];
-        const gx = hit.object.userData.gx;
-        const gy = hit.object.userData.gy + 1; // ブロックの上
-        const gz = hit.object.userData.gz;
+      if (hits.length === 0) return;
 
-        dropItemAt(gx, gy, gz, STATE.selectedDrop);
-        STATE.dropsLeft--;
-        updateHUD();
-        setToast(`X:${gx}, Y:${gy} に【${STATE.selectedDrop.name}】をポコンと落としました`);
+      const hit = hits[0];
+      const gx = hit.object.userData.gx;
+      const gy = hit.object.userData.gy + 1;
+      const gz = hit.object.userData.gz;
 
-        if (STATE.dropsLeft === 0) {
-          triggerNightCycle();
-        }
+      // カウント消費
+      if (STATE.useApi) STATE.geminiCount--;
+      else STATE.testCount--;
+      updateHUD();
+
+      // アイテム出現
+      dropPhysicalItem(gx, gy, gz, STATE.selectedDrop);
+      setToast(`【${STATE.selectedDrop.name}】を投下！(${STATE.selectedDrop.sense}が発生)`);
+
+      // キャラクターが知覚して思考・行動
+      await charaReactToDrop(gx, gy, gz, STATE.selectedDrop);
+
+      if ((STATE.useApi ? STATE.geminiCount : STATE.testCount) === 0) {
+        triggerNightCycle();
       }
     }
 
-    function dropItemAt(x, y, z, item) {
+    function dropPhysicalItem(x, y, z, drop) {
       const colors = { 'リンゴ': 0xef4444, 'ツルハシ': 0x64748b, 'たいまつ': 0xf59e0b, '石ころ': 0x334155 };
       const mesh = new THREE.Mesh(
         new THREE.BoxGeometry(0.3, 0.3, 0.3),
-        new THREE.MeshLambertMaterial({ color: colors[item.name] || 0xffffff })
+        new THREE.MeshLambertMaterial({ color: colors[drop.name] || 0xffffff })
       );
       mesh.position.set(x, y + 0.15, z);
       worldGroup.add(mesh);
-      droppedItems.push({ mesh, gx: x, gy: y, gz: z, item: item.name });
+      droppedItems.push({ mesh, gx: x, gy: y, gz: z, drop: drop });
     }
 
-    function pickDropItem(icon, name, el) {
-      STATE.selectedDrop = { icon, name };
-      document.querySelectorAll('.palette-item').forEach(p => p.classList.remove('selected'));
-      el.classList.add('selected');
-      setToast(`地面をタップして【${name}】を落とせます`);
-    }
-
-    // --- キャラクターの自律生態ループ（1×1×1の視界で行動） ---
-    let animClock = 0;
-    let isWalking = false;
-
-    setInterval(async () => {
+    // --- AI思考による1ブロック物理移動 ---
+    async function charaReactToDrop(dropX, dropY, dropZ, drop) {
       if (STATE.isBusy) return;
-      await charaSenseAndAct();
-    }, 2800);
-
-    async function charaSenseAndAct() {
       STATE.isBusy = true;
 
-      // 1. 足元または目の前のアイテム判定
-      const foundIdx = droppedItems.findIndex(d => Math.abs(d.gx - STATE.charaGrid.x) <= 1 && Math.abs(d.gy - STATE.charaGrid.y) <= 1 && Math.abs(d.gz - STATE.charaGrid.z) <= 1);
+      // 刺激の方向と物理情報を算出
+      const cx = STATE.charaGrid.x, cy = STATE.charaGrid.y, cz = STATE.charaGrid.z;
+      const dist = Math.hypot(dropX - cx, dropY - cy, dropZ - cz).toFixed(1);
+      const dirX = dropX > cx ? '東(右)' : (dropX < cx ? '西(左)' : '');
+      const dirZ = dropZ > cz ? '南(手前)' : (dropZ < cz ? '北(奥)' : '');
+      const dirY = dropY > cy ? '上' : (dropY < cy ? '下' : '');
+      const stimulusDirection = `${dirX}${dirZ}${dirY}` || 'すぐそば';
+
+      // 物理的に移動可能な候補マスを取得
+      const validMoves = getValidMoveNeighbors(cx, cy, cz);
       
-      if (foundIdx !== -1) {
-        // アイテム発見！
-        const target = droppedItems[foundIdx];
-        await moveTo(target.gx, target.gy + 0.5, target.gz, 600);
-        STATE.charaGrid = { x: target.gx, y: target.gy, z: target.gz };
-
-        worldGroup.remove(target.mesh);
-        droppedItems.splice(foundIdx, 1);
-
-        // AI思考
-        await triggerAIEncounter(target.item);
-        STATE.isBusy = false;
-        return;
+      let decision = null;
+      if (STATE.useApi) {
+        decision = await callGeminiThought(drop, stimulusDirection, dist, validMoves);
+      } else {
+        decision = getMockThought(drop, stimulusDirection, dist, validMoves);
       }
 
-      // 2. お化け接近判定（気配にビビる）
-      const distGhost = Math.hypot(chara.position.x - ghost.position.x, chara.position.z - ghost.position.z);
-      if (distGhost < 2.5 && STATE.charaGrid.y >= 0) {
-        setThought('「ヒエッ！冷たい気配がする！タテ穴へ逃げろ！」');
-        // タテ穴から地下へ逃げ込む
-        await moveTo(0, 0.5, -1, 600);
-        await moveTo(0, -2.5, -1, 800);
-        STATE.charaGrid = { x: 0, y: -3, z: -1 };
-        STATE.morale = Math.max(0, STATE.morale - 15);
-        STATE.fatigue = Math.min(100, STATE.fatigue + 10);
+      // 思考と日記の反映
+      setThought(decision.thought);
+      recordDiary(decision.diary);
+
+      // 移動実行（物理1ブロック移動）
+      if (decision.chosenMove) {
+        const dest = decision.chosenMove;
+        await moveTo(dest.x, dest.y + 0.5, dest.z, 500);
+        STATE.charaGrid = { x: dest.x, y: dest.y, z: dest.z };
+        
+        // 記憶縄張りの拡張（Mental Map）
+        STATE.knownVoxels[`${dest.x},${dest.y},${dest.z}`] = true;
         updateHUD();
-        STATE.isBusy = false;
-        return;
-      }
 
-      // 3. 地下でツルハシを持っていれば壁を掘る
-      if (STATE.charaGrid.y < 0 && STATE.handItem === 'ツルハシ') {
-        const digX = STATE.charaGrid.x + (Math.random() > 0.5 ? 1 : -1);
-        const digY = STATE.charaGrid.y;
-        const digZ = STATE.charaGrid.z;
-        if (voxelMap[`${digX},${digY},${digZ}`]) {
-          setThought(`「ここにツルハシを振ってみよう…カンカン！」`);
-          isWalking = true;
-          rArm.rotation.x = -1.2;
-          await new Promise(r => setTimeout(r, 600));
-          removeBlock(digX, digY, digZ);
-          isWalking = false;
-          rArm.rotation.x = 0;
-          STATE.fatigue = Math.min(100, STATE.fatigue + 8);
-          STATE.hunger = Math.min(100, STATE.hunger + 5);
-          updateHUD();
-          STATE.isBusy = false;
-          return;
-        }
-      }
-
-      // 4. 通常の徘徊（1歩トコトコ）
-      const dirs = [{x:1,z:0}, {x:-1,z:0}, {x:0,z:1}, {x:0,z:-1}];
-      const d = dirs[Math.floor(Math.random() * dirs.length)];
-      const nx = Math.max(-3, Math.min(3, STATE.charaGrid.x + d.x));
-      const nz = Math.max(-3, Math.min(0, STATE.charaGrid.z + d.z));
-      
-      // 移動先にブロックが詰まっていないか
-      if (!voxelMap[`${nx},${STATE.charaGrid.y},${nz}`]) {
-        await moveTo(nx, STATE.charaGrid.y + 0.5, nz, 500);
-        STATE.charaGrid.x = nx;
-        STATE.charaGrid.z = nz;
+        // 偶然アイテムのマスに到達したら拾う
+        checkItemPickup(dest.x, dest.y, dest.z);
       }
 
       STATE.isBusy = false;
     }
 
-    // AI遭遇思考（Gemini または モック）
-    async function triggerAIEncounter(itemName) {
-      const key = localStorage.getItem('gemini_api_key');
-      let story = '', thought = '';
+    // Gemini APIによる自律思考
+    async function callGeminiThought(drop, direction, dist, validMoves) {
+      const apiKey = localStorage.getItem('gemini_api_key');
+      const prompt = `あなたは箱庭で生きるロボットです。視界は1マスしか見えません。
+ステータス: 体力=${STATE.hp}, 疲労=${STATE.fatigue}, 空腹=${STATE.hunger}, 性格=「${STATE.trait}」。
+現在位置: (${STATE.charaGrid.x}, ${STATE.charaGrid.y}, ${STATE.charaGrid.z})。
+【物理刺激】: ${direction}の距離${dist}ブロックで「${drop.sense}」を感知した！
+【移動可能な隣接空洞マス】: ${JSON.stringify(validMoves.map((m, i) => ({ id: i, direction: m.name, pos: [m.x, m.y, m.z] })))}。
+重力と物理法則を守り、知覚した刺激にどう反応してどの隣接マスへ1ブロック動くか（または動かないか）を決めてください。
+以下のJSONフォーマットのみを出力してください:
+{"thought":"心の声(30字程度)", "diary":"日記の一行(35字程度)", "moveId": 候補のid(動かない場合は-1)}`;
 
-      if (key) {
-        const prompt = `あなたは「${STATE.trait}」な自律ロボです。視界1マスで足元に【${itemName}】を発見しました。
-ステータス: 体力=${STATE.hp}, 疲労=${STATE.fatigue}, 空腹=${STATE.hunger}, 充実=${STATE.morale}。
-思い込み:「${STATE.belief}」。
-このアイテムの正体をどう勘違い/解釈し、どう使ったかを、心の声(30字)と、日記の1行(40字)でJSON出力してください。
-{"thought":"...", "diary":"...", "equip":true/false, "delta":{"hp":0,"hunger":0,"morale":0}}`;
-        try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-          });
-          const d = await res.json();
-          const parsed = JSON.parse(d.candidates[0].content.parts[0].text.match(/\{[\s\S]*\}/)[0]);
-          thought = parsed.thought;
-          story = parsed.diary;
-          if (parsed.equip) equipItem(itemName);
-          applyDelta(parsed.delta);
-        } catch(e) {
-          useLocalEncounter(itemName);
-          return;
-        }
-      } else {
-        useLocalEncounter(itemName);
-        return;
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        const data = await res.json();
+        const json = JSON.parse(data.candidates[0].content.parts[0].text.match(/\{[\s\S]*\}/)[0]);
+        const chosen = (json.moveId >= 0 && json.moveId < validMoves.length) ? validMoves[json.moveId] : null;
+        return { thought: json.thought, diary: json.diary, chosenMove: chosen };
+      } catch (e) {
+        return getMockThought(drop, direction, dist, validMoves);
       }
-
-      setThought(thought);
-      recordDiary(story);
     }
 
-    function useLocalEncounter(itemName) {
-      if (itemName === 'リンゴ') {
-        setThought('「赤い丸い塊だ！かじってみたら甘くて元気が出た！」');
-        recordDiary('地面に赤い果実が落ちていた。食べたら空腹が癒えた。');
-        STATE.hunger = Math.max(0, STATE.hunger - 30);
-        STATE.hp = Math.min(100, STATE.hp + 10);
-      } else if (itemName === 'ツルハシ') {
-        equipItem('ツルハシ');
-        setThought('「鋭い鉄のクチバシを拾ったぞ。これで壁が砕けそうだ！」');
-        recordDiary('硬い鉄の棒を見つけた。地下の壁を掘り崩せる。');
-        STATE.morale = Math.min(100, STATE.morale + 20);
-      } else if (itemName === 'たいまつ') {
-        equipItem('たいまつ');
-        setThought('「暖かい光だ！これを持っていれば暗闇もお化けも怖くない！」');
-        recordDiary('光を放つ棒を手に入れた。ヤツはおそらく光を嫌う。');
-        STATE.morale = Math.min(100, STATE.morale + 25);
-      } else {
-        setThought('「硬い石ころだ。投げたらお化けをすり抜けて悲しかった…」');
-        recordDiary('石ころは白いヤツには効かない。隠れるのが一番だ。');
-        STATE.morale = Math.max(0, STATE.morale - 10);
+    // 内蔵モック思考（テスト枠用）
+    function getMockThought(drop, direction, dist, validMoves) {
+      if (validMoves.length === 0) {
+        return { thought: `「${direction}から${drop.sense}がするが、壁に囲まれて動けない！」`, diary: '物音を聞いたが身動きが取れなかった。', chosenMove: null };
       }
-      updateHUD();
+      // 刺激の方向へ近づくか、ビビって別のマスへ1ブロック
+      const move = validMoves[Math.floor(Math.random() * validMoves.length)];
+      return {
+        thought: `「${direction}から${drop.sense}だ！気になるから${move.name}へ1歩寄ってみよう。」`,
+        diary: `${direction}の気配を感じ、足場を確かめながら${move.name}へ進んだ。`,
+        chosenMove: move
+      };
+    }
+
+    function checkItemPickup(cx, cy, cz) {
+      const idx = droppedItems.findIndex(d => d.gx === cx && d.gy === cy && d.gz === cz);
+      if (idx !== -1) {
+        const target = droppedItems[idx];
+        worldGroup.remove(target.mesh);
+        droppedItems.splice(idx, 1);
+        equipItem(target.drop.name);
+        setThought(`「足元に【${target.drop.name}】が落ちていた！手に取ったぞ！」`);
+        recordDiary(`足元にあった${target.drop.name}を拾い上げた。`);
+      }
     }
 
     function equipItem(name) {
@@ -565,45 +597,27 @@
       document.getElementById('prof-hand').innerText = name;
     }
 
-    function applyDelta(delta) {
-      if (!delta) return;
-      if (delta.hp) STATE.hp = Math.max(0, Math.min(100, STATE.hp + delta.hp));
-      if (delta.hunger) STATE.hunger = Math.max(0, Math.min(100, STATE.hunger + delta.hunger));
-      if (delta.morale) STATE.morale = Math.max(0, Math.min(100, STATE.morale + delta.morale));
-      updateHUD();
-    }
-
-    function setThought(t) {
-      STATE.currentThought = t;
-      document.getElementById('prof-thought').innerText = t;
-      setToast(t);
-    }
-
-    function recordDiary(text) {
-      STATE.diary += `\n・${text}`;
-      document.getElementById('prof-diary').innerText = STATE.diary;
-    }
-
-    // --- 夜のサイクル（記憶リセット） ---
-    function triggerNightCycle() {
-      setTimeout(() => {
-        alert('🌙 1日の奇跡（20回）を使い果たしました。ロボは地下の隠れ家で眠りにつき、記憶を失います...');
-        STATE.day++;
-        STATE.dropsLeft = 20;
-        STATE.sleep = 0;
-        STATE.fatigue = 10;
-        STATE.hunger = 45;
-
-        // 記憶リセットと新しい思い込み
-        STATE.belief = '過去の日記に記された知恵';
-        STATE.diary += `\n\n【${STATE.day}日目の朝】\n記憶がない。手帳を読み返して行動を始めよう。`;
-        
+    // 自律うろつき（アイテム投下がない平時、記憶した縄張り内のみをトコトコ移動）
+    setInterval(async () => {
+      if (STATE.isBusy) return;
+      const valid = getValidMoveNeighbors(STATE.charaGrid.x, STATE.charaGrid.y, STATE.charaGrid.z);
+      // 記憶している（訪問済み）マスを優先
+      const knownMoves = valid.filter(m => STATE.knownVoxels[`${m.x},${m.y},${m.z}`]);
+      const pool = knownMoves.length > 0 ? knownMoves : valid;
+      if (pool.length > 0 && Math.random() < 0.6) {
+        STATE.isBusy = true;
+        const target = pool[Math.floor(Math.random() * pool.length)];
+        await moveTo(target.x, target.y + 0.5, target.z, 600);
+        STATE.charaGrid = { x: target.x, y: target.y, z: target.z };
+        STATE.knownVoxels[`${target.x},${target.y},${target.z}`] = true;
+        checkItemPickup(target.x, target.y, target.z);
         updateHUD();
-        openBookModal();
-      }, 1000);
-    }
+        STATE.isBusy = false;
+      }
+    }, 3200);
 
-    // --- メインアニメーション ---
+    // --- メインループ ---
+    let animClock = 0, isWalking = false;
     function animate() {
       requestAnimationFrame(animate);
       animClock += 0.04;
@@ -645,7 +659,25 @@
       });
     }
 
-    // --- UI更新＆モーダル操作 ---
+    // --- 夜のサイクル（記憶リセット） ---
+    function triggerNightCycle() {
+      setTimeout(() => {
+        alert('🌙 20回の枠を使い切りました。ロボは夜の眠りにつき、記憶をリセットします...');
+        STATE.day++;
+        if (STATE.useApi) STATE.geminiCount = 20;
+        else STATE.testCount = 20;
+        
+        // 記憶リセット：縄張りは現在地周辺のみに再圧縮
+        STATE.knownVoxels = {};
+        STATE.knownVoxels[`${STATE.charaGrid.x},${STATE.charaGrid.y},${STATE.charaGrid.z}`] = true;
+
+        STATE.diary += `\n\n【${STATE.day}日目の朝】\n昨日の記憶がない。手帳を頼りに生き延びよう。`;
+        updateHUD();
+        openBookModal();
+      }, 1000);
+    }
+
+    // --- UI更新 ＆ モーダル ---
     function updateHUD() {
       document.getElementById('g-hp').style.width = STATE.hp + '%';
       document.getElementById('g-fatigue').style.width = STATE.fatigue + '%';
@@ -653,14 +685,32 @@
       document.getElementById('g-sleep').style.width = STATE.sleep + '%';
       document.getElementById('g-morale').style.width = STATE.morale + '%';
       document.getElementById('ui-day').innerText = `📅 観察 ${STATE.day}日目`;
-      document.getElementById('ui-drops').innerText = `神の手(残): ${STATE.dropsLeft}回`;
-      document.getElementById('prof-loc').innerText = `${STATE.charaGrid.y < 0 ? '地下巣穴' : '地上'} (X:${STATE.charaGrid.x}, Y:${STATE.charaGrid.y})`;
+      
+      const badge = document.getElementById('ui-count-badge');
+      if (STATE.useApi) {
+        badge.className = 'mode-badge badge-api';
+        badge.innerText = `⚡ GEMINI残: ${STATE.geminiCount}/20`;
+      } else {
+        badge.className = 'mode-badge badge-test';
+        badge.innerText = `🧪 TEST残: ${STATE.testCount}/20`;
+      }
+
+      const areaCount = Object.keys(STATE.knownVoxels).length;
+      document.getElementById('ui-mental-size').innerText = `縄張り: ${areaCount}マス`;
+      document.getElementById('prof-loc').innerText = `(${STATE.charaGrid.x}, ${STATE.charaGrid.y}, ${STATE.charaGrid.z})`;
+      document.getElementById('prof-area').innerText = `${areaCount}マス`;
     }
     updateHUD();
 
-    function setToast(msg) {
-      const el = document.getElementById('toastMsg');
-      el.innerText = msg;
+    function setToast(msg) { document.getElementById('toastMsg').innerText = msg; }
+    function setThought(t) { STATE.currentThought = t; document.getElementById('prof-thought').innerText = t; setToast(t); }
+    function recordDiary(d) { STATE.diary += `\n・${d}`; document.getElementById('prof-diary').innerText = STATE.diary; }
+
+    function pickDropItem(icon, name, sense, el) {
+      STATE.selectedDrop = { icon, name, sense };
+      document.querySelectorAll('.palette-item').forEach(p => p.classList.remove('selected'));
+      el.classList.add('selected');
+      setToast(`マップをタップして【${name}】を落とせます`);
     }
 
     function openBookModal() {
@@ -669,15 +719,30 @@
       document.getElementById('bookModal').style.display = 'flex';
     }
     function closeBookModal() { document.getElementById('bookModal').style.display = 'none'; }
-    function openKeyModal() {
+
+    function openSettingModal() {
+      document.getElementById('apiToggle').checked = STATE.useApi;
       document.getElementById('keyInput').value = localStorage.getItem('gemini_api_key') || '';
-      document.getElementById('keyModal').style.display = 'flex';
+      document.getElementById('settingModal').style.display = 'flex';
     }
-    function closeKeyModal() { document.getElementById('keyModal').style.display = 'none'; }
-    function saveKey() {
-      localStorage.setItem('gemini_api_key', document.getElementById('keyInput').value.trim());
-      closeKeyModal();
+    function closeSettingModal() { document.getElementById('settingModal').style.display = 'none'; }
+
+    function toggleApiMode(checked) {
+      STATE.useApi = checked;
+      localStorage.setItem('use_gemini_api', checked ? 'true' : 'false');
+      updateHUD();
     }
+
+    function saveSettings() {
+      const key = document.getElementById('keyInput').value.trim();
+      localStorage.setItem('gemini_api_key', key);
+      closeSettingModal();
+      setToast(STATE.useApi ? '⚡ Gemini API思考モードに切り替えました' : '🧪 テスト思考モードに切り替えました');
+    }
+
+    // 初期化時の保存設定復元
+    STATE.useApi = localStorage.getItem('use_gemini_api') === 'true';
+    updateHUD();
 
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
