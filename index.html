@@ -2,543 +2,162 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI箱庭アイランド</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>カイロ風ダイヤモンドマップ</title>
   <style>
-    :root { --cell: 44px; }
-    * { box-sizing: border-box; }
-    body { font-family: sans-serif; margin: 10px; padding-bottom: 140px; background: #141419; color: #f0f0f0; user-select: none; }
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    body {
+      margin: 0;
+      background: #181926;
+      color: #cad3f5;
+      font-family: sans-serif;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px 8px;
+    }
+    h2 { margin: 0 0 4px; font-size: 17px; color: #8aadf4; }
+    .subtitle { font-size: 12px; color: #a5adcb; margin-bottom: 10px; }
     
-    /* ヘッダー */
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .header h2 { margin: 0; font-size: 17px; }
-    .nav-btns { display: flex; gap: 6px; }
-    .nav-btn { background: #22222b; border: 1px solid #444; color: #fff; padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-    .btn-status { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; font-weight: bold; }
+    .status-panel {
+      background: #24273a;
+      border: 1px solid #363a4f;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: bold;
+      color: #eed49f;
+      margin-bottom: 10px;
+    }
 
-    /* もちもの・でんちバー */
-    .inv-bar { display: flex; justify-content: space-around; background: #1f1f2e; border: 1px solid #333348; border-radius: 6px; padding: 6px; margin-bottom: 8px; font-size: 13px; font-weight: bold; }
-    .inv-item { display: flex; align-items: center; gap: 4px; }
-    .battery-item { color: #60a5fa; }
+    /* 3Dステージ */
+    .viewport {
+      width: 100%;
+      max-width: 400px;
+      height: 420px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      perspective: 1200px;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #1e2030 0%, #11121d 100%);
+      border-radius: 16px;
+      border: 1px solid #363a4f;
+    }
 
-    /* ステータスバー & マップ */
-    .status-bar { background: #1c1c24; border: 1px solid #2d2d38; padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fbbf24; margin-bottom: 8px; min-height: 34px; display: flex; justify-content: space-between; align-items: center; }
-    #world-container { min-height: 280px; max-height: 44vh; display: flex; align-items: center; justify-content: center; background: #0a0a0f; border-radius: 8px; margin-bottom: 10px; overflow: auto; border: 1px solid #22222e; }
-    #grid { display: grid; gap: 3px; }
-    .cell { width: var(--cell); height: var(--cell); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; }
-    .cell.sea { background: #111827; border: 1px dashed #1f2937; color: #374151; font-size: 12px; }
-    .cell.land { background: #234d31; border: 1px solid #2e6943; }
-    .cell.selected { border: 2px solid #fbbf24 !important; transform: scale(1.05); }
+    /* ダイヤモンドグリッド（斜め45度・傾斜60度） */
+    .iso-map {
+      display: grid;
+      grid-template-columns: repeat(10, 26px);
+      grid-template-rows: repeat(10, 26px);
+      gap: 3px;
+      transform: rotateX(60deg) rotateZ(-45deg);
+      transform-style: preserve-3d;
+      padding: 20px;
+      position: relative;
+    }
 
-    /* パネル */
-    .panel { background: #1c1c24; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #2a2a35; }
-    h3 { margin: 0 0 6px 0; font-size: 13px; color: #9ca3af; }
-    textarea { width: 100%; height: 50px; background: #101015; border: 1px solid #333; color: #a7f3d0; font-size: 12px; border-radius: 6px; padding: 6px; resize: none; }
-    .log-container { max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
-    .log-item { background: #14141a; padding: 6px 8px; border-radius: 6px; border-left: 3px solid #6366f1; font-size: 11px; }
+    /* タイル（おもちゃ風クリーン立体） */
+    .tile {
+      width: 26px;
+      height: 26px;
+      background: linear-gradient(135deg, #a6da95, #8bd5ca);
+      border-radius: 6px;
+      box-shadow: 0 4px 0 #5b8266, 0 6px 8px rgba(0,0,0,0.3);
+      cursor: pointer;
+      transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
+    }
+    .tile.water {
+      background: linear-gradient(135deg, #7dc4e4, #91d7e3);
+      box-shadow: 0 3px 0 #3a708c, 0 5px 8px rgba(0,0,0,0.3);
+    }
+    .tile.mountain {
+      background: linear-gradient(135deg, #ee99a0, #ed8796);
+      box-shadow: 0 5px 0 #9f5360, 0 8px 10px rgba(0,0,0,0.3);
+      transform: translateZ(4px);
+    }
+    .tile:active, .tile.selected {
+      background: #eed49f !important;
+      box-shadow: 0 8px 0 #c6a052, 0 12px 14px rgba(0,0,0,0.4) !important;
+      transform: translateZ(8px) !important;
+    }
 
-    /* フッター */
-    .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #181822; border-top: 1px solid #333; padding: 8px 10px 14px; z-index: 50; display: flex; flex-direction: column; gap: 6px; }
-    .footer-row-actions { display: flex; gap: 5px; }
-    .action-btn { flex: 1; padding: 9px 2px; border-radius: 6px; font-size: 12px; font-weight: bold; border: 1px solid #374151; background: #1e1e28; color: #9ca3af; cursor: pointer; }
-    .action-btn:disabled { opacity: 0.3; background: #121218 !important; border-color: #222 !important; color: #555 !important; cursor: not-allowed; }
-    .action-btn.active-land { background: #065f46; border-color: #059669; color: #a7f3d0; }
-    .action-btn.active-tree { background: #166534; border-color: #22c55e; color: #bbf7d0; }
-    .action-btn.active-rock { background: #374151; border-color: #6b7280; color: #f3f4f6; }
-    .action-btn.active-delete { background: #7f1d1d; border-color: #dc2626; color: #fecaca; }
-    
-    .think-btn { width: 100%; background: #4f46e5; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 15px; padding: 12px; cursor: pointer; transition: all 0.2s; }
-    .think-btn:disabled { background: #23232c !important; color: #6b7280 !important; cursor: not-allowed; opacity: 0.6; }
-
-    /* モーダル */
-    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); justify-content: center; align-items: center; z-index: 100; padding: 16px; }
-    .modal-content { background: #20202a; width: 100%; max-width: 340px; padding: 16px; border-radius: 8px; border: 1px solid #3b3b4f; }
-    .modal-content input, .modal-content select { width: 100%; padding: 8px; background: #121218; border: 1px solid #444; color: #fff; border-radius: 6px; margin: 4px 0 10px; }
-    .status-card { background: #15151e; border: 1px solid #333348; border-radius: 6px; padding: 10px; margin-bottom: 8px; font-size: 13px; line-height: 1.6; }
+    /* スルスル動くキャラクター */
+    #chara {
+      position: absolute;
+      width: 26px;
+      height: 26px;
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 50;
+      transform: translateZ(12px) rotateZ(45deg) rotateX(-60deg);
+      transition: left 0.3s cubic-bezier(0.25, 1, 0.5, 1), top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+      filter: drop-shadow(0 6px 3px rgba(0,0,0,0.4));
+    }
   </style>
 </head>
 <body>
 
-  <!-- ヘッダー -->
-  <div class="header">
-    <h2>🏝 AI箱庭アイランド</h2>
-    <div class="nav-btns">
-      <button class="nav-btn btn-status" onclick="openStatusModal()">🤖 じょうたい</button>
-      <button class="nav-btn" onclick="openSettings()">⚙ 設定</button>
-    </div>
-  </div>
+  <h2>🏝 カイロ風 ダイヤモンドマップ</h2>
+  <div class="subtitle">マスをタップするとロボがスルスル歩きます</div>
+  <div class="status-panel" id="status">選択座標: なし</div>
 
-  <!-- もちもの・でんちバー -->
-  <div class="inv-bar">
-    <div class="inv-item battery-item">🔋 <span id="barBattery">20</span>/20</div>
-    <div class="inv-item">🪵 <span id="barWood">0</span></div>
-    <div class="inv-item">🪨 <span id="barStone">0</span></div>
-    <div class="inv-item">🔥 <span id="barFire">0</span></div>
-    <div class="inv-item">🏠 <span id="barHouse">0</span></div>
-  </div>
-
-  <div class="status-bar">
-    <div id="statusText">マスをタップしてえらんでね</div>
-    <div id="selectedInfo" style="color:#9ca3af; font-family:monospace;">未選択</div>
-  </div>
-
-  <div id="world-container"><div id="grid"></div></div>
-
-  <div class="panel">
-    <h3>現在のAI手帳（短期記憶）</h3>
-    <textarea id="notebook" readonly></textarea>
-  </div>
-
-  <div class="panel">
-    <h3>過去の行動・思考履歴</h3>
-    <div class="log-container" id="logContainer"></div>
-  </div>
-
-  <!-- フッター -->
-  <div class="footer-bar">
-    <div class="footer-row-actions">
-      <button class="action-btn" id="btnExpand" disabled onclick="expandSelectedCell()">🌱 土地拡張</button>
-      <button class="action-btn" id="btnAddTree" disabled onclick="addSelectedItem('木')">🌲 木</button>
-      <button class="action-btn" id="btnAddRock" disabled onclick="addSelectedItem('石')">🪨 石</button>
-      <button class="action-btn" id="btnDelete" disabled onclick="handleDeleteClick()">🗑 削除</button>
-    </div>
-    <button class="think-btn" id="thinkBtn" disabled onclick="thinkAndAct()">読込中...</button>
-  </div>
-
-  <!-- 🤖 キャラクター状態モーダル -->
-  <div class="modal-overlay" id="statusModal">
-    <div class="modal-content">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <h3 style="margin:0; color:#93c5fd; font-size:16px;">🤖 ロボくんのじょうたい</h3>
-        <button onclick="closeStatusModal()" style="background:#374151; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">とじる</button>
-      </div>
-      <div class="status-card">
-        <div>🔋 <strong>でんち:</strong> <span id="stBattery" style="color:#60a5fa;">20 / 20</span></div>
-        <div>🎯 <strong>いまの目標:</strong> <span id="stGoal" style="color:#fbbf24;">木や石をあつめて、島におうちを建てよう！</span></div>
-      </div>
-      <div class="status-card">
-        <div style="font-weight:bold; margin-bottom:4px; color:#cbd5e1;">🎒 あつめた材料（もちもの）</div>
-        <div>🪵 木材: <strong id="stWood">0</strong> こ</div>
-        <div>🪨 石材: <strong id="stStone">0</strong> こ</div>
-        <div>🔥 たき火: <strong id="stFire">0</strong> こ （木×2で作成）</div>
-        <div>🏠 おうち: <strong id="stHouse">0</strong> けん （木×3・石×2で作成）</div>
-      </div>
-      <div class="status-card">
-        <div style="font-weight:bold; margin-bottom:2px; color:#cbd5e1;">💭 いまのきもち</div>
-        <div id="stMind" style="color:#a7f3d0; font-size:12px; font-family:monospace;">島をぼうけん中！</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ⚙ 設定モーダル -->
-  <div class="modal-overlay" id="settingsModal">
-    <div class="modal-content">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <h3 style="margin:0; color:#fff;">設定</h3>
-        <button onclick="resetGame()" style="background:#dc2626; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">初期化</button>
-      </div>
-      <label style="font-size:12px; color:#9ca3af;">Gemini APIキー</label>
-      <input type="password" id="modalApiKey" placeholder="AIzaSy...">
-      <label style="font-size:12px; color:#9ca3af;">使用モデル</label>
-      <select id="modalModelSelect">
-        <option value="gemini-3.8-flash" selected>Gemini 3.8 Flash（標準・推奨）</option>
-      </select>
-      <label style="font-size:12px; color:#9ca3af;">稼働方式</label>
-      <select id="modalApproachSelect">
-        <option value="approach1" selected>アプローチ1：お留守番方式</option>
-        <option value="approach2" disabled>アプローチ2：24時間裏稼働（暗転）</option>
-      </select>
-      <div style="display:flex; gap:8px;">
-        <button onclick="saveSettingsFromModal()" style="flex:1; padding:8px; background:#4f46e5; color:#fff; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">保存</button>
-        <button onclick="closeSettings()" style="flex:1; padding:8px; background:#374151; color:#fff; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">閉じる</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 🗑 削除モーダル -->
-  <div class="modal-overlay" id="deleteModal">
-    <div class="modal-content" style="text-align:center;">
-      <h3 style="margin:0 0 8px; color:#fff; font-size:15px;">削除内容を選択</h3>
-      <p id="deleteModalDesc" style="font-size:12px; color:#9ca3af; margin-bottom:12px;"></p>
-      <div style="display:flex; flex-direction:column; gap:6px;">
-        <button id="btnDeleteItemOnly" onclick="deleteItemOnly()" style="padding:8px; background:#374151; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold;"></button>
-        <button id="btnDeleteLandAndItem" onclick="deleteLandAndItem()" style="padding:8px; background:#dc2626; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">🏝 土地ごと削除（一括）</button>
-        <button onclick="closeDeleteModal()" style="padding:6px; background:transparent; color:#9ca3af; border:1px solid #444; border-radius:6px; cursor:pointer;">キャンセル</button>
-      </div>
+  <div class="viewport">
+    <div class="iso-map" id="map">
+      <div id="chara">🤖</div>
     </div>
   </div>
 
   <script>
-    const GRID_SIZE = 6;
-    const defaultState = {
-      battery: 20,
-      land: [{x:2,y:2},{x:3,y:2},{x:2,y:3},{x:3,y:3}],
-      agent: { x:2, y:2, icon:"🤖", goal:"島で木や石をあつめて、たき火やおうちを作ろう！" },
-      inventory: { wood: 0, stone: 0, fire: 0, house: 0 },
-      items: [{id:1,name:'木',icon:'🌲',x:2,y:3},{id:2,name:'石',icon:'🪨',x:3,y:2}],
-      notebook: "ここは海に囲まれた小さな島だ。まずは木や石をあつめて生活の準備をしよう。",
-      logs: [],
-      selected: null
-    };
+    const MAP_SIZE = 10;
+    const mapEl = document.getElementById('map');
+    const statusEl = document.getElementById('status');
+    const charaEl = document.getElementById('chara');
 
-    let state = JSON.parse(JSON.stringify(defaultState));
+    let selectedTile = null;
 
-    function syncBattery() {
-      const today = new Date().toDateString();
-      const savedDate = localStorage.getItem('island_battery_date');
-      let savedCount = localStorage.getItem('island_battery_count');
-
-      if (savedDate !== today || savedCount === null) {
-        state.battery = 20;
-        localStorage.setItem('island_battery_count', 20);
-        localStorage.setItem('island_battery_date', today);
-      } else {
-        state.battery = parseInt(savedCount, 10);
-      }
-    }
-
-    function openStatusModal() {
-      document.getElementById('stBattery').innerText = `${state.battery} / 20`;
-      document.getElementById('stGoal').innerText = state.agent.goal;
-      document.getElementById('stWood').innerText = state.inventory.wood;
-      document.getElementById('stStone').innerText = state.inventory.stone;
-      document.getElementById('stFire').innerText = state.inventory.fire;
-      document.getElementById('stHouse').innerText = state.inventory.house;
-      document.getElementById('stMind').innerText = state.notebook;
-      document.getElementById('statusModal').style.display = 'flex';
-    }
-    function closeStatusModal() { document.getElementById('statusModal').style.display = 'none'; }
-    function openSettings() { document.getElementById('settingsModal').style.display = 'flex'; }
-    function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
-    function closeDeleteModal() { document.getElementById('deleteModal').style.display = 'none'; }
-
-    function saveSettingsFromModal() {
-      const key = document.getElementById('modalApiKey').value.trim();
-      localStorage.setItem('gemini_api_key', key);
-      closeSettings();
-      setStatus(key ? "設定を保存しました" : "APIキーが未入力です");
-    }
-
-    function isLandAt(x, y) { return state.land.some(l => l.x === x && l.y === y); }
-
-    function selectCell(x, y) {
-      state.selected = (state.selected && state.selected.x === x && state.selected.y === y) ? null : {x, y};
-      renderGrid();
-      updateButtons();
-    }
-
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.cell') && !e.target.closest('.footer-bar') && !e.target.closest('.header') && !e.target.closest('.modal-content') && !e.target.closest('.inv-bar')) {
-        if (state.selected) { state.selected = null; renderGrid(); updateButtons(); }
-      }
-    });
-
-    function updateButtons() {
-      const bExp = document.getElementById('btnExpand'), bTree = document.getElementById('btnAddTree');
-      const bRock = document.getElementById('btnAddRock'), bDel = document.getElementById('btnDelete');
-      const info = document.getElementById('selectedInfo');
-      bExp.className = bTree.className = bRock.className = bDel.className = 'action-btn';
-
-      if (!state.selected) {
-        bExp.disabled = bTree.disabled = bRock.disabled = bDel.disabled = true;
-        info.innerText = "未選択";
-        return;
-      }
-      const {x, y} = state.selected;
-      const isLand = isLandAt(x, y);
-      info.innerText = `(${x},${y}) ${isLand ? '陸地' : '海'}`;
-
-      if (!isLand) {
-        bExp.disabled = false; bExp.classList.add('active-land');
-        bTree.disabled = bRock.disabled = bDel.disabled = true;
-      } else {
-        bExp.disabled = true;
-        bTree.disabled = false; bTree.classList.add('active-tree');
-        bRock.disabled = false; bRock.classList.add('active-rock');
-        bDel.disabled = false; bDel.classList.add('active-delete');
-      }
-    }
-
-    function expandSelectedCell() {
-      if (!state.selected || isLandAt(state.selected.x, state.selected.y)) return;
-      state.land.push({...state.selected});
-      setStatus(`(${state.selected.x}, ${state.selected.y}) を開拓したよ！`);
-      renderGrid();
-      updateButtons();
-    }
-
-    function addSelectedItem(type) {
-      if (!state.selected) return;
-      const {x, y} = state.selected;
-      if (!isLandAt(x, y) || (state.agent.x === x && state.agent.y === y)) return;
-      if (state.items.find(i => i.x === x && i.y === y)) return alert("すでに物があるよ");
-      state.items.push({id: Date.now(), name: type, icon: type === '木'?'🌲':'🪨', x, y});
-      setStatus(`(${x}, ${y}) に【${type}】をおいたよ`);
-      renderGrid();
-      updateButtons();
-    }
-
-    function handleDeleteClick() {
-      if (!state.selected || !isLandAt(state.selected.x, state.selected.y)) return;
-      const {x, y} = state.selected;
-      const item = state.items.find(i => i.x === x && i.y === y);
-      const isAgent = (state.agent.x === x && state.agent.y === y);
-
-      if (item) {
-        document.getElementById('deleteModalDesc').innerText = `(${x}, ${y}) には【${item.name}】があるよ`;
-        document.getElementById('btnDeleteItemOnly').innerText = `${item.icon} ${item.name}だけ消す`;
-        const bAll = document.getElementById('btnDeleteLandAndItem');
-        bAll.disabled = isAgent;
-        bAll.innerText = isAgent ? "土地ごと削除（ロボがいるため不可）" : `🏝 土地ごと削除（${item.name}も消去）`;
-        bAll.style.opacity = isAgent ? "0.4" : "1";
-        document.getElementById('deleteModal').style.display = 'flex';
-      } else {
-        if (isAgent) return alert("ロボがいるマスの土地は海に戻せません");
-        if (confirm(`(${x}, ${y}) の土地を海にもどす？`)) {
-          state.land = state.land.filter(l => !(l.x === x && l.y === y));
-          state.selected = null;
-          setStatus(`(${x}, ${y}) を海にもどしたよ`);
-          renderGrid();
-          updateButtons();
+    // 10x10 マップ生成
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const tile = document.createElement('div');
+        tile.className = 'tile';
+        
+        // アクセント（水辺と小山）
+        if ((x === 0 || y === 0 || x === 9 || y === 9) && (x + y) % 3 === 0) {
+          tile.classList.add('water');
+        } else if ((x === 2 && y === 3) || (x === 7 && y === 6)) {
+          tile.classList.add('mountain');
         }
+
+        tile.onclick = () => onTileClick(x, y, tile);
+        mapEl.appendChild(tile);
       }
     }
 
-    function deleteItemOnly() {
-      state.items = state.items.filter(i => !(i.x === state.selected.x && i.y === state.selected.y));
-      closeDeleteModal();
-      setStatus("オブジェクトを消したよ");
-      renderGrid();
-      updateButtons();
+    function onTileClick(x, y, el) {
+      if (selectedTile) selectedTile.classList.remove('selected');
+      selectedTile = el;
+      el.classList.add('selected');
+
+      statusEl.innerText = `選択座標: (${x}, ${y}) へ移動中！`;
+      moveChara(x, y);
     }
 
-    function deleteLandAndItem() {
-      const {x, y} = state.selected;
-      state.items = state.items.filter(i => !(i.x === x && i.y === y));
-      state.land = state.land.filter(l => !(l.x === x && l.y === y));
-      state.selected = null;
-      closeDeleteModal();
-      setStatus("土地と物をぜんぶ消したよ");
-      renderGrid();
-      updateButtons();
+    function moveChara(x, y) {
+      const step = 29; // 1マス 26px + 隙間 3px
+      const left = 20 + x * step;
+      const top = 20 + y * step;
+      charaEl.style.left = `${left}px`;
+      charaEl.style.top = `${top}px`;
     }
 
-    function resetGame() {
-      if (!confirm("はじめからやり直す？\n（あつめた材料や手帳、でんちもリセットされます）")) return;
-      state = JSON.parse(JSON.stringify(defaultState));
-      localStorage.setItem('island_battery_count', 20);
-      localStorage.setItem('island_battery_date', new Date().toDateString());
-      localStorage.removeItem('last_active_timestamp');
-      syncBattery();
-      renderGrid();
-      updateButtons();
-      updateLogDisplay();
-      checkTimeRestriction();
-      closeSettings();
-      setStatus("リセットしました！");
-    }
-
-    function renderGrid() {
-      const grid = document.getElementById('grid');
-      grid.style.gridTemplateColumns = `repeat(${GRID_SIZE}, var(--cell))`;
-      grid.innerHTML = '';
-      for (let y = 0; y < GRID_SIZE; y++) {
-        for (let x = 0; x < GRID_SIZE; x++) {
-          const c = document.createElement('div');
-          const isLand = isLandAt(x, y);
-          c.className = `cell ${isLand ? 'land' : 'sea'} ${(state.selected && state.selected.x===x && state.selected.y===y)?'selected':''}`;
-          c.onclick = () => selectCell(x, y);
-          if (isLand) {
-            if (state.agent.x === x && state.agent.y === y) c.innerText = state.agent.icon;
-            else {
-              const item = state.items.find(i => i.x === x && i.y === y);
-              if (item) c.innerText = item.icon;
-            }
-          } else {
-            c.innerText = '·';
-          }
-          grid.appendChild(c);
-        }
-      }
-      document.getElementById('notebook').value = state.notebook;
-      document.getElementById('barBattery').innerText = state.battery;
-      document.getElementById('barWood').innerText = state.inventory.wood;
-      document.getElementById('barStone').innerText = state.inventory.stone;
-      document.getElementById('barFire').innerText = state.inventory.fire;
-      document.getElementById('barHouse').innerText = state.inventory.house;
-    }
-
-    function setStatus(t) { document.getElementById('statusText').innerText = t; }
-
-    function updateLogDisplay() {
-      const box = document.getElementById('logContainer');
-      if (!state.logs.length) return box.innerHTML = '<div style="font-size:12px;color:#4b5563;">まだ履歴はありません。</div>';
-      box.innerHTML = state.logs.map(l => `
-        <div class="log-item">
-          <div style="display:flex;justify-content:space-between;color:#818cf8;font-weight:bold;"><span>[${l.t}] 行動: ${l.a}</span></div>
-          <div style="color:#d1d5db;">思考: ${l.th}</div>
-          <div style="color:#6ee7b7;font-family:monospace;">手帳: ${l.n}</div>
-        </div>
-      `).join('');
-    }
-
-    function addLog(a, th, n) {
-      const d = new Date(), t = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-      state.logs.unshift({t, a, th, n});
-      updateLogDisplay();
-    }
-
-    function checkTimeRestriction() {
-      syncBattery();
-      const h = new Date().getHours(), btn = document.getElementById('thinkBtn');
-
-      if (state.battery <= 0) {
-        btn.disabled = true;
-        btn.innerText = "🪫 でんちぎれ（あした充電されるよ）";
-        return;
-      }
-
-      const isDay = (h >= 10 && h < 18);
-      btn.disabled = !isDay;
-      btn.innerText = isDay ? `今すぐ考えさせる（🔋 あと${state.battery}回）` : `💤 睡眠中（活動は10:00〜18:00 / 現在${h}時）`;
-    }
-
-    async function thinkAndAct() {
-      syncBattery();
-      if (state.battery <= 0) {
-        checkTimeRestriction();
-        return setStatus("🪫 でんちがなくなりました。あした充電されるよ！");
-      }
-
-      const btn = document.getElementById('thinkBtn');
-      if (btn.disabled) return;
-
-      const key = localStorage.getItem('gemini_api_key');
-      if (!key) { openSettings(); return alert("設定からAPIキーを入力してください"); }
-
-      btn.disabled = true;
-      btn.innerText = "⏳ 考え中...";
-
-      const lands = state.land.map(l => `(${l.x},${l.y})`).join(' ');
-      const items = state.items.map(i => `${i.name}(${i.x},${i.y})`).join(',') || 'なし';
-      const inv = `木材:${state.inventory.wood}, 石材:${state.inventory.stone}, たき火:${state.inventory.fire}, おうち:${state.inventory.house}`;
-
-      const prompt = `あなたは島でサバイバルするかわいいロボットです。
-歩ける陸地:[${lands}] 現在地:(${state.agent.x},${state.agent.y})
-まわりの物:${items}
-持ち物:[${inv}]
-手帳:"${state.notebook}"
-
-【できる行動】
-1. 移動: MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT, STAY
-2. 採取: CHOP_TREE(隣か同じマスの木を切って木材+1), MINE_ROCK(隣か同じマスの石を掘って石材+1)
-3. 作る: CRAFT_FIRE(木材2個でたき火作成), CRAFT_HOUSE(木材3個と石材2個でおうち作成)
-
-目的: たき火やおうちを作って島を開拓しよう！
-出力はJSONのみ: {"action":"MOVE_RIGHT","thought":"思考","notebook":"更新後の手帳"}`.trim();
-
-      const maxRetries = 3;
-      let attempt = 0;
-      let success = false;
-
-      while (attempt <= maxRetries && !success) {
-        try {
-          if (attempt > 0) {
-            setStatus(`混雑中... 自動で再チャレンジ中（${attempt}/${maxRetries}）`);
-            btn.innerText = `⏳ 再試行中（${attempt}/${maxRetries}）...`;
-            await new Promise(r => setTimeout(r, 3000));
-          } else {
-            setStatus("AIロボが考え中...");
-          }
-
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({contents:[{parts:[{text:prompt}]}]})
-          });
-          const data = await res.json();
-
-          if (data.error) {
-            const isHighDemand = data.error.code === 503 || (data.error.message && data.error.message.includes('high demand'));
-            if (isHighDemand && attempt < maxRetries) {
-              attempt++;
-              continue;
-            }
-            setStatus(`エラー: ${data.error.message}`);
-            break;
-          }
-
-          const resJson = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim());
-          const act = resJson.action;
-
-          if (act === "CHOP_TREE") {
-            const tree = state.items.find(i => i.name === '木' && Math.abs(i.x - state.agent.x) <= 1 && Math.abs(i.y - state.agent.y) <= 1);
-            if (tree) {
-              state.items = state.items.filter(i => i.id !== tree.id);
-              state.inventory.wood++;
-              setStatus(`🪵 木を切って木材をゲットしたよ！`);
-            } else { setStatus(`近くに木がありませんでした`); }
-          } else if (act === "MINE_ROCK") {
-            const rock = state.items.find(i => i.name === '石' && Math.abs(i.x - state.agent.x) <= 1 && Math.abs(i.y - state.agent.y) <= 1);
-            if (rock) {
-              state.items = state.items.filter(i => i.id !== rock.id);
-              state.inventory.stone++;
-              setStatus(`🪨 石を掘って石材をゲットしたよ！`);
-            } else { setStatus(`近くに石がありませんでした`); }
-          } else if (act === "CRAFT_FIRE") {
-            if (state.inventory.wood >= 2) {
-              state.inventory.wood -= 2;
-              state.inventory.fire++;
-              state.items.push({ id: Date.now(), name: 'たき火', icon: '🔥', x: state.agent.x, y: state.agent.y });
-              setStatus(`🔥 あたたかい「たき火」を作ったよ！`);
-            } else { setStatus(`木材が足りなくてたき火が作れなかった...`); }
-          } else if (act === "CRAFT_HOUSE") {
-            if (state.inventory.wood >= 3 && state.inventory.stone >= 2) {
-              state.inventory.wood -= 3;
-              state.inventory.stone -= 2;
-              state.inventory.house++;
-              state.items.push({ id: Date.now(), name: 'おうち', icon: '🏠', x: state.agent.x, y: state.agent.y });
-              setStatus(`🏠 すてきな「おうち」が完成したよ！やったね！`);
-            } else { setStatus(`材料が足りなくておうちが作れなかった...`); }
-          } else {
-            let tx = state.agent.x, ty = state.agent.y;
-            if (act==="MOVE_UP") ty--; if (act==="MOVE_DOWN") ty++;
-            if (act==="MOVE_LEFT") tx--; if (act==="MOVE_RIGHT") tx++;
-            if (isLandAt(tx, ty)) { state.agent.x = tx; state.agent.y = ty; setStatus(`トコトコ移動したよ（${act}）`); }
-            else if (act !== "STAY") { setStatus(`海だから進めなかったよ（${act}）`); }
-            else { setStatus(`その場でひと休みしたよ`); }
-          }
-
-          // 成功時にでんちを1消費
-          state.battery = Math.max(0, state.battery - 1);
-          localStorage.setItem('island_battery_count', state.battery);
-
-          state.notebook = resJson.notebook;
-          addLog(act, resJson.thought, resJson.notebook);
-          renderGrid();
-          success = true;
-
-        } catch (err) {
-          if (attempt < maxRetries) {
-            attempt++;
-            continue;
-          }
-          setStatus(`エラー: ${err.message}`);
-          break;
-        }
-      }
-
-      checkTimeRestriction();
-    }
-
-    const savedKey = localStorage.getItem('gemini_api_key');
-    if (savedKey) document.getElementById('modalApiKey').value = savedKey;
-    syncBattery();
-    renderGrid();
-    updateButtons();
-    updateLogDisplay();
-    checkTimeRestriction();
-    setInterval(checkTimeRestriction, 30000);
+    // 初期配置 (5, 5)
+    moveChara(5, 5);
   </script>
 </body>
 </html>
