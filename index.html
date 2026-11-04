@@ -7,17 +7,29 @@
   <title>ボクセルAI自律思考水槽</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-    html, body { width: 100%; height: 100dvh; overflow: hidden; background: #07090e; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; position: fixed; inset: 0; }
+    html, body {
+      width: 100%; height: 100%; min-height: 100vh; min-height: 100dvh;
+      overflow: hidden; background: #07090e; color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      position: fixed; inset: 0;
+    }
 
-    /* 3D全画面キャンバス（絶対に崩さない土台） */
+    /* エラー通知用（万が一のエラーでも真っ黒にさせない） */
+    #crash-banner {
+      display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+      background: #dc2626; color: #fff; padding: 12px; font-size: 12px;
+      line-height: 1.4; font-weight: bold; text-align: center;
+    }
+
+    /* 3D全画面キャンバス（土台） */
     #stage { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
     #c3d { width: 100%; height: 100%; display: block; }
 
-    /* 上部：ステータスバー（全ゲージ100点満点） */
+    /* 上部：ステータスバー（100点満点） */
     .top-hud {
       position: absolute; top: 10px; left: 10px; right: 10px; z-index: 10;
-      background: rgba(13, 17, 26, 0.88); backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px;
+      background: rgba(13, 17, 26, 0.9); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px;
       padding: 8px 12px; pointer-events: none;
     }
     .status-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; text-align: center; font-size: 10px; font-weight: bold; }
@@ -32,7 +44,7 @@
     .badge-api { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
     .badge-test { background: rgba(234, 179, 8, 0.2); color: #eab308; border: 1px solid #eab308; }
 
-    /* ロボの思考モニター（上部に浮かべて3D画面を遮らない） */
+    /* ロボの思考モニター */
     .thought-card {
       position: absolute; top: 78px; left: 10px; right: 58px; z-index: 10;
       background: rgba(15, 23, 42, 0.92); border: 1px solid #38bdf8; border-radius: 10px;
@@ -106,9 +118,26 @@
     .input-box { width: 100%; padding: 8px; background: #020617; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 12px; }
     .save-btn { padding: 10px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
   </style>
+
+  <!-- エラーが起きても真っ黒にさせない保護スクリプト -->
+  <script>
+    window.onerror = function(msg, url, line) {
+      var b = document.getElementById('crash-banner');
+      if (b) {
+        b.style.display = 'block';
+        b.textContent = '⚠️ 起動エラー: ' + msg + ' (行:' + line + ')';
+      }
+      return false;
+    };
+  </script>
+
+  <!-- Three.js 読み込み -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
+
+  <!-- エラー告知バナー -->
+  <div id="crash-banner"></div>
 
   <!-- 3D水槽 -->
   <div id="stage"><div id="c3d"></div></div>
@@ -124,7 +153,7 @@
     </div>
     <div class="hud-sub">
       <span id="ui-id">🤖 個体#1 (0, 0, -1)</span>
-      <span id="ui-badge" class="badge badge-test">🧪 TEST残: 20/20</span>
+      <span id="ui-badge" class="badge badge-api">⚡ 3.8残: 20/20</span>
       <span id="ui-timer">⏳ 生存: 00:00</span>
     </div>
   </div>
@@ -132,7 +161,7 @@
   <!-- ロボの思考モニター -->
   <div class="thought-card">
     <div class="thought-title">
-      <span id="ui-brain-title">🤖 ロボの深層思考 (AI頭脳)</span>
+      <span id="ui-brain-title">🤖 ロボの深層思考 (gemini-3.8-flash)</span>
       <span id="ui-state" style="color:#94a3b8;">待機中</span>
     </div>
     <div class="thought-body" id="thought-txt">
@@ -157,8 +186,8 @@
     </div>
   </div>
 
-  <!-- 手帳の小窓（最初はdisplay: none） -->
-  <div class="modal-cover" id="diaryModal" style="display: none;">
+  <!-- 手帳の小窓（初期表示は必ず非表示） -->
+  <div class="modal-cover" id="diaryModal">
     <div class="modal-box">
       <div class="modal-head">
         <div class="modal-title">📖 拾い上げた古い手帳（日記）</div>
@@ -175,8 +204,8 @@
     </div>
   </div>
 
-  <!-- 設定の小窓（最初はdisplay: none） -->
-  <div class="modal-cover" id="settingModal" style="display: none;">
+  <!-- 設定の小窓（初期表示は必ず非表示） -->
+  <div class="modal-cover" id="settingModal">
     <div class="modal-box">
       <div class="modal-head">
         <div class="modal-title">⚙️ AI思考システム設定</div>
@@ -184,16 +213,16 @@
       </div>
       <div class="setting-row">
         <div>
-          <div style="font-size:12px; font-weight:bold;">Gemini APIで思考させる</div>
-          <div style="font-size:10px; color:#94a3b8;">ON: 本番API(残20) / OFF: テスト(残20)</div>
+          <div style="font-size:12px; font-weight:bold;">Gemini 3.8 APIで思考させる</div>
+          <div style="font-size:10px; color:#94a3b8;">ON: 3.8本番API(残20) / OFF: テスト(残20)</div>
         </div>
         <label class="switch">
-          <input type="checkbox" id="api-toggle">
+          <input type="checkbox" id="api-toggle" checked>
           <span class="slider"></span>
         </label>
       </div>
-      <div style="font-size:11px; color:#94a3b8; line-height:1.4;">
-        ※混雑時（High demand）は空いているモデルへ自動切り替えして思考を止めません。
+      <div style="font-size:11px; color:#38bdf8; line-height:1.4;">
+        ※最新の「gemini-3.8-flash」モデルを使用します。
       </div>
       <div style="font-size:11px; color:#94a3b8;">Gemini APIキー (AIzaSy...):</div>
       <input type="password" id="api-key" class="input-box" placeholder="キーを貼り付け">
@@ -203,16 +232,28 @@
 
   <script>
     // ========================================================
+    // 安全なデータ保存ラッパー（プレビューでもクラッシュさせない）
+    // ========================================================
+    const safeStorage = {
+      getItem: function(key) {
+        try { return localStorage.getItem(key); } catch(e) { return null; }
+      },
+      setItem: function(key, val) {
+        try { localStorage.setItem(key, val); } catch(e) {}
+      }
+    };
+
+    // ========================================================
     // 1. ロボットの内部状態
     // ========================================================
     const ROBOT = {
       gen: 1,
       isStop: false,
-      useApi: false,
+      useApi: true,
       apiCount: 20,
       testCount: 20,
       seconds: 0,
-      activeModel: "Gemini",
+      activeModel: "gemini-3.8-flash",
       stats: {
         hp: 100,      // 体力 (空腹0で激減。0で機能停止)
         hunger: 70,   // 空腹 (1分で-1、1歩で-1)
@@ -234,19 +275,14 @@
     // 初期縄張り (2x2x2)
     for (let x = 0; x <= 1; x++) {
       for (let y = -1; y <= 0; y++) {
-        for (let z = -1; z <= 0; z++) ROBOT.known[`${x},${y},${z}`] = true;
+        for (let z = -1; z <= 0; z++) ROBOT.known[x + ',' + y + ',' + z] = true;
       }
     }
 
-    ROBOT.useApi = localStorage.getItem('use_api_flag') === 'true';
-
-    // 混雑に強いモデル優先リスト（混んでいたら自動で次に切り替える）
-    const MODEL_CANDIDATES = [
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-2.5-pro",
-      "gemini-1.5-flash"
-    ];
+    const savedFlag = safeStorage.getItem('use_api_flag');
+    if (savedFlag !== null) {
+      ROBOT.useApi = (savedFlag === 'true');
+    }
 
     // ========================================================
     // 2. 本格思考スキーマ（JSON構造化）
@@ -304,7 +340,7 @@
       if (ROBOT.stats.hunger === 0 && ROBOT.seconds % 20 === 0) {
         ROBOT.stats.hp = Math.max(0, ROBOT.stats.hp - 15);
         document.getElementById('thought-txt').innerHTML =
-          `<span style="color:#ef4444; font-weight:bold;">⚠️ お腹が空っぽで回路が軋む…体力が15減ってしまった！</span>`;
+          '<span style="color:#ef4444; font-weight:bold;">⚠️ お腹が空っぽで回路が軋む…体力が15減ってしまった！</span>';
         if (ROBOT.stats.hp === 0) {
           triggerShutdown("お腹が空っぽのまま時間が過ぎ、手帳を握りしめたまま意識が途絶えた。");
         }
@@ -313,191 +349,140 @@
 
       const m = String(Math.floor(ROBOT.seconds / 60)).padStart(2, '0');
       const s = String(ROBOT.seconds % 60).padStart(2, '0');
-      document.getElementById('ui-timer').textContent = `⏳ 生存: ${m}:${s}`;
+      document.getElementById('ui-timer').textContent = '⏳ 生存: ' + m + ':' + s;
     }, 1000);
 
     // ========================================================
     // 4. 3D水槽（地上と地下の断面・ハシゴ・透明ガラス）
     // ========================================================
-    const stage = document.getElementById('c3d');
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x07090e);
+    let scene, camera, renderer, world, clickBlocks = [], voxelMap = {}, fieldApples = [];
+    let chara, bodyM, headM, rArm, lArm, rLeg, lLeg, handApple;
+    let targetCamPos, targetCamLook, curCamLook;
 
-    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
-    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'low-power' });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    stage.appendChild(renderer.domElement);
+    const CAM = {
+      surface: { pos: new THREE.Vector3(0, 9, 13), look: new THREE.Vector3(0, 0, -1) },
+      antfarm: { pos: new THREE.Vector3(0, -2.5, 12), look: new THREE.Vector3(0, -2.5, 0) }
+    };
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.6);
-    sun.position.set(10, 20, 10);
-    scene.add(sun);
+    function init3D() {
+      const stage = document.getElementById('c3d');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x07090e);
 
-    const world = new THREE.Group();
-    scene.add(world);
+      camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
+      renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'low-power' });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      stage.appendChild(renderer.domElement);
 
-    const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
-    const COLOR_LIT = { grass: 0x48bb78, dirt: 0x784f33, stone: 0x475569 };
-    const COLOR_DARK = { grass: 0x112619, dirt: 0x21160e, stone: 0x151921 };
+      scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+      const sun = new THREE.DirectionalLight(0xffffff, 0.6);
+      sun.position.set(10, 20, 10);
+      scene.add(sun);
 
-    const voxelMap = {};
-    const clickBlocks = [];
+      world = new THREE.Group();
+      scene.add(world);
 
-    for (let x = -4; x <= 4; x++) {
-      for (let z = -4; z <= 0; z++) {
-        if (!(x === 0 && z === -1)) makeBlock(x, 0, z, 'grass');
-        for (let y = -1; y >= -5; y--) {
-          if (x === 0 && z === -1 && y >= -3) continue;
-          if (Math.abs(x) <= 2 && y <= -2 && y >= -4 && z >= -2) continue;
-          makeBlock(x, y, z, y >= -2 ? 'dirt' : 'stone');
+      const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+      const COLOR_LIT = { grass: 0x48bb78, dirt: 0x784f33, stone: 0x475569 };
+      const COLOR_DARK = { grass: 0x112619, dirt: 0x21160e, stone: 0x151921 };
+
+      function makeBlock(x, y, z, type) {
+        const mat = new THREE.MeshLambertMaterial({ color: COLOR_DARK[type] });
+        const b = new THREE.Mesh(boxGeo, mat);
+        b.position.set(x, y, z);
+        b.userData = { gx: x, gy: y, gz: z, type: type };
+        world.add(b);
+        voxelMap[x + ',' + y + ',' + z] = b;
+        clickBlocks.push(b);
+      }
+
+      for (let x = -4; x <= 4; x++) {
+        for (let z = -4; z <= 0; z++) {
+          if (!(x === 0 && z === -1)) makeBlock(x, 0, z, 'grass');
+          for (let y = -1; y >= -5; y--) {
+            if (x === 0 && z === -1 && y >= -3) continue;
+            if (Math.abs(x) <= 2 && y <= -2 && y >= -4 && z >= -2) continue;
+            makeBlock(x, y, z, y >= -2 ? 'dirt' : 'stone');
+          }
         }
       }
-    }
 
-    function makeBlock(x, y, z, type) {
-      const mat = new THREE.MeshLambertMaterial({ color: COLOR_DARK[type] });
-      const b = new THREE.Mesh(boxGeo, mat);
-      b.position.set(x, y, z);
-      b.userData = { gx: x, gy: y, gz: z, type };
-      world.add(b);
-      voxelMap[`${x},${y},${z}`] = b;
-      clickBlocks.push(b);
+      // 木製ハシゴ
+      const ladMat = new THREE.MeshLambertMaterial({ color: 0xb45309 });
+      for (let y = 0; y >= -3; y--) {
+        const step = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.1), ladMat);
+        step.position.set(0, y - 0.2, -1.4);
+        world.add(step);
+      }
+
+      // ガラス面
+      const glass = new THREE.Mesh(
+        new THREE.PlaneGeometry(9, 6),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.08, side: THREE.DoubleSide })
+      );
+      glass.position.set(0, -2.5, 0.5);
+      scene.add(glass);
+
+      // ロボット
+      chara = new THREE.Group();
+      world.add(chara);
+
+      bodyM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x3b82f6 }));
+      bodyM.scale.set(0.5, 0.5, 0.35); bodyM.position.y = 0.5; chara.add(bodyM);
+
+      headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x93c5fd }));
+      headM.scale.set(0.42, 0.4, 0.4); headM.position.y = 0.85; chara.add(headM);
+
+      const armGeo = new THREE.BoxGeometry(0.16, 0.38, 0.16);
+      const armMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
+      rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.35, 0.5, 0); chara.add(rArm);
+      lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.35, 0.5, 0); chara.add(lArm);
+
+      handApple = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshLambertMaterial({ color: 0xef4444, visible: false }));
+      handApple.position.set(0, -0.22, 0.14);
+      rArm.add(handApple);
+
+      const legGeo = new THREE.BoxGeometry(0.18, 0.32, 0.18);
+      const legMat = new THREE.MeshLambertMaterial({ color: 0x1e3a8a });
+      rLeg = new THREE.Mesh(legGeo, legMat); rLeg.position.set(0.16, 0.16, 0); chara.add(rLeg);
+      lLeg = new THREE.Mesh(legGeo, legMat); lLeg.position.set(-0.16, 0.16, 0); chara.add(lLeg);
+
+      chara.position.set(0, 0.5, -1);
+
+      targetCamPos = CAM.surface.pos.clone();
+      targetCamLook = CAM.surface.look.clone();
+      curCamLook = targetCamLook.clone();
+      camera.position.copy(targetCamPos);
+
+      refreshFog();
+      spawnApple(2, 0, -1);
+      setupTouch();
+      renderLoop();
     }
 
     function refreshFog() {
+      const COLOR_LIT = { grass: 0x48bb78, dirt: 0x784f33, stone: 0x475569 };
+      const COLOR_DARK = { grass: 0x112619, dirt: 0x21160e, stone: 0x151921 };
       for (const key in voxelMap) {
         const b = voxelMap[key];
         let lit = false;
         for (let ox = -1; ox <= 1; ox++) {
           for (let oy = -1; oy <= 1; oy++) {
             for (let oz = -1; oz <= 1; oz++) {
-              if (ROBOT.known[`${b.userData.gx+ox},${b.userData.gy+oy},${b.userData.gz+oz}`]) lit = true;
+              if (ROBOT.known[(b.userData.gx+ox) + ',' + (b.userData.gy+oy) + ',' + (b.userData.gz+oz)]) lit = true;
             }
           }
         }
         b.material.color.setHex(lit ? COLOR_LIT[b.userData.type] : COLOR_DARK[b.userData.type]);
       }
     }
-    refreshFog();
-
-    // 木製ハシゴ
-    const ladMat = new THREE.MeshLambertMaterial({ color: 0xb45309 });
-    for (let y = 0; y >= -3; y--) {
-      const step = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.1), ladMat);
-      step.position.set(0, y - 0.2, -1.4);
-      world.add(step);
-    }
-
-    // ガラス面
-    const glass = new THREE.Mesh(
-      new THREE.PlaneGeometry(9, 6),
-      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.08, side: THREE.DoubleSide })
-    );
-    glass.position.set(0, -2.5, 0.5);
-    scene.add(glass);
-
-    // ロボット
-    const chara = new THREE.Group();
-    world.add(chara);
-
-    const bodyM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x3b82f6 }));
-    bodyM.scale.set(0.5, 0.5, 0.35); bodyM.position.y = 0.5; chara.add(bodyM);
-
-    const headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x93c5fd }));
-    headM.scale.set(0.42, 0.4, 0.4); headM.position.y = 0.85; chara.add(headM);
-
-    const armGeo = new THREE.BoxGeometry(0.16, 0.38, 0.16);
-    const armMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
-    const rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.35, 0.5, 0); chara.add(rArm);
-    const lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.35, 0.5, 0); chara.add(lArm);
-
-    const handApple = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshLambertMaterial({ color: 0xef4444, visible: false }));
-    handApple.position.set(0, -0.22, 0.14);
-    rArm.add(handApple);
-
-    const legGeo = new THREE.BoxGeometry(0.18, 0.32, 0.18);
-    const legMat = new THREE.MeshLambertMaterial({ color: 0x1e3a8a });
-    const rLeg = new THREE.Mesh(legGeo, legMat); rLeg.position.set(0.16, 0.16, 0); chara.add(rLeg);
-    const lLeg = new THREE.Mesh(legGeo, legMat); lLeg.position.set(-0.16, 0.16, 0); chara.add(lLeg);
-
-    chara.position.set(0, 0.5, -1);
-
-    const fieldApples = [];
-
-    const CAM = {
-      surface: { pos: new THREE.Vector3(0, 9, 13), look: new THREE.Vector3(0, 0, -1) },
-      antfarm: { pos: new THREE.Vector3(0, -2.5, 12), look: new THREE.Vector3(0, -2.5, 0) }
-    };
-    let targetCamPos = CAM.surface.pos.clone();
-    let targetCamLook = CAM.surface.look.clone();
-    let curCamLook = targetCamLook.clone();
-    camera.position.copy(targetCamPos);
 
     function changeCam(type) {
       targetCamPos.copy(CAM[type].pos);
       targetCamLook.copy(CAM[type].look);
       document.getElementById('btn-sur').classList.toggle('active', type === 'surface');
       document.getElementById('btn-ant').classList.toggle('active', type === 'antfarm');
-    }
-
-    // ========================================================
-    // 5. タッチ操作（回転・ズーム・リンゴ投下）
-    // ========================================================
-    let touchMode = 'none', prevX = 0, prevDist = 0, touchTime = 0;
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-
-    window.addEventListener('touchstart', e => {
-      if (e.target.closest('.top-hud, .thought-card, .side-btns, .bottom-hud, .modal-cover')) return;
-      touchTime = performance.now();
-      if (e.touches.length === 1) {
-        touchMode = 'drag'; prevX = e.touches[0].clientX;
-      } else if (e.touches.length === 2) {
-        touchMode = 'pinch';
-        prevDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      }
-    }, { passive: true });
-
-    window.addEventListener('touchmove', e => {
-      if (touchMode === 'drag' && e.touches.length === 1) {
-        world.rotation.y += (e.touches[0].clientX - prevX) * 0.007;
-        prevX = e.touches[0].clientX;
-      } else if (touchMode === 'pinch' && e.touches.length === 2) {
-        const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-        camera.fov = Math.max(20, Math.min(65, camera.fov + (prevDist - d) * 0.02));
-        camera.updateProjectionMatrix();
-        prevDist = d;
-      }
-    }, { passive: true });
-
-    window.addEventListener('touchend', e => {
-      if (performance.now() - touchTime < 250 && touchMode === 'drag' && e.changedTouches.length === 1) {
-        dropAppleAtPoint(e.changedTouches[0]);
-      }
-      touchMode = 'none';
-    });
-
-    function dropAppleAtPoint(touch) {
-      if (ROBOT.isStop) return;
-      mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
-
-      const hits = raycaster.intersectObjects(clickBlocks);
-      if (hits.length === 0) return;
-
-      let gx = hits[0].object.userData.gx;
-      let gy = hits[0].object.userData.gy;
-      let gz = hits[0].object.userData.gz;
-
-      // タテ穴なら地下の底までストンと落とす
-      while (gy > -4 && !voxelMap[`${gx},${gy},${gz}`]) {
-        gy--;
-      }
-
-      spawnApple(gx, gy, gz);
-      document.getElementById('guide-txt').textContent = `🍎リンゴを落としました！(島に${fieldApples.length}個)`;
     }
 
     function spawnApple(gx, gy, gz) {
@@ -508,31 +493,86 @@
       grp.add(apple, leaf);
       grp.position.set(gx, gy + 0.65, gz);
       world.add(grp);
-      fieldApples.push({ mesh: grp, gx, gy, gz });
+      fieldApples.push({ mesh: grp, gx: gx, gy: gy, gz: gz });
     }
 
-    spawnApple(2, 0, -1);
+    function setupTouch() {
+      let touchMode = 'none', prevX = 0, prevDist = 0, touchTime = 0;
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+
+      window.addEventListener('touchstart', e => {
+        if (e.target.closest('.top-hud, .thought-card, .side-btns, .bottom-hud, .modal-cover')) return;
+        touchTime = performance.now();
+        if (e.touches.length === 1) {
+          touchMode = 'drag'; prevX = e.touches[0].clientX;
+        } else if (e.touches.length === 2) {
+          touchMode = 'pinch';
+          prevDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchmove', e => {
+        if (touchMode === 'drag' && e.touches.length === 1) {
+          world.rotation.y += (e.touches[0].clientX - prevX) * 0.007;
+          prevX = e.touches[0].clientX;
+        } else if (touchMode === 'pinch' && e.touches.length === 2) {
+          const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+          camera.fov = Math.max(20, Math.min(65, camera.fov + (prevDist - d) * 0.02));
+          camera.updateProjectionMatrix();
+          prevDist = d;
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchend', e => {
+        if (performance.now() - touchTime < 250 && touchMode === 'drag' && e.changedTouches.length === 1) {
+          dropAppleAtPoint(e.changedTouches[0]);
+        }
+        touchMode = 'none';
+      });
+
+      function dropAppleAtPoint(touch) {
+        if (ROBOT.isStop) return;
+        mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+
+        const hits = raycaster.intersectObjects(clickBlocks);
+        if (hits.length === 0) return;
+
+        let gx = hits[0].object.userData.gx;
+        let gy = hits[0].object.userData.gy;
+        let gz = hits[0].object.userData.gz;
+
+        while (gy > -4 && !voxelMap[gx + ',' + gy + ',' + gz]) {
+          gy--;
+        }
+
+        spawnApple(gx, gy, gz);
+        document.getElementById('guide-txt').textContent = '🍎リンゴを落としました！(島に' + fieldApples.length + '個)';
+      }
+    }
 
     // ========================================================
-    // 6. 1×1×1の周囲センサーと物理行動リスト
+    // 5. 物理移動・匂いセンサー
     // ========================================================
     function canWalk(x, y, z) {
-      if (voxelMap[`${x},${y},${z}`]) return false;
+      if (voxelMap[x + ',' + y + ',' + z]) return false;
       if (x < -4 || x > 4 || z < -4 || z > 0 || y > 1 || y < -5) return false;
-      const hasFloor = Boolean(voxelMap[`${x},${y-1},${z}`]);
+      const hasFloor = Boolean(voxelMap[x + ',' + (y - 1) + ',' + z]);
       const onLadder = (x === 0 && z === -1 && y >= -3 && y <= 0);
-      const isLowest = (y === -4 && Boolean(voxelMap[`${x},-5,${z}`]));
+      const isLowest = (y === -4 && Boolean(voxelMap[x + ',-5,' + z]));
       return (hasFloor || onLadder || isLowest);
     }
 
     function inspect1x1Surroundings(cx, cy, cz) {
       const checkDir = (dx, dy, dz, label) => {
         const tx = cx + dx, ty = cy + dy, tz = cz + dz;
-        const blk = voxelMap[`${tx},${ty},${tz}`];
-        if (blk) return `${label}: 硬い${blk.userData.type === 'grass' ? '草土' : (blk.userData.type === 'dirt' ? '土壁' : '岩壁')}に塞がれている`;
-        if (tx === 0 && tz === -1 && ty >= -3 && ty <= 0) return `${label}: 地下へ続くタテ穴と木製ハシゴがある`;
-        if (canWalk(tx, ty, tz)) return `${label}: 1歩進める空間がある`;
-        return `${label}: 足場のない空間（進めない）`;
+        const blk = voxelMap[tx + ',' + ty + ',' + tz];
+        if (blk) return label + ': 硬い' + (blk.userData.type === 'grass' ? '草土' : (blk.userData.type === 'dirt' ? '土壁' : '岩壁')) + 'に塞がれている';
+        if (tx === 0 && tz === -1 && ty >= -3 && ty <= 0) return label + ': 地下へ続くタテ穴と木製ハシゴがある';
+        if (canWalk(tx, ty, tz)) return label + ': 1歩進める空間がある';
+        return label + ': 足場のない空間（進めない）';
       };
       return [
         checkDir(1, 0, 0, "東(右1マス)"),
@@ -570,8 +610,8 @@
         const tx = cx + d.dx, ty = cy + d.dy, tz = cz + d.dz;
         if (d.dy !== 0 && !(cx === 0 && cz === -1 && cy >= -3 && ty >= -3 && ty <= 0)) continue;
         if (canWalk(tx, ty, tz)) {
-          const visited = ROBOT.known[`${tx},${ty},${tz}`] ? "一度歩いた場所" : "まだ知らない暗闇のマス";
-          list.push({ id: list.length, type: "MOVE", pos: [tx, ty, tz], txt: `${d.name} [座標(${tx},${ty},${tz})・${visited}] ※空腹-1/元気-2` });
+          const visited = ROBOT.known[tx + ',' + ty + ',' + tz] ? "一度歩いた場所" : "まだ知らない暗闇のマス";
+          list.push({ id: list.length, type: "MOVE", pos: [tx, ty, tz], txt: d.name + ' [座標(' + tx + ',' + ty + ',' + tz + ')・' + visited + '] ※空腹-1/元気-2' });
         }
       }
 
@@ -583,16 +623,16 @@
       if (fieldApples.length === 0) return "甘いリンゴの匂いはどこからも漂ってこない。";
       return fieldApples.map((a, i) => {
         const dist = Math.hypot(a.gx - cx, a.gy - cy, a.gz - cz).toFixed(1);
-        if (dist <= 1) return `すぐ目の前（距離${dist}）から強烈に甘いリンゴの香りがする！`;
-        const ew = a.gx > cx ? `東へ${a.gx - cx}マス` : (a.gx < cx ? `西へ${cx - a.gx}マス` : '東西は同じ列');
-        const ns = a.gz > cz ? `南へ${a.gz - cz}マス` : (a.gz < cz ? `北へ${cz - a.gz}マス` : '南北は同じ列');
-        const ud = a.gy > cy ? `上へ${a.gy - cy}段` : (a.gy < cy ? `下(地下)へ${cy - a.gy}段` : '同じ高さ');
-        return `リンゴの匂い#${i+1}: 方角[${ew}, ${ns}, ${ud}]（直線距離${dist}マス）`;
+        if (dist <= 1) return 'すぐ目の前（距離' + dist + '）から強烈に甘いリンゴの香りがする！';
+        const ew = a.gx > cx ? '東へ' + (a.gx - cx) + 'マス' : (a.gx < cx ? '西へ' + (cx - a.gx) + 'マス' : '東西は同じ列');
+        const ns = a.gz > cz ? '南へ' + (a.gz - cz) + 'マス' : (a.gz < cz ? '北へ' + (cz - a.gz) + 'マス' : '南北は同じ列');
+        const ud = a.gy > cy ? '上へ' + (a.gy - cy) + '段' : (a.gy < cy ? '下(地下)へ' + (cy - a.gy) + '段' : '同じ高さ');
+        return 'リンゴの匂い#' + (i + 1) + ': 方角[' + ew + ', ' + ns + ', ' + ud + ']（直線距離' + dist + 'マス）';
       }).join(' / ');
     }
 
     // ========================================================
-    // 7. 自律思考ステップ（混雑回避フォールバック搭載）
+    // 6. 自律思考ステップ（gemini-3.8-flash 専用通信）
     // ========================================================
     async function stepAiThought() {
       if (ROBOT.isStop) return;
@@ -603,7 +643,7 @@
         return;
       }
 
-      const apiKey = localStorage.getItem('gemini_api_key') || '';
+      const apiKey = safeStorage.getItem('gemini_api_key') || '';
       if (ROBOT.useApi && !apiKey) {
         alert("右上の⚙️設定からGemini APIキーを入力してください。");
         openModal('settingModal');
@@ -613,10 +653,6 @@
       const btn = document.getElementById('think-btn');
       btn.disabled = true;
 
-      if (ROBOT.useApi) ROBOT.apiCount--;
-      else ROBOT.testCount--;
-      updateHUD();
-
       const cx = ROBOT.pos.x, cy = ROBOT.pos.y, cz = ROBOT.pos.z;
       const actions = getPossibleActions(cx, cy, cz);
       const smell = scanAppleSmell(cx, cy, cz);
@@ -625,19 +661,23 @@
       let decision;
       if (ROBOT.useApi) {
         try {
-          decision = await callGeminiWithFallback(cx, cy, cz, actions, smell, touch1x1, apiKey);
+          decision = await callGemini38Flash(cx, cy, cz, actions, smell, touch1x1, apiKey);
+          ROBOT.apiCount--;
         } catch (err) {
-          document.getElementById('ui-state').textContent = "❌ 全モデル混雑";
-          document.getElementById('thought-txt').innerHTML = `<span style="color:#f87171;">【通信エラー】: Googleのサーバーが全モデル混雑しています。数十秒待って再度お試しください。(${err.message})</span>`;
+          document.getElementById('ui-state').textContent = "⚠️ 通信待機";
+          document.getElementById('thought-txt').innerHTML = '<span style="color:#f87171;">【gemini-3.8-flash 混雑】: Googleサーバーが混み合っています。5〜10秒ほど待って再度お試しください。(' + err.message + ')</span>';
           btn.disabled = false;
+          updateHUD();
           return;
         }
       } else {
+        ROBOT.testCount--;
         document.getElementById('ui-state').textContent = "🧪 テスト思考中...";
         await new Promise(r => setTimeout(r, 350));
         decision = localDeepTestBrain(cx, cy, cz, actions, smell);
       }
 
+      updateHUD();
       document.getElementById('ui-state').textContent = "行動中";
       await executeAction(decision, actions);
 
@@ -645,8 +685,10 @@
       if (!ROBOT.isStop) btn.disabled = false;
     }
 
-    // 混雑（High demand / 503 / 429）を自動で回避するタフなAPI呼び出し
-    async function callGeminiWithFallback(cx, cy, cz, actions, smell, touch1x1, key) {
+    // gemini-3.8-flash 通信関数
+    async function callGemini38Flash(cx, cy, cz, actions, smell, touch1x1, key) {
+      document.getElementById('ui-state').textContent = "⚡ 3.8-flash 思考中...";
+
       const prompt = `あなたは箱庭の水槽世界で生きる小さな自律ロボット（個体#${ROBOT.gen}）です。
 あなたの視界は「自分の足元と目の前の1マス（1×1×1）」しか見えず、世界の全体像や人間（プレイヤー）の存在、そして「死（ゲームオーバー）」というゲームの仕組みを一切知りません。
 あなたが頼りにできるのは、自分の五感（手触り・匂い・空腹の痛み）と、足元に落ちていた「古い手帳（過去の自分が書き残した手記）」だけです。
@@ -679,47 +721,30 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
 2. 次に、古い手帳の『お腹が空っぽになって動けなくなった』という記録と現在の空腹度(${ROBOT.stats.hunger})を照らし合わせ、「歩けばお腹が1減るけれど、あの甘い匂いの方へ踏み出すべきか、それとも今食べるべきか」という生々しい心の葛藤(innerConflict)を一人称（ボク）で深く語ってください。
 3. 空腹度を最優先に考えて行動(actionId)を選び、今回の体験で深まった自分の仮説(updatedBelief)と、未来の自分へ残す手帳のメモ(diaryMemo)を出力してください。`;
 
-      let lastError = null;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`;
 
-      for (const model of MODEL_CANDIDATES) {
-        document.getElementById('ui-state').textContent = `⚡ ${model} 思考中...`;
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-
-        try {
-          const res = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                temperature: 0.85,
-                responseMimeType: "application/json",
-                responseSchema: thoughtSchema
-              }
-            })
-          });
-
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            const msg = errData?.error?.message || `HTTP ${res.status}`;
-            console.warn(`[${model}] 混雑またはエラー: ${msg}`);
-            lastError = msg;
-            // 混雑やレートリミットなら次の候補モデルへ即座にリトライ！
-            continue;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.85,
+            responseMimeType: "application/json",
+            responseSchema: thoughtSchema
           }
+        })
+      });
 
-          const data = await res.json();
-          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          ROBOT.activeModel = model;
-          return JSON.parse(rawText);
-
-        } catch (e) {
-          lastError = e.message;
-          continue;
-        }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const msg = errData?.error?.message || `HTTP ${res.status}`;
+        throw new Error(msg);
       }
 
-      throw new Error(lastError || "全モデル混雑中");
+      const data = await res.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      return JSON.parse(rawText);
     }
 
     // テストモード思考
@@ -727,24 +752,24 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
       const eat = actions.find(a => a.type === "EAT_HAND" || a.type === "EAT_FIELD");
       if (eat && ROBOT.stats.hunger <= 85) {
         return {
-          sensoryPerception: `目の前に真っ赤なリンゴの甘い香り。お腹は${ROBOT.stats.hunger}まで減っている。`,
+          sensoryPerception: '目の前に真っ赤なリンゴの甘い香り。お腹は' + ROBOT.stats.hunger + 'まで減っている。',
           innerConflict: "古い手帳に『お腹が減りすぎて指先も動かなくなった』と書いてあった…。手遅れになる前に、このリンゴを食べておこう！",
           actionId: eat.id,
           moraleDelta: 10,
           updatedBelief: "リンゴを食べればお腹の痛みが消えて、体力が湧いてくる。",
-          diaryMemo: `座標(${cx},${cy},${cz})でリンゴを食べた。甘くて温かい。`
+          diaryMemo: '座標(' + cx + ',' + cy + ',' + cz + ')でリンゴを食べた。甘くて温かい。'
         };
       }
 
       const pick = actions.find(a => a.type === "PICK_FIELD");
       if (pick && !ROBOT.hasApple) {
         return {
-          sensoryPerception: `足元にツヤツヤしたリンゴが落ちている。`,
+          sensoryPerception: '足元にツヤツヤしたリンゴが落ちている。',
           innerConflict: "今はまだお腹に余裕があるけれど、いつ食べ物がなくなるか分からない。右手に拾って大事に持っておこう。",
           actionId: pick.id,
           moraleDelta: 5,
           updatedBelief: "リンゴを手に持っておけば、お腹が減ったらいつでも食べられる。",
-          diaryMemo: `座標(${cx},${cy},${cz})でリンゴを拾って右手に握った。`
+          diaryMemo: '座標(' + cx + ',' + cy + ',' + cz + ')でリンゴを拾って右手に握った。'
         };
       }
 
@@ -758,24 +783,24 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
         });
         const best = moves[0];
         return {
-          sensoryPerception: `${smell}`,
-          innerConflict: `1歩歩くとお腹が1減ってしまうけど…このままじっとしていてもお腹は減るばかりだ。甘い匂いがする(${best.pos.join(',')})の方へ踏み出してみよう！`,
+          sensoryPerception: smell,
+          innerConflict: '1歩歩くとお腹が1減ってしまうけど…このままじっとしていてもお腹は減るばかりだ。甘い匂いがする(' + best.pos.join(',') + ')の方へ踏み出してみよう！',
           actionId: best.id,
           moraleDelta: 2,
           updatedBelief: "甘い匂いが強くなる方角へ進めば、きっとリンゴが見つかるはずだ。",
-          diaryMemo: `甘い匂いを頼りに(${best.pos.join(',')})へ1歩進んだ。`
+          diaryMemo: '甘い匂いを頼りに(' + best.pos.join(',') + ')へ1歩進んだ。'
         };
       }
 
       if (moves.length > 0) {
         const rnd = moves[Math.floor(Math.random() * moves.length)];
         return {
-          sensoryPerception: `周囲に匂いはない。空腹度は${ROBOT.stats.hunger}。`,
-          innerConflict: `リンゴの匂いがしない…手帳の警告が頭をよぎる。不安だけど、足場を確かめながら(${rnd.pos.join(',')})を探してみよう。`,
+          sensoryPerception: '周囲に匂いはない。空腹度は' + ROBOT.stats.hunger + '。',
+          innerConflict: 'リンゴの匂いがしない…手帳の警告が頭をよぎる。不安だけど、足場を確かめながら(' + rnd.pos.join(',') + ')を探してみよう。',
           actionId: rnd.id,
           moraleDelta: -2,
           updatedBelief: "匂いがしない時は、まだ歩いていない場所を少しずつ調べるしかない。",
-          diaryMemo: `匂いを探して(${rnd.pos.join(',')})へ足を進めた。`
+          diaryMemo: '匂いを探して(' + rnd.pos.join(',') + ')へ足を進めた。'
         };
       }
 
@@ -790,7 +815,7 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
       };
     }
 
-    // 決まった行動を3D空間とステータスへ反映
+    // 決まった行動を反映
     async function executeAction(decision, actions) {
       const act = actions.find(a => a.id === decision.actionId) || actions[0];
 
@@ -802,24 +827,24 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
         ROBOT.stats.morale = Math.max(0, Math.min(100, ROBOT.stats.morale + decision.moraleDelta));
       }
 
-      document.getElementById('thought-txt').innerHTML = `
-        <div style="color:#94a3b8; font-size:10px; margin-bottom:2px;">👁️ 知覚: ${decision.sensoryPerception}</div>
-        <div style="color:#fefcbf; font-weight:bold; margin-bottom:4px;">💭 「${decision.innerConflict}」</div>
-        <div style="color:#9ae6b4; font-size:10px;">⚡ 決断: ${act.txt}</div>
-      `;
-      ROBOT.diary.push(`・[個体#${ROBOT.gen}] ${decision.diaryMemo}`);
+      document.getElementById('thought-txt').innerHTML =
+        '<div style="color:#94a3b8; font-size:10px; margin-bottom:2px;">👁️ 知覚: ' + decision.sensoryPerception + '</div>' +
+        '<div style="color:#fefcbf; font-weight:bold; margin-bottom:4px;">💭 「' + decision.innerConflict + '」</div>' +
+        '<div style="color:#9ae6b4; font-size:10px;">⚡ 決断: ' + act.txt + '</div>';
+
+      ROBOT.diary.push('・[個体#' + ROBOT.gen + '] ' + decision.diaryMemo);
 
       if (act.type === "MOVE") {
         ROBOT.stats.hunger = Math.max(0, ROBOT.stats.hunger - 1);
         ROBOT.stats.stamina = Math.max(0, ROBOT.stats.stamina - 2);
 
-        const [tx, ty, tz] = act.pos;
+        const tx = act.pos[0], ty = act.pos[1], tz = act.pos[2];
         headM.rotation.y = tx > ROBOT.pos.x ? -0.35 : (tx < ROBOT.pos.x ? 0.35 : 0);
         await walkCharaTo(tx, ty + 0.5, tz, 500);
         headM.rotation.y = 0;
 
         ROBOT.pos = { x: tx, y: ty, z: tz };
-        ROBOT.known[`${tx},${ty},${tz}`] = true;
+        ROBOT.known[tx + ',' + ty + ',' + tz] = true;
         refreshFog();
 
         if (ty <= -2) changeCam('antfarm');
@@ -851,7 +876,7 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
         ROBOT.stats.hp = Math.min(100, ROBOT.stats.hp + 15);
         ROBOT.stats.morale = Math.min(100, ROBOT.stats.morale + 10);
         ROBOT.eaten++;
-        document.getElementById('guide-txt').textContent = `🍎リンゴを食べました！(残り${fieldApples.length}個)`;
+        document.getElementById('guide-txt').textContent = '🍎リンゴを食べました！(残り' + fieldApples.length + '個)';
 
       } else if (act.type === "PICK_FIELD") {
         const ap = fieldApples[act.appleIdx];
@@ -861,7 +886,7 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
         }
         ROBOT.hasApple = true;
         handApple.material.visible = true;
-        document.getElementById('guide-txt').textContent = `🍎リンゴを右手に持ちました！(島に残り${fieldApples.length}個)`;
+        document.getElementById('guide-txt').textContent = '🍎リンゴを右手に持ちました！(島に残り' + fieldApples.length + '個)';
 
       } else if (act.type === "REST") {
         ROBOT.stats.stamina = Math.min(100, ROBOT.stats.stamina + 10);
@@ -870,7 +895,7 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
       if (ROBOT.stats.hunger === 0) {
         ROBOT.stats.hp = Math.max(0, ROBOT.stats.hp - 20);
         document.getElementById('thought-txt').innerHTML +=
-          `<div style="color:#ef4444; font-weight:bold; margin-top:3px;">🚨【飢餓の激痛】お腹が0で体力が20削られた！</div>`;
+          '<div style="color:#ef4444; font-weight:bold; margin-top:3px;">🚨【飢餓の激痛】お腹が0で体力が20削られた！</div>';
         if (ROBOT.stats.hp === 0) {
           triggerShutdown("お腹が空っぽのまま一歩を踏み出し、視界が真っ暗になって倒れ込んだ。");
         }
@@ -885,17 +910,16 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
       chara.position.y = ROBOT.pos.y + 0.25;
 
       const appleHint = fieldApples.length > 0
-        ? `どこかにまだ${fieldApples.length}個のリンゴの匂いが残っているのに…`
-        : `周りにはもうリンゴの匂いがしなかった…`;
+        ? 'どこかにまだ' + fieldApples.length + '個のリンゴの匂いが残っているのに…'
+        : '周りにはもうリンゴの匂いがしなかった…';
 
-      const lastNote = `【個体#${ROBOT.gen}の震える文字の走り書き】\n座標(${ROBOT.pos.x}, ${ROBOT.pos.y}, ${ROBOT.pos.z})にて。${reason}${appleHint} 次にこの手帳を拾ったボクへ：空腹がゼロになると本当に動けなくなる。何よりも先にリンゴを探して食べてくれ…。`;
+      const lastNote = '【個体#' + ROBOT.gen + 'の震える文字の走り書き】\n座標(' + ROBOT.pos.x + ', ' + ROBOT.pos.y + ', ' + ROBOT.pos.z + ')にて。' + reason + appleHint + ' 次にこの手帳を拾ったボクへ：空腹がゼロになると本当に動けなくなる。何よりも先にリンゴを探して食べてくれ…。';
       ROBOT.diary.push(lastNote);
 
       document.getElementById('ui-state').textContent = "⚠️ 意識途絶";
-      document.getElementById('thought-txt').innerHTML = `
-        <div style="color:#ef4444; font-weight:bold;">ロボの体力が0になり、その場に倒れ込みました…</div>
-        <div style="color:#cbd5e1; font-size:10px; margin-top:2px;">意識が消える直前、古い手帳に最後の文字を書き残しました。下の赤いボタンで次の個体が手帳を拾い上げます。</div>
-      `;
+      document.getElementById('thought-txt').innerHTML =
+        '<div style="color:#ef4444; font-weight:bold;">ロボの体力が0になり、その場に倒れ込みました…</div>' +
+        '<div style="color:#cbd5e1; font-size:10px; margin-top:2px;">意識が消える直前、古い手帳に最後の文字を書き残しました。下の赤いボタンで次の個体が手帳を拾い上げます。</div>';
 
       document.getElementById('think-btn').style.display = 'none';
       document.getElementById('respawn-btn').style.display = 'block';
@@ -918,40 +942,41 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
       chara.position.set(0, 0.5, -1);
       changeCam('surface');
 
-      ROBOT.belief = `前の個体#${ROBOT.gen - 1}が『空腹がゼロになって動けなくなった』と手帳に書き残している。絶対に空腹をゼロにしてはいけない！`;
+      ROBOT.belief = '前の個体#' + (ROBOT.gen - 1) + 'が『空腹がゼロになって動けなくなった』と手帳に書き残している。絶対に空腹をゼロにしてはいけない！';
       document.getElementById('diary-belief').textContent = ROBOT.belief;
 
-      ROBOT.diary.push(`【個体#${ROBOT.gen}が目覚めた日のメモ】\n目を覚ますと足元に古い手帳が落ちていた。前のページに誰かが倒れる直前に書いた悲痛な文字がある…。ボクはこの手帳の記録を頼りに、必ずリンゴを見つけて生き延びるぞ。`);
+      ROBOT.diary.push('【個体#' + ROBOT.gen + 'が目覚めた日のメモ】\n目を覚ますと足元に古い手帳が落ちていた。前のページに誰かが倒れる直前に書いた悲痛な文字がある…。ボクはこの手帳の記録を頼りに、必ずリンゴを見つけて生き延びるぞ。');
 
       document.getElementById('think-btn').style.display = 'block';
       document.getElementById('think-btn').disabled = false;
       document.getElementById('respawn-btn').style.display = 'none';
 
       document.getElementById('ui-state').textContent = "再起動完了";
-      document.getElementById('thought-txt').innerHTML = `
-        <div style="color:#86efac; font-weight:bold;">個体#${ROBOT.gen}が目を覚まし、足元の古い手帳を読みました！</div>
-        <div style="color:#fefcbf; font-size:10px;">「前のボクが書き残した手帳を読んだぞ…お腹が0になる前にリンゴを見つけよう！」</div>
-      `;
+      document.getElementById('thought-txt').innerHTML =
+        '<div style="color:#86efac; font-weight:bold;">個体#' + ROBOT.gen + 'が目を覚まし、足元の古い手帳を読みました！</div>' +
+        '<div style="color:#fefcbf; font-size:10px;">「前のボクが書き残した手帳を読んだぞ…お腹が0になる前にリンゴを見つけよう！」</div>';
 
       updateHUD();
       openModal('diaryModal');
     }
 
     // ========================================================
-    // 8. アニメーション＆画面表示
+    // 7. アニメーション＆描画ループ
     // ========================================================
     let clock = 0, isWalking = false;
     function renderLoop() {
       requestAnimationFrame(renderLoop);
       clock += 0.04;
 
-      camera.position.lerp(targetCamPos, 0.06);
-      curCamLook.lerp(targetCamLook, 0.06);
-      camera.lookAt(curCamLook);
+      if (camera && targetCamPos) {
+        camera.position.lerp(targetCamPos, 0.06);
+        curCamLook.lerp(targetCamLook, 0.06);
+        camera.lookAt(curCamLook);
+      }
 
       for (const a of fieldApples) a.mesh.rotation.y += 0.03;
 
-      if (!ROBOT.isStop) {
+      if (!ROBOT.isStop && chara) {
         if (isWalking) {
           rArm.rotation.x = Math.sin(clock * 8) * 0.7;
           lArm.rotation.x = -Math.sin(clock * 8) * 0.7;
@@ -962,9 +987,10 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
           bodyM.scale.y = 0.5 + Math.sin(clock * 2) * 0.02;
         }
       }
-      renderer.render(scene, camera);
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+      }
     }
-    renderLoop();
 
     function walkCharaTo(tx, ty, tz, dur) {
       return new Promise(resolve => {
@@ -986,30 +1012,30 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
     function updateHUD() {
       const s = ROBOT.stats;
       document.getElementById('v-hp').textContent = s.hp;
-      document.getElementById('b-hp').style.width = `${s.hp}%`;
+      document.getElementById('b-hp').style.width = s.hp + '%';
 
       document.getElementById('v-hunger').textContent = s.hunger;
-      document.getElementById('b-hunger').style.width = `${s.hunger}%`;
+      document.getElementById('b-hunger').style.width = s.hunger + '%';
 
       document.getElementById('v-stamina').textContent = s.stamina;
-      document.getElementById('b-stamina').style.width = `${s.stamina}%`;
+      document.getElementById('b-stamina').style.width = s.stamina + '%';
 
       document.getElementById('v-sleep').textContent = s.sleep;
-      document.getElementById('b-sleep').style.width = `${s.sleep}%`;
+      document.getElementById('b-sleep').style.width = s.sleep + '%';
 
       document.getElementById('v-morale').textContent = s.morale;
-      document.getElementById('b-morale').style.width = `${s.morale}%`;
+      document.getElementById('b-morale').style.width = s.morale + '%';
 
-      document.getElementById('ui-id').textContent = `🤖 個体#${ROBOT.gen} (${ROBOT.pos.x}, ${ROBOT.pos.y}, ${ROBOT.pos.z})`;
-      document.getElementById('ui-brain-title').textContent = `🤖 ロボの深層思考 (${ROBOT.useApi ? ROBOT.activeModel : "テスト頭脳"})`;
+      document.getElementById('ui-id').textContent = '🤖 個体#' + ROBOT.gen + ' (' + ROBOT.pos.x + ', ' + ROBOT.pos.y + ', ' + ROBOT.pos.z + ')';
+      document.getElementById('ui-brain-title').textContent = '🤖 ロボの深層思考 (' + (ROBOT.useApi ? ROBOT.activeModel : "テスト頭脳") + ')';
 
       const badge = document.getElementById('ui-badge');
       if (ROBOT.useApi) {
         badge.className = "badge badge-api";
-        badge.textContent = `⚡ API残: ${ROBOT.apiCount}/20`;
+        badge.textContent = '⚡ 3.8残: ' + ROBOT.apiCount + '/20';
       } else {
         badge.className = "badge badge-test";
-        badge.textContent = `🧪 TEST残: ${ROBOT.testCount}/20`;
+        badge.textContent = '🧪 TEST残: ' + ROBOT.testCount + '/20';
       }
 
       document.getElementById('diary-text').textContent = ROBOT.diary.join("\n\n");
@@ -1018,7 +1044,7 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
     function openModal(id) {
       if (id === 'settingModal') {
         document.getElementById('api-toggle').checked = ROBOT.useApi;
-        document.getElementById('api-key').value = localStorage.getItem('gemini_api_key') || '';
+        document.getElementById('api-key').value = safeStorage.getItem('gemini_api_key') || '';
       }
       document.getElementById(id).style.display = 'flex';
     }
@@ -1030,20 +1056,25 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
       ROBOT.useApi = document.getElementById('api-toggle').checked;
       const key = document.getElementById('api-key').value.trim();
 
-      localStorage.setItem('use_api_flag', ROBOT.useApi ? 'true' : 'false');
-      localStorage.setItem('gemini_api_key', key);
+      safeStorage.setItem('use_api_flag', ROBOT.useApi ? 'true' : 'false');
+      safeStorage.setItem('gemini_api_key', key);
 
       closeModal('settingModal');
       updateHUD();
     }
 
     window.addEventListener('resize', () => {
+      if (!camera || !renderer) return;
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    updateHUD();
+    // 画面の準備が整ってから安全に起動
+    window.addEventListener('DOMContentLoaded', () => {
+      init3D();
+      updateHUD();
+    });
   </script>
 </body>
 </html>
