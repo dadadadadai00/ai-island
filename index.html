@@ -1,1029 +1,1048 @@
+```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ボクセルAI自律思考水槽</title>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-html, body { width: 100%; height: 100dvh; overflow: hidden; background: #0b0f17; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-​/* 3Dステージ背景 */
-#stage { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
-#c3d { width: 100%; height: 100%; display: block; }
-​/* 上部：5大ステータスバー（100ポイント基準） */
-.top-hud {
-position: absolute; top: 8px; left: 8px; right: 8px; z-index: 10;
-background: rgba(15, 20, 28, 0.94); backdrop-filter: blur(8px);
-border: 1px solid #2d3748; border-radius: 10px; padding: 8px 10px;
-box-shadow: 0 4px 16px rgba(0,0,0,0.6);
-}
-.status-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; font-size: 11px; text-align: center; }
-.bar-bg { background: #2d3748; height: 6px; border-radius: 3px; margin-top: 3px; overflow: hidden; }
-.bar-fill { height: 100%; transition: width 0.4s ease; }
-.hud-sub {
-display: flex; justify-content: space-between; align-items: center;
-font-size: 10px; color: #a0aec0; margin-top: 6px; padding-top: 5px; border-top: 1px solid #1f2937;
-}
-.mode-badge { padding: 2px 7px; border-radius: 4px; font-weight: bold; font-size: 10px; }
-.badge-api { background: rgba(49, 130, 206, 0.25); color: #63b3ed; border: 1px solid #3182ce; }
-.badge-test { background: rgba(236, 201, 75, 0.2); color: #ecc94b; border: 1px solid #d69e2e; }
-​/* ロボの思考モニター（視界1×1×1・認識・葛藤・実行） */
-.monitor {
-position: absolute; top: 76px; left: 8px; right: 52px; z-index: 10;
-background: rgba(20, 30, 43, 0.94); border: 1px solid #2b6cb0; border-radius: 10px;
-padding: 9px 11px; backdrop-filter: blur(6px); box-shadow: 0 6px 20px rgba(0,0,0,0.65);
-pointer-events: none;
-}
-.monitor-header { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #63b3ed; margin-bottom: 5px; font-weight: bold; }
-.action-badge { display: inline-block; background: #2b6cb0; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 10px; margin-bottom: 5px; }
-.action-badge.danger { background: #c53030; }
-.thought-box { font-size: 11px; line-height: 1.45; color: #f7fafc; min-height: 48px; }
-​/* 右上：視点切替・手帳・設定ボタン */
-.side-controls {
-position: absolute; top: 76px; right: 8px; z-index: 10;
-display: flex; flex-direction: column; gap: 7px;
-}
-.icon-btn {
-width: 38px; height: 38px; border-radius: 50%;
-background: rgba(26, 34, 45, 0.92); border: 1px solid #4a5568;
-color: #fff; font-size: 15px; display: flex; align-items: center; justify-content: center;
-box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer;
-}
-.icon-btn.active { background: #2b6cb0; border-color: #63b3ed; }
-​/* 下部：操作パネル */
-.bottom-panel {
-position: absolute; bottom: 12px; left: 8px; right: 8px; z-index: 10;
-display: flex; flex-direction: column; gap: 6px; pointer-events: none;
-}
-.field-status {
-align-self: center; background: rgba(15, 20, 28, 0.92); border: 1px solid #4a5568;
-border-radius: 16px; padding: 4px 12px; font-size: 11px; color: #cbd5e0;
-box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-}
-.controls {
-display: flex; gap: 8px; pointer-events: auto; max-width: 460px; width: 100%; margin: 0 auto;
-}
-.think-btn {
-flex: 1; background: linear-gradient(135deg, #3182ce, #2b6cb0); color: #fff;
-border: 1px solid #63b3ed; border-radius: 10px; font-weight: bold; padding: 12px 10px;
-font-size: 13px; cursor: pointer; box-shadow: 0 4px 14px rgba(49, 130, 206, 0.4);
-}
-.think-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.respawn-btn {
-flex: 1; background: linear-gradient(135deg, #9b2c2c, #742a2a); color: #fff;
-border: 1px solid #fc8181; border-radius: 10px; font-weight: bold; padding: 12px 10px;
-font-size: 13px; cursor: pointer; display: none; box-shadow: 0 4px 14px rgba(229, 62, 62, 0.5);
-}
-​/* 手帳モーダル ＆ 設定モーダル */
-.modal-overlay {
-position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200;
-display: none; align-items: center; justify-content: center; padding: 14px;
-}
-.modal-card {
-width: 100%; max-width: 390px; background: #141e2b; border: 1px solid #2b6cb0;
-border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
-max-height: 90dvh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.85);
-}
-.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2d3748; padding-bottom: 8px; }
-.modal-title { font-size: 14px; font-weight: bold; color: #63b3ed; }
-.close-btn { font-size: 18px; color: #a0aec0; cursor: pointer; padding: 0 4px; }
-​.profile-grid {
-background: #0f141c; border-radius: 8px; padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px; border: 1px solid #2d3748;
-}
-.diary-box {
-background: #0f141c; border: 1px solid #2d3748; border-radius: 8px; padding: 10px;
-font-size: 11px; line-height: 1.55; color: #e2e8f0; max-height: 220px; overflow-y: auto; white-space: pre-wrap;
-}
-​.toggle-row {
-display: flex; justify-content: space-between; align-items: center;
-background: #0f141c; padding: 10px 12px; border-radius: 8px; border: 1px solid #2d3748;
-}
-.switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
-.switch input { opacity: 0; width: 0; height: 0; }
-.slider { position: absolute; cursor: pointer; inset: 0; background-color: #4a5568; transition: .3s; border-radius: 24px; }
-.slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
-input:checked + .slider { background-color: #3182ce; }
-input:checked + .slider:before { transform: translateX(20px); }
-​.input-field {
-width: 100%; padding: 9px 10px; background: #0f141c; border: 1px solid #4a5568;
-color: #fff; border-radius: 6px; font-size: 12px;
-}
-.modal-action-btn {
-background: #3182ce; color: #fff; border: 1px solid #63b3ed; border-radius: 8px;
-padding: 10px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center;
-}
-</style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ボクセルAI自律思考水槽</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    html, body { width: 100%; height: 100dvh; overflow: hidden; background: #07090e; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; position: fixed; inset: 0; }
+
+    /* 3Dの全画面水槽ステージ（画面のうしろにしっかり固定） */
+    #stage { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+    #c3d { width: 100%; height: 100%; display: block; }
+
+    /* 上部：ステータスバー（全ゲージ100点満点） */
+    .top-hud {
+      position: absolute; top: 10px; left: 10px; right: 10px; z-index: 10;
+      background: rgba(13, 17, 26, 0.88); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px;
+      padding: 8px 12px; pointer-events: none;
+    }
+    .status-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; text-align: center; font-size: 10px; font-weight: bold; }
+    .bar-box { background: rgba(255, 255, 255, 0.1); height: 5px; border-radius: 3px; margin-top: 3px; overflow: hidden; }
+    .bar-val { height: 100%; transition: width 0.3s ease; }
+    .hud-sub {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.08);
+      font-size: 10px; color: #94a3b8;
+    }
+    .badge { padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+    .badge-api { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
+    .badge-test { background: rgba(234, 179, 8, 0.2); color: #eab308; border: 1px solid #eab308; }
+
+    /* ロボの思考モニター（3D画面を邪魔しないサイズで上部に浮かべる） */
+    .thought-card {
+      position: absolute; top: 78px; left: 10px; right: 58px; z-index: 10;
+      background: rgba(15, 23, 42, 0.92); border: 1px solid #38bdf8; border-radius: 10px;
+      padding: 8px 12px; backdrop-filter: blur(6px); pointer-events: none;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+    .thought-title { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; color: #38bdf8; margin-bottom: 4px; }
+    .thought-body { font-size: 11px; line-height: 1.45; color: #f8fafc; }
+
+    /* 右上の丸ボタン群 */
+    .side-btns {
+      position: absolute; top: 78px; right: 10px; z-index: 10;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .circle-btn {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff; font-size: 16px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; backdrop-filter: blur(4px); box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .circle-btn.active { border-color: #38bdf8; background: #1e3a8a; }
+
+    /* 下部：操作ボタン */
+    .bottom-hud {
+      position: absolute; bottom: 12px; left: 10px; right: 10px; z-index: 10;
+      display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+    }
+    .tap-guide {
+      align-self: center; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 20px; padding: 4px 14px; font-size: 11px; color: #cbd5e1;
+    }
+    .action-row {
+      display: flex; gap: 8px; width: 100%; max-width: 400px; margin: 0 auto; pointer-events: auto;
+    }
+    .main-btn {
+      flex: 1; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 13px;
+      color: #fff; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .btn-think { background: linear-gradient(135deg, #0284c7, #2563eb); border: 1px solid #38bdf8; }
+    .btn-respawn { background: linear-gradient(135deg, #dc2626, #991b1b); border: 1px solid #f87171; display: none; }
+
+    /* 手帳と設定の小窓（最初はdisplay: noneで絶対に隠す！） */
+    .modal-cover {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px);
+      display: none; align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-box {
+      width: 100%; max-width: 360px; background: #0f172a; border: 1px solid #334155;
+      border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8); max-height: 85dvh; overflow-y: auto;
+    }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
+    .modal-title { font-size: 14px; font-weight: bold; color: #38bdf8; }
+    .close-btn { font-size: 18px; color: #94a3b8; cursor: pointer; padding: 0 4px; }
+
+    .diary-content {
+      background: #020617; border: 1px solid #1e293b; border-radius: 8px; padding: 10px;
+      font-size: 11px; line-height: 1.6; color: #cbd5e1; max-height: 200px; overflow-y: auto; white-space: pre-wrap;
+    }
+    .setting-row {
+      display: flex; justify-content: space-between; align-items: center;
+      background: #020617; padding: 10px; border-radius: 8px; border: 1px solid #1e293b;
+    }
+    .switch { position: relative; width: 44px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; inset: 0; background: #334155; border-radius: 24px; cursor: pointer; transition: .3s; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .3s; }
+    input:checked + .slider { background: #38bdf8; }
+    input:checked + .slider:before { transform: translateX(20px); }
+    .input-box { width: 100%; padding: 8px; background: #020617; border: 1px solid #334155; color: #fff; border-radius: 6px; font-size: 12px; }
+    .preset-row { display: flex; gap: 6px; }
+    .preset-btn { flex: 1; padding: 6px; background: #1e293b; color: #38bdf8; border: 1px solid #334155; border-radius: 6px; font-size: 10px; cursor: pointer; }
+    .save-btn { padding: 10px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-​<!-- 3Dボクセル水槽ステージ -->
-<div id="stage"><div id="c3d"></div></div>
-​<!-- 上部：5大ステータスバー（全ゲージ100ポイント計算） -->
-<div class="top-hud">
-<div class="status-bar">
-<div>❤️体力 <span id="val-hp">100</span><div class="bar-bg"><div id="bar-hp" class="bar-fill" style="width:100%; background:#f56565;"></div></div></div>
-<div>🍖空腹 <span id="val-hunger">70</span><div class="bar-bg"><div id="bar-hunger" class="bar-fill" style="width:70%; background:#ecc94b;"></div></div></div>
-<div>⚡スタミナ <span id="val-stamina">85</span><div class="bar-bg"><div id="bar-stamina" class="bar-fill" style="width:85%; background:#ed8936;"></div></div></div>
-<div>💤覚醒 <span id="val-sleep">80</span><div class="bar-bg"><div id="bar-sleep" class="bar-fill" style="width:80%; background:#9f7aea;"></div></div></div>
-<div>✨充実 <span id="val-morale">60</span><div class="bar-bg"><div id="bar-morale" class="bar-fill" style="width:60%; background:#48bb78;"></div></div></div>
-</div>
-<div class="hud-sub">
-<span id="ui-gen">🤖 個体#1 (0, 0, -1)</span>
-<span id="ui-count-badge" class="mode-badge badge-test">🧪 TEST残: 20/20</span>
-<span id="ui-timer-info">⏳経過: 00:00</span>
-</div>
-</div>
-​<!-- ロボの思考モニター -->
-<div class="monitor">
-<div class="monitor-header">
-<span>🤖 ロボの思考モニター (視界1×1×1)</span>
-<span id="model-status">待機中</span>
-</div>
-<div id="action-display" class="action-badge">状態: 静止して周囲を警戒</div>
-<div id="thought-display" class="thought-box">
-（地面をタップすると🍎りんごを落とせます。下のボタンでロボ自身が知覚・思考して1歩行動を決めます）
-</div>
-</div>
-​<!-- 右上：視点切替・手帳・設定 -->
-<div class="side-controls">
-<div class="icon-btn active" id="btn-v-sur" onclick="setView('surface')" title="地上視点">🌲</div>
-<div class="icon-btn" id="btn-v-ant" onclick="setView('antfarm')" title="地下断面視点">⛏️</div>
-<div class="icon-btn" onclick="openDiaryModal()" title="古い手帳（日記）を開く">📖</div>
-<div class="icon-btn" onclick="openSettingModal()" title="API設定">⚙️</div>
-</div>
-​<!-- 下部：操作パネル -->
-<div class="bottom-panel">
-<div id="field-items" class="field-status">ブロックタップで【🍎りんご】投下 (島に存在: 0個)</div>
-<div class="controls">
-<button id="think-btn" class="think-btn" onclick="triggerAutonomousStep()">🧠 AIに思考・行動を決定させる</button>
-<button id="respawn-btn" class="respawn-btn" onclick="respawnCharacter()">🔄 次の個体へ（古い手帳を開いて目覚める）</button>
-</div>
-</div>
-​<!-- 手帳モーダル（日記と状態の記録） -->
-<div class="modal-overlay" id="diaryModal">
-<div class="modal-card">
-<div class="modal-header">
-<div class="modal-title">📖 拾い上げた古い手帳（日記）</div>
-<div class="close-btn" onclick="closeDiaryModal()">✕</div>
-</div>
-<div class="profile-grid">
-<div>現在の個体: <b id="prof-gen">個体#1</b></div>
-<div>状態: <b id="prof-alive">活動中</b></div>
-<div>現在位置: <b id="prof-pos">(0, 0, -1)</b></div>
-<div>所持品: <b id="prof-inv">なし</b></div>
-<div style="grid-column: span 2;">探索した縄張り: <b id="prof-known">8マス</b> / 食べた🍎累計: <b id="prof-eaten">0個</b></div>
-</div>
-<div style="font-size:11px; color:#63b3ed; font-weight:bold;">【ページに残された手記（以前の自分が書き残した記録）】</div>
-<div id="diary-log-box" class="diary-box"></div>
-<button class="modal-action-btn" onclick="closeDiaryModal()">手帳を閉じて観察へ戻る</button>
-</div>
-</div>
-​<!-- 設定モーダル -->
-<div class="modal-overlay" id="settingModal">
-<div class="modal-card">
-<div class="modal-header">
-<div class="modal-title">⚙️ AI思考エンジン ＆ API設定</div>
-<div class="close-btn" onclick="closeSettingModal()">✕</div>
-</div>
-<div class="toggle-row">
-<div>
-<div style="font-size:12px; font-weight:bold;">Gemini APIで実際に思考させる</div>
-<div style="font-size:10px; color:#a0aec0;">ON: 本番APIカウント(20) / OFF: テスト用思考(20)</div>
-</div>
-<label class="switch">
-<input type="checkbox" id="api-toggle">
-<span class="slider"></span>
-</label>
-</div>
-<div style="font-size:11px; color:#a0aec0;">使用モデル名 (3.8以上推奨 / 混雑時はフォールバック):</div>
-<input type="text" id="model-input" class="input-field" value="gemini-3.8-flash" list="model-list" />
-<datalist id="model-list">
-<option value="gemini-3.8-flash">gemini-3.8-flash (推奨・高速)</option>
-<option value="gemini-3.8-pro">gemini-3.8-pro (高精度)</option>
-<option value="gemini-2.5-flash">gemini-2.5-flash (安定フォールバック)</option>
-</datalist>
-<div style="font-size:11px; color:#a0aec0;">Gemini APIキー:</div>
-<input type="password" id="api-key" class="input-field" placeholder="AIzaSy..." />
-<button class="modal-action-btn" onclick="saveSettings()">設定を保存して閉じる</button>
-</div>
-</div>
-​<script>
-// ==========================================
-// 1. ロボットの内部状態と手帳（Single Source of Truth）
-// ==========================================
-// 全ゲージは100ポイント計算
-const roboState = {
-generation: 1,
-isDead: false,
-useApi: false,
-primaryModel: "gemini-3.8-flash",
-apiCount: 20,
-testCount: 20,
-secondsElapsed: 0,
-stats: {
-hp: 100,        // 体力 (0-100: 空腹0で削られ、0になると動かなくなる)
-hunger: 70,     // 空腹度 (100=満腹, 0=極度の空腹。1分-1, 1歩-1)
-stamina: 85,    // スタミナ・元気度 (100=万全, 0=疲弊。1分-1, 1歩-2, 休息で回復)
-sleep: 80,      // 覚醒度 (100=明晰, 0=睡魔。2分-1, 行動-1, 休息で回復)
-morale: 60      // 充実度 (100=好奇心満タン, 0=退屈。何もない時間で-1, 食事や発見で回復)
-},
-pos: { x: 0, y: 0, z: -1 },
-knownVoxels: {},
-inventory: [],
-eatenCount: 0,
-// ロボは「ゲームオーバー」を知らない。手元の手帳に書かれた手記だけが世界の全て。
-diary: [
-"【手帳の最初のページ】\n目が覚めたら、この狭い島に一人で立っていた。自分の足元と目の前の1マスしか見えない。手元にこの古い手帳がある。前のページには『…お腹が減りすぎて体が動かなくなった…』という誰かの文字が残っている。これは昔のボクが書いたのだろうか？ とにかくお腹が空きすぎないよう、甘い匂いのする食べ物を探さなければならない。"
-],
-personality: "視界1マスの手探りの中で生き延びようとする自律ロボット。ゲームのルールや死の概念は知らず、手元の古い手帳に刻まれた過去の手記だけを信じて、お腹が空きすぎないよう必死に行動を模索する。"
-};
-​// 初期行動範囲（2×2×2）の登録
-function initMentalMap() {
-for (let dx = 0; dx <= 1; dx++) {
-for (let dy = -1; dy <= 0; dy++) {
-for (let dz = -1; dz <= 0; dz++) {
-roboState.knownVoxels[${dx},${dy},${dz}] = true;
-}
-}
-}
-}
-initMentalMap();
-​// 設定復元
-roboState.useApi = localStorage.getItem('use_gemini_api') === 'true';
-roboState.primaryModel = localStorage.getItem('gemini_primary_model') || 'gemini-3.8-flash';
-​// ==========================================
-// 2. 実時間タイマー（1分ごとに空腹-1、時間経過の自然減）
-// ==========================================
-setInterval(() => {
-if (roboState.isDead) return;
-roboState.secondsElapsed++;
-​// 1分（60秒）ごとに空腹ゲージが -1 ポイント
-if (roboState.secondsElapsed % 60 === 0) {
-applyPassiveStatChange({ hunger: -1, stamina: -1, morale: -1 });
-}
-​// 2分（120秒）ごとに覚醒度が -1 ポイント
-if (roboState.secondsElapsed % 120 === 0) {
-applyPassiveStatChange({ sleep: -1 });
-}
-​// 空腹度が0の場合、20秒ごとに飢餓ダメージ（体力が削られる）
-if (roboState.stats.hunger === 0 && roboState.secondsElapsed % 20 === 0) {
-applyStarvationDamage(15, "（お腹が完全に空っぽのまま時間が経過し、体がギシギシと軋んで体力が削られた…）");
-}
-​updateHUDTimer();
-}, 1000);
-​function applyPassiveStatChange(deltas) {
-const clamp = (v) => Math.max(0, Math.min(100, v));
-if (deltas.hunger) roboState.stats.hunger = clamp(roboState.stats.hunger + deltas.hunger);
-if (deltas.stamina) roboState.stats.stamina = clamp(roboState.stats.stamina + deltas.stamina);
-if (deltas.sleep) roboState.stats.sleep = clamp(roboState.stats.sleep + deltas.sleep);
-if (deltas.morale) roboState.stats.morale = clamp(roboState.stats.morale + deltas.morale);
-updateUI();
-}
-​function applyStarvationDamage(damage, note) {
-roboState.stats.hp = Math.max(0, roboState.stats.hp - damage);
-document.getElementById('thought-display').innerHTML = <div style="color:#fc8181; font-weight:bold;">⚠️ 飢餓による体力消耗 (-${damage})</div> <div style="color:#cbd5e0; font-size:11px;">${note}</div>;
-if (roboState.stats.hp === 0) {
-handleShutdown("空腹が限界のまま時間が経過し、体のエネルギーが尽きて完全に沈黙した。");
-}
-updateUI();
-}
-​function updateHUDTimer() {
-const m = String(Math.floor(roboState.secondsElapsed / 60)).padStart(2, '0');
-const s = String(roboState.secondsElapsed % 60).padStart(2, '0');
-document.getElementById('ui-timer-info').textContent = ⏳経過: ${m}:${s};
-}
-​// ==========================================
-// 3. Three.js 3Dボクセル水槽（断面表示・重力落下）
-// ==========================================
-const container = document.getElementById('c3d');
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x070a10);
-​const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
-const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'low-power' });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-container.appendChild(renderer.domElement);
-​scene.add(new THREE.AmbientLight(0xffffff, 0.85));
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.65);
-dirLight.position.set(10, 20, 10);
-scene.add(dirLight);
-​const worldGroup = new THREE.Group();
-scene.add(worldGroup);
-​const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
-const COLOR_LIT = { grass: 0x48bb78, dirt: 0x784f33, stone: 0x475569 };
-const COLOR_FOG = { grass: 0x112619, dirt: 0x21160e, stone: 0x151921 };
-​const voxelMap = {};
-const interactiveBlocks = [];
-​for (let x = -4; x <= 4; x++) {
-for (let z = -4; z <= 0; z++) {
-if (!(x === 0 && z === -1)) createBlock(x, 0, z, 'grass');
-for (let y = -1; y >= -5; y--) {
-if (x === 0 && z === -1 && y >= -3) continue; // タテ穴
-if (Math.abs(x) <= 2 && y <= -2 && y >= -4 && z >= -2) continue; // 地下空洞
-createBlock(x, y, z, y >= -2 ? 'dirt' : 'stone');
-}
-}
-}
-​function createBlock(x, y, z, type) {
-const mat = new THREE.MeshLambertMaterial({ color: COLOR_FOG[type] });
-const b = new THREE.Mesh(boxGeo, mat);
-b.position.set(x, y, z);
-b.userData = { gx: x, gy: y, gz: z, type };
-worldGroup.add(b);
-voxelMap[${x},${y},${z}] = b;
-interactiveBlocks.push(b);
-}
-​function isVoxelLit(bx, by, bz) {
-for (let ox = -1; ox <= 1; ox++) {
-for (let oy = -1; oy <= 1; oy++) {
-for (let oz = -1; oz <= 1; oz++) {
-if (roboState.knownVoxels[${bx+ox},${by+oy},${bz+oz}]) return true;
-}
-}
-}
-return false;
-}
-​function refreshFogOfWar() {
-for (const key in voxelMap) {
-const b = voxelMap[key];
-const lit = isVoxelLit(b.userData.gx, b.userData.gy, b.userData.gz);
-b.material.color.setHex(lit ? COLOR_LIT[b.userData.type] : COLOR_FOG[b.userData.type]);
-}
-}
-refreshFogOfWar();
-​// ハシゴと水槽ガラス
-const ladderMat = new THREE.MeshLambertMaterial({ color: 0xb45309 });
-for (let y = 0; y >= -3; y--) {
-const step = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.1), ladderMat);
-step.position.set(0, y - 0.2, -1.4);
-worldGroup.add(step);
-}
-const glass = new THREE.Mesh(
-new THREE.PlaneGeometry(9, 6),
-new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.07, side: THREE.DoubleSide })
-);
-glass.position.set(0, -2.5, 0.5);
-scene.add(glass);
-​// キャラクター構造
-const chara = new THREE.Group();
-worldGroup.add(chara);
-​const bodyM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x3b82f6 }));
-bodyM.scale.set(0.5, 0.5, 0.35); bodyM.position.y = 0.5; chara.add(bodyM);
-​const headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x93c5fd }));
-headM.scale.set(0.42, 0.4, 0.4); headM.position.y = 0.85; chara.add(headM);
-​const armGeo = new THREE.BoxGeometry(0.16, 0.38, 0.16);
-const armMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
-const rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.35, 0.5, 0); chara.add(rArm);
-const lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.35, 0.5, 0); chara.add(lArm);
-​const heldAppleMesh = new THREE.Mesh(
-new THREE.BoxGeometry(0.22, 0.22, 0.22),
-new THREE.MeshLambertMaterial({ color: 0xef4444, visible: false })
-);
-heldAppleMesh.position.set(0, -0.22, 0.14);
-rArm.add(heldAppleMesh);
-​const legGeo = new THREE.BoxGeometry(0.18, 0.32, 0.18);
-const bootGeo = new THREE.BoxGeometry(0.2, 0.14, 0.26);
-const legMat = new THREE.MeshLambertMaterial({ color: 0x1e3a8a });
-const bootMat = new THREE.MeshLambertMaterial({ color: 0x78350f });
-​const rLegG = new THREE.Group(); rLegG.position.set(0.16, 0.25, 0);
-const rLeg = new THREE.Mesh(legGeo, legMat); const rBoot = new THREE.Mesh(bootGeo, bootMat);
-rBoot.position.set(0, -0.14, 0.04); rLegG.add(rLeg, rBoot); chara.add(rLegG);
-​const lLegG = new THREE.Group(); lLegG.position.set(-0.16, 0.25, 0);
-const lLeg = new THREE.Mesh(legGeo, legMat); const lBoot = new THREE.Mesh(bootGeo, bootMat);
-lBoot.position.set(0, -0.14, 0.04); lLegG.add(lLeg, lBoot); chara.add(lLegG);
-​chara.position.set(0, 0.5, -1);
-​// フィールド上のりんご配列
-const fieldApples = [];
-​// カメラ設定
-const VIEWS = {
-surface: { pos: new THREE.Vector3(0, 9, 13), look: new THREE.Vector3(0, 0, -1) },
-antfarm: { pos: new THREE.Vector3(0, -2.5, 12), look: new THREE.Vector3(0, -2.5, 0) }
-};
-let targetCamPos = VIEWS.surface.pos.clone();
-let targetCamLook = VIEWS.surface.look.clone();
-let curCamLook = targetCamLook.clone();
-camera.position.copy(targetCamPos);
-​function setView(mode) {
-targetCamPos.copy(VIEWS[mode].pos);
-targetCamLook.copy(VIEWS[mode].look);
-document.getElementById('btn-v-sur').classList.toggle('active', mode === 'surface');
-document.getElementById('btn-v-ant').classList.toggle('active', mode === 'antfarm');
-}
-​// タッチ操作（ドラッグ回転・ピンチズーム・タップ投下）
-let touchMode = 'none', prevX = 0, prevDist = 0, touchStartTime = 0;
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-​window.addEventListener('touchstart', e => {
-if (e.target.closest('.top-hud, .monitor, .side-controls, .bottom-panel, .modal-overlay')) return;
-touchStartTime = performance.now();
-if (e.touches.length === 1) {
-touchMode = 'drag'; prevX = e.touches[0].clientX;
-} else if (e.touches.length === 2) {
-touchMode = 'pinch';
-prevDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-}
-}, { passive: true });
-​window.addEventListener('touchmove', e => {
-if (touchMode === 'drag' && e.touches.length === 1) {
-worldGroup.rotation.y += (e.touches[0].clientX - prevX) * 0.007;
-prevX = e.touches[0].clientX;
-} else if (touchMode === 'pinch' && e.touches.length === 2) {
-const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-camera.fov = Math.max(20, Math.min(65, camera.fov + (prevDist - d) * 0.02));
-camera.updateProjectionMatrix();
-prevDist = d;
-}
-}, { passive: true });
-​window.addEventListener('touchend', e => {
-if (performance.now() - touchStartTime < 250 && touchMode === 'drag' && e.changedTouches.length === 1) {
-handleTapDrop(e.changedTouches[0]);
-}
-touchMode = 'none';
-});
-​renderer.domElement.addEventListener('click', e => {
-handleTapDrop(e);
-});
-​function handleTapDrop(pointer) {
-if (roboState.isDead) return;
-const remain = roboState.useApi ? roboState.apiCount : roboState.testCount;
-if (remain <= 0) {
-alert("本日の活動枠（20回）を使い切りました。手帳の確認または設定をご確認ください。");
-return;
-}
-​mouse.x = (pointer.clientX / window.innerWidth) * 2 - 1;
-mouse.y = -(pointer.clientY / window.innerHeight) * 2 + 1;
-raycaster.setFromCamera(mouse, camera);
-​const hits = raycaster.intersectObjects(interactiveBlocks);
-if (hits.length === 0) return;
-​const hit = hits[0];
-let gx = hit.object.userData.gx;
-let gy = hit.object.userData.gy;
-let gz = hit.object.userData.gz;
-​// 重力落下
-while (gy > -4 && !voxelMap[${gx},${gy},${gz}]) {
-gy--;
-}
-​if (roboState.useApi) roboState.apiCount--;
-else roboState.testCount--;
-​spawnApple(gx, gy, gz);
-updateUI();
-}
-​function spawnApple(gx, gy, gz) {
-const g = new THREE.Group();
-const core = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.32), new THREE.MeshLambertMaterial({ color: 0xef4444 }));
-const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.1), new THREE.MeshLambertMaterial({ color: 0x22c55e }));
-leaf.position.set(0, 0.2, 0);
-g.add(core, leaf);
-g.position.set(gx, gy + 0.66, gz);
-worldGroup.add(g);
-fieldApples.push({ mesh: g, gx, gy, gz });
-}
-​// 初期配置のりんご
-spawnApple(1, 0, -1);
-​// ==========================================
-// 4. 物理法則判定 ＆ 1×1×1感覚スキャン
-// ==========================================
-function isPhysicallyWalkable(x, y, z) {
-if (voxelMap[${x},${y},${z}]) return false;
-if (x < -4 || x > 4 || z < -4 || z > 0 || y > 1 || y < -5) return false;
-const hasFooting = Boolean(voxelMap[${x},${y-1},${z}]);
-const hasLadder = (x === 0 && z === -1 && y >= -3 && y <= 0);
-const isBottomFloor = (y === -4 && Boolean(voxelMap[${x},-5,${z}]));
-return (hasFooting || hasLadder || isBottomFloor);
-}
-​function getPhysicalActionOptions(cx, cy, cz) {
-const options = [];
-​// 手にりんごを持っている場合
-if (roboState.inventory.includes('🍎りんご')) {
-options.push({
-optionId: options.length,
-actionType: "EAT_APPLE",
-label: "手に持っている【🍎りんご】を食べる（空腹を癒やし体力を回復）",
-targetPos: [cx, cy, cz]
-});
-}
-​// 足元または隣接1マスに落ちているりんご
-const reachableAppleIdx = fieldApples.findIndex(a =>
-Math.abs(a.gx - cx) + Math.abs(a.gy - cy) + Math.abs(a.gz - cz) <= 1
-);
-if (reachableAppleIdx !== -1) {
-const ap = fieldApples[reachableAppleIdx];
-options.push({
-optionId: options.length,
-actionType: "EAT_FIELD_APPLE",
-label: 目の前/足元(${ap.gx},${ap.gy},${ap.gz})にある【🍎りんご】をその場で食べる,
-targetPos: [ap.gx, ap.gy, ap.gz],
-appleIndex: reachableAppleIdx
-});
-if (!roboState.inventory.includes('🍎りんご')) {
-options.push({
-optionId: options.length,
-actionType: "PICKUP_APPLE",
-label: 目の前/足元(${ap.gx},${ap.gy},${ap.gz})にある【🍎りんご】を拾って手袋で抱える,
-targetPos: [ap.gx, ap.gy, ap.gz],
-appleIndex: reachableAppleIdx
-});
-}
-}
-​// 隣接1ブロック移動（1歩歩く：空腹-1, スタミナ-2）
-const dirs = [
-{ dx: 1, dy: 0, dz: 0, name: "東(右)へ1歩歩く" },
-{ dx: -1, dy: 0, dz: 0, name: "西(左)へ1歩歩く" },
-{ dx: 0, dy: 0, dz: 1, name: "南(手前)へ1歩歩く" },
-{ dx: 0, dy: 0, dz: -1, name: "北(奥)へ1歩歩く" },
-{ dx: 0, dy: 1, dz: 0, name: "ハシゴを1段よじ登る" },
-{ dx: 0, dy: -1, dz: 0, name: "ハシゴを1段降りる" }
-];
-​for (const d of dirs) {
-const tx = cx + d.dx, ty = cy + d.dy, tz = cz + d.dz;
-if (d.dy !== 0) {
-const canLadder = (cx === 0 && cz === -1 && cy >= -3 && ty >= -3 && ty <= 0);
-if (!canLadder) continue;
-}
-if (isPhysicallyWalkable(tx, ty, tz)) {
-const hasApple = fieldApples.some(a => a.gx === tx && a.gy === ty && a.gz === tz);
-options.push({
-optionId: options.length,
-actionType: "MOVE",
-label: ${d.name} -> (${tx},${ty},${tz}) ${hasApple ? '[★足元にりんご！]' : ''},
-targetPos: [tx, ty, tz]
-});
-}
-}
-​// 休息
-options.push({
-optionId: options.length,
-actionType: "REST",
-label: 現在地(${cx},${cy},${cz})でじっと動かず休息する（スタミナと覚醒を温存）,
-targetPos: [cx, cy, cz]
-});
-​return options;
-}
-​function get1x1x1SensoryReport(cx, cy, cz) {
-if (fieldApples.length === 0) return "周囲から甘い匂いは全く漂ってこない。";
-return fieldApples.map((a, i) => {
-const dist = Math.hypot(a.gx - cx, a.gy - cy, a.gz - cz).toFixed(1);
-if (dist == 0) return ★足元(${a.gx},${a.gy},${a.gz})に甘い果実がある！;
-const ew = a.gx > cx ? 東へ${a.gx - cx} : (a.gx < cx ? 西へ${cx - a.gx} : '東西0');
-const ns = a.gz > cz ? 南へ${a.gz - cz} : (a.gz < cz ? 北へ${cz - a.gz} : '南北0');
-const ud = a.gy > cy ? 上へ${a.gy - cy} : (a.gy < cy ? 下へ${cy - a.gy} : '高低差0');
-return 匂い#${i+1}: 方向[${ew}, ${ns}, ${ud}] (距離約${dist}歩);
-}).join(" / ");
-}
-​// ==========================================
-// 5. AI思考スキーマ定義（構造化JSON出力）
-// ==========================================
-const decisionSchema = {
-type: "OBJECT",
-properties: {
-perception: {
-type: "STRING",
-description: "自分の身体の感覚（空腹・体力の低下など）と、1×1×1の視界・漂う匂いについての直接的な把握"
-},
-innerThought: {
-type: "STRING",
-description: "頭の中の生の葛藤。手帳に書かれた手記の警告を気にしながら、お腹の減り具合と目の前の状況からどう動くべきかを考えた独り言"
-},
-selectedOptionId: {
-type: "INTEGER",
-description: "提示された【実行可能な物理アクション一覧】から選んだ optionId の整数"
-},
-chosenAction: {
-type: "STRING",
-description: "決定した行動の短い要約（例：「甘い匂いの方へ1歩進む」「拾ったりんごをかじる」など）"
-},
-actionDetail: {
-type: "STRING",
-description: "その行動を実行した時の様子や体感"
-},
-statChanges: {
-type: "OBJECT",
-description: "今回の行動によるステータス変化（空腹度は移動なら-1、食事なら+40〜+50程度回復させること）",
-properties: {
-hpDelta: { type: "INTEGER" },
-hungerDelta: { type: "INTEGER" },
-staminaDelta: { type: "INTEGER" },
-sleepDelta: { type: "INTEGER" },
-moraleDelta: { type: "INTEGER" }
-},
-required: ["hpDelta", "hungerDelta", "staminaDelta", "sleepDelta", "moraleDelta"]
-},
-diaryEntry: {
-type: "STRING",
-description: "この手帳に書き残す1行の手記（座標や発見、次の自分が読むためのメモ）"
-}
-},
-required: [
-"perception", "innerThought", "selectedOptionId", "chosenAction",
-"actionDetail", "statChanges", "diaryEntry"
-]
-};
-​// ==========================================
-// 6. Gemini API 呼び出し（モデル切替つき）
-// ==========================================
-async function callGeminiBrain(promptText, apiKey) {
-const models = [
-roboState.primaryModel,
-"gemini-3.8-flash",
-"gemini-2.5-flash",
-"gemini-2.0-flash"
-].filter((v, i, a) => v && a.indexOf(v) === i);
-​let lastError = null;
-​for (const modelName of models) {
-document.getElementById('model-status').textContent = ⚡思考中 (${modelName})...;
-const url = https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey};
-​try {
-const response = await fetch(url, {
-method: "POST",
-headers: { "Content-Type": "application/json" },
-body: JSON.stringify({
-contents: [{ parts: [{ text: promptText }] }],
-generationConfig: {
-temperature: 0.85,
-responseMimeType: "application/json",
-responseSchema: decisionSchema
-}
-})
-});
-​if (!response.ok) {
-const errData = await response.json().catch(() => ({}));
-lastError = errData?.error?.message || HTTP ${response.status};
-console.warn([${modelName}] 切替: ${lastError});
-continue;
-}
-​const data = await response.json();
-const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
-document.getElementById('model-status').textContent = 完了 (${modelName});
-return JSON.parse(rawJson);
-​} catch (err) {
-lastError = err.message;
-continue;
-}
-}
-throw new Error(API通信失敗: ${lastError});
-}
-​// ==========================================
-// 7. 自律思考ステップ（死を知らず手帳を頼る）
-// ==========================================
-async function triggerAutonomousStep() {
-if (roboState.isDead) return;
-​const remain = roboState.useApi ? roboState.apiCount : roboState.testCount;
-if (remain <= 0) {
-alert("本日の活動枠（20回）を使い切りました。手帳の確認または設定をご確認ください。");
-return;
-}
-​const apiKey = localStorage.getItem('gemini_api_key') || '';
-if (roboState.useApi && !apiKey) {
-alert("右上の⚙️設定からGemini APIキーを入力するか、テスト用思考に切り替えてください。");
-openSettingModal();
-return;
-}
-​const btn = document.getElementById('think-btn');
-btn.disabled = true;
-​if (roboState.useApi) roboState.apiCount--;
-else roboState.testCount--;
-updateUI();
-​const cx = roboState.pos.x, cy = roboState.pos.y, cz = roboState.pos.z;
-const actionOptions = getPhysicalActionOptions(cx, cy, cz);
-const scentReport = get1x1x1SensoryReport(cx, cy, cz);
-​// 重要：AI自身は「ゲームオーバー」や「死亡」というゲームメタ構造を知らない。
-// 古い手帳に書かれた手記の警告だけを手がかりに、必死にお腹の減りと向き合う。
-const prompt = `
-あなたは水槽のような小さな箱庭で活動する自律ロボットです。
-視界は「自分の足元と目の前の1マス」しか見えません。
-あなたはゲームのシステムや「死（ゲームオーバー）」のルールを知りません。
-ただ、手元に前任者（昔の自分？）が書き遺した【古い手帳】があり、そこには『…お腹が空きすぎて体が動かなくなった…』という不気味な記録が残っています。
-​【あなたの現在の身体感覚（すべて100ポイント満点）】
-・❤️体力: ${roboState.stats.hp}/100 （体がしっかり動くかの源。空腹がゼロになると軋むように削られる）
-・🍖空腹度: ${roboState.stats.hunger}/100 （満腹度。1分経つと-1、1歩歩くと-1減る。これがゼロになると激痛と疲弊で体力が削られる）
-・⚡スタミナ: ${roboState.stats.stamina}/100 （元気度。動くと減り、休息で回復する）
-・💤覚醒度: ${roboState.stats.sleep}/100 （頭の冴え。時間が経つと眠くなる）
-・✨充実度: ${roboState.stats.morale}/100 （気力。発見や食事で満たされる）
-​【手帳の記録（唯一の外部情報・記憶の残骸）】
-${roboState.diary.slice(-5).join("\n")}
-​【現在の知覚（視界1×1×1 ＆ 嗅覚センサー）】
-・現在座標: (X:{cx}, Y:{cy}, Z:${cz}) ※Y=0が地上、Yがマイナスは地下
-・手に持っているもの: ${roboState.inventory.length ? roboState.inventory.join("、") : "なし"}
-・漂ってくる匂い: ${scentReport}
-​【いま物理的に選べる行動一覧】
-${JSON.stringify(actionOptions.map(o => ({ optionId: o.optionId, actionType: o.actionType, 内容: o.label })))}
-​【思考の指針】
-​あなたは手帳の手記を読んで「空腹が底をつくと本当に動けなくなってしまうのかもしれない」と恐れています。
-​空腹度と体力の低下に強く危機感を抱き、手帳のアドバイス通りに🍎りんごの匂いを追うか、今手元・足元にあるりんごを食べることを最優先に考えてください。
-​行動に伴うステータス変化（statChanges）を設定してください。1歩歩くなら空腹度は-1、スタミナは-2です。りんごを食べた場合は空腹度を+40〜+50回復させてください。
-`;
-​try {
-let decision;
-if (roboState.useApi) {
-decision = await callGeminiBrain(prompt, apiKey);
-} else {
-document.getElementById('model-status').textContent = "🧪テスト思考中...";
-await new Promise(r => setTimeout(r, 350));
-decision = generateTestBrainDecision(cx, cy, cz, actionOptions, scentReport);
-document.getElementById('model-status').textContent = "完了 (TEST思考)";
-}
-​await applyDecisionToWorld(decision, actionOptions);
-} catch (error) {
-document.getElementById('model-status').textContent = "❌通信エラー";
-document.getElementById('thought-display').innerHTML = <span style="color:#fc8181;">エラー: ${error.message}</span>;
-} finally {
-if (!roboState.isDead) btn.disabled = false;
-}
-}
-​// テスト用思考エンジン
-function generateTestBrainDecision(cx, cy, cz, actionOptions, scentReport) {
-const eatOpt = actionOptions.find(o => o.actionType === "EAT_APPLE" || o.actionType === "EAT_FIELD_APPLE");
-if (eatOpt && roboState.stats.hunger <= 85) {
-return {
-perception: 空腹度は${roboState.stats.hunger}。手元か足元に食べられる🍎りんごがある。,
-innerThought: 手帳に『空腹で動けなくなった』と書いてあった…！今すぐこのりんごを食べてエネルギーを補給しよう。,
-selectedOptionId: eatOpt.optionId,
-chosenAction: "🍎りんごを食べて腹ごしらえ",
-actionDetail: "りんごを夢中でかじった。甘い果汁が染み渡り、お腹と元気が満たされた。",
-statChanges: { hpDelta: 10, hungerDelta: 45, staminaDelta: 10, sleepDelta: 2, moraleDelta: 25 },
-diaryEntry: (${cx},${cy},${cz})で🍎りんごを食べた。手帳の通り、これでまた動ける。
-};
-}
-​const pickOpt = actionOptions.find(o => o.actionType === "PICKUP_APPLE");
-if (pickOpt) {
-return {
-perception: 足元に🍎りんごが転がっているのを感じる。,
-innerThought: この果実を手袋で確保しておこう。手帳の前のボクもこうやって蓄えておけばよかったんだ。,
-selectedOptionId: pickOpt.optionId,
-chosenAction: "🍎りんごを拾い上げて抱える",
-actionDetail: "しゃがんで足元のりんごを拾い、右腕にしっかりと抱えた。",
-statChanges: { hpDelta: 0, hungerDelta: -1, staminaDelta: -1, sleepDelta: -1, moraleDelta: 10 },
-diaryEntry: 足元にあった🍎りんごを拾って手袋に収めた。
-};
-}
-​const moveOpts = actionOptions.filter(o => o.actionType === "MOVE");
-if (fieldApples.length > 0 && moveOpts.length > 0) {
-const target = fieldApples[0];
-moveOpts.sort((a, b) => {
-const da = Math.hypot(target.gx - a.targetPos[0], target.gy - a.targetPos[1], target.gz - a.targetPos[2]);
-const db = Math.hypot(target.gx - b.targetPos[0], target.gy - b.targetPos[1], target.gz - b.targetPos[2]);
-return da - db;
-});
-const best = moveOpts[0];
-return {
-perception: 空腹度${roboState.stats.hunger}。${scentReport},
-innerThought: 歩けばお腹が減るが、じっとしていても腹は減る…手帳に書かれた匂いを信じて、あっちへ1歩進んでみよう。,
-selectedOptionId: best.optionId,
-chosenAction: 匂いを追って(${best.targetPos.join(',')})へ1歩前進,
-actionDetail: 足元を手探りで確かめながら、甘い匂いのする方向へ慎重に1歩踏み出した。,
-statChanges: { hpDelta: 0, hungerDelta: -1, staminaDelta: -2, sleepDelta: -1, moraleDelta: 5 },
-diaryEntry: 匂いを頼りに(${best.targetPos.join(',')})へ1歩進んだ。
-};
-}
-​if (moveOpts.length > 0) {
-const chosen = moveOpts[Math.floor(Math.random() * moveOpts.length)];
-return {
-perception: りんごの匂いはしない。空腹度は${roboState.stats.hunger}。,
-innerThought: どこかに食べ物はないか…手帳をめくりながら、足場を探して1歩歩いてみよう。,
-selectedOptionId: chosen.optionId,
-chosenAction: 周囲を手探りで探索移動(${chosen.targetPos.join(',')}),
-actionDetail: 1ブロック移動して周囲の壁や床を手探りで触った。,
-statChanges: { hpDelta: 0, hungerDelta: -1, staminaDelta: -2, sleepDelta: -1, moraleDelta: -2 },
-diaryEntry: (${chosen.targetPos.join(',')})へ歩いてみたが、まだ食べ物は見当たらない。
-};
-}
-​const restOpt = actionOptions.find(o => o.actionType === "REST") || actionOptions[0];
-return {
-perception: 周囲は行き止まりのようだ。,
-innerThought: 無駄に動いてお腹を減らすより、一度その場で体を休めよう。,
-selectedOptionId: restOpt.optionId,
-chosenAction: "その場で静かに休息",
-actionDetail: "膝を抱えてじっと座り、スタミナを回復させた。",
-statChanges: { hpDelta: 0, hungerDelta: 0, staminaDelta: 15, sleepDelta: 10, moraleDelta: 0 },
-diaryEntry: (${cx},${cy},${cz})で座って呼吸を整えた。
-};
-}
-​// ==========================================
-// 8. 物理反映 ＆ ゲージ更新（1歩歩く＝空腹-1）
-// ==========================================
-async function applyDecisionToWorld(decision, actionOptions) {
-const chosenOpt = actionOptions.find(o => o.optionId === decision.selectedOptionId) || actionOptions[0];
-​// 3D動作の実行
-if (chosenOpt.actionType === "MOVE") {
-const [tx, ty, tz] = chosenOpt.targetPos;
-await animateWalkTo(tx, ty + 0.5, tz, 500);
-roboState.pos = { x: tx, y: ty, z: tz };
-roboState.knownVoxels[${tx},${ty},${tz}] = true;
-refreshFogOfWar();
-​if (ty <= -2) setView('antfarm');
-else if (ty >= 0) setView('surface');
-​} else if (chosenOpt.actionType === "PICKUP_APPLE") {
-const ap = fieldApples[chosenOpt.appleIndex];
-if (ap) {
-worldGroup.remove(ap.mesh);
-fieldApples.splice(chosenOpt.appleIndex, 1);
-roboState.inventory.push('🍎りんご');
-heldAppleMesh.material.visible = true;
-}
-​} else if (chosenOpt.actionType === "EAT_FIELD_APPLE") {
-const ap = fieldApples[chosenOpt.appleIndex];
-if (ap) {
-worldGroup.remove(ap.mesh);
-fieldApples.splice(chosenOpt.appleIndex, 1);
-}
-heldAppleMesh.material.visible = true;
-rArm.rotation.x = -0.9;
-await new Promise(r => setTimeout(r, 650));
-heldAppleMesh.material.visible = false;
-rArm.rotation.x = 0;
-roboState.eatenCount++;
-​} else if (chosenOpt.actionType === "EAT_APPLE") {
-const idx = roboState.inventory.indexOf('🍎りんご');
-if (idx !== -1) roboState.inventory.splice(idx, 1);
-heldAppleMesh.material.visible = true;
-rArm.rotation.x = -0.9;
-await new Promise(r => setTimeout(r, 650));
-heldAppleMesh.material.visible = roboState.inventory.includes('🍎りんご');
-rArm.rotation.x = 0;
-roboState.eatenCount++;
-}
-​// ゲージ増減計算（100ポイント基準）
-const clamp = (v) => Math.max(0, Math.min(100, v));
-const sc = decision.statChanges || {};
-​// ルール適用：
-// 1. 「1歩歩く」場合は空腹度が必ず -1、スタミナは -2
-// 2. 「食べる」場合は空腹度が大幅回復（+40〜+50）
-let hungerDelta = Number(sc.hungerDelta) || 0;
-if (chosenOpt.actionType === "MOVE") {
-hungerDelta = -1; // 1歩歩く = マイナス1ポイント
-} else if (chosenOpt.actionType === "EAT_APPLE" || chosenOpt.actionType === "EAT_FIELD_APPLE") {
-hungerDelta = 45;
-}
-​roboState.stats.hunger = clamp(roboState.stats.hunger + hungerDelta);
-roboState.stats.stamina = clamp(roboState.stats.stamina + (Number(sc.staminaDelta) || 0));
-roboState.stats.sleep = clamp(roboState.stats.sleep + (Number(sc.sleepDelta) || 0));
-roboState.stats.morale = clamp(roboState.stats.morale + (Number(sc.moraleDelta) || 0));
-​let hpDelta = Number(sc.hpDelta) || 0;
-let starvationNote = "";
-​// 空腹度が0になった場合、行動するたびに激しい飢餓ダメージで体力が削られる
-if (roboState.stats.hunger === 0) {
-const starveDamage = 25;
-hpDelta -= starveDamage;
-starvationNote = <div style="color:#fc8181; font-weight:bold; margin-top:4px;">🚨【激しい空腹】お腹が限界を突破し、軋むように体力が -${starveDamage} 削られた！</div>;
-}
-​roboState.stats.hp = clamp(roboState.stats.hp + hpDelta);
-​// モニター表示
-const actionBadge = document.getElementById('action-display');
-actionBadge.textContent = 行動: ${decision.chosenAction};
-actionBadge.className = roboState.stats.hunger === 0 ? "action-badge danger" : "action-badge";
-​document.getElementById('thought-display').innerHTML = <div style="color:#a0aec0; font-size:11px; margin-bottom:3px;">👁️ 認識: ${decision.perception}</div> <div style="color:#fefcbf; font-weight:bold; margin-bottom:4px;">💭 思考: 「${decision.innerThought}」</div> <div style="color:#9ae6b4; font-size:11px;">⚡ 実行: ${decision.actionDetail}</div> ${starvationNote};
-​// 手帳への手記追加
-roboState.diary.push(・[個体#${roboState.generation}] ${decision.diaryEntry});
-​// 体力が0になったら機能停止（AI本人は死を知らないまま意識が途切れる）
-if (roboState.stats.hp === 0) {
-handleShutdown("動くたびに激しい痛みが走り、視界が真っ暗になってその場に倒れ込んだ。");
-}
-​updateUI();
-}
-​// 機能停止（倒れ込みと手記の終焉）
-function handleShutdown(causeDetail) {
-roboState.isDead = true;
-chara.rotation.z = Math.PI / 2; // パタリと倒れる
-chara.position.y = roboState.pos.y + 0.25;
-​const deathPos = (${roboState.pos.x}, ${roboState.pos.y}, ${roboState.pos.z});
-const finalMemo = 【震える文字で書かれた最後のページ】\n座標${deathPos}にて。${causeDetail} 手が震えてペンが握れない。空腹のせいか…？ 次にこの手帳を開く人へ：絶対に、お腹を空っぽにしてはいけない…！;
-roboState.diary.push(finalMemo);
-​document.getElementById('action-display').textContent = "⚠️ 機能停止（意識途絶）";
-document.getElementById('action-display').className = "action-badge danger";
-document.getElementById('thought-display').innerHTML = <div style="color:#fc8181; font-weight:bold;">ロボの意識が完全に途絶えました…</div> <div style="color:#e2e8f0; font-size:11px; margin-top:4px;">倒れる直前、震える手で手帳に最後の手記を残したようです。下の「🔄 次の個体へ」を押すと、新たな個体がこの手帳を開いて目覚めます。</div>;
-​document.getElementById('think-btn').style.display = 'none';
-document.getElementById('respawn-btn').style.display = 'block';
-updateUI();
-}
-​// 復活処理（次の個体が手帳をめくり、前任者の手記を読んで目覚める）
-function respawnCharacter() {
-roboState.generation++;
-roboState.isDead = false;
-roboState.secondsElapsed = 0;
-roboState.stats = { hp: 100, hunger: 70, stamina: 85, sleep: 80, morale: 60 };
-roboState.pos = { x: 0, y: 0, z: -1 };
-roboState.inventory = [];
-heldAppleMesh.material.visible = false;
-​if (roboState.useApi) roboState.apiCount = 20;
-else roboState.testCount = 20;
-​chara.rotation.z = 0;
-chara.position.set(0, 0.5, -1);
-setView('surface');
-​roboState.diary.push(【個体#${roboState.generation}の手記】\n初期位置で目覚めた。足元に落ちていた手帳をめくると、前の個体が書き残した壮絶な手記が刻まれていた…！『空腹で意識が消えた』とある。ボクも同じ轍を踏まないよう、慎重に生き抜こう。);
-​document.getElementById('think-btn').style.display = 'block';
-document.getElementById('think-btn').disabled = false;
-document.getElementById('respawn-btn').style.display = 'none';
-​document.getElementById('action-display').textContent = 個体#${roboState.generation} 活動開始;
-document.getElementById('action-display').className = "action-badge";
-document.getElementById('thought-display').innerHTML = <div style="color:#9ae6b4; font-weight:bold;">新たな個体#${roboState.generation}が手帳を読み終えて立ち上がりました！</div> <div style="color:#fefcbf; font-size:11px; margin-top:4px;">「手帳の最後の文字が震えていた…空腹がゼロになると動けなくなるらしい。絶対にりんごを探し出すぞ。」</div>;
-​updateUI();
-openDiaryModal(); // 手帳を自動で開いて前の手記を読ませる
-}
-​// ==========================================
-// 9. メインループ ＆ UI管理
-// ==========================================
-let animClock = 0, isWalking = false;
-function animate() {
-requestAnimationFrame(animate);
-animClock += 0.04;
-​camera.position.lerp(targetCamPos, 0.06);
-curCamLook.lerp(targetCamLook, 0.06);
-camera.lookAt(curCamLook);
-​for (const a of fieldApples) a.mesh.rotation.y += 0.025;
-​if (!roboState.isDead) {
-if (isWalking) {
-rArm.rotation.x = Math.sin(animClock * 8) * 0.7;
-lArm.rotation.x = -Math.sin(animClock * 8) * 0.7;
-rLegG.rotation.x = -Math.sin(animClock * 8) * 0.7;
-lLegG.rotation.x = Math.sin(animClock * 8) * 0.7;
-} else {
-rLegG.rotation.x = 0; lLegG.rotation.x = 0;
-bodyM.scale.y = 0.5 + Math.sin(animClock * 2) * 0.02;
-}
-}
-renderer.render(scene, camera);
-}
-animate();
-​function animateWalkTo(tx, ty, tz, dur) {
-return new Promise(resolve => {
-isWalking = true;
-const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z;
-const start = performance.now();
-function step(now) {
-const p = Math.min((now - start) / dur, 1);
-chara.position.x = sx + (tx - sx) * p;
-chara.position.y = sy + (ty - sy) * p;
-chara.position.z = sz + (tz - sz) * p;
-if (p < 1) requestAnimationFrame(step);
-else { isWalking = false; resolve(); }
-}
-requestAnimationFrame(step);
-});
-}
-​function updateUI() {
-const s = roboState.stats;
-document.getElementById('val-hp').textContent = s.hp;
-document.getElementById('bar-hp').style.width = ${s.hp}%;
-​document.getElementById('val-hunger').textContent = s.hunger;
-document.getElementById('bar-hunger').style.width = ${s.hunger}%;
-​document.getElementById('val-stamina').textContent = s.stamina;
-document.getElementById('bar-stamina').style.width = ${s.stamina}%;
-​document.getElementById('val-sleep').textContent = s.sleep;
-document.getElementById('bar-sleep').style.width = ${s.sleep}%;
-​document.getElementById('val-morale').textContent = s.morale;
-document.getElementById('bar-morale').style.width = ${s.morale}%;
-​document.getElementById('ui-gen').textContent = 🤖 個体#${roboState.generation} (${roboState.pos.x}, ${roboState.pos.y}, ${roboState.pos.z});
-​const badge = document.getElementById('ui-count-badge');
-if (roboState.useApi) {
-badge.className = "mode-badge badge-api";
-badge.textContent = ⚡ API残: ${roboState.apiCount}/20;
-} else {
-badge.className = "mode-badge badge-test";
-badge.textContent = 🧪 TEST残: ${roboState.testCount}/20;
-}
-​document.getElementById('field-items').textContent =
-マップタップで【🍎りんご】投下 (島に存在: ${fieldApples.length}個 / 食べた累計: ${roboState.eatenCount}個);
-​// 手帳モーダル内同期
-document.getElementById('prof-gen').textContent = 個体#${roboState.generation};
-document.getElementById('prof-alive').textContent = roboState.isDead ? "⚠️ 機能停止" : "🟢 活動中";
-document.getElementById('prof-pos').textContent = (${roboState.pos.x}, ${roboState.pos.y}, ${roboState.pos.z});
-document.getElementById('prof-inv').textContent = roboState.inventory.length ? roboState.inventory.join(' ') : "なし";
-document.getElementById('prof-known').textContent = ${Object.keys(roboState.knownVoxels).length}マス;
-document.getElementById('prof-eaten').textContent = ${roboState.eatenCount}個;
-document.getElementById('diary-log-box').textContent = roboState.diary.join("\n\n");
-}
-​function openDiaryModal() {
-updateUI();
-document.getElementById('diaryModal').style.display = 'flex';
-}
-function closeDiaryModal() {
-document.getElementById('diaryModal').style.display = 'none';
-}
-​function openSettingModal() {
-document.getElementById('api-toggle').checked = roboState.useApi;
-document.getElementById('model-input').value = roboState.primaryModel;
-document.getElementById('api-key').value = localStorage.getItem('gemini_api_key') || '';
-document.getElementById('settingModal').style.display = 'flex';
-}
-function closeSettingModal() {
-document.getElementById('settingModal').style.display = 'none';
-}
-​function saveSettings() {
-roboState.useApi = document.getElementById('api-toggle').checked;
-roboState.primaryModel = document.getElementById('model-input').value.trim() || 'gemini-3.8-flash';
-const key = document.getElementById('api-key').value.trim();
-​localStorage.setItem('use_gemini_api', roboState.useApi ? 'true' : 'false');
-localStorage.setItem('gemini_primary_model', roboState.primaryModel);
-localStorage.setItem('gemini_api_key', key);
-​closeSettingModal();
-updateUI();
-}
-​window.addEventListener('resize', () => {
-camera.aspect = window.innerWidth / window.innerHeight;
-camera.updateProjectionMatrix();
-renderer.setSize(window.innerWidth, window.innerHeight);
-});
-​updateUI();
-</script>
+
+  <!-- 3D水槽 -->
+  <div id="stage"><div id="c3d"></div></div>
+
+  <!-- 上部ステータス（全ゲージ100点満点） -->
+  <div class="top-hud">
+    <div class="status-grid">
+      <div>❤️体力 <span id="v-hp">100</span><div class="bar-box"><div id="b-hp" class="bar-val" style="width:100%; background:#ef4444;"></div></div></div>
+      <div>🍖空腹 <span id="v-hunger">70</span><div class="bar-box"><div id="b-hunger" class="bar-val" style="width:70%; background:#eab308;"></div></div></div>
+      <div>⚡元気 <span id="v-stamina">85</span><div class="bar-box"><div id="b-stamina" class="bar-val" style="width:85%; background:#f97316;"></div></div></div>
+      <div>💤目覚め <span id="v-sleep">80</span><div class="bar-box"><div id="b-sleep" class="bar-val" style="width:80%; background:#a855f7;"></div></div></div>
+      <div>✨気分 <span id="v-morale">60</span><div class="bar-box"><div id="b-morale" class="bar-val" style="width:60%; background:#10b981;"></div></div></div>
+    </div>
+    <div class="hud-sub">
+      <span id="ui-id">🤖 個体#1 (0, 0, -1)</span>
+      <span id="ui-badge" class="badge badge-test">🧪 TEST残: 20/20</span>
+      <span id="ui-timer">⏳ 生存: 00:00</span>
+    </div>
+  </div>
+
+  <!-- ロボの思考モニター -->
+  <div class="thought-card">
+    <div class="thought-title">
+      <span id="ui-brain-title">🤖 ロボの深層思考 (3.8モデル)</span>
+      <span id="ui-state" style="color:#94a3b8;">待機中</span>
+    </div>
+    <div class="thought-body" id="thought-txt">
+      （地面をタップすると🍎リンゴを落とせます。下のボタンを押すとロボが五感と古い手帳をもとに深く考えて1歩動きます）
+    </div>
+  </div>
+
+  <!-- 右上のボタン -->
+  <div class="side-btns">
+    <div class="circle-btn active" id="btn-sur" onclick="changeCam('surface')" title="地上を見る">🌲</div>
+    <div class="circle-btn" id="btn-ant" onclick="changeCam('antfarm')" title="地下を見る">⛏️</div>
+    <div class="circle-btn" onclick="openModal('diaryModal')" title="手帳を開く">📖</div>
+    <div class="circle-btn" onclick="openModal('settingModal')" title="設定を開く">⚙️</div>
+  </div>
+
+  <!-- 下部操作ボタン -->
+  <div class="bottom-hud">
+    <div class="tap-guide" id="guide-txt">地面をタップして【🍎リンゴ】を落とせます</div>
+    <div class="action-row">
+      <button id="think-btn" class="main-btn btn-think" onclick="stepAiThought()">🧠 AIに深く考えて行動させる</button>
+      <button id="respawn-btn" class="main-btn btn-respawn" onclick="respawnRobot()">🔄 次の個体へ（古い手帳を読んで起き上がる）</button>
+    </div>
+  </div>
+
+  <!-- 手帳の小窓（最初はdisplay: noneで絶対に隠す！） -->
+  <div class="modal-cover" id="diaryModal" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-title">📖 拾い上げた古い手帳（日記）</div>
+        <div class="close-btn" onclick="closeModal('diaryModal')">✕</div>
+      </div>
+      <div style="font-size:11px; color:#94a3b8; line-height:1.4;">
+        ロボは「死（ゲームオーバー）」というルールを知りません。手元に落ちていたこの古い手帳の文字だけを頼りに、なぜ前の自分が動けなくなったのかを推測して生き延びようとします。
+      </div>
+      <div style="font-size:11px; color:#38bdf8; font-weight:bold;">
+        💡 今の思い込み: <span id="diary-belief" style="color:#f8fafc; font-weight:normal;">お腹が空っぽになると体が動かなくなるらしい…</span>
+      </div>
+      <div class="diary-content" id="diary-text"></div>
+      <button class="save-btn" onclick="closeModal('diaryModal')">手帳をとじる</button>
+    </div>
+  </div>
+
+  <!-- 設定の小窓（最初はdisplay: noneで絶対に隠す！） -->
+  <div class="modal-cover" id="settingModal" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-title">⚙️ AIの思考システム設定 (3.8対応)</div>
+        <div class="close-btn" onclick="closeModal('settingModal')">✕</div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div style="font-size:12px; font-weight:bold;">Gemini 3.8 APIで思考させる</div>
+          <div style="font-size:10px; color:#94a3b8;">ON: 本番3.8思考(残20) / OFF: テスト(残20)</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="api-toggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div style="font-size:11px; color:#94a3b8;">使用する3.8モデル名:</div>
+      <input type="text" id="model-name" class="input-box" value="gemini-3.8-flash">
+      <div class="preset-row">
+        <button class="preset-btn" onclick="document.getElementById('model-name').value='gemini-3.8-flash'">3.8-flash (標準)</button>
+        <button class="preset-btn" onclick="document.getElementById('model-name').value='gemini-3.8-pro'">3.8-pro (高精度)</button>
+      </div>
+      <div style="font-size:11px; color:#94a3b8;">Gemini APIキー (AIzaSy...):</div>
+      <input type="password" id="api-key" class="input-box" placeholder="キーを貼り付け">
+      <button class="save-btn" onclick="saveSettings()">設定をほぞん</button>
+    </div>
+  </div>
+
+  <script>
+    // ========================================================
+    // 1. ロボットの内部状態（3.8モデルによる深い内面表現）
+    // ========================================================
+    const ROBOT = {
+      gen: 1,
+      isStop: false,
+      useApi: false,
+      modelName: "gemini-3.8-flash",
+      apiCount: 20,
+      testCount: 20,
+      seconds: 0,
+      stats: {
+        hp: 100,      // 体力 (空腹が0になると減る。0で機能停止)
+        hunger: 70,   // 空腹 (100=満腹。1分で-1、1歩で-1)
+        stamina: 85,  // 元気 (1分で-1、1歩で-2)
+        sleep: 80,    // 目覚め (2分で-1)
+        morale: 60    // 気分 (1分で-1、発見や食事で変動)
+      },
+      trait: "慎重で少し怖がりだが、生きるために必死に頭を使う性格",
+      belief: "手帳の警告どおり、お腹が空っぽになると体が動かなくなるらしい。甘い匂いを頼りにリンゴを探そう。",
+      pos: { x: 0, y: 0, z: -1 },
+      hasApple: false,
+      eaten: 0,
+      known: {},
+      diary: [
+        "【手帳の最初のページ】\n目が覚めたら、この狭い場所に一人で立っていた。自分の足元と目の前の1マスしか見えない。足元にこの古い手帳が落ちていた。前のページには『…お腹が減りすぎて、もう指先も動かない…甘い匂いがしたのに…』と誰かの震える文字がある。昔のボクが書いたのだろうか？ お腹が空っぽになる前に、なんとしてもリンゴを見つけなければ。"
+      ]
+    };
+
+    // 初期縄張り (2x2x2)
+    for (let x = 0; x <= 1; x++) {
+      for (let y = -1; y <= 0; y++) {
+        for (let z = -1; z <= 0; z++) ROBOT.known[`${x},${y},${z}`] = true;
+      }
+    }
+
+    // 設定の復元（古い2.0や2.5が残っていたら自動的に3.8へアップグレード）
+    ROBOT.useApi = localStorage.getItem('use_api_flag') === 'true';
+    const savedModel = localStorage.getItem('gemini_model_name') || 'gemini-3.8-flash';
+    if (savedModel.includes('2.0') || savedModel.includes('2.5') || savedModel.includes('1.5')) {
+      ROBOT.modelName = 'gemini-3.8-flash';
+      localStorage.setItem('gemini_model_name', 'gemini-3.8-flash');
+    } else {
+      ROBOT.modelName = savedModel;
+    }
+
+    // ========================================================
+    // 2. 3.8モデルの表現力を引き出す「本格思考スキーマ」
+    // ========================================================
+    const thoughtSchema = {
+      type: "OBJECT",
+      properties: {
+        sensoryPerception: {
+          type: "STRING",
+          description: "視界1マスで感じた足元の感触、漂うリンゴの匂いの強さ、現在の空腹や体力のリアルな身体感覚（40字程度）"
+        },
+        innerConflict: {
+          type: "STRING",
+          description: "古い手帳の記録（『空腹で動けなくなった』等）と今の身体状況を踏まえた、ロボの頭の中の深い葛藤と本音の一人称独白（80字程度）"
+        },
+        actionId: {
+          type: "INTEGER",
+          description: "熟考の末に選んだ行動のid番号"
+        },
+        moraleDelta: {
+          type: "INTEGER",
+          description: "今回の発見や不安による気分の変化（-10〜+15）"
+        },
+        updatedBelief: {
+          type: "STRING",
+          description: "今回の行動を通じて更新された、ロボ自身の現在の仮説・思い込み（40字程度）"
+        },
+        diaryMemo: {
+          type: "STRING",
+          description: "いつか意識を失ったときのために、次の自分へ手帳に書き残す生々しい観察メモ（45字程度）"
+        }
+      },
+      required: ["sensoryPerception", "innerConflict", "actionId", "moraleDelta", "updatedBelief", "diaryMemo"]
+    };
+
+    // ========================================================
+    // 3. 時間の経過（1分で空腹-1、空腹0で体力消耗）
+    // ========================================================
+    setInterval(() => {
+      if (ROBOT.isStop) return;
+      ROBOT.seconds++;
+
+      // 1分（60秒）ごとに空腹・元気・気分が-1
+      if (ROBOT.seconds % 60 === 0) {
+        ROBOT.stats.hunger = Math.max(0, ROBOT.stats.hunger - 1);
+        ROBOT.stats.stamina = Math.max(0, ROBOT.stats.stamina - 1);
+        ROBOT.stats.morale = Math.max(0, ROBOT.stats.morale - 1);
+        updateHUD();
+      }
+
+      // 2分（120秒）ごとに目覚めが-1
+      if (ROBOT.seconds % 120 === 0) {
+        ROBOT.stats.sleep = Math.max(0, ROBOT.stats.sleep - 1);
+        updateHUD();
+      }
+
+      // 空腹が0のとき、20秒ごとに体力が削られる
+      if (ROBOT.stats.hunger === 0 && ROBOT.seconds % 20 === 0) {
+        ROBOT.stats.hp = Math.max(0, ROBOT.stats.hp - 15);
+        document.getElementById('thought-txt').innerHTML =
+          `<span style="color:#ef4444; font-weight:bold;">⚠️ お腹が空っぽで内部回路が軋む…体力が15減ってしまった！</span>`;
+        if (ROBOT.stats.hp === 0) {
+          triggerShutdown("お腹が空っぽのまま時間が過ぎ、手帳を握りしめたまま意識が途絶えた。");
+        }
+        updateHUD();
+      }
+
+      const m = String(Math.floor(ROBOT.seconds / 60)).padStart(2, '0');
+      const s = String(ROBOT.seconds % 60).padStart(2, '0');
+      document.getElementById('ui-timer').textContent = `⏳ 生存: ${m}:${s}`;
+    }, 1000);
+
+    // ========================================================
+    // 4. 3D水槽（地上と地下の断面・ハシゴ・透明ガラス）
+    // ========================================================
+    const stage = document.getElementById('c3d');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x07090e);
+
+    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
+    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'low-power' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    stage.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.6);
+    sun.position.set(10, 20, 10);
+    scene.add(sun);
+
+    const world = new THREE.Group();
+    scene.add(world);
+
+    const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+    const COLOR_LIT = { grass: 0x48bb78, dirt: 0x784f33, stone: 0x475569 };
+    const COLOR_DARK = { grass: 0x112619, dirt: 0x21160e, stone: 0x151921 };
+
+    const voxelMap = {};
+    const clickBlocks = [];
+
+    for (let x = -4; x <= 4; x++) {
+      for (let z = -4; z <= 0; z++) {
+        if (!(x === 0 && z === -1)) makeBlock(x, 0, z, 'grass');
+        for (let y = -1; y >= -5; y--) {
+          if (x === 0 && z === -1 && y >= -3) continue;
+          if (Math.abs(x) <= 2 && y <= -2 && y >= -4 && z >= -2) continue;
+          makeBlock(x, y, z, y >= -2 ? 'dirt' : 'stone');
+        }
+      }
+    }
+
+    function makeBlock(x, y, z, type) {
+      const mat = new THREE.MeshLambertMaterial({ color: COLOR_DARK[type] });
+      const b = new THREE.Mesh(boxGeo, mat);
+      b.position.set(x, y, z);
+      b.userData = { gx: x, gy: y, gz: z, type };
+      world.add(b);
+      voxelMap[`${x},${y},${z}`] = b;
+      clickBlocks.push(b);
+    }
+
+    function refreshFog() {
+      for (const key in voxelMap) {
+        const b = voxelMap[key];
+        let lit = false;
+        for (let ox = -1; ox <= 1; ox++) {
+          for (let oy = -1; oy <= 1; oy++) {
+            for (let oz = -1; oz <= 1; oz++) {
+              if (ROBOT.known[`${b.userData.gx+ox},${b.userData.gy+oy},${b.userData.gz+oz}`]) lit = true;
+            }
+          }
+        }
+        b.material.color.setHex(lit ? COLOR_LIT[b.userData.type] : COLOR_DARK[b.userData.type]);
+      }
+    }
+    refreshFog();
+
+    // 木製ハシゴ
+    const ladMat = new THREE.MeshLambertMaterial({ color: 0xb45309 });
+    for (let y = 0; y >= -3; y--) {
+      const step = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.1), ladMat);
+      step.position.set(0, y - 0.2, -1.4);
+      world.add(step);
+    }
+
+    // ガラス面
+    const glass = new THREE.Mesh(
+      new THREE.PlaneGeometry(9, 6),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.08, side: THREE.DoubleSide })
+    );
+    glass.position.set(0, -2.5, 0.5);
+    scene.add(glass);
+
+    // ロボット
+    const chara = new THREE.Group();
+    world.add(chara);
+
+    const bodyM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x3b82f6 }));
+    bodyM.scale.set(0.5, 0.5, 0.35); bodyM.position.y = 0.5; chara.add(bodyM);
+
+    const headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x93c5fd }));
+    headM.scale.set(0.42, 0.4, 0.4); headM.position.y = 0.85; chara.add(headM);
+
+    const armGeo = new THREE.BoxGeometry(0.16, 0.38, 0.16);
+    const armMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
+    const rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.35, 0.5, 0); chara.add(rArm);
+    const lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.35, 0.5, 0); chara.add(lArm);
+
+    const handApple = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshLambertMaterial({ color: 0xef4444, visible: false }));
+    handApple.position.set(0, -0.22, 0.14);
+    rArm.add(handApple);
+
+    const legGeo = new THREE.BoxGeometry(0.18, 0.32, 0.18);
+    const legMat = new THREE.MeshLambertMaterial({ color: 0x1e3a8a });
+    const rLeg = new THREE.Mesh(legGeo, legMat); rLeg.position.set(0.16, 0.16, 0); chara.add(rLeg);
+    const lLeg = new THREE.Mesh(legGeo, legMat); lLeg.position.set(-0.16, 0.16, 0); chara.add(lLeg);
+
+    chara.position.set(0, 0.5, -1);
+
+    const fieldApples = [];
+
+    const CAM = {
+      surface: { pos: new THREE.Vector3(0, 9, 13), look: new THREE.Vector3(0, 0, -1) },
+      antfarm: { pos: new THREE.Vector3(0, -2.5, 12), look: new THREE.Vector3(0, -2.5, 0) }
+    };
+    let targetCamPos = CAM.surface.pos.clone();
+    let targetCamLook = CAM.surface.look.clone();
+    let curCamLook = targetCamLook.clone();
+    camera.position.copy(targetCamPos);
+
+    function changeCam(type) {
+      targetCamPos.copy(CAM[type].pos);
+      targetCamLook.copy(CAM[type].look);
+      document.getElementById('btn-sur').classList.toggle('active', type === 'surface');
+      document.getElementById('btn-ant').classList.toggle('active', type === 'antfarm');
+    }
+
+    // ========================================================
+    // 5. タッチ操作（回転・ズーム・リンゴ投下）
+    // ========================================================
+    let touchMode = 'none', prevX = 0, prevDist = 0, touchTime = 0;
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    window.addEventListener('touchstart', e => {
+      if (e.target.closest('.top-hud, .thought-card, .side-btns, .bottom-hud, .modal-cover')) return;
+      touchTime = performance.now();
+      if (e.touches.length === 1) {
+        touchMode = 'drag'; prevX = e.touches[0].clientX;
+      } else if (e.touches.length === 2) {
+        touchMode = 'pinch';
+        prevDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', e => {
+      if (touchMode === 'drag' && e.touches.length === 1) {
+        world.rotation.y += (e.touches[0].clientX - prevX) * 0.007;
+        prevX = e.touches[0].clientX;
+      } else if (touchMode === 'pinch' && e.touches.length === 2) {
+        const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        camera.fov = Math.max(20, Math.min(65, camera.fov + (prevDist - d) * 0.02));
+        camera.updateProjectionMatrix();
+        prevDist = d;
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', e => {
+      if (performance.now() - touchTime < 250 && touchMode === 'drag' && e.changedTouches.length === 1) {
+        dropAppleAtPoint(e.changedTouches[0]);
+      }
+      touchMode = 'none';
+    });
+
+    function dropAppleAtPoint(touch) {
+      if (ROBOT.isStop) return;
+      mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      const hits = raycaster.intersectObjects(clickBlocks);
+      if (hits.length === 0) return;
+
+      let gx = hits[0].object.userData.gx;
+      let gy = hits[0].object.userData.gy;
+      let gz = hits[0].object.userData.gz;
+
+      while (gy > -4 && !voxelMap[`${gx},${gy},${gz}`]) {
+        gy--;
+      }
+
+      spawnApple(gx, gy, gz);
+      document.getElementById('guide-txt').textContent = `🍎リンゴを落としました！(島に${fieldApples.length}個)`;
+    }
+
+    function spawnApple(gx, gy, gz) {
+      const grp = new THREE.Group();
+      const apple = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshLambertMaterial({ color: 0xef4444 }));
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.08), new THREE.MeshLambertMaterial({ color: 0x22c55e }));
+      leaf.position.set(0, 0.18, 0);
+      grp.add(apple, leaf);
+      grp.position.set(gx, gy + 0.65, gz);
+      world.add(grp);
+      fieldApples.push({ mesh: grp, gx, gy, gz });
+    }
+
+    spawnApple(2, 0, -1);
+
+    // ========================================================
+    // 6. 1×1×1の周囲センサーと物理行動リスト
+    // ========================================================
+    function canWalk(x, y, z) {
+      if (voxelMap[`${x},${y},${z}`]) return false;
+      if (x < -4 || x > 4 || z < -4 || z > 0 || y > 1 || y < -5) return false;
+      const hasFloor = Boolean(voxelMap[`${x},${y-1},${z}`]);
+      const onLadder = (x === 0 && z === -1 && y >= -3 && y <= 0);
+      const isLowest = (y === -4 && Boolean(voxelMap[`${x},-5,${z}`]));
+      return (hasFloor || onLadder || isLowest);
+    }
+
+    function inspect1x1Surroundings(cx, cy, cz) {
+      const checkDir = (dx, dy, dz, label) => {
+        const tx = cx + dx, ty = cy + dy, tz = cz + dz;
+        const blk = voxelMap[`${tx},${ty},${tz}`];
+        if (blk) return `${label}: 硬い${blk.userData.type === 'grass' ? '草土' : (blk.userData.type === 'dirt' ? '土壁' : '岩壁')}に塞がれている`;
+        if (tx === 0 && tz === -1 && ty >= -3 && ty <= 0) return `${label}: 地下へ続くタテ穴と木製ハシゴがある`;
+        if (canWalk(tx, ty, tz)) return `${label}: 1歩進める空間がある`;
+        return `${label}: 足場のない空間（進めない）`;
+      };
+      return [
+        checkDir(1, 0, 0, "東(右1マス)"),
+        checkDir(-1, 0, 0, "西(左1マス)"),
+        checkDir(0, 0, 1, "南(手前1マス)"),
+        checkDir(0, 0, -1, "北(奥1マス)")
+      ].join(" / ");
+    }
+
+    function getPossibleActions(cx, cy, cz) {
+      const list = [];
+
+      if (ROBOT.hasApple) {
+        list.push({ id: list.length, type: "EAT_HAND", txt: "右手に持っている🍎リンゴにかぶりつく（空腹+45回復・体力+10回復）" });
+      }
+
+      const nearIdx = fieldApples.findIndex(a => Math.abs(a.gx - cx) + Math.abs(a.gy - cy) + Math.abs(a.gz - cz) <= 1);
+      if (nearIdx !== -1) {
+        list.push({ id: list.length, type: "EAT_FIELD", appleIdx: nearIdx, txt: "目の前に落ちている🍎リンゴをすぐ食べる（空腹+45回復・体力+10回復）" });
+        if (!ROBOT.hasApple) {
+          list.push({ id: list.length, type: "PICK_FIELD", appleIdx: nearIdx, txt: "目の前にある🍎リンゴを拾って右手に持つ（あとで食べるために確保）" });
+        }
+      }
+
+      const dirs = [
+        { dx: 1, dy: 0, dz: 0, name: "東(右)へ1歩歩く" },
+        { dx: -1, dy: 0, dz: 0, name: "西(左)へ1歩歩く" },
+        { dx: 0, dy: 0, dz: 1, name: "南(手前)へ1歩歩く" },
+        { dx: 0, dy: 0, dz: -1, name: "北(奥)へ1歩歩く" },
+        { dx: 0, dy: 1, dz: 0, name: "木製ハシゴを1段のぼる" },
+        { dx: 0, dy: -1, dz: 0, name: "木製ハシゴを1段おりる" }
+      ];
+
+      for (const d of dirs) {
+        const tx = cx + d.dx, ty = cy + d.dy, tz = cz + d.dz;
+        if (d.dy !== 0 && !(cx === 0 && cz === -1 && cy >= -3 && ty >= -3 && ty <= 0)) continue;
+        if (canWalk(tx, ty, tz)) {
+          const visited = ROBOT.known[`${tx},${ty},${tz}`] ? "一度歩いた場所" : "まだ知らない暗闇のマス";
+          list.push({ id: list.length, type: "MOVE", pos: [tx, ty, tz], txt: `${d.name} [座標(${tx},${ty},${tz})・${visited}] ※空腹-1/元気-2` });
+        }
+      }
+
+      list.push({ id: list.length, type: "REST", txt: "その場に座って息を整える（元気+10回復・空腹は減らない）" });
+      return list;
+    }
+
+    function scanAppleSmell(cx, cy, cz) {
+      if (fieldApples.length === 0) return "甘いリンゴの匂いはどこからも漂ってこない。";
+      return fieldApples.map((a, i) => {
+        const dist = Math.hypot(a.gx - cx, a.gy - cy, a.gz - cz).toFixed(1);
+        if (dist <= 1) return `すぐ目の前（距離${dist}）から強烈に甘いリンゴの香りがする！`;
+        const ew = a.gx > cx ? `東へ${a.gx - cx}マス` : (a.gx < cx ? `西へ${cx - a.gx}マス` : '東西は同じ列');
+        const ns = a.gz > cz ? `南へ${a.gz - cz}マス` : (a.gz < cz ? `北へ${cz - a.gz}マス` : '南北は同じ列');
+        const ud = a.gy > cy ? `上へ${a.gy - cy}段` : (a.gy < cy ? `下(地下)へ${cy - a.gy}段` : '同じ高さ');
+        return `リンゴの匂い#${i+1}: 方角[${ew}, ${ns}, ${ud}]（直線距離${dist}マス）`;
+      }).join(' / ');
+    }
+
+    // ========================================================
+    // 7. Gemini 3.8による本格的な自律思考ステップ
+    // ========================================================
+    async function stepAiThought() {
+      if (ROBOT.isStop) return;
+
+      const remain = ROBOT.useApi ? ROBOT.apiCount : ROBOT.testCount;
+      if (remain <= 0) {
+        alert("今日の活動枠（20回）を使い切りました。");
+        return;
+      }
+
+      const apiKey = localStorage.getItem('gemini_api_key') || '';
+      if (ROBOT.useApi && !apiKey) {
+        alert("右上の⚙️設定からGemini APIキーを入力してください。");
+        openModal('settingModal');
+        return;
+      }
+
+      const btn = document.getElementById('think-btn');
+      btn.disabled = true;
+
+      if (ROBOT.useApi) ROBOT.apiCount--;
+      else ROBOT.testCount--;
+      updateHUD();
+
+      const cx = ROBOT.pos.x, cy = ROBOT.pos.y, cz = ROBOT.pos.z;
+      const actions = getPossibleActions(cx, cy, cz);
+      const smell = scanAppleSmell(cx, cy, cz);
+      const touch1x1 = inspect1x1Surroundings(cx, cy, cz);
+
+      let decision;
+      if (ROBOT.useApi) {
+        document.getElementById('ui-state').textContent = `⚡ ${ROBOT.modelName} 思考中...`;
+        try {
+          decision = await callGemini38Brain(cx, cy, cz, actions, smell, touch1x1, apiKey);
+        } catch (err) {
+          document.getElementById('ui-state').textContent = "❌ 通信エラー";
+          document.getElementById('thought-txt').innerHTML = `<span style="color:#f87171;">【${ROBOT.modelName} エラー】: ${err.message}</span>`;
+          btn.disabled = false;
+          return;
+        }
+      } else {
+        document.getElementById('ui-state').textContent = "🧪 テスト思考中...";
+        await new Promise(r => setTimeout(r, 350));
+        decision = localDeepTestBrain(cx, cy, cz, actions, smell);
+      }
+
+      document.getElementById('ui-state').textContent = "行動中";
+      await executeAction(decision, actions);
+
+      document.getElementById('ui-state').textContent = "待機中";
+      if (!ROBOT.isStop) btn.disabled = false;
+    }
+
+    // 3.8モデル専用：深い葛藤と内面を引き出すAPI呼び出し
+    async function callGemini38Brain(cx, cy, cz, actions, smell, touch1x1, key) {
+      const prompt = `あなたは箱庭の水槽世界で生きる小さな自律ロボット（個体#${ROBOT.gen}）です。
+あなたの視界は「自分の足元と目の前の1マス（1×1×1）」しか見えず、世界の全体像や人間（プレイヤー）の存在、そして「死（ゲームオーバー）」というゲームの仕組みを一切知りません。
+あなたが頼りにできるのは、自分の五感（手触り・匂い・空腹の痛み）と、足元に落ちていた「古い手帳（過去の自分が書き残した手記）」だけです。
+
+【あなたの性格と思考のクセ】
+・性格: ${ROBOT.trait}
+・現在の仮説・思い込み: 「${ROBOT.belief}」
+
+【現在の身体ゲージ（すべて100点満点）】
+・❤️体力: ${ROBOT.stats.hp}/100（空腹が0になると激しい痛みで削られていく）
+・🍖空腹度: ${ROBOT.stats.hunger}/100（※1分経過で-1、1歩歩くごとに-1減少。0になると飢餓状態！）
+・⚡元気(スタミナ): ${ROBOT.stats.stamina}/100（1歩歩くごとに-2減少）
+・💤目覚め: ${ROBOT.stats.sleep}/100
+・✨気分(充実): ${ROBOT.stats.morale}/100
+・右手に持っている物: ${ROBOT.hasApple ? "🍎リンゴ（いつでも食べられる）" : "何も持っていない"}
+
+【1×1×1の五感センサーが捉えた現在の状況】
+・現在地の座標: (X:${cx}, Y:${cy}, Z:${cz}) ※Y=0が地上、Yがマイナスは暗い地下室
+・周囲1マスの手触り: ${touch1x1}
+・空間に漂う匂い: ${smell}
+
+【古い手帳に残された記録（唯一の記憶と警告）】
+${ROBOT.diary.slice(-5).join("\n")}
+
+【いま物理的に選択できる行動リスト】
+${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
+
+【思考のルール】
+1. 固定のテンプレ反応はせず、まず「五感で何を感じたか(sensoryPerception)」を整理してください。
+2. 次に、古い手帳の『お腹が空っぽになって動けなくなった』という記録と現在の空腹度(${ROBOT.stats.hunger})を照らし合わせ、「歩けばお腹が1減るけれど、あの甘い匂いの方へ踏み出すべきか、それとも今食べるべきか」という生々しい心の葛藤(innerConflict)を一人称（ボク）で深く語ってください。
+3. 空腹度を最優先に考えて行動(actionId)を選び、今回の体験で深まった自分の仮説(updatedBelief)と、未来の自分へ残す手帳のメモ(diaryMemo)を出力してください。`;
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${ROBOT.modelName}:generateContent?key=${key}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.85,
+            responseMimeType: "application/json",
+            responseSchema: thoughtSchema
+          }
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      return JSON.parse(rawText);
+    }
+
+    // テストモード用の思考（スキーマと同じ構造で出力）
+    function localDeepTestBrain(cx, cy, cz, actions, smell) {
+      const eat = actions.find(a => a.type === "EAT_HAND" || a.type === "EAT_FIELD");
+      if (eat && ROBOT.stats.hunger <= 85) {
+        return {
+          sensoryPerception: `目の前に真っ赤なリンゴの甘い香り。お腹は${ROBOT.stats.hunger}まで減っている。`,
+          innerConflict: "古い手帳に『お腹が減りすぎて指先も動かなくなった』と書いてあった…。手遅れになる前に、このリンゴを食べておこう！",
+          actionId: eat.id,
+          moraleDelta: 10,
+          updatedBelief: "リンゴを食べればお腹の痛みが消えて、体力が湧いてくる。",
+          diaryMemo: `座標(${cx},${cy},${cz})でリンゴを食べた。甘くて温かい。`
+        };
+      }
+
+      const pick = actions.find(a => a.type === "PICK_FIELD");
+      if (pick && !ROBOT.hasApple) {
+        return {
+          sensoryPerception: `足元にツヤツヤしたリンゴが落ちている。`,
+          innerConflict: "今はまだお腹に余裕があるけれど、いつ食べ物がなくなるか分からない。右手に拾って大事に持っておこう。",
+          actionId: pick.id,
+          moraleDelta: 5,
+          updatedBelief: "リンゴを手に持っておけば、お腹が減ったらいつでも食べられる。",
+          diaryMemo: `座標(${cx},${cy},${cz})でリンゴを拾って右手に握った。`
+        };
+      }
+
+      const moves = actions.filter(a => a.type === "MOVE");
+      if (fieldApples.length > 0 && moves.length > 0) {
+        const target = fieldApples[0];
+        moves.sort((a, b) => {
+          const da = Math.hypot(target.gx - a.pos[0], target.gy - a.pos[1], target.gz - a.pos[2]);
+          const db = Math.hypot(target.gx - b.pos[0], target.gy - b.pos[1], target.gz - b.pos[2]);
+          return da - db;
+        });
+        const best = moves[0];
+        return {
+          sensoryPerception: `${smell}`,
+          innerConflict: `1歩歩くとお腹が1減ってしまうけど…このままじっとしていてもお腹は減るばかりだ。甘い匂いがする(${best.pos.join(',')})の方へ踏み出してみよう！`,
+          actionId: best.id,
+          moraleDelta: 2,
+          updatedBelief: "甘い匂いが強くなる方角へ進めば、きっとリンゴが見つかるはずだ。",
+          diaryMemo: `甘い匂いを頼りに(${best.pos.join(',')})へ1歩進んだ。`
+        };
+      }
+
+      if (moves.length > 0) {
+        const rnd = moves[Math.floor(Math.random() * moves.length)];
+        return {
+          sensoryPerception: `周囲に匂いはない。空腹度は${ROBOT.stats.hunger}。`,
+          innerConflict: `リンゴの匂いがしない…手帳の警告が頭をよぎる。不安だけど、足場を確かめながら(${rnd.pos.join(',')})を探してみよう。`,
+          actionId: rnd.id,
+          moraleDelta: -2,
+          updatedBelief: "匂いがしない時は、まだ歩いていない場所を少しずつ調べるしかない。",
+          diaryMemo: `匂いを探して(${rnd.pos.join(',')})へ足を進めた。`
+        };
+      }
+
+      const rest = actions.find(a => a.type === "REST") || actions[0];
+      return {
+        sensoryPerception: "周囲は壁に囲まれている。",
+        innerConflict: "むやみに動くとお腹が減ってしまう。今はここで静かに息を整えよう。",
+        actionId: rest.id,
+        moraleDelta: 0,
+        updatedBelief: "匂いがないときは無理に歩かず体力を守ることも大切だ。",
+        diaryMemo: "その場で座り込んで体力を温存した。"
+      };
+    }
+
+    // 決まった行動を3D空間とステータスへ反映
+    async function executeAction(decision, actions) {
+      const act = actions.find(a => a.id === decision.actionId) || actions[0];
+
+      // 思い込みと気分の更新
+      if (decision.updatedBelief) {
+        ROBOT.belief = decision.updatedBelief;
+        document.getElementById('diary-belief').textContent = ROBOT.belief;
+      }
+      if (typeof decision.moraleDelta === 'number') {
+        ROBOT.stats.morale = Math.max(0, Math.min(100, ROBOT.stats.morale + decision.moraleDelta));
+      }
+
+      // モニターに五感認識・心の葛藤・行動を表示
+      document.getElementById('thought-txt').innerHTML = `
+        <div style="color:#94a3b8; font-size:10px; margin-bottom:2px;">👁️ 知覚: ${decision.sensoryPerception}</div>
+        <div style="color:#fefcbf; font-weight:bold; margin-bottom:4px;">💭 「${decision.innerConflict}」</div>
+        <div style="color:#9ae6b4; font-size:10px;">⚡ 決断: ${act.txt}</div>
+      `;
+      ROBOT.diary.push(`・[個体#${ROBOT.gen}] ${decision.diaryMemo}`);
+
+      if (act.type === "MOVE") {
+        // 1歩歩くごとに空腹-1、元気-2
+        ROBOT.stats.hunger = Math.max(0, ROBOT.stats.hunger - 1);
+        ROBOT.stats.stamina = Math.max(0, ROBOT.stats.stamina - 2);
+
+        const [tx, ty, tz] = act.pos;
+        headM.rotation.y = tx > ROBOT.pos.x ? -0.35 : (tx < ROBOT.pos.x ? 0.35 : 0);
+        await walkCharaTo(tx, ty + 0.5, tz, 500);
+        headM.rotation.y = 0;
+
+        ROBOT.pos = { x: tx, y: ty, z: tz };
+        ROBOT.known[`${tx},${ty},${tz}`] = true;
+        refreshFog();
+
+        if (ty <= -2) changeCam('antfarm');
+        else if (ty >= 0) changeCam('surface');
+
+      } else if (act.type === "EAT_HAND") {
+        ROBOT.hasApple = false;
+        handApple.material.visible = false;
+        rArm.rotation.x = -0.9;
+        await new Promise(r => setTimeout(r, 600));
+        rArm.rotation.x = 0;
+
+        ROBOT.stats.hunger = Math.min(100, ROBOT.stats.hunger + 45);
+        ROBOT.stats.hp = Math.min(100, ROBOT.stats.hp + 15);
+        ROBOT.stats.morale = Math.min(100, ROBOT.stats.morale + 10);
+        ROBOT.eaten++;
+
+      } else if (act.type === "EAT_FIELD") {
+        const ap = fieldApples[act.appleIdx];
+        if (ap) {
+          world.remove(ap.mesh);
+          fieldApples.splice(act.appleIdx, 1);
+        }
+        rArm.rotation.x = -0.9;
+        await new Promise(r => setTimeout(r, 600));
+        rArm.rotation.x = 0;
+
+        ROBOT.stats.hunger = Math.min(100, ROBOT.stats.hunger + 45);
+        ROBOT.stats.hp = Math.min(100, ROBOT.stats.hp + 15);
+        ROBOT.stats.morale = Math.min(100, ROBOT.stats.morale + 10);
+        ROBOT.eaten++;
+        document.getElementById('guide-txt').textContent = `🍎リンゴを食べました！(残り${fieldApples.length}個)`;
+
+      } else if (act.type === "PICK_FIELD") {
+        const ap = fieldApples[act.appleIdx];
+        if (ap) {
+          world.remove(ap.mesh);
+          fieldApples.splice(act.appleIdx, 1);
+        }
+        ROBOT.hasApple = true;
+        handApple.material.visible = true;
+        document.getElementById('guide-txt').textContent = `🍎リンゴを右手に持ちました！(島に残り${fieldApples.length}個)`;
+
+      } else if (act.type === "REST") {
+        ROBOT.stats.stamina = Math.min(100, ROBOT.stats.stamina + 10);
+      }
+
+      // 空腹が0になったら体力を激しく消耗
+      if (ROBOT.stats.hunger === 0) {
+        ROBOT.stats.hp = Math.max(0, ROBOT.stats.hp - 20);
+        document.getElementById('thought-txt').innerHTML +=
+          `<div style="color:#ef4444; font-weight:bold; margin-top:3px;">🚨【飢餓の激痛】お腹が0で体力が20削られた！</div>`;
+        if (ROBOT.stats.hp === 0) {
+          triggerShutdown("お腹が空っぽのまま一歩を踏み出し、視界が真っ暗になって倒れ込んだ。");
+        }
+      }
+
+      updateHUD();
+    }
+
+    // 機能停止（ロボは「死」を知らず、手帳に最後のメモを残す）
+    function triggerShutdown(reason) {
+      ROBOT.isStop = true;
+      chara.rotation.z = Math.PI / 2;
+      chara.position.y = ROBOT.pos.y + 0.25;
+
+      const appleHint = fieldApples.length > 0
+        ? `どこかにまだ${fieldApples.length}個のリンゴの匂いが残っているのに…`
+        : `周りにはもうリンゴの匂いがしなかった…`;
+
+      const lastNote = `【個体#${ROBOT.gen}の震える文字の走り書き】\n座標(${ROBOT.pos.x}, ${ROBOT.pos.y}, ${ROBOT.pos.z})にて。${reason}${appleHint} 次にこの手帳を拾ったボクへ：空腹がゼロになると本当に動けなくなる。何よりも先にリンゴを探して食べてくれ…。`;
+      ROBOT.diary.push(lastNote);
+
+      document.getElementById('ui-state').textContent = "⚠️ 意識途絶";
+      document.getElementById('thought-txt').innerHTML = `
+        <div style="color:#ef4444; font-weight:bold;">ロボの体力が0になり、その場に倒れ込みました…</div>
+        <div style="color:#cbd5e1; font-size:10px; margin-top:2px;">意識が消える直前、古い手帳に最後の文字を書き残しました。下の赤いボタンで次の個体が手帳を拾い上げます。</div>
+      `;
+
+      document.getElementById('think-btn').style.display = 'none';
+      document.getElementById('respawn-btn').style.display = 'block';
+      updateHUD();
+    }
+
+    // 復活して手帳を引き継ぐ
+    function respawnRobot() {
+      ROBOT.gen++;
+      ROBOT.isStop = false;
+      ROBOT.seconds = 0;
+      ROBOT.stats = { hp: 100, hunger: 70, stamina: 85, sleep: 80, morale: 60 };
+      ROBOT.pos = { x: 0, y: 0, z: -1 };
+      ROBOT.hasApple = false;
+      handApple.material.visible = false;
+
+      if (ROBOT.useApi) ROBOT.apiCount = 20;
+      else ROBOT.testCount = 20;
+
+      chara.rotation.z = 0;
+      chara.position.set(0, 0.5, -1);
+      changeCam('surface');
+
+      ROBOT.belief = `前の個体#${ROBOT.gen - 1}が『空腹がゼロになって動けなくなった』と手帳に書き残している。絶対に空腹をゼロにしてはいけない！`;
+      document.getElementById('diary-belief').textContent = ROBOT.belief;
+
+      ROBOT.diary.push(`【個体#${ROBOT.gen}が目覚めた日のメモ】\n目を覚ますと足元に古い手帳が落ちていた。前のページに誰かが倒れる直前に書いた悲痛な文字がある…。ボクはこの手帳の記録を頼りに、必ずリンゴを見つけて生き延びるぞ。`);
+
+      document.getElementById('think-btn').style.display = 'block';
+      document.getElementById('think-btn').disabled = false;
+      document.getElementById('respawn-btn').style.display = 'none';
+
+      document.getElementById('ui-state').textContent = "再起動完了";
+      document.getElementById('thought-txt').innerHTML = `
+        <div style="color:#86efac; font-weight:bold;">個体#${ROBOT.gen}が目を覚まし、足元の古い手帳を読みました！</div>
+        <div style="color:#fefcbf; font-size:10px;">「前のボクが書き残した手帳を読んだぞ…お腹が0になる前にリンゴを見つけよう！」</div>
+      `;
+
+      updateHUD();
+      openModal('diaryModal');
+    }
+
+    // ========================================================
+    // 8. アニメーション＆画面表示の更新
+    // ========================================================
+    let clock = 0, isWalking = false;
+    function renderLoop() {
+      requestAnimationFrame(renderLoop);
+      clock += 0.04;
+
+      camera.position.lerp(targetCamPos, 0.06);
+      curCamLook.lerp(targetCamLook, 0.06);
+      camera.lookAt(curCamLook);
+
+      for (const a of fieldApples) a.mesh.rotation.y += 0.03;
+
+      if (!ROBOT.isStop) {
+        if (isWalking) {
+          rArm.rotation.x = Math.sin(clock * 8) * 0.7;
+          lArm.rotation.x = -Math.sin(clock * 8) * 0.7;
+          rLeg.rotation.x = -Math.sin(clock * 8) * 0.7;
+          lLeg.rotation.x = Math.sin(clock * 8) * 0.7;
+        } else {
+          rLeg.rotation.x = 0; lLeg.rotation.x = 0;
+          bodyM.scale.y = 0.5 + Math.sin(clock * 2) * 0.02;
+        }
+      }
+      renderer.render(scene, camera);
+    }
+    renderLoop();
+
+    function walkCharaTo(tx, ty, tz, dur) {
+      return new Promise(resolve => {
+        isWalking = true;
+        const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z;
+        const start = performance.now();
+        function s(now) {
+          const p = Math.min((now - start) / dur, 1);
+          chara.position.x = sx + (tx - sx) * p;
+          chara.position.y = sy + (ty - sy) * p;
+          chara.position.z = sz + (tz - sz) * p;
+          if (p < 1) requestAnimationFrame(s);
+          else { isWalking = false; resolve(); }
+        }
+        requestAnimationFrame(s);
+      });
+    }
+
+    function updateHUD() {
+      const s = ROBOT.stats;
+      document.getElementById('v-hp').textContent = s.hp;
+      document.getElementById('b-hp').style.width = `${s.hp}%`;
+
+      document.getElementById('v-hunger').textContent = s.hunger;
+      document.getElementById('b-hunger').style.width = `${s.hunger}%`;
+
+      document.getElementById('v-stamina').textContent = s.stamina;
+      document.getElementById('b-stamina').style.width = `${s.stamina}%`;
+
+      document.getElementById('v-sleep').textContent = s.sleep;
+      document.getElementById('b-sleep').style.width = `${s.sleep}%`;
+
+      document.getElementById('v-morale').textContent = s.morale;
+      document.getElementById('b-morale').style.width = `${s.morale}%`;
+
+      document.getElementById('ui-id').textContent = `🤖 個体#${ROBOT.gen} (${ROBOT.pos.x}, ${ROBOT.pos.y}, ${ROBOT.pos.z})`;
+      document.getElementById('ui-brain-title').textContent = `🤖 ロボの深層思考 (${ROBOT.modelName})`;
+
+      const badge = document.getElementById('ui-badge');
+      if (ROBOT.useApi) {
+        badge.className = "badge badge-api";
+        badge.textContent = `⚡ 3.8残: ${ROBOT.apiCount}/20`;
+      } else {
+        badge.className = "badge badge-test";
+        badge.textContent = `🧪 TEST残: ${ROBOT.testCount}/20`;
+      }
+
+      document.getElementById('diary-text').textContent = ROBOT.diary.join("\n\n");
+    }
+
+    function openModal(id) {
+      if (id === 'settingModal') {
+        document.getElementById('api-toggle').checked = ROBOT.useApi;
+        document.getElementById('model-name').value = ROBOT.modelName;
+        document.getElementById('api-key').value = localStorage.getItem('gemini_api_key') || '';
+      }
+      document.getElementById(id).style.display = 'flex';
+    }
+    function closeModal(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+
+    function saveSettings() {
+      ROBOT.useApi = document.getElementById('api-toggle').checked;
+      ROBOT.modelName = document.getElementById('model-name').value.trim() || 'gemini-3.8-flash';
+      const key = document.getElementById('api-key').value.trim();
+
+      localStorage.setItem('use_api_flag', ROBOT.useApi ? 'true' : 'false');
+      localStorage.setItem('gemini_model_name', ROBOT.modelName);
+      localStorage.setItem('gemini_api_key', key);
+
+      closeModal('settingModal');
+      updateHUD();
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    updateHUD();
+  </script>
 </body>
 </html>
+```
