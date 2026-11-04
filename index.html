@@ -1,888 +1,327 @@
-```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ボクセルAI生態観察水槽</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI自律思考エンジン</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-    html, body { width: 100%; height: 100dvh; overflow: hidden; background: #07090e; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    body { background: #0f141c; color: #e2e8f0; font-family: sans-serif; margin: 0; padding: 12px; }
+    .status-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: #1a222d; padding: 10px; border-radius: 8px; font-size: 12px; text-align: center; }
+    .bar-bg { background: #2d3748; height: 6px; border-radius: 3px; margin-top: 4px; overflow: hidden; }
+    .bar-fill { background: #48bb78; height: 100%; transition: width 0.4s; }
     
-    #stage { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
-    #c3d { width: 100%; height: 100%; display: block; }
+    .monitor { background: #141e2b; border: 1px solid #2b6cb0; border-radius: 8px; padding: 12px; margin-top: 12px; min-height: 180px; }
+    .monitor-header { display: flex; justify-content: space-between; font-size: 13px; color: #63b3ed; margin-bottom: 8px; font-weight: bold; }
+    .thought-box { font-size: 14px; line-height: 1.5; color: #f7fafc; margin-bottom: 10px; }
+    .action-badge { display: inline-block; background: #2b6cb0; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-bottom: 6px; }
+    .memory-log { font-size: 12px; color: #a0aec0; border-top: 1px solid #2d3748; padding-top: 8px; margin-top: 8px; max-height: 120px; overflow-y: auto; }
 
-    /* 上部HUD：5大ステータス ＆ カウントダウン */
-    .top-hud {
-      position: absolute; top: 8px; left: 8px; right: 8px; z-index: 10;
-      background: rgba(13, 16, 27, 0.9); backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 6px 10px;
-    }
-    .status-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 4px; }
-    .gauge-wrap { display: flex; flex-direction: column; gap: 2px; }
-    .gauge-label { font-size: 8px; color: #94a3b8; text-align: center; }
-    .gauge-bar { height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
-    .gauge-fill { height: 100%; width: 50%; transition: width 0.3s ease; }
-    .hud-sub { display: flex; justify-content: space-between; align-items: center; font-size: 10px; font-weight: bold; }
-    .mode-badge { padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; }
-    .badge-api { background: rgba(56,189,248,0.25); color: #38bdf8; border: 1px solid #38bdf8; }
-    .badge-test { background: rgba(234,179,8,0.25); color: #eab308; border: 1px solid #eab308; }
+    .stage { background: #1a261e; border-radius: 8px; padding: 16px; margin-top: 12px; text-align: center; position: relative; }
+    .robo { font-size: 40px; margin: 10px 0; }
+    .field-items { font-size: 13px; color: #cbd5e0; margin-top: 8px; }
 
-    /* 思考プロセス・実況ウィンドウ */
-    .thought-monitor {
-      position: absolute; top: 62px; left: 10px; right: 54px; z-index: 10;
-      background: rgba(15, 23, 42, 0.94); border: 1px solid #38bdf8; border-radius: 10px;
-      padding: 8px 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.6); backdrop-filter: blur(6px);
-      display: flex; flex-direction: column; gap: 3px; pointer-events: none;
-    }
-    .thought-head { display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; color: #38bdf8; }
-    .thought-body { font-size: 11px; line-height: 1.45; color: #f1f5f9; min-height: 38px; white-space: pre-wrap; }
-    .thought-body.error { color: #f87171; font-weight: bold; }
-
-    /* 右上アイコンボタン群 */
-    .view-controls {
-      position: absolute; top: 62px; right: 8px; z-index: 10;
-      display: flex; flex-direction: column; gap: 8px;
-    }
-    .hud-icon-btn {
-      width: 38px; height: 38px; border-radius: 50%;
-      background: rgba(15, 20, 32, 0.85); border: 1px solid rgba(255,255,255,0.2);
-      color: #fff; font-size: 15px; display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.5); backdrop-filter: blur(4px); cursor: pointer;
-    }
-    .hud-icon-btn.active { border-color: #38bdf8; background: #1e3a8a; }
-
-    /* 下部HUD：神の手パレット */
-    .bottom-hud {
-      position: absolute; bottom: 12px; left: 8px; right: 8px; z-index: 10;
-      display: flex; flex-direction: column; gap: 6px; pointer-events: none;
-    }
-    .toast-msg {
-      align-self: center; background: rgba(10, 12, 18, 0.9); border: 1px solid rgba(56, 189, 248, 0.4);
-      border-radius: 20px; padding: 4px 14px; font-size: 11px; color: #f8fafc; backdrop-filter: blur(4px);
-    }
-    .item-palette {
-      display: flex; gap: 6px; justify-content: center; pointer-events: auto;
-    }
-    .palette-item {
-      width: 54px; height: 54px; background: rgba(18, 24, 38, 0.9); border: 2px solid #334155;
-      border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      font-size: 18px; color: #fff; cursor: pointer; backdrop-filter: blur(6px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4); transition: transform 0.15s, border-color 0.15s;
-    }
-    .palette-item span:last-child { font-size: 8px; color: #94a3b8; margin-top: 2px; }
-    .palette-item.selected { border-color: #38bdf8; transform: translateY(-4px); background: #1e293b; }
-
-    /* モーダル共通 */
-    .book-modal {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200;
-      display: none; align-items: center; justify-content: center; padding: 14px;
-    }
-    .book-card {
-      width: 100%; max-width: 370px; background: #131722; border: 1px solid #334155;
-      border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.8); max-height: 90dvh; overflow-y: auto;
-    }
-    .book-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #242c3d; padding-bottom: 8px; }
-    .book-title { font-size: 14px; font-weight: bold; color: #38bdf8; }
-    .close-cross { font-size: 18px; color: #94a3b8; cursor: pointer; padding: 0 4px; }
-
-    .status-profile {
-      background: #0b0d14; border-radius: 8px; padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px;
-    }
-    .prof-item { color: #94a3b8; }
-    .prof-item b { color: #f1f5f9; }
-    .prof-full { grid-column: span 2; color: #94a3b8; border-top: 1px solid #1e2536; padding-top: 4px; }
-    .prof-full b { color: #fde047; }
-
-    .diary-records {
-      background: #0b0d14; border-radius: 8px; padding: 10px; font-size: 11px; line-height: 1.5;
-      color: #cbd5e1; max-height: 150px; overflow-y: auto; white-space: pre-wrap;
-    }
-
-    .toggle-row {
-      display: flex; justify-content: space-between; align-items: center;
-      background: #0b0d14; padding: 10px 12px; border-radius: 8px; border: 1px solid #242c3d;
-    }
-    .toggle-label { font-size: 12px; font-weight: bold; color: #e2e8f0; }
-    .toggle-sub { font-size: 10px; color: #94a3b8; }
-    
-    .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    .slider {
-      position: absolute; cursor: pointer; inset: 0; background-color: #334155;
-      transition: .3s; border-radius: 24px;
-    }
-    .slider:before {
-      position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
-      background-color: white; transition: .3s; border-radius: 50%;
-    }
-    input:checked + .slider { background-color: #38bdf8; }
-    input:checked + .slider:before { transform: translateX(20px); }
-
-    .form-control {
-      width: 100%; padding: 9px 10px; background: #0b0d14; border: 1px solid #334155;
-      color: #fff; border-radius: 8px; font-size: 12px;
-    }
-    .btn-primary {
-      padding: 10px; background: linear-gradient(135deg, #2563eb, #0284c7); color: #fff;
-      border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px;
-    }
-    .btn-secondary {
-      padding: 8px; background: #1e293b; color: #cbd5e1; border: 1px solid #334155;
-      border-radius: 8px; font-size: 11px; cursor: pointer;
-    }
+    .controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+    button { background: #2d3748; color: #fff; border: 1px solid #4a5568; border-radius: 8px; padding: 10px 4px; font-size: 12px; cursor: pointer; }
+    button:active { background: #4a5568; }
+    .think-btn { grid-column: span 4; background: #3182ce; border-color: #63b3ed; font-weight: bold; padding: 12px; font-size: 14px; }
+    .api-input { width: 100%; box-sizing: border-box; margin-top: 12px; padding: 8px; background: #1a222d; border: 1px solid #4a5568; color: #fff; border-radius: 4px; }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-  <div id="stage"><div id="c3d"></div></div>
-
-  <!-- 上部ステータスバー -->
-  <div class="top-hud">
-    <div class="status-row">
-      <div class="gauge-wrap"><div class="gauge-label">❤️体力</div><div class="gauge-bar"><div class="gauge-fill" id="g-hp" style="background:#ef4444;"></div></div></div>
-      <div class="gauge-wrap"><div class="gauge-label">☕疲労</div><div class="gauge-bar"><div class="gauge-fill" id="g-fatigue" style="background:#f59e0b;"></div></div></div>
-      <div class="gauge-wrap"><div class="gauge-label">🍖空腹</div><div class="gauge-bar"><div class="gauge-fill" id="g-hunger" style="background:#eab308;"></div></div></div>
-      <div class="gauge-wrap"><div class="gauge-label">💤睡眠</div><div class="gauge-bar"><div class="gauge-fill" id="g-sleep" style="background:#8b5cf6;"></div></div></div>
-      <div class="gauge-wrap"><div class="gauge-label">✨充実</div><div class="gauge-bar"><div class="gauge-fill" id="g-morale" style="background:#10b981;"></div></div></div>
-    </div>
-    <div class="hud-sub">
-      <span id="ui-day">📅 観察 1日目</span>
-      <span id="ui-count-badge" class="mode-badge badge-test">🧪 TEST残: 20/20</span>
-      <span id="ui-mental-size" style="color:#94a3b8;">縄張り: 8マス</span>
-    </div>
+  <!-- ステータスバー -->
+  <div class="status-bar">
+    <div>❤️体力 <span id="val-hp">80</span><div class="bar-bg"><div id="bar-hp" class="bar-fill" style="width:80%; background:#f56565;"></div></div></div>
+    <div>💦疲労 <span id="val-fatigue">20</span><div class="bar-bg"><div id="bar-fatigue" class="bar-fill" style="width:20%; background:#ed8936;"></div></div></div>
+    <div>🍖空腹 <span id="val-hunger">60</span><div class="bar-bg"><div id="bar-hunger" class="bar-fill" style="width:60%; background:#ecc94b;"></div></div></div>
+    <div>💤睡眠 <span id="val-sleep">30</span><div class="bar-bg"><div id="bar-sleep" class="bar-fill" style="width:30%; background:#9f7aea;"></div></div></div>
+    <div>✨充実 <span id="val-fun">50</span><div class="bar-bg"><div id="bar-fun" class="bar-fill" style="width:50%; background:#48bb78;"></div></div></div>
   </div>
 
-  <!-- 思考実況ウィンドウ -->
-  <div class="thought-monitor">
-    <div class="thought-head">
-      <span id="thought-status">🤖 ロボの思考モニター</span>
-      <span id="thought-step" style="color:#94a3b8;">待機中</span>
+  <!-- ロボの思考モニター -->
+  <div class="monitor">
+    <div class="monitor-header">
+      <span>🤖 ロボの思考モニター</span>
+      <span id="model-status">待機中</span>
     </div>
-    <div class="thought-body" id="thought-text">（じっと周囲を観察中…ブロックをタップしてアイテムを落とすと、音や匂いを感じ取って思考します）</div>
+    <div id="action-display" class="action-badge">行動: 観察中</div>
+    <div id="thought-display" class="thought-box">（ここにAIの生の思考プロセスと行動理由が表示されます）</div>
+    <div id="memory-display" class="memory-log">【記憶ログ】まだ記憶はありません。</div>
   </div>
 
-  <!-- 視点切り替え ＆ モーダル呼び出し -->
-  <div class="view-controls">
-    <div class="hud-icon-btn active" id="btn-v-sur" onclick="setView('surface')" title="地上視点">🌲</div>
-    <div class="hud-icon-btn" id="btn-v-ant" onclick="setView('antfarm')" title="アリの巣断面視点">⛏️</div>
-    <div class="hud-icon-btn" onclick="openBookModal()" title="カルテと日記">📖</div>
-    <div class="hud-icon-btn" onclick="openSettingModal()" title="API設定">⚙️</div>
+  <!-- 静止フィールド（状態確認用） -->
+  <div class="stage">
+    <div id="robo-avatar" class="robo">🤖</div>
+    <div id="robo-state-text" style="font-size:13px; color:#68d391;">静止して周囲を見渡している</div>
+    <div id="field-items" class="field-items">島のアイテム: なし</div>
   </div>
 
-  <!-- 下部：神の手アイテムパレット -->
-  <div class="bottom-hud">
-    <div class="toast-msg" id="toastMsg">ブロックをタップして【リンゴ】を落とせます</div>
-    <div class="item-palette">
-      <div class="palette-item selected" onclick="pickDropItem('🍎', 'リンゴ', '甘い果実の匂いとポコンという音', this)"><span>🍎</span><span>リンゴ</span></div>
-      <div class="palette-item" onclick="pickDropItem('⛏️', 'ツルハシ', 'ガシャンという硬い金属の響き', this)"><span>⛏️</span><span>ツルハシ</span></div>
-      <div class="palette-item" onclick="pickDropItem('🔥', 'たいまつ', 'パチパチと爆ぜる暖かい光と熱気', this)"><span>🔥</span><span>たいまつ</span></div>
-      <div class="palette-item" onclick="pickDropItem('🪨', '石ころ', 'ゴトッという重く鈍い衝突音', this)"><span>🪨</span><span>石ころ</span></div>
-    </div>
+  <!-- アイテム投下＆思考実行 -->
+  <div class="controls">
+    <button onclick="dropItem('🍎リンゴ')">🍎 リンゴ投下</button>
+    <button onclick="dropItem('⛏️ツルハシ')">⛏️ ツルハシ投下</button>
+    <button onclick="dropItem('🔥たいまつ')">🔥 たいまつ投下</button>
+    <button onclick="dropItem('🪨石ころ')">🪨 石ころ投下</button>
+    <button id="think-btn" class="think-btn" onclick="triggerAutonomousStep()">🧠 AIに思考・行動を決定させる</button>
   </div>
 
-  <!-- カルテ ＆ 観察手帳モーダル -->
-  <div class="book-modal" id="bookModal">
-    <div class="book-card">
-      <div class="book-head">
-        <div class="book-title">📋 ロボの状態カルテ ＆ 観察手帳</div>
-        <div class="close-cross" onclick="closeBookModal()">✕</div>
-      </div>
-      <div class="status-profile">
-        <div class="prof-item">性格: <b id="prof-trait">ビビリでてんねん</b></div>
-        <div class="prof-item">現在座標: <b id="prof-loc">(X:0, Y:0, Z:-1)</b></div>
-        <div class="prof-item">右手装備: <b id="prof-hand">素手</b></div>
-        <div class="prof-item">記憶縄張り: <b id="prof-area">8マス</b></div>
-        <div class="prof-full">今日の思い込み: <b id="prof-belief">外は危険がいっぱいだがお腹は減る</b></div>
-      </div>
-      <div style="font-size:11px;font-weight:bold;color:#94a3b8;margin-top:2px;">📖 過去の自分が書き残した日記（唯一の記憶）</div>
-      <div class="diary-records" id="prof-diary"></div>
-      <button class="btn-secondary" onclick="triggerNightCycle()">🌙 今すぐ夜にして就寝・記憶リセットを試す</button>
-    </div>
-  </div>
+  <input type="password" id="api-key" class="api-input" placeholder="Gemini APIキーを入力（ローカル保存されます）" />
 
-  <!-- 設定モーダル -->
-  <div class="book-modal" id="settingModal">
-    <div class="book-card">
-      <div class="book-head">
-        <div class="book-title">⚙️ Gemini API 思考システム設定</div>
-        <div class="close-cross" onclick="closeSettingModal()">✕</div>
-      </div>
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-label">Gemini APIで思考させる</div>
-          <div class="toggle-sub">ON: 本番API(残20) / OFF: テスト思考(残20)</div>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="apiToggle">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div style="font-size:11px;color:#94a3b8;">使用するモデル (選択または直接入力):</div>
-      <input type="text" id="modelSelect" list="modelOptions" class="form-control" value="gemini-3.8-flash" placeholder="gemini-3.8-flash">
-      <datalist id="modelOptions">
-        <option value="gemini-3.8-flash">gemini-3.8-flash (3.8 標準)</option>
-        <option value="gemini-3.8-pro">gemini-3.8-pro (3.8 高精度)</option>
-        <option value="gemini-3-flash-preview">gemini-3-flash-preview</option>
-        <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-      </datalist>
-      <div style="font-size:11px;color:#94a3b8;">Gemini APIキー:</div>
-      <input type="password" id="keyInput" class="form-control" placeholder="AIzaSy...">
-      <button class="btn-primary" onclick="saveSettings()">設定を保存して反映</button>
-    </div>
-  </div>
+<script>
+// ==========================================
+// 1. ロボットの内部状態と記憶（Single Source of Truth）
+// ==========================================
+const roboState = {
+  stats: {
+    hp: 80,       // 体力 (0-100)
+    fatigue: 20,  // 疲労 (0-100: 高いほど疲れている)
+    hunger: 60,   // 空腹 (0-100: 高いほどお腹が空いている)
+    sleep: 30,    // 眠気 (0-100: 高いほど眠い)
+    fun: 50       // 充実 (0-100: 高いほど満たされている)
+  },
+  fieldItems: ['🍎リンゴ'], // 現在島に落ちているもの
+  inventory: [],           // ロボが手に持っているもの・作ったもの
+  memories: [],            // 過去の思考と行動の記憶（文脈維持に不可欠）
+  personality: "好奇心旺盛で少し不器用な自律ロボット。ただ生き延びるだけでなく、アイテムを組み合わせて実験したり、独自の遊びを編み出すのが好き。"
+};
 
-  <script>
-    // --- ゲームステータス管理 ---
-    const STATE = {
-      day: 1,
-      useApi: false,
-      modelName: 'gemini-3.8-flash',
-      geminiCount: 20,
-      testCount: 20,
-      hp: 80, fatigue: 20, hunger: 45, sleep: 20, morale: 70,
-      trait: 'ビビリでてんねん',
-      belief: '暗い穴は怖いが、甘い匂いには逆らえない',
-      handItem: '素手',
-      diary: '【1日目の朝】\n目が覚めた。自分の足元と目の前1マスしか見えない。中央(X:0, Y:0, Z:-1)に地下へ降りるハシゴがあるようだ。',
-      selectedDrop: { icon: '🍎', name: 'リンゴ', sense: '甘い果実の匂いとポコンという音' },
-      charaGrid: { x: 0, y: 0, z: -1 },
-      knownVoxels: {},
-      inheritedLandmark: null,
-      isBusy: false
-    };
+// APIキーの復元
+const apiKeyInput = document.getElementById('api-key');
+apiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
+apiKeyInput.addEventListener('change', (e) => localStorage.setItem('gemini_api_key', e.target.value.trim()));
 
-    // 初期認知範囲 2x2x2 (8マス)
-    for (let dx = 0; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 0; dy++) {
-        for (let dz = -1; dz <= 0; dz++) {
-          STATE.knownVoxels[`${dx},${dy},${dz}`] = true;
-        }
-      }
+// アイテム投下処理
+function dropItem(itemName) {
+  roboState.fieldItems.push(itemName);
+  updateUI();
+  addMemoryLog(`[環境変化] 空から「${itemName}」が落ちてきた。`);
+}
+
+// ==========================================
+// 2. AIに「本物の思考と行動決定」をさせるスキーマ定義
+// ==========================================
+// ポイント：最初に「innerThought（内心の葛藤や閃き）」を書かせることで、
+// その後の行動決定（action）がテンプレではなく文脈に沿った自由な決定になる。
+const decisionSchema = {
+  type: "OBJECT",
+  properties: {
+    perception: {
+      type: "STRING",
+      description: "自分の体調（空腹や疲労など）と、目の前にあるアイテム・状況に対する客観的な認識"
+    },
+    innerThought: {
+      type: "STRING",
+      description: "ロボの頭の中の自由な思考。欲求の葛藤（「お腹は空いているけど、あの石とツルハシで何か作れそう…」など）や、アイテムをどう工夫して使うかの閃きを一人称（ボク/ワタシ等）で記述"
+    },
+    chosenAction: {
+      type: "STRING",
+      description: "決定した具体的な行動の短いタイトル（例：「たいまつで焼きリンゴ作り」「石ころを積んでオブジェ制作」「ツルハシで地面を掘って昼寝穴を作る」など自由）"
+    },
+    actionDetail: {
+      type: "STRING",
+      description: "その行動をどのように実行し、どんな結果になったかの具体的な描写"
+    },
+    consumedItems: {
+      type: "ARRAY",
+      items: { type: "STRING" },
+      description: "今回の行動で消費・消滅した島のアイテムや所持品（そのまま残る場合は空配列）"
+    },
+    createdOrKeptItem: {
+      type: "STRING",
+      description: "行動の結果、新しく手に入れた・作り出したアイテムや所持したアイテム（なければ空文字）"
+    },
+    statChanges: {
+      type: "OBJECT",
+      description: "今回の行動によって変化したステータスの増減値（-30〜+30の範囲）",
+      properties: {
+        hpDelta: { type: "INTEGER" },
+        fatigueDelta: { type: "INTEGER" },
+        hungerDelta: { type: "INTEGER" },
+        sleepDelta: { type: "INTEGER" },
+        funDelta: { type: "INTEGER" }
+      },
+      required: ["hpDelta", "fatigueDelta", "hungerDelta", "sleepDelta", "funDelta"]
+    },
+    memorySummary: {
+      type: "STRING",
+      description: "次回の思考に引き継ぐための、今回の行動と学びの1行要約"
     }
+  },
+  required: [
+    "perception", "innerThought", "chosenAction", "actionDetail",
+    "consumedItems", "createdOrKeptItem", "statChanges", "memorySummary"
+  ]
+};
 
-    // --- Three.js ステージ初期化 ---
-    const container = document.getElementById('c3d');
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x06080e);
+// ==========================================
+// 3. 高負荷（503エラー）に負けないAPI呼び出し（自動モデル切替）
+// ==========================================
+// メインが混雑していても自動で別モデルにフォールバックして思考を止めない
+const MODEL_PRIORITY = [
+  "gemini-2.5-flash",
+  "gemini-2.5-pro",
+  "gemini-2.0-flash"
+];
 
-    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
-    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'low-power' });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(renderer.domElement);
+async function callGeminiBrain(promptText, apiKey) {
+  let lastError = null;
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    dirLight.position.set(10, 20, 10);
-    scene.add(dirLight);
+  for (const modelName of MODEL_PRIORITY) {
+    document.getElementById('model-status').textContent = `思考中 (${modelName})...`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
-    const worldGroup = new THREE.Group();
-    scene.add(worldGroup);
-
-    // --- ボクセルマップ ＆ フォグ・オブ・ウォー ---
-    const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
-    const COLOR_DEF = { grass: 0x48bb78, dirt: 0x784f33, stone: 0x475569 };
-    const COLOR_FOG = { grass: 0x0f2316, dirt: 0x1f140d, stone: 0x13171c };
-
-    const voxelMap = {};
-    const interactiveBlocks = [];
-
-    for (let x = -4; x <= 4; x++) {
-      for (let z = -4; z <= 0; z++) {
-        if (!(x === 0 && z === -1)) createBlock(x, 0, z, 'grass');
-        for (let y = -1; y >= -5; y--) {
-          if (x === 0 && z === -1 && y >= -3) continue; // タテ穴
-          if (Math.abs(x) <= 2 && y <= -2 && y >= -4 && z >= -2) continue; // 初期地下室
-          createBlock(x, y, z, y >= -2 ? 'dirt' : 'stone');
-        }
-      }
-    }
-
-    function createBlock(x, y, z, type) {
-      const isKnown = isVoxelLit(x, y, z);
-      const mat = new THREE.MeshLambertMaterial({ color: isKnown ? COLOR_DEF[type] : COLOR_FOG[type] });
-      const b = new THREE.Mesh(boxGeo, mat);
-      b.position.set(x, y, z);
-      b.userData = { gx: x, gy: y, gz: z, type: type };
-      worldGroup.add(b);
-      voxelMap[`${x},${y},${z}`] = b;
-      interactiveBlocks.push(b);
-    }
-
-    function removeBlock(x, y, z) {
-      const key = `${x},${y},${z}`;
-      if (voxelMap[key]) {
-        worldGroup.remove(voxelMap[key]);
-        const idx = interactiveBlocks.indexOf(voxelMap[key]);
-        if (idx !== -1) interactiveBlocks.splice(idx, 1);
-        delete voxelMap[key];
-      }
-    }
-
-    function isVoxelLit(bx, by, bz) {
-      const radius = STATE.handItem === 'たいまつ' ? 2 : 1;
-      for (let ox = -radius; ox <= radius; ox++) {
-        for (let oy = -radius; oy <= radius; oy++) {
-          for (let oz = -radius; oz <= radius; oz++) {
-            if (STATE.knownVoxels[`${bx+ox},${by+oy},${bz+oz}`]) return true;
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig: {
+            temperature: 0.9, // 自由な発想・遊びを促すため少し高めに設定
+            responseMimeType: "application/json",
+            responseSchema: decisionSchema
           }
-        }
-      }
-      return false;
-    }
-
-    function refreshFogOfWar() {
-      for (const key in voxelMap) {
-        const b = voxelMap[key];
-        const lit = isVoxelLit(b.userData.gx, b.userData.gy, b.userData.gz);
-        b.material.color.setHex(lit ? COLOR_DEF[b.userData.type] : COLOR_FOG[b.userData.type]);
-      }
-    }
-
-    // ハシゴ
-    const ladderMat = new THREE.MeshLambertMaterial({ color: 0xb45309 });
-    for (let y = 0; y >= -3; y--) {
-      const s = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.1), ladderMat);
-      s.position.set(0, y - 0.2, -1.4);
-      worldGroup.add(s);
-    }
-
-    // 水槽前面ガラス
-    const glass = new THREE.Mesh(
-      new THREE.PlaneGeometry(9, 6),
-      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.08, side: THREE.DoubleSide })
-    );
-    glass.position.set(0, -2.5, 0.5);
-    scene.add(glass);
-
-    const droppedItems = [];
-
-    // --- 関節階層キャラクター（頭・体・両腕・両足・両靴） ---
-    const chara = new THREE.Group();
-    worldGroup.add(chara);
-
-    const bodyM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x3b82f6 }));
-    bodyM.scale.set(0.5, 0.5, 0.35); bodyM.position.y = 0.5; chara.add(bodyM);
-
-    const headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x93c5fd }));
-    headM.scale.set(0.42, 0.4, 0.4); headM.position.y = 0.85; chara.add(headM);
-
-    const armGeo = new THREE.BoxGeometry(0.16, 0.38, 0.16);
-    const armMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
-    const rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.35, 0.5, 0); chara.add(rArm);
-    const lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.35, 0.5, 0); chara.add(lArm);
-
-    const itemSlot = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshLambertMaterial({ color: 0xef4444, visible: false }));
-    itemSlot.position.set(0, -0.22, 0.14); rArm.add(itemSlot);
-
-    const legGeo = new THREE.BoxGeometry(0.18, 0.32, 0.18);
-    const bootGeo = new THREE.BoxGeometry(0.2, 0.14, 0.26);
-    const legMat = new THREE.MeshLambertMaterial({ color: 0x1e3a8a });
-    const bootMat = new THREE.MeshLambertMaterial({ color: 0x78350f });
-
-    const rLegG = new THREE.Group(); rLegG.position.set(0.16, 0.25, 0);
-    const rLeg = new THREE.Mesh(legGeo, legMat); const rBoot = new THREE.Mesh(bootGeo, bootMat);
-    rBoot.position.set(0, -0.14, 0.04); rLegG.add(rLeg, rBoot); chara.add(rLegG);
-
-    const lLegG = new THREE.Group(); lLegG.position.set(-0.16, 0.25, 0);
-    const lLeg = new THREE.Mesh(legGeo, legMat); const lBoot = new THREE.Mesh(bootGeo, bootMat);
-    lBoot.position.set(0, -0.14, 0.04); lLegG.add(lLeg, lBoot); chara.add(lLegG);
-
-    chara.position.set(0, 0.5, -1);
-
-    // --- カメラワーク ---
-    const VIEWS = {
-      surface: { pos: new THREE.Vector3(0, 9, 13), look: new THREE.Vector3(0, 0, -1) },
-      antfarm: { pos: new THREE.Vector3(0, -2.5, 12), look: new THREE.Vector3(0, -2.5, 0) }
-    };
-    let targetCamPos = VIEWS.surface.pos.clone();
-    let targetCamLook = VIEWS.surface.look.clone();
-    let curCamLook = targetCamLook.clone();
-    camera.position.copy(targetCamPos);
-
-    function setView(mode) {
-      targetCamPos.copy(VIEWS[mode].pos);
-      targetCamLook.copy(VIEWS[mode].look);
-      document.getElementById('btn-v-sur').classList.toggle('active', mode === 'surface');
-      document.getElementById('btn-v-ant').classList.toggle('active', mode === 'antfarm');
-    }
-
-    // --- タッチ操作（1本指回転・2本指ピンチズーム・タップ投下） ---
-    let touchMode = 'none', prevX = 0, prevDist = 0, touchStartTime = 0;
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-
-    window.addEventListener('touchstart', e => {
-      if (e.target.closest('.top-hud, .view-controls, .bottom-hud, .book-modal')) return;
-      touchStartTime = performance.now();
-      if (e.touches.length === 1) {
-        touchMode = 'drag'; prevX = e.touches[0].clientX;
-      } else if (e.touches.length === 2) {
-        touchMode = 'pinch';
-        prevDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      }
-    }, { passive: true });
-
-    window.addEventListener('touchmove', e => {
-      if (touchMode === 'drag' && e.touches.length === 1) {
-        worldGroup.rotation.y += (e.touches[0].clientX - prevX) * 0.007;
-        prevX = e.touches[0].clientX;
-      } else if (touchMode === 'pinch' && e.touches.length === 2) {
-        const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-        camera.fov = Math.max(20, Math.min(65, camera.fov + (prevDist - d) * 0.02));
-        camera.updateProjectionMatrix();
-        prevDist = d;
-      }
-    }, { passive: true });
-
-    window.addEventListener('touchend', e => {
-      if (performance.now() - touchStartTime < 250 && touchMode === 'drag' && e.changedTouches.length === 1) {
-        handleTapDrop(e.changedTouches[0]);
-      }
-      touchMode = 'none';
-    });
-
-    // PCマウスクリックでも動作確認可能にする
-    renderer.domElement.addEventListener('click', e => {
-      handleTapDrop(e);
-    });
-
-    // --- 物理移動候補の算出（ツルハシ所持時は掘削移動も候補に追加） ---
-    function isPhysicallyWalkable(x, y, z) {
-      if (voxelMap[`${x},${y},${z}`]) return false;
-      if (x < -4 || x > 4 || z < -4 || z > 0 || y > 1 || y < -5) return false;
-      const hasFooting = Boolean(voxelMap[`${x},${y-1},${z}`]);
-      const hasLadder = (x === 0 && z === -1 && y >= -3);
-      const isFloor = (y === -5);
-      return (hasFooting || hasLadder || isFloor);
-    }
-
-    function getValidMoveNeighbors(cx, cy, cz) {
-      const candidates = [];
-      const deltas = [
-        { dx: 1, dy: 0, dz: 0, name: '東(右)へ1歩進む' },
-        { dx: -1, dy: 0, dz: 0, name: '西(左)へ1歩進む' },
-        { dx: 0, dy: 0, dz: 1, name: '南(手前)へ1歩進む' },
-        { dx: 0, dy: 0, dz: -1, name: '北(奥)へ1歩進む' },
-        { dx: 0, dy: 1, dz: 0, name: 'ハシゴを1段登る' },
-        { dx: 0, dy: -1, dz: 0, name: 'ハシゴを1段降りる' }
-      ];
-
-      for (const d of deltas) {
-        const tx = cx + d.dx, ty = cy + d.dy, tz = cz + d.dz;
-        if (tx < -4 || tx > 4 || tz < -4 || tz > 0 || ty > 1 || ty < -5) continue;
-
-        if (d.dy !== 0) {
-          const onLadder = (cx === 0 && cz === -1 && cy >= -3 && ty >= -3 && ty <= 0);
-          if (!onLadder) continue;
-        }
-
-        if (isPhysicallyWalkable(tx, ty, tz)) {
-          candidates.push({ id: candidates.length, 方向: d.name, 座標: [tx, ty, tz], isDig: false });
-        } else if (d.dy === 0 && cy < 0 && STATE.handItem === 'ツルハシ' && voxelMap[`${tx},${ty},${tz}`]) {
-          candidates.push({ id: candidates.length, 方向: `${d.name.slice(0,4)}の土壁をツルハシで掘削して進む`, 座標: [tx, ty, tz], isDig: true });
-        }
-      }
-      return candidates;
-    }
-
-    // --- 神の手：アイテム投下 ---
-    async function handleTapDrop(touch) {
-      if (STATE.isBusy) return;
-      const activeCount = STATE.useApi ? STATE.geminiCount : STATE.testCount;
-      if (activeCount <= 0) {
-        setToast('今日の介入枠（20回）を使い切りました');
-        return;
-      }
-
-      mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
-
-      const hits = raycaster.intersectObjects(interactiveBlocks);
-      if (hits.length === 0) return;
-
-      const hit = hits[0];
-      const gx = hit.object.userData.gx;
-      const gy = hit.object.userData.gy + 1;
-      const gz = hit.object.userData.gz;
-
-      if (STATE.useApi) STATE.geminiCount--;
-      else STATE.testCount--;
-      updateHUD();
-
-      dropPhysicalItem(gx, gy, gz, STATE.selectedDrop);
-      setToast(`座標(${gx}, ${gy}, ${gz})に【${STATE.selectedDrop.name}】を投下！`);
-
-      await charaReactToDrop(gx, gy, gz, STATE.selectedDrop);
-
-      if ((STATE.useApi ? STATE.geminiCount : STATE.testCount) === 0) {
-        triggerNightCycle();
-      }
-    }
-
-    function dropPhysicalItem(x, y, z, drop) {
-      const colors = { 'リンゴ': 0xef4444, 'ツルハシ': 0x64748b, 'たいまつ': 0xf59e0b, '石ころ': 0x334155 };
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.32, 0.32, 0.32),
-        new THREE.MeshLambertMaterial({ color: colors[drop.name] || 0xffffff })
-      );
-      mesh.position.set(x, y - 0.3, z);
-      worldGroup.add(mesh);
-      droppedItems.push({ mesh, gx: x, gy: y - 1, gz: z, drop: drop });
-    }
-
-    // --- 完全ターン制：刺激の知覚 ➜ Gemini思考 ➜ 決断表示 ➜ 1ブロック移動 ---
-    async function charaReactToDrop(dropX, dropY, dropZ, drop) {
-      STATE.isBusy = true;
-
-      const cx = STATE.charaGrid.x, cy = STATE.charaGrid.y, cz = STATE.charaGrid.z;
-      const dist = Math.hypot(dropX - cx, (dropY - 1) - cy, dropZ - cz).toFixed(1);
-      const dirX = dropX > cx ? '東(右)' : (dropX < cx ? '西(左)' : '');
-      const dirZ = dropZ > cz ? '南(手前)' : (dropZ < cz ? '北(奥)' : '');
-      const dirY = (dropY - 1) > cy ? '上空・地上側' : ((dropY - 1) < cy ? '足元・地下側' : '同じ高さ');
-      const direction = `${dirX}${dirZ}・${dirY}`;
-
-      headM.rotation.y = dropX > cx ? -0.45 : (dropX < cx ? 0.45 : 0);
-
-      const thoughtBody = document.getElementById('thought-text');
-      thoughtBody.classList.remove('error');
-
-      const validMoves = getValidMoveNeighbors(cx, cy, cz);
-      let decision = null;
-
-      if (STATE.useApi) {
-        document.getElementById('thought-step').innerText = `⚡ ${STATE.modelName} 通信中...`;
-        thoughtBody.innerText = `（${direction}からの「${drop.sense}」を知覚し、日記と欲求を照らし合わせて思考中…）`;
-        
-        try {
-          decision = await callGeminiThought(cx, cy, cz, direction, dist, drop, validMoves);
-        } catch (err) {
-          document.getElementById('thought-step').innerText = '❌ API通信エラー';
-          thoughtBody.classList.add('error');
-          thoughtBody.innerText = `【通信失敗】: ${err.message}\n右上の⚙️からAPIキーやモデル設定を確認してください。`;
-          headM.rotation.y = 0;
-          STATE.isBusy = false;
-          return;
-        }
-      } else {
-        document.getElementById('thought-step').innerText = '🧪 テスト思考中...';
-        thoughtBody.innerText = `（テストモードで刺激「${drop.sense}」への反応を計算中…）`;
-        await new Promise(r => setTimeout(r, 500));
-        decision = getMockThought(cx, cy, cz, direction, dist, drop, validMoves);
-      }
-
-      document.getElementById('thought-step').innerText = STATE.useApi ? '⚡ AIの決断' : '🧪 テスト決断';
-      thoughtBody.innerText = `「${decision.thought}」`;
-      recordDiary(decision.diary);
-
-      await new Promise(r => setTimeout(r, 1400));
-
-      if (decision.chosenMove) {
-        const dest = decision.chosenMove;
-        const [tx, ty, tz] = dest.座標;
-
-        if (dest.isDig) {
-          document.getElementById('thought-step').innerText = '⛏️ 壁を掘削中';
-          rArm.rotation.x = -1.3;
-          await new Promise(r => setTimeout(r, 400));
-          removeBlock(tx, ty, tz);
-          rArm.rotation.x = 0;
-        }
-
-        document.getElementById('thought-step').innerText = '🚶 1ブロック移動';
-        await moveTo(tx, ty + 0.5, tz, 600);
-        STATE.charaGrid = { x: tx, y: ty, z: tz };
-        
-        STATE.fatigue = Math.min(100, STATE.fatigue + (dest.isDig ? 8 : 3));
-        STATE.hunger = Math.min(100, STATE.hunger + 4);
-        STATE.sleep = Math.min(100, STATE.sleep + 3);
-
-        STATE.knownVoxels[`${tx},${ty},${tz}`] = true;
-        refreshFogOfWar();
-        updateHUD();
-
-        checkItemPickup(tx, ty, tz);
-      } else {
-        document.getElementById('thought-step').innerText = '🛑 その場で待機';
-      }
-
-      headM.rotation.y = 0;
-      document.getElementById('thought-step').innerText = '待機中';
-      STATE.isBusy = false;
-    }
-
-    // --- ご指定のマスタープロンプトによる Gemini API 通信 ---
-    async function callGeminiThought(cx, cy, cz, direction, dist, drop, validMoves) {
-      const apiKey = localStorage.getItem('gemini_api_key');
-      if (!apiKey) {
-        throw new Error('APIキーが未設定です。右上の⚙️ボタンからキーを保存してください。');
-      }
-
-      const prompt = `あなたは箱庭の水槽世界で生きる小さな自律ロボットです。
-あなたの視界は「自分の足元と目の前の1マス」しか見えず、世界の全体像や人間（プレイヤー）の存在を知りません。
-
-【あなたの現在の肉体・精神状態】
-・性格: 「${STATE.trait}」
-・今日の思い込み（日記から得た教訓）: 「${STATE.belief}」
-・現在の装備: 右手に【${STATE.handItem}】
-・体力: ${STATE.hp}/100, 疲労: ${STATE.fatigue}/100, 空腹: ${STATE.hunger}/100, 睡眠不足: ${STATE.sleep}/100, 充実感: ${STATE.morale}/100
-・現在座標: (X:${cx}, Y:${cy}, Z:${cz}) ※Y=0が地上、Yがマイナスになるほど深い地下室
-
-【過去の自分が書き残した日記（唯一の記憶）】
-${STATE.diary}
-
-【いま発生した外界からの物理刺激】
-突然、あなたから見て【${direction}（距離約${dist}ブロック）】の方向から、「${drop.sense}」が伝わってきました！
-（※あなたにはそれが何のアイテムかまだ見えていません。音や匂い、光だけを感じています）
-
-【現在地から物理的に1歩で移動できる隣接マス候補】
-${JSON.stringify(validMoves)}
-
-【思考と出力の指示】
-1. "thought"（心の声・80文字以内）:
-   突然の「${drop.sense}」に対して、あなたの性格、現在の空腹や疲労、そして過去の日記の教訓を照らし合わせ、「怖いから逃げようか、でもお腹が空いているから近づこうか、ハシゴを降りようか」と人間くさく迷い、最終的にどう行動するかを決めた生々しい独り言を語ってください。
-2. "moveId"（行動の選択）:
-   上記の葛藤の結果、実際に踏み出す隣接マスの \`id\` を整数で指定してください（恐怖や疲労でその場から動かない決断をした場合は \`-1\`）。
-3. "diary"（手帳へのメモ・40文字以内）:
-   今回の知覚と自分の行動について、明日の自分（記憶を失う自分）へ残すための短い観察メモを1行で書いてください。座標や方角、感触を含めると翌日の助けになります。
-
-以下のJSONフォーマットのみを出力してください（解説やMarkdown記法は一切不要）:
-{"thought": "...", "moveId": 0, "diary": "..."}`;
-
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${STATE.modelName}:generateContent?key=${apiKey}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        })
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        const msg = errData.error ? errData.error.message : `HTTP ${res.status}`;
-        throw new Error(msg);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const msg = errData?.error?.message || `HTTP ${response.status}`;
+        // High demand (503/429) などの場合は次のモデルへ即座に切り替え
+        console.warn(`[${modelName}] 失敗: ${msg}`);
+        lastError = msg;
+        continue;
       }
 
-      const data = await res.json();
-      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('AI応答からJSONを解析できませんでした。');
-      }
+      const data = await response.json();
+      const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      document.getElementById('model-status').textContent = `完了 (${modelName})`;
+      return JSON.parse(rawJson);
 
-      const parsed = JSON.parse(jsonMatch[0]);
-      const chosen = validMoves.find(m => m.id === Number(parsed.moveId)) || null;
-      return {
-        thought: parsed.thought || '……（考えがまとまらない）',
-        diary: parsed.diary || `(${cx},${cy},${cz})で${drop.sense}を感じた。`,
-        chosenMove: chosen
-      };
+    } catch (err) {
+      lastError = err.message;
+      continue;
     }
+  }
+  throw new Error(`全モデル通信失敗: ${lastError}`);
+}
 
-    // テスト枠用の内蔵思考
-    function getMockThought(cx, cy, cz, direction, dist, drop, validMoves) {
-      if (validMoves.length === 0) {
-        return {
-          thought: `[TEST] ${direction}から${drop.sense}がしたけれど、足場がなくて動けない…！`,
-          diary: `(${cx},${cy},${cz})にて${drop.sense}を聞いたが動けず。`,
-          chosenMove: null
-        };
-      }
-      const chosen = validMoves[Math.floor(Math.random() * validMoves.length)];
-      return {
-        thought: `[TEST思考] ${direction}（約${dist}マス先）から「${drop.sense}」がしたぞ…！「${STATE.belief}」だし、思い切って【${chosen.方向}】へ1歩踏み出してみよう！`,
-        diary: `${direction}の「${drop.sense}」に誘われ(${chosen.座標.join(',')})へ移動。`,
-        chosenMove: chosen
-      };
-    }
+// ==========================================
+// 4. 自律思考ステップの実行
+// ==========================================
+async function triggerAutonomousStep() {
+  const apiKey = apiKeyInput.value.trim();
+  if (!apiKey) {
+    alert("Gemini APIキーを入力してください。");
+    return;
+  }
 
-    // 移動先でのアイテム接触・鑑定
-    function checkItemPickup(cx, cy, cz) {
-      const idx = droppedItems.findIndex(d => d.gx === cx && d.gy === cy && d.gz === cz);
-      if (idx !== -1) {
-        const target = droppedItems[idx];
-        worldGroup.remove(target.mesh);
-        droppedItems.splice(idx, 1);
+  const btn = document.getElementById('think-btn');
+  btn.disabled = true;
 
-        const name = target.drop.name;
-        if (name === 'リンゴ') {
-          STATE.hunger = Math.max(0, STATE.hunger - 35);
-          STATE.hp = Math.min(100, STATE.hp + 15);
-          STATE.morale = Math.min(100, STATE.morale + 15);
-          document.getElementById('thought-text').innerText = `「わあっ！足元に甘い【リンゴ】があった！夢中で食べたらお腹が満たされて元気が出たぞ！」`;
-          recordDiary(`座標(${cx},${cy},${cz})で赤い果実を発見し食べて回復した。`);
-        } else {
-          equipItem(name);
-          STATE.morale = Math.min(100, STATE.morale + 20);
-          document.getElementById('thought-text').innerText = `「足元に硬い【${name}】が落ちていた！右手にしっかり装備したぞ！」`;
-          recordDiary(`座標(${cx},${cy},${cz})で【${name}】を拾い右手に装備した。`);
-          refreshFogOfWar();
-        }
-        updateHUD();
-      }
-    }
+  // AIに渡す現在のワールド状況プロンプト
+  const prompt = `
+あなたは小さな浮島で暮らす自律型AIロボットです。
+プログラムされた固定の選択肢ではなく、あなた自身の意思で考え、目の前のアイテムを工夫して使ったり、自由に遊んだり、休んだりして行動を決定してください。
 
-    function equipItem(name) {
-      STATE.handItem = name;
-      itemSlot.material.visible = true;
-      const c = { 'ツルハシ': 0x64748b, 'たいまつ': 0xf59e0b, 'リンゴ': 0xef4444, '石ころ': 0x334155 };
-      itemSlot.material.color.setHex(c[name] || 0xffffff);
-      document.getElementById('prof-hand').innerText = name;
-    }
+【あなたの性格】
+${roboState.personality}
 
-    // --- 描画・歩行アニメーションループ ---
-    let animClock = 0, isWalking = false;
-    function animate() {
-      requestAnimationFrame(animate);
-      animClock += 0.04;
+【現在の体調・ステータス（0〜100）】
+- 体力: ${roboState.stats.hp}（低いと動けない）
+- 疲労: ${roboState.stats.fatigue}（高いと休みたくなる）
+- 空腹: ${roboState.stats.hunger}（高いと何か食べたくなる）
+- 眠気: ${roboState.stats.sleep}（高いと眠くなる）
+- 充実: ${roboState.stats.fun}（遊びや発見で上がる）
 
-      camera.position.lerp(targetCamPos, 0.06);
-      curCamLook.lerp(targetCamLook, 0.06);
-      camera.lookAt(curCamLook);
+【現在フィールドに落ちているアイテム】
+${roboState.fieldItems.length > 0 ? roboState.fieldItems.join("、") : "なし（地面の土や草のみ）"}
 
-      if (isWalking) {
-        rArm.rotation.x = Math.sin(animClock * 8) * 0.7;
-        lArm.rotation.x = -Math.sin(animClock * 8) * 0.7;
-        rLegG.rotation.x = -Math.sin(animClock * 8) * 0.7;
-        lLegG.rotation.x = Math.sin(animClock * 8) * 0.7;
-      } else {
-        rLegG.rotation.x = 0; lLegG.rotation.x = 0;
-        bodyM.scale.y = 0.5 + Math.sin(animClock * 2) * 0.02;
-      }
+【自分が持っている・作ったアイテム】
+${roboState.inventory.length > 0 ? roboState.inventory.join("、") : "なし"}
 
-      renderer.render(scene, camera);
-    }
-    animate();
+【直近の記憶（過去の自分の行動）】
+${roboState.memories.length > 0 ? roboState.memories.slice(-5).join("\n") : "まだ島に降り立ったばかり。"}
 
-    function moveTo(tx, ty, tz, dur) {
-      return new Promise(resolve => {
-        isWalking = true;
-        const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z;
-        const start = performance.now();
-        function s(now) {
-          const p = Math.min((now - start) / dur, 1);
-          chara.position.x = sx + (tx - sx) * p;
-          chara.position.y = sy + (ty - sy) * p;
-          chara.position.z = sz + (tz - sz) * p;
-          if (p < 1) requestAnimationFrame(s);
-          else { isWalking = false; resolve(); }
-        }
-        requestAnimationFrame(s);
-      });
-    }
+【行動決定のルール】
+1. 同じ行動ばかり繰り返さず、直近の記憶を踏まえて「次はこれを試してみよう」と発展させてください。
+2. アイテムは本来の用途（リンゴを食べる、ツルハシで掘る）だけでなく、複数アイテムの組み合わせ（例：たいまつでリンゴを焼く、石ころとツルハシで火花を出す、リンゴの種を植える等）も自由に発想して構いません。
+3. 空腹や疲労が限界（80以上）のときは、生存のための行動を優先するか、それに抗う理由を思考に書いてください。
+`;
 
-    // --- 夜の記憶リセットと「日記からの思い込み更新」 ---
-    function triggerNightCycle() {
-      setTimeout(() => {
-        const landmarkPos = { x: STATE.charaGrid.x, y: STATE.charaGrid.y, z: STATE.charaGrid.z };
-        STATE.inheritedLandmark = landmarkPos;
+  try {
+    const decision = await callGeminiBrain(prompt, apiKey);
+    applyDecisionToWorld(decision);
+  } catch (error) {
+    document.getElementById('model-status').textContent = "エラー発生";
+    document.getElementById('thought-display').textContent = `（思考ノイズ発生…少し頭を冷やしています: ${error.message}）`;
+  } finally {
+    btn.disabled = false;
+  }
+}
 
-        STATE.day++;
-        if (STATE.useApi) STATE.geminiCount = 20;
-        else STATE.testCount = 20;
+// ==========================================
+// 5. AIの決定をワールドとステータスに反映
+// ==========================================
+function applyDecisionToWorld(decision) {
+  // 1. 思考と行動の表示
+  document.getElementById('action-display').textContent = `決定行動: ${decision.chosenAction}`;
+  document.getElementById('thought-display').innerHTML = `
+    <div style="color:#a0aec0; font-size:12px; margin-bottom:4px;">👁️ 認識: ${decision.perception}</div>
+    <div style="color:#fefcbf; font-weight:bold; margin-bottom:6px;">💭 思考: 「${decision.innerThought}」</div>
+    <div style="color:#9ae6b4; font-size:13px;">⚡ 実行結果: ${decision.actionDetail}</div>
+  `;
+  document.getElementById('robo-state-text').textContent = decision.chosenAction;
 
-        STATE.sleep = 0;
-        STATE.fatigue = 10;
-        STATE.hunger = Math.min(100, STATE.hunger + 15);
-
-        // 記憶リセット：現在地と日記の重要地点のみ点灯を引き継ぐ
-        STATE.knownVoxels = {};
-        STATE.knownVoxels[`${landmarkPos.x},${landmarkPos.y},${landmarkPos.z}`] = true;
-        refreshFogOfWar();
-
-        // 日記から翌朝の思い込みを更新
-        STATE.belief = `昨日の日記にある地点(${landmarkPos.x},${landmarkPos.y},${landmarkPos.z})と装備【${STATE.handItem}】が頼りだ`;
-        STATE.diary += `\n\n【${STATE.day}日目の朝】\n記憶がリセットされた。だが手帳に『地点(${landmarkPos.x}, ${landmarkPos.y}, ${landmarkPos.z})で夜を越した』と記録がある。`;
-        
-        document.getElementById('thought-step').innerText = `🌅 ${STATE.day}日目の朝`;
-        document.getElementById('thought-text').innerText = `「目が覚めた…昨日の記憶がないぞ。でもこの日記によると『${STATE.belief}』らしい…！」`;
-
-        updateHUD();
-        openBookModal();
-      }, 600);
-    }
-
-    // --- UI更新 ＆ モーダル制御 ---
-    function updateHUD() {
-      document.getElementById('g-hp').style.width = STATE.hp + '%';
-      document.getElementById('g-fatigue').style.width = STATE.fatigue + '%';
-      document.getElementById('g-hunger').style.width = STATE.hunger + '%';
-      document.getElementById('g-sleep').style.width = STATE.sleep + '%';
-      document.getElementById('g-morale').style.width = STATE.morale + '%';
-      document.getElementById('ui-day').innerText = `📅 観察 ${STATE.day}日目`;
-      
-      const badge = document.getElementById('ui-count-badge');
-      if (STATE.useApi) {
-        badge.className = 'mode-badge badge-api';
-        badge.innerText = `⚡ GEMINI残: ${STATE.geminiCount}/20`;
-      } else {
-        badge.className = 'mode-badge badge-test';
-        badge.innerText = `🧪 TEST残: ${STATE.testCount}/20`;
-      }
-
-      const areaCount = Object.keys(STATE.knownVoxels).length;
-      document.getElementById('ui-mental-size').innerText = `縄張り: ${areaCount}マス`;
-      document.getElementById('prof-loc').innerText = `(X:${STATE.charaGrid.x}, Y:${STATE.charaGrid.y}, Z:${STATE.charaGrid.z})`;
-      document.getElementById('prof-area').innerText = `${areaCount}マス`;
-      document.getElementById('prof-belief').innerText = STATE.belief;
-      document.getElementById('prof-diary').innerText = STATE.diary;
-    }
-
-    function setToast(msg) { document.getElementById('toastMsg').innerText = msg; }
-    function recordDiary(d) { STATE.diary += `\n・${d}`; document.getElementById('prof-diary').innerText = STATE.diary; }
-
-    function pickDropItem(icon, name, sense, el) {
-      STATE.selectedDrop = { icon, name, sense };
-      document.querySelectorAll('.palette-item').forEach(p => p.classList.remove('selected'));
-      el.classList.add('selected');
-      setToast(`ブロックをタップして【${name}】を落とせます`);
-    }
-
-    function openBookModal() {
-      updateHUD();
-      document.getElementById('bookModal').style.display = 'flex';
-    }
-    function closeBookModal() { document.getElementById('bookModal').style.display = 'none'; }
-
-    function openSettingModal() {
-      document.getElementById('apiToggle').checked = STATE.useApi;
-      document.getElementById('modelSelect').value = STATE.modelName;
-      document.getElementById('keyInput').value = localStorage.getItem('gemini_api_key') || '';
-      document.getElementById('settingModal').style.display = 'flex';
-    }
-    function closeSettingModal() { document.getElementById('settingModal').style.display = 'none'; }
-
-    function saveSettings() {
-      STATE.useApi = document.getElementById('apiToggle').checked;
-      let inputModel = document.getElementById('modelSelect').value.trim() || 'gemini-3.8-flash';
-      if (inputModel === '3.8' || inputModel === 'gemini-3.8') {
-        inputModel = 'gemini-3.8-flash';
-      }
-      STATE.modelName = inputModel;
-      const key = document.getElementById('keyInput').value.trim();
-      localStorage.setItem('use_gemini_api', STATE.useApi ? 'true' : 'false');
-      localStorage.setItem('gemini_model_v38', STATE.modelName);
-      localStorage.setItem('gemini_api_key', key);
-      closeSettingModal();
-      updateHUD();
-      setToast(STATE.useApi ? `⚡ ${STATE.modelName} 思考モードを有効化しました` : '🧪 テスト思考モードを有効化しました');
-    }
-
-    // 保存設定の復元
-    STATE.useApi = localStorage.getItem('use_gemini_api') === 'true';
-    STATE.modelName = localStorage.getItem('gemini_model_v38') || 'gemini-3.8-flash';
-    refreshFogOfWar();
-    updateHUD();
-
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+  // 2. アイテムの消費処理
+  if (Array.isArray(decision.consumedItems)) {
+    decision.consumedItems.forEach(item => {
+      const fIdx = roboState.fieldItems.indexOf(item);
+      if (fIdx !== -1) roboState.fieldItems.splice(fIdx, 1);
+      const iIdx = roboState.inventory.indexOf(item);
+      if (iIdx !== -1) roboState.inventory.splice(iIdx, 1);
     });
-  </script>
+  }
+
+  // 3. 新規アイテム・所持品の追加
+  if (decision.createdOrKeptItem && decision.createdOrKeptItem.trim() !== "") {
+    roboState.inventory.push(decision.createdOrKeptItem.trim());
+  }
+
+  // 4. ステータスの更新（0〜100にクランプ）
+  const clamp = (val) => Math.max(0, Math.min(100, val));
+  const sc = decision.statChanges;
+  roboState.stats.hp = clamp(roboState.stats.hp + (sc.hpDelta || 0));
+  roboState.stats.fatigue = clamp(roboState.stats.fatigue + (sc.fatigueDelta || 0));
+  roboState.stats.hunger = clamp(roboState.stats.hunger + (sc.hungerDelta || 0));
+  roboState.stats.sleep = clamp(roboState.stats.sleep + (sc.sleepDelta || 0));
+  roboState.stats.fun = clamp(roboState.stats.fun + (sc.funDelta || 0));
+
+  // 5. 記憶の蓄積
+  addMemoryLog(`・${decision.memorySummary}`);
+
+  updateUI();
+}
+
+function addMemoryLog(text) {
+  roboState.memories.push(text);
+  const memEl = document.getElementById('memory-display');
+  memEl.innerHTML = "<strong>【記憶ログ】</strong><br>" + roboState.memories.slice(-5).reverse().join("<br>");
+}
+
+function updateUI() {
+  const s = roboState.stats;
+  ['hp', 'fatigue', 'hunger', 'sleep', 'fun'].forEach(key => {
+    document.getElementById(`val-${key}`).textContent = s[key];
+    document.getElementById(`bar-${key}`).style.width = `${s[key]}%`;
+  });
+
+  const fieldStr = roboState.fieldItems.length ? roboState.fieldItems.join(' ') : 'なし';
+  const invStr = roboState.inventory.length ? ` / 🎒所持・制作物: ${roboState.inventory.join(' ')}` : '';
+  document.getElementById('field-items').textContent = `島のアイテム: ${fieldStr}${invStr}`;
+}
+
+updateUI();
+</script>
 </body>
 </html>
-```
