@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -43,7 +42,7 @@
     .badge-api { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
     .badge-test { background: rgba(234, 179, 8, 0.2); color: #eab308; border: 1px solid #eab308; }
 
-    /* 思考モニター */
+    /* 思考モニター ＆ サーバー混雑ランプ */
     .thought-card {
       position: absolute; top: 78px; left: 10px; right: 58px; z-index: 10;
       background: rgba(15, 23, 42, 0.92); border: 1px solid #38bdf8; border-radius: 10px;
@@ -51,7 +50,7 @@
       box-shadow: 0 4px 16px rgba(0,0,0,0.5);
     }
     .thought-title { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: bold; color: #38bdf8; margin-bottom: 4px; }
-    .server-status { font-size: 10px; padding: 1px 6px; border-radius: 10px; }
+    .server-status { font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: bold; }
     .status-green { background: #065f46; color: #34d399; }
     .status-yellow { background: #854d0e; color: #fde047; }
     .status-red { background: #991b1b; color: #fca5a5; }
@@ -88,10 +87,10 @@
       transition: all 0.2s ease;
     }
     .btn-think { background: linear-gradient(135deg, #0284c7, #2563eb); border: 1px solid #38bdf8; }
-    .btn-think:disabled { background: #334155; border-color: #475569; color: #94a3b8; cursor: not-allowed; }
+    .btn-think:disabled { background: #334155; border-color: #475569; color: #94a3b8; cursor: not-allowed; opacity: 0.85; }
     .btn-respawn { background: linear-gradient(135deg, #dc2626, #991b1b); border: 1px solid #f87171; display: none; }
 
-    /* 手帳と設定の小窓（初期状態は絶対に display: none !） */
+    /* 手帳と設定の小窓（初期状態は絶対に display: none） */
     .modal-cover {
       position: fixed; inset: 0; z-index: 100;
       background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px);
@@ -162,7 +161,7 @@
   <div class="thought-card">
     <div class="thought-title">
       <span id="ui-brain-title">🤖 ロボの深層思考 (gemini-3.8-flash)</span>
-      <span id="server-lamp" class="server-status status-yellow">📡 混雑チェック中...</span>
+      <span id="server-lamp" class="server-status status-yellow">📡 通信確認中...</span>
     </div>
     <div class="thought-body" id="thought-txt">
       （地面をタップすると🍎リンゴを落とせます。Googleサーバーの状態を確認しています…）
@@ -226,13 +225,13 @@
       </div>
       <div style="font-size:11px; color:#94a3b8;">Gemini APIキー (AIzaSy...):</div>
       <input type="password" id="api-key" class="input-box" placeholder="キーを貼り付け">
-      <button class="save-btn" onclick="saveSettings()">設定をほぞんして混雑を再確認</button>
+      <button class="save-btn" onclick="saveSettings()">設定をほぞんして通信を再確認</button>
     </div>
   </div>
 
   <script>
     // ========================================================
-    // 安全なデータ保存ラッパー（プレビューでもクラッシュさせない）
+    // 安全なデータ保存ラッパー
     // ========================================================
     const safeStorage = {
       getItem: function(key) {
@@ -256,13 +255,11 @@
       const savedDate = safeStorage.getItem('gemini_quota_date');
       const savedCount = safeStorage.getItem('gemini_quota_count');
 
-      // 日付が変わっていたら（または初回なら）20回に新品リセット
       if (savedDate !== today || savedCount === null) {
         safeStorage.setItem('gemini_quota_date', today);
         safeStorage.setItem('gemini_quota_count', '20');
         return 20;
       }
-      // 同じ日なら、前回の残りをそのまま引き継ぐ（勝手に20に戻さない！）
       return parseInt(savedCount, 10);
     }
 
@@ -280,16 +277,16 @@
       gen: 1,
       isStop: false,
       useApi: true,
-      realApiQuota: initQuota(), // 本物の日次残回数
+      realApiQuota: initQuota(),
       testCount: 20,
       seconds: 0,
       serverState: "checking", // "checking", "ready", "busy", "error"
       stats: {
         hp: 100,
-        hunger: 70,   // 1分で-1、1歩で-1
-        stamina: 85,  // 1分で-1、1歩で-2
-        sleep: 80,    // 2分で-1
-        morale: 60    // 1分で-1
+        hunger: 70,
+        stamina: 85,
+        sleep: 80,
+        morale: 60
       },
       trait: "慎重で少し怖がりだが、生きるために必死に頭を使う性格",
       belief: "手帳の警告どおり、お腹が空っぽになると体が動かなくなるらしい。甘い匂いを頼りにリンゴを探そう。",
@@ -312,9 +309,13 @@
     if (savedFlag !== null) ROBOT.useApi = (savedFlag === 'true');
 
     // ========================================================
-    // 3. サーバー混雑の「事前自動チェック」（枠消費なし）
+    // 3. サーバー混雑監視＆自動復帰パイプライン
     // ========================================================
+    let healthTimer = null;
+
     async function checkServerHealth() {
+      if (healthTimer) clearTimeout(healthTimer);
+
       const lamp = document.getElementById('server-lamp');
       const btn = document.getElementById('think-btn');
 
@@ -338,21 +339,21 @@
       }
 
       lamp.className = "server-status status-yellow";
-      lamp.textContent = "📡 混雑チェック中...";
-      btn.disabled = true;
-      btn.textContent = "📡 混雑状況を確認しています...";
+      lamp.textContent = "📡 確認中...";
 
-      // countTokens APIを使って、枠を一切消費せずにサーバーが混んでいるかだけを調べる
       const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:countTokens?key=' + key;
 
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+
         const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: "ping" }] }]
-          })
+          body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         if (res.ok) {
           ROBOT.serverState = "ready";
@@ -361,15 +362,24 @@
           btn.disabled = false;
           btn.textContent = "🧠 AIに深く考えて行動させる";
           document.getElementById('thought-txt').innerHTML =
-            '（Googleサーバーとの通信は良好です！下のボタンを押すとロボが深く考えて1歩動きます）';
+            '（Googleサーバーとの通信は良好です！ボタンを押すとロボが深く考えて1歩動きます）';
+
+          // 良好時は45秒後に静かに再確認
+          healthTimer = setTimeout(checkServerHealth, 45000);
+
         } else if (res.status === 503 || res.status === 429) {
+          // 混雑時は絶対にボタンを押せないようにロック
           ROBOT.serverState = "busy";
           lamp.className = "server-status status-yellow";
-          lamp.textContent = "🟡 Google混雑中";
-          btn.disabled = false;
-          btn.textContent = "⚠️ 現在混雑中ですが、押して試す";
+          lamp.textContent = "🟡 混雑中 (順番待ち)";
+          btn.disabled = true;
+          btn.textContent = "⏳ Google混雑中（空き次第、自動で押せます）";
           document.getElementById('thought-txt').innerHTML =
-            '<span style="color:#fde047;">【Googleサーバー混雑】現在世界中でアクセスが集中しています。数秒待って空くのを待つか、このままボタンを押して試せます。</span>';
+            '<span style="color:#fde047; font-weight:bold;">【Google混雑中】アクセス集中によりサーバーが順番待ちになっています。空き次第、下のボタンが自動で青く押せるようになりますのでそのままお待ちください…</span>';
+
+          // 混雑時は5秒おきに自動で空き具合を再確認
+          healthTimer = setTimeout(checkServerHealth, 5000);
+
         } else {
           const errData = await res.json().catch(() => ({}));
           const msg = errData?.error?.message || ('HTTP ' + res.status);
@@ -382,12 +392,12 @@
             '<span style="color:#f87171;">【エラー】' + msg + '</span>';
         }
       } catch (e) {
-        ROBOT.serverState = "error";
-        lamp.className = "server-status status-red";
-        lamp.textContent = "🔴 オフライン";
-        btn.disabled = false;
-        btn.textContent = "🔄 再接続を試す";
-        btn.onclick = checkServerHealth;
+        ROBOT.serverState = "busy";
+        lamp.className = "server-status status-yellow";
+        lamp.textContent = "🟡 混雑待機中";
+        btn.disabled = true;
+        btn.textContent = "⏳ 通信待機中（自動で再確認しています）";
+        healthTimer = setTimeout(checkServerHealth, 6000);
       }
     }
 
@@ -529,7 +539,7 @@
 
       refreshFog();
       spawnApple(2, 0, -1);
-      setupTouch();
+      setupControls();
       renderLoop();
     }
 
@@ -568,11 +578,13 @@
       fieldApples.push({ mesh: grp, gx: gx, gy: gy, gz: gz });
     }
 
-    function setupTouch() {
+    function setupControls() {
       let touchMode = 'none', prevX = 0, prevDist = 0, touchTime = 0;
+      let mouseDragging = false, mouseDownX = 0, mouseDownTime = 0;
       const raycaster = new THREE.Raycaster();
       const mouse = new THREE.Vector2();
 
+      // スマホ向けタッチ操作
       window.addEventListener('touchstart', e => {
         if (e.target.closest('.top-hud, .thought-card, .side-btns, .bottom-hud, .modal-cover')) return;
         touchTime = performance.now();
@@ -598,15 +610,40 @@
 
       window.addEventListener('touchend', e => {
         if (performance.now() - touchTime < 250 && touchMode === 'drag' && e.changedTouches.length === 1) {
-          dropAppleAtPoint(e.changedTouches[0]);
+          dropAppleAtClientPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
         }
         touchMode = 'none';
       });
 
-      function dropAppleAtPoint(touch) {
+      // マウス操作（クリックでリンゴ落下・ドラッグで水槽回転）
+      window.addEventListener('mousedown', e => {
+        if (e.target.closest('.top-hud, .thought-card, .side-btns, .bottom-hud, .modal-cover')) return;
+        mouseDragging = true;
+        mouseDownX = e.clientX;
+        prevX = e.clientX;
+        mouseDownTime = performance.now();
+      });
+
+      window.addEventListener('mousemove', e => {
+        if (!mouseDragging) return;
+        world.rotation.y += (e.clientX - prevX) * 0.007;
+        prevX = e.clientX;
+      });
+
+      window.addEventListener('mouseup', e => {
+        if (!mouseDragging) return;
+        mouseDragging = false;
+        const dur = performance.now() - mouseDownTime;
+        const moveDist = Math.abs(e.clientX - mouseDownX);
+        if (dur < 250 && moveDist < 6) {
+          dropAppleAtClientPoint(e.clientX, e.clientY);
+        }
+      });
+
+      function dropAppleAtClientPoint(clientX, clientY) {
         if (ROBOT.isStop) return;
-        mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+        mouse.x = (clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(clientY / window.innerHeight) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
 
         const hits = raycaster.intersectObjects(clickBlocks);
@@ -701,7 +738,7 @@
     }
 
     // ========================================================
-    // 7. 自律思考ステップ（混雑時は枠を減らさず即座に案内）
+    // 7. 自律思考ステップ（自動リトライ＆完全混雑ガード）
     // ========================================================
     const thoughtSchema = {
       type: "OBJECT",
@@ -743,28 +780,44 @@
 
       let decision;
       if (ROBOT.useApi) {
-        try {
-          lamp.className = "server-status status-yellow";
-          lamp.textContent = "⚡ 思考中...";
-          btn.textContent = "⚡ gemini-3.8-flash が思考中...";
+        lamp.className = "server-status status-yellow";
+        lamp.textContent = "⚡ 思考中...";
+        btn.textContent = "⚡ gemini-3.8-flash が深く思考中...";
 
-          decision = await callGemini38Flash(cx, cy, cz, actions, smell, touch1x1, apiKey);
+        // 一時的な混雑を乗り越える自動再送処理（最大3回まで粘る）
+        let retryCount = 0;
+        let success = false;
 
-          // 成功したときだけ！本物の残数を-1してローカルに保存
-          consumeRealQuota();
-          lamp.className = "server-status status-green";
-          lamp.textContent = "🟢 通信良好 (3.8-flash)";
-
-        } catch (err) {
-          // 失敗したときは枠を減らさない！
-          lamp.className = "server-status status-yellow";
-          lamp.textContent = "🟡 混雑エラー";
-          btn.disabled = false;
-          btn.textContent = "⚠️ 混雑中：数秒後に再試行";
-          document.getElementById('thought-txt').innerHTML =
-            '<span style="color:#f87171;">【Googleサーバー混雑】通信が一時的に途切れました（回数は減っていません）。5〜10秒ほど待ってからもう一度押してください。(' + err.message + ')</span>';
-          return;
+        while (retryCount < 3 && !success) {
+          try {
+            decision = await callGemini38Flash(cx, cy, cz, actions, smell, touch1x1, apiKey);
+            success = true;
+          } catch (err) {
+            retryCount++;
+            if (retryCount < 3) {
+              btn.textContent = `⚡ 混雑中…空くのを待って再送しています (${retryCount}/2)...`;
+              await new Promise(r => setTimeout(r, 2000 * retryCount));
+            } else {
+              // 3回粘っても混んでいた場合：枠は減らさず即座にボタンを押せない待機モードへ
+              ROBOT.serverState = "busy";
+              lamp.className = "server-status status-yellow";
+              lamp.textContent = "🟡 混雑中 (順番待ち)";
+              btn.disabled = true;
+              btn.textContent = "⏳ Google混雑中（空き次第、自動で押せます）";
+              document.getElementById('thought-txt').innerHTML =
+                '<span style="color:#fde047; font-weight:bold;">【Google混雑中】サーバーが順番待ちになっています。回数は減っていません。空き次第、自動でボタンが青く押せるようになります。</span>';
+              
+              if (healthTimer) clearTimeout(healthTimer);
+              healthTimer = setTimeout(checkServerHealth, 5000);
+              return;
+            }
+          }
         }
+
+        consumeRealQuota();
+        lamp.className = "server-status status-green";
+        lamp.textContent = "🟢 通信良好 (3.8-flash)";
+
       } else {
         ROBOT.testCount--;
         lamp.textContent = "🧪 テスト中";
@@ -1165,4 +1218,3 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動内容: a.txt })))}
   </script>
 </body>
 </html>
-```
