@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>ボクセルAI自律思考水槽 - 純粋自律シミュレーション</title>
+  <title>ボクセルAI自律思考水槽 - 空きドア自動案内＆電球点灯版</title>
 
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,8 +20,31 @@
       position: fixed; inset: 0;
     }
 
+    /* 3D水槽キャンバス（全画面固定） */
     #stage { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
     #c3d { width: 100%; height: 100%; display: block; }
+
+    /* 頭上の電球ポップアップ（API完全通過時に3D座標と連動してピカッと光る） */
+    #bulb-popup {
+      position: absolute; z-index: 5; pointer-events: none;
+      transform: translate(-50%, -100%);
+      display: none; align-items: center; justify-content: center;
+      flex-direction: column;
+      filter: drop-shadow(0 0 14px #fde047) drop-shadow(0 0 28px #f59e0b);
+      animation: bulbPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    .bulb-icon { font-size: 30px; line-height: 1; }
+    .bulb-tag {
+      background: rgba(250, 204, 21, 0.95); color: #0f172a;
+      font-size: 9px; font-weight: 900; padding: 1px 6px;
+      border-radius: 8px; margin-top: 2px; white-space: nowrap;
+      box-shadow: 0 0 10px rgba(250, 204, 21, 0.9);
+    }
+    @keyframes bulbPop {
+      0% { transform: translate(-50%, -60%) scale(0.2); opacity: 0; }
+      70% { transform: translate(-50%, -115%) scale(1.2); opacity: 1; }
+      100% { transform: translate(-50%, -100%) scale(1); opacity: 1; }
+    }
 
     /* 上部ステータス */
     .top-hud {
@@ -42,15 +65,20 @@
     .badge-on { background: #0369a1; color: #7dd3fc; border: 1px solid #38bdf8; }
     .badge-off { background: #334155; color: #94a3b8; border: 1px solid #475569; }
 
-    /* AIの思考生ログ表示カード */
+    /* AI思考生ログ表示カード */
     .thought-card {
       position: absolute; top: 78px; left: 10px; right: 58px; z-index: 10;
       background: rgba(15, 23, 42, 0.95); border: 1px solid #38bdf8; border-radius: 12px;
       padding: 8px 12px; backdrop-filter: blur(6px); pointer-events: none;
       box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
     }
-    .thought-title { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: bold; color: #38bdf8; margin-bottom: 4px; }
-    .server-status { font-size: 10px; padding: 2px 7px; border-radius: 10px; }
+    .thought-card.flash-success {
+      border-color: #fde047;
+      box-shadow: 0 0 20px rgba(250, 204, 21, 0.55);
+    }
+    .thought-title { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: bold; color: #38bdf8; margin-bottom: 4px; gap: 4px; }
+    .server-status { font-size: 10px; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
     .status-green { background: #065f46; color: #34d399; }
     .status-yellow { background: #854d0e; color: #fde047; }
     .status-red { background: #7f1d1d; color: #fca5a5; }
@@ -90,16 +118,16 @@
     .main-btn:disabled { background: #334155; border-color: #475569; color: #94a3b8; cursor: not-allowed; }
     .btn-respawn { background: linear-gradient(135deg, #dc2626, #991b1b); border: 1px solid #f87171; display: none; }
 
-    /* モーダル小窓（初期は絶対に display: none !） */
+    /* モーダル小窓（初期状態は必ず display: none） */
     .modal-cover {
       position: fixed; inset: 0; z-index: 100;
       background: rgba(0, 0, 0, 0.82); backdrop-filter: blur(6px);
       display: none; align-items: center; justify-content: center; padding: 16px;
     }
     .modal-box {
-      width: 100%; max-width: 380px; background: #0f172a; border: 1px solid #334155;
-      border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px;
-      box-shadow: 0 12px 35px rgba(0,0,0,0.85); max-height: 85dvh; overflow-y: auto;
+      width: 100%; max-width: 390px; background: #0f172a; border: 1px solid #334155;
+      border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
+      box-shadow: 0 12px 35px rgba(0,0,0,0.85); max-height: 88dvh; overflow-y: auto;
     }
     .modal-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
     .modal-title { font-size: 14px; font-weight: bold; color: #38bdf8; }
@@ -108,8 +136,26 @@
       background: #020617; border: 1px solid #1e293b; border-radius: 8px; padding: 10px;
       font-size: 11px; line-height: 1.6; color: #cbd5e1; max-height: 240px; overflow-y: auto; white-space: pre-wrap;
     }
-    .input-box { width: 100%; padding: 10px; background: #020617; border: 1px solid #334155; color: #fff; border-radius: 8px; font-size: 12px; }
-    .save-btn { padding: 12px; background: #0284c7; color: #fff; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+    .input-box, .select-box {
+      width: 100%; padding: 10px; background: #020617; border: 1px solid #334155;
+      color: #fff; border-radius: 8px; font-size: 12px;
+    }
+    .save-btn { padding: 11px; background: #0284c7; color: #fff; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 12px; }
+    .sub-btn { padding: 8px 10px; background: #1e293b; color: #38bdf8; border: 1px solid #334155; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; }
+    .msg-line { font-size: 11px; color: #fde047; min-height: 16px; line-height: 1.4; }
+
+    /* ドア（列）ごとの混み具合リスト */
+    .radar-list {
+      display: flex; flex-direction: column; gap: 6px;
+      background: #020617; border: 1px solid #1e293b; border-radius: 10px; padding: 8px;
+    }
+    .radar-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 9px; border-radius: 8px; background: #0f172a; border: 1px solid #1e293b;
+      font-size: 11px; cursor: pointer;
+    }
+    .radar-item.selected { border-color: #38bdf8; background: rgba(2, 132, 199, 0.22); }
+    .radar-tag { font-size: 10px; padding: 2px 6px; border-radius: 6px; font-weight: bold; }
   </style>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -117,6 +163,12 @@
 <body>
 
   <div id="stage"><div id="c3d"></div></div>
+
+  <!-- API完全通過時にロボの頭上でピカッと光る電球マーク -->
+  <div id="bulb-popup">
+    <div class="bulb-icon">💡</div>
+    <div class="bulb-tag" id="bulb-tag-txt">API通過!</div>
+  </div>
 
   <!-- 上部ステータス -->
   <div class="top-hud">
@@ -128,20 +180,20 @@
       <div>✨気分 <span id="v-morale">60</span><div class="bar-box"><div id="b-morale" class="bar-val" style="width:60%; background:#10b981;"></div></div></div>
     </div>
     <div class="hud-sub">
-      <span id="ui-id">🤖 個体#1</span>
-      <span id="ui-badge" class="badge badge-off">📡 AI思考待機中</span>
+      <span id="ui-id">🤖 個体#1 (0, 0, -1)</span>
+      <span id="ui-badge" class="badge badge-off">⚙️ キー未設定</span>
       <span id="ui-timer">⏳ 生存: 00:00</span>
     </div>
   </div>
 
-  <!-- 思考モニター -->
-  <div class="thought-card">
+  <!-- 思考モニター（ドアの混み具合と生ログを表示） -->
+  <div class="thought-card" id="thought-card">
     <div class="thought-title">
-      <span id="ui-brain-title">🤖 AI思考生ログ</span>
-      <span id="server-lamp" class="server-status status-yellow">📡 準備中</span>
+      <span id="ui-brain-title">🚪 空き列: 確認中...</span>
+      <span id="server-lamp" class="server-status status-yellow">📡 ドア確認中</span>
     </div>
     <div class="thought-body" id="thought-txt">
-      （地面をタップすると🍎リンゴを落とせます。下のボタンを押すと、AIが自律思考して行動します）
+      （ゲームを開くと自動で各ドアの混み具合を見て、一番空いている列をご案内します。下のボタンを押すとその列に並んで思考します）
     </div>
   </div>
 
@@ -150,14 +202,14 @@
     <div class="circle-btn active" id="btn-sur" onclick="changeCam('surface')" title="地上を見る">🌲</div>
     <div class="circle-btn" id="btn-ant" onclick="changeCam('antfarm')" title="地下を見る">⛏️</div>
     <div class="circle-btn" onclick="openModal('diaryModal')" title="手帳を開く">📖</div>
-    <div class="circle-btn" onclick="openModal('settingModal')" title="設定を開く">⚙️</div>
+    <div class="circle-btn" onclick="openModal('settingModal')" title="ドアの混み具合と設定">⚙️</div>
   </div>
 
   <!-- 下部操作ボタン -->
   <div class="bottom-hud">
     <div class="tap-guide" id="guide-txt">地面をタップして【🍎リンゴ】を落とせます</div>
     <div class="action-row">
-      <button id="think-btn" class="main-btn" onclick="stepAiLife()">🧠 AIに深く考えて行動させる</button>
+      <button id="think-btn" class="main-btn" onclick="stepAiLife()">⚡ 空いている列に並んで思考させる</button>
       <button id="respawn-btn" class="main-btn btn-respawn" onclick="respawnRobot()">🔄 次の個体へ（古い手帳を読んで起き上がる）</button>
     </div>
   </div>
@@ -180,31 +232,95 @@
     </div>
   </div>
 
-  <!-- 設定の小窓 -->
+  <!-- 通信・ドアの混み具合チェック小窓 -->
   <div class="modal-cover" id="settingModal">
     <div class="modal-box">
       <div class="modal-head">
-        <div class="modal-title">⚙️ AI接続設定</div>
+        <div class="modal-title">🚪 ドアの混み具合チェック＆列の選択</div>
         <div class="close-btn" onclick="closeModal('settingModal')">✕</div>
       </div>
-      <div style="font-size:11px; color:#94a3b8;">
-        Google AI Studioで取得したAPIキー（AIzaSy...）を入力すると、本物のGeminiと通信してロボが自律思考します。
+
+      <label style="font-size:11px; color:#38bdf8; font-weight:bold;">① Google AI Studio APIキー（無料枠のままでOK）</label>
+      <input type="password" id="setting-api-key" class="input-box" placeholder="AIzaSy... から始まるキーを貼り付け">
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+        <label style="font-size:11px; color:#38bdf8; font-weight:bold;">② どのドア（列）が空いているか見る</label>
+        <button class="sub-btn" onclick="scanDoorsAndPickBest(true)">📡 いまの混み具合を調べる</button>
       </div>
-      <input type="password" id="setting-api-key" class="input-box" placeholder="Gemini APIキーを貼り付け">
+
+      <!-- 3つのドアの混み具合リスト -->
+      <div class="radar-list" id="model-radar-list">
+        <div class="radar-item" data-model="gemini-3.8-flash-lite" onclick="selectModelFromRadar('gemini-3.8-flash-lite')">
+          <div>
+            <div style="font-weight:bold; color:#f8fafc;">🚪 ドア1: gemini-3.8-flash-lite</div>
+            <div style="font-size:10px; color:#94a3b8;">無料枠◎ / 高速レーン（一番スイスイ通りやすい）</div>
+          </div>
+          <span class="radar-tag status-yellow" id="st-gemini-3.8-flash-lite">未確認</span>
+        </div>
+
+        <div class="radar-item" data-model="gemini-3.8-flash" onclick="selectModelFromRadar('gemini-3.8-flash')">
+          <div>
+            <div style="font-weight:bold; color:#f8fafc;">🚪 ドア2: gemini-3.8-flash</div>
+            <div style="font-size:10px; color:#94a3b8;">無料枠◎ / 標準レーン（バランス型）</div>
+          </div>
+          <span class="radar-tag status-yellow" id="st-gemini-3.8-flash">未確認</span>
+        </div>
+
+        <div class="radar-item" data-model="gemini-3.8-pro" onclick="selectModelFromRadar('gemini-3.8-pro')">
+          <div>
+            <div style="font-weight:bold; color:#f8fafc;">🚪 ドア3: gemini-3.8-pro</div>
+            <div style="font-size:10px; color:#94a3b8;">じっくり思考レーン（上位頭脳）</div>
+          </div>
+          <span class="radar-tag status-yellow" id="st-gemini-3.8-pro">未確認</span>
+        </div>
+      </div>
+
+      <label style="font-size:11px; color:#94a3b8;">現在並んでいる列（別のモデル一覧も取得できます）</label>
+      <div style="display:flex; gap:6px;">
+        <select id="setting-model" class="select-box" style="flex:1;" onchange="syncRadarSelection(this.value)">
+          <option value="gemini-3.8-flash-lite">gemini-3.8-flash-lite (高速ドア)</option>
+          <option value="gemini-3.8-flash">gemini-3.8-flash (標準ドア)</option>
+          <option value="gemini-3.8-pro">gemini-3.8-pro (上位ドア)</option>
+        </select>
+        <button class="sub-btn" onclick="fetchAvailableModelsFromGoogle()" title="Googleから全ドア一覧を取り寄せる">🔍全列取得</button>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:6px; font-size:11px; color:#cbd5e1;">
+        <input type="checkbox" id="setting-auto-switch" checked>
+        <label for="setting-auto-switch">並んだ列が急に混んだら、隣の空いている列へ自動で並び直す</label>
+      </div>
+
+      <div class="msg-line" id="setting-msg"></div>
+
       <div style="display:flex; gap:8px;">
-        <button class="save-btn" style="flex:1;" onclick="saveApiKey()">保存して通信テスト</button>
-        <button style="padding:10px; background:#ef4444; color:#fff; border:none; border-radius:8px; font-size:11px;" onclick="clearApiKey()">キー消去</button>
+        <button class="save-btn" style="flex:1;" onclick="saveApiKey()">この列に決めて閉じる</button>
+        <button style="padding:10px; background:#ef4444; color:#fff; border:none; border-radius:8px; font-size:11px; cursor:pointer;" onclick="clearApiKey()">キー消去</button>
       </div>
-      <button style="padding:8px; background:#1e293b; color:#94a3b8; border:none; border-radius:8px; font-size:11px;" onclick="closeModal('settingModal')">閉じる</button>
+      <button style="padding:8px; background:#1e293b; color:#94a3b8; border:none; border-radius:8px; font-size:11px; cursor:pointer;" onclick="closeModal('settingModal')">閉じる</button>
     </div>
   </div>
 
   <script>
-    // 安全なデータ保存
+    /* =====================================================================
+       【1. 安全なデータ保存と「日付が変わるまで20回に戻らない」通信残数管理】
+       ===================================================================== */
     const safeStorage = {
       getItem: (k) => { try { return localStorage.getItem(k); } catch(e) { return null; } },
       setItem: (k, v) => { try { localStorage.setItem(k, v); } catch(e) {} }
     };
+
+    // 空いているドアの順番リスト（起動時のチェックで一番空いている順に並び替わる）
+    let rankedOpenDoors = ['gemini-3.8-flash-lite', 'gemini-3.8-flash', 'gemini-3.8-pro'];
+
+    function getSelectedModel() {
+      const saved = safeStorage.getItem('gemini_model_38');
+      return saved && saved.length > 3 ? saved : 'gemini-3.8-flash-lite';
+    }
+
+    function getAutoSwitch() {
+      const s = safeStorage.getItem('gemini_auto_switch');
+      return s === null ? true : (s === 'true');
+    }
 
     function getTodayString() {
       const d = new Date();
@@ -220,24 +336,25 @@
         safeStorage.setItem('gemini_quota_count', '20');
         return 20;
       }
-      return parseInt(savedCount, 10);
+      const parsed = parseInt(savedCount, 10);
+      return isNaN(parsed) ? 20 : parsed;
     }
 
     function consumeQuota() {
       const cur = Math.max(0, ROBOT.realQuota - 1);
       ROBOT.realQuota = cur;
+      safeStorage.setItem('gemini_quota_date', getTodayString());
       safeStorage.setItem('gemini_quota_count', String(cur));
       updateHUD();
     }
 
-    // 本物のエージェントデータ構造
     const ROBOT = {
       gen: 1,
       isStop: false,
       realQuota: initQuota(),
       seconds: 0,
       stats: { hp: 100, hunger: 70, stamina: 85, sleep: 80, morale: 60 },
-      belief: "古い手帳に『空腹がゼロになると動けなくなる』と書かれている。匂いを頼りにリンゴを探そう。",
+      belief: "古い手帳に『空腹がゼロになると動けなくなる』と書かれている。空いているドアから通信が繋がり次第、リンゴを探す。",
       pos: { x: 0, y: 0, z: -1 },
       hasApple: false,
       eaten: 0,
@@ -247,81 +364,222 @@
       ]
     };
 
-    for (let x = 0; x <= 1; x++) {
-      for (let y = -1; y <= 0; y++) {
-        for (let z = -1; z <= 0; z++) ROBOT.known[x + ',' + y + ',' + z] = true;
+    function markVision(cx, cy, cz) {
+      for (let ox = -1; ox <= 1; ox++) {
+        for (let oy = -1; oy <= 1; oy++) {
+          for (let oz = -1; oz <= 1; oz++) {
+            ROBOT.known[(cx + ox) + ',' + (cy + oy) + ',' + (cz + oz)] = true;
+          }
+        }
       }
     }
+    markVision(0, 0, -1);
 
-    // 設定処理
-    function saveApiKey() {
-      const key = document.getElementById('setting-api-key').value.trim();
-      if (key.length > 10) {
-        safeStorage.setItem('gemini_api_key', key);
-        closeModal('settingModal');
-        testApiConnection();
-      } else {
-        alert("有効なAPIキーを入力してください");
+    /* =====================================================================
+       【2. ゲームを開いた瞬間にドアの混み具合を見て、空いている列に並ばせる仕組み】
+       ===================================================================== */
+    function selectModelFromRadar(modelName) {
+      const sel = document.getElementById('setting-model');
+      if (![...sel.options].some(o => o.value === modelName)) {
+        const opt = document.createElement('option');
+        opt.value = modelName;
+        opt.textContent = modelName;
+        sel.appendChild(opt);
       }
+      sel.value = modelName;
+      safeStorage.setItem('gemini_model_38', modelName);
+      syncRadarSelection(modelName);
+      updateHUD();
     }
 
-    function clearApiKey() {
-      if (confirm("APIキーを消去しますか？")) {
-        safeStorage.setItem('gemini_api_key', '');
-        closeModal('settingModal');
-        updateHUD();
-        testApiConnection();
-      }
+    function syncRadarSelection(modelName) {
+      document.querySelectorAll('.radar-item').forEach(el => {
+        el.classList.toggle('selected', el.getAttribute('data-model') === modelName);
+      });
     }
 
-    // 事前通信確認（ヘルスチェック）
-    async function testApiConnection() {
-      const key = safeStorage.getItem('gemini_api_key') || '';
+    // ★ ゲームを開いた時やボタンを押した時に、3つのドアの混み具合を見て一番空いている列を自動セット ★
+    async function scanDoorsAndPickBest(fromModal) {
+      const inputEl = document.getElementById('setting-api-key');
+      const key = (inputEl && inputEl.value.trim()) ? inputEl.value.trim() : (safeStorage.getItem('gemini_api_key') || '');
+      const msg = document.getElementById('setting-msg');
       const lamp = document.getElementById('server-lamp');
-      const badge = document.getElementById('ui-badge');
+      const btn = document.getElementById('think-btn');
 
       if (key.length <= 10) {
         lamp.className = "server-status status-yellow";
         lamp.textContent = "⚙️ キー未設定";
-        badge.className = "badge badge-off";
-        badge.textContent = "⚙️ キーを設定してください";
+        if (fromModal && msg) {
+          msg.style.color = '#fca5a5';
+          msg.textContent = '⚠️ 先に①の欄へ無料APIキーを入力してください。';
+        }
+        updateHUD();
         return;
       }
 
       lamp.className = "server-status status-yellow";
-      lamp.textContent = "📡 接続確認中...";
+      lamp.textContent = "📡 ドアの混み具合を確認中...";
+      if (fromModal && msg) {
+        msg.style.color = '#38bdf8';
+        msg.textContent = '📡 3つのドアの混み具合を調べています（通信回数は減りません）...';
+      }
+
+      const doors = ['gemini-3.8-flash-lite', 'gemini-3.8-flash', 'gemini-3.8-pro'];
+      const results = [];
+
+      // 3つのドアを同時にノックして、返事の速さを測る
+      await Promise.all(doors.map(async (m) => {
+        const badge = document.getElementById('st-' + m);
+        if (badge) {
+          badge.className = 'radar-tag status-yellow';
+          badge.textContent = '確認中...';
+        }
+
+        const t0 = performance.now();
+        try {
+          const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + m + ':countTokens?key=' + key;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: 'ping' }] }] })
+          });
+          const ms = Math.round(performance.now() - t0);
+
+          if (res.ok) {
+            if (badge) {
+              badge.className = 'radar-tag status-green';
+              badge.textContent = '🟢 空き (' + ms + 'ms)';
+            }
+            results.push({ model: m, ok: true, ms: ms });
+          } else if (res.status === 503 || res.status === 429) {
+            if (badge) {
+              badge.className = 'radar-tag status-yellow';
+              badge.textContent = '🟡 混雑中';
+            }
+            results.push({ model: m, ok: false, ms: 99999 });
+          } else {
+            if (badge) {
+              badge.className = 'radar-tag status-red';
+              badge.textContent = '❌ 閉鎖 (' + res.status + ')';
+            }
+            results.push({ model: m, ok: false, ms: 999999 });
+          }
+        } catch (e) {
+          if (badge) {
+            badge.className = 'radar-tag status-red';
+            badge.textContent = '❌ 通信不可';
+          }
+          results.push({ model: m, ok: false, ms: 999999 });
+        }
+      }));
+
+      // 空いていて速い順番に並び替える
+      results.sort((a, b) => a.ms - b.ms);
+      rankedOpenDoors = results.map(r => r.model);
+
+      const best = results.find(r => r.ok);
+      if (best) {
+        selectModelFromRadar(best.model);
+        const shortName = best.model.replace('gemini-', '');
+        lamp.className = "server-status status-green";
+        lamp.textContent = "🟢 空き列: " + shortName + " (" + best.ms + "ms)";
+        btn.innerHTML = "⚡ 空いている列（" + shortName + "）で思考させる";
+
+        if (fromModal && msg) {
+          msg.style.color = '#34d399';
+          msg.textContent = '✨ いま一番スイスイ通れる「' + best.model + '」の列に自動で並びました！';
+        }
+      } else {
+        lamp.className = "server-status status-yellow";
+        lamp.textContent = "🟡 全ドア混雑中";
+        btn.innerHTML = "⚡ 空いている列を探して思考させる";
+        if (fromModal && msg) {
+          msg.style.color = '#fde047';
+          msg.textContent = '⚠️ いま全てのドアが混み合っています。少し待つか🔍全列取得をお試しください。';
+        }
+      }
+      updateHUD();
+    }
+
+    async function fetchAvailableModelsFromGoogle() {
+      const key = document.getElementById('setting-api-key').value.trim() || safeStorage.getItem('gemini_api_key') || '';
+      const msg = document.getElementById('setting-msg');
+      if (key.length <= 10) {
+        msg.style.color = '#fca5a5';
+        msg.textContent = '⚠️ 先に①の欄へAPIキーを入力してください。';
+        return;
+      }
+
+      msg.style.color = '#38bdf8';
+      msg.textContent = '🔍 Googleサーバーから通れるドア（モデル）一覧を取得中...';
 
       try {
-        const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:countTokens?key=' + key;
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] })
+        const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + key);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const models = (data.models || [])
+          .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
+          .map(m => m.name.replace('models/', ''));
+
+        const sel = document.getElementById('setting-model');
+        const currentVal = sel.value;
+
+        const baseModels = ['gemini-3.8-flash-lite', 'gemini-3.8-flash', 'gemini-3.8-pro'];
+        const merged = [...new Set([...baseModels, ...models])];
+
+        sel.innerHTML = '';
+        merged.forEach(mName => {
+          const opt = document.createElement('option');
+          opt.value = mName;
+          opt.textContent = mName;
+          sel.appendChild(opt);
         });
 
-        if (res.ok) {
-          lamp.className = "server-status status-green";
-          lamp.textContent = "🟢 Gemini 3.8 接続完了";
-          badge.className = "badge badge-on";
-          badge.textContent = "⚡ 3.8残: " + ROBOT.realQuota + "/20";
-        } else if (res.status === 503 || res.status === 429) {
-          lamp.className = "server-status status-yellow";
-          lamp.textContent = "🟡 サーバー混雑中";
-          badge.className = "badge badge-on";
-          badge.textContent = "⚠️ 混雑中（再試行可能）";
-        } else {
-          lamp.className = "server-status status-red";
-          lamp.textContent = "❌ キー確認要";
-          badge.className = "badge badge-off";
-          badge.textContent = "❌ キーが無効です";
-        }
+        if (merged.includes(currentVal)) sel.value = currentVal;
+        msg.style.color = '#34d399';
+        msg.textContent = '✓ Googleから ' + models.length + ' 個の列を取得して選択欄に追加しました！';
       } catch (e) {
-        lamp.className = "server-status status-red";
-        lamp.textContent = "❌ ネットワークエラー";
+        msg.style.color = '#fca5a5';
+        msg.textContent = '⚠️ 一覧の取得に失敗しました: ' + e.message;
       }
     }
 
-    // 時間の経過（1分で空腹-1、空腹0で激痛）
+    function saveApiKey() {
+      const key = document.getElementById('setting-api-key').value.trim();
+      const model = document.getElementById('setting-model').value;
+      const autoSw = document.getElementById('setting-auto-switch').checked;
+      const msg = document.getElementById('setting-msg');
+
+      safeStorage.setItem('gemini_model_38', model);
+      safeStorage.setItem('gemini_auto_switch', String(autoSw));
+
+      if (key.length > 10) {
+        safeStorage.setItem('gemini_api_key', key);
+        msg.style.color = '#34d399';
+        msg.textContent = '✓ 保存しました！ドアの混み具合を確認しています...';
+        closeModal('settingModal');
+        updateHUD();
+        scanDoorsAndPickBest(false);
+      } else {
+        msg.style.color = '#fca5a5';
+        msg.textContent = '⚠️ 正しいAPIキー（AIzaSy...）を入力してください';
+      }
+    }
+
+    function clearApiKey() {
+      safeStorage.setItem('gemini_api_key', '');
+      document.getElementById('setting-api-key').value = '';
+      const msg = document.getElementById('setting-msg');
+      msg.style.color = '#fde047';
+      msg.textContent = 'キーを消去しました。';
+      closeModal('settingModal');
+      updateHUD();
+      scanDoorsAndPickBest(false);
+    }
+
+    /* =====================================================================
+       【3. 生命維持・時間経過と「共通の最終着（手帳を残して倒れる）」】
+       ===================================================================== */
     setInterval(() => {
       if (ROBOT.isStop) return;
       ROBOT.seconds++;
@@ -341,7 +599,7 @@
       if (ROBOT.stats.hunger === 0 && ROBOT.seconds % 20 === 0) {
         ROBOT.stats.hp = Math.max(0, ROBOT.stats.hp - 15);
         document.getElementById('thought-txt').innerHTML =
-          '<span style="color:#ef4444; font-weight:bold;">⚠️ 空腹が限界です！回路が軋み、体力が15削られました！</span>';
+          '<span style="color:#ef4444; font-weight:bold;">⚠️ 空腹がゼロになり、激しい痛みで体力が15削られました！</span>';
         if (ROBOT.stats.hp === 0) {
           triggerShutdown("空腹のまま限界を迎え、手帳を握りしめたまま動けなくなった。");
         }
@@ -353,9 +611,12 @@
       document.getElementById('ui-timer').textContent = '⏳ 生存: ' + m + ':' + s;
     }, 1000);
 
-    // 3D環境
+    /* =====================================================================
+       【4. 3Dボクセル水槽・3D電球ギミック・ハシゴ昇降・知覚センサー】
+       ===================================================================== */
     let scene, camera, renderer, world, clickBlocks = [], voxelMap = {}, fieldApples = [];
     let chara, bodyM, headM, eyeM, rArm, lArm, rLeg, lLeg, handApple;
+    let bulbGroup, bulbGlass, bulbHalo, bulbLight, bulbTimer = 0;
     let targetCamPos, targetCamLook, curCamLook;
 
     const CAM = {
@@ -399,22 +660,20 @@
         for (let z = -4; z <= 0; z++) {
           if (!(x === 0 && z === -1)) makeBlock(x, 0, z, 'grass');
           for (let y = -1; y >= -5; y--) {
-            if (x === 0 && z === -1 && y >= -3) continue;
+            if (x === 0 && z === -1 && y >= -4) continue;
             if (Math.abs(x) <= 2 && y <= -2 && y >= -4 && z >= -2) continue;
             makeBlock(x, y, z, y >= -2 ? 'dirt' : 'stone');
           }
         }
       }
 
-      // 木製ハシゴ
       const ladMat = new THREE.MeshLambertMaterial({ color: 0xb45309 });
-      for (let y = 0; y >= -3; y--) {
+      for (let y = 0; y >= -4; y--) {
         const step = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.1), ladMat);
         step.position.set(0, y - 0.2, -1.4);
         world.add(step);
       }
 
-      // 水槽ガラス
       const glass = new THREE.Mesh(
         new THREE.PlaneGeometry(9, 6),
         new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.08, side: THREE.DoubleSide })
@@ -422,7 +681,6 @@
       glass.position.set(0, -2.5, 0.5);
       scene.add(glass);
 
-      // キャラクター
       chara = new THREE.Group();
       world.add(chara);
 
@@ -450,6 +708,37 @@
       rLeg = new THREE.Mesh(legGeo, legMat); rLeg.position.set(0.16, 0.16, 0); chara.add(rLeg);
       lLeg = new THREE.Mesh(legGeo, legMat); lLeg.position.set(-0.16, 0.16, 0); chara.add(lLeg);
 
+      // ★ API完全通過時に頭上でピカッと光る3D電球オブジェクト ★
+      bulbGroup = new THREE.Group();
+      bulbGroup.position.set(0, 1.38, 0);
+      bulbGroup.visible = false;
+      chara.add(bulbGroup);
+
+      const bulbBase = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, 0.12, 0.16),
+        new THREE.MeshLambertMaterial({ color: 0x94a3b8 })
+      );
+      bulbBase.position.y = -0.14;
+      bulbGroup.add(bulbBase);
+
+      bulbGlass = new THREE.Mesh(
+        new THREE.BoxGeometry(0.32, 0.32, 0.32),
+        new THREE.MeshBasicMaterial({ color: 0xfef08a })
+      );
+      bulbGlass.position.y = 0.05;
+      bulbGroup.add(bulbGlass);
+
+      bulbHalo = new THREE.Mesh(
+        new THREE.BoxGeometry(0.52, 0.52, 0.52),
+        new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.45 })
+      );
+      bulbHalo.position.y = 0.05;
+      bulbGroup.add(bulbHalo);
+
+      bulbLight = new THREE.PointLight(0xfde047, 0, 4.5);
+      bulbLight.position.set(0, 0.2, 0);
+      bulbGroup.add(bulbLight);
+
       chara.position.set(0, 0.5, -1);
 
       targetCamPos = CAM.surface.pos.clone();
@@ -463,19 +752,45 @@
       renderLoop();
     }
 
+    function triggerIdeaBulb(modelName) {
+      bulbTimer = 150;
+      bulbGroup.visible = true;
+      bulbLight.intensity = 2.6;
+      eyeM.material.color.setHex(0xfde047);
+
+      const popup = document.getElementById('bulb-popup');
+      const tag = document.getElementById('bulb-tag-txt');
+      tag.textContent = '⚡ ' + modelName.replace('gemini-', '') + ' 通過!';
+      popup.style.display = 'flex';
+
+      const card = document.getElementById('thought-card');
+      card.classList.add('flash-success');
+      setTimeout(() => card.classList.remove('flash-success'), 1800);
+    }
+
+    function updateBulbScreenPosition() {
+      const popup = document.getElementById('bulb-popup');
+      if (bulbTimer <= 0 || !bulbGroup.visible) {
+        if (popup.style.display !== 'none') popup.style.display = 'none';
+        return;
+      }
+      const worldPos = new THREE.Vector3();
+      bulbGroup.getWorldPosition(worldPos);
+      worldPos.y += 0.35;
+      worldPos.project(camera);
+
+      const x = (worldPos.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-(worldPos.y * 0.5) + 0.5) * window.innerHeight;
+      popup.style.left = x + 'px';
+      popup.style.top = y + 'px';
+    }
+
     function refreshFog() {
       const COLOR_LIT = { grass: 0x48bb78, dirt: 0x784f33, stone: 0x475569 };
       const COLOR_DARK = { grass: 0x112619, dirt: 0x21160e, stone: 0x151921 };
       for (const key in voxelMap) {
         const b = voxelMap[key];
-        let lit = false;
-        for (let ox = -1; ox <= 1; ox++) {
-          for (let oy = -1; oy <= 1; oy++) {
-            for (let oz = -1; oz <= 1; oz++) {
-              if (ROBOT.known[(b.userData.gx+ox) + ',' + (b.userData.gy+oy) + ',' + (b.userData.gz+oz)]) lit = true;
-            }
-          }
-        }
+        const lit = Boolean(ROBOT.known[b.userData.gx + ',' + b.userData.gy + ',' + b.userData.gz]);
         b.material.color.setHex(lit ? COLOR_LIT[b.userData.type] : COLOR_DARK[b.userData.type]);
       }
     }
@@ -553,30 +868,29 @@
       }
     }
 
-    // 地形と行動の判定
     function canWalk(x, y, z) {
       if (voxelMap[x + ',' + y + ',' + z]) return false;
-      if (x < -4 || x > 4 || z < -4 || z > 0 || y > 1 || y < -5) return false;
+      if (x < -4 || x > 4 || z < -4 || z > 0 || y > 0 || y < -4) return false;
       const hasFloor = Boolean(voxelMap[x + ',' + (y - 1) + ',' + z]);
-      const onLadder = (x === 0 && z === -1 && y >= -3 && y <= 0);
-      const isLowest = (y === -4 && Boolean(voxelMap[x + ',-5,' + z]));
-      return (hasFloor || onLadder || isLowest);
+      const onLadder = (x === 0 && z === -1 && y >= -4 && y <= 0);
+      return (hasFloor || onLadder);
     }
 
     function inspectSurroundings(cx, cy, cz) {
       const check = (dx, dy, dz, label) => {
         const tx = cx + dx, ty = cy + dy, tz = cz + dz;
-        const blk = voxelMap[tx + ',' + ty + ',' + tz];
-        if (blk) return label + ': 壁に遮られている';
-        if (tx === 0 && tz === -1 && ty >= -3 && ty <= 0) return label + ': ハシゴがある';
-        if (canWalk(tx, ty, tz)) return label + ': 1歩進める';
-        return label + ': 足場がない';
+        if (voxelMap[tx + ',' + ty + ',' + tz]) return label + ':壁';
+        if (tx === 0 && tz === -1 && ty >= -4 && ty <= 0) return label + ':ハシゴ';
+        if (canWalk(tx, ty, tz)) return label + ':進める';
+        return label + ':崖/空間';
       };
       return [
         check(1, 0, 0, "東"),
         check(-1, 0, 0, "西"),
         check(0, 0, 1, "南"),
-        check(0, 0, -1, "北")
+        check(0, 0, -1, "北"),
+        check(0, 1, 0, "上"),
+        check(0, -1, 0, "下")
       ].join(" / ");
     }
 
@@ -590,7 +904,7 @@
       if (nearIdx !== -1) {
         list.push({ id: list.length, type: "EAT_FIELD", appleIdx: nearIdx, txt: "目の前のリンゴをすぐ食べる（空腹+45回復）" });
         if (!ROBOT.hasApple) {
-          list.push({ id: list.length, type: "PICK_FIELD", appleIdx: nearIdx, txt: "目の前のリンゴを拾って手に持つ" });
+          list.push({ id: list.length, type: "PICK_FIELD", appleIdx: nearIdx, txt: "目の前のリンゴを拾って右手に持つ" });
         }
       }
 
@@ -605,7 +919,7 @@
 
       for (const d of dirs) {
         const tx = cx + d.dx, ty = cy + d.dy, tz = cz + d.dz;
-        if (d.dy !== 0 && !(cx === 0 && cz === -1 && cy >= -3 && ty >= -3 && ty <= 0)) continue;
+        if (d.dy !== 0 && !(cx === 0 && cz === -1 && cy >= -4 && cy <= 0 && ty >= -4 && ty <= 0)) continue;
         if (canWalk(tx, ty, tz)) {
           list.push({ id: list.length, type: "MOVE", pos: [tx, ty, tz], txt: d.name + ' [座標(' + tx + ',' + ty + ',' + tz + ')] ※空腹-1' });
         }
@@ -619,72 +933,106 @@
       if (fieldApples.length === 0) return "リンゴの匂いは漂ってこない。";
       return fieldApples.map((a, i) => {
         const dist = Math.hypot(a.gx - cx, a.gy - cy, a.gz - cz).toFixed(1);
-        return '匂い#' + (i + 1) + ': 距離' + dist + 'マス地点から甘い香り';
+        const dirs = [];
+        if (a.gx > cx) dirs.push("東");
+        if (a.gx < cx) dirs.push("西");
+        if (a.gz > cz) dirs.push("南");
+        if (a.gz < cz) dirs.push("北");
+        if (a.gy > cy) dirs.push("上");
+        if (a.gy < cy) dirs.push("下");
+        const dirTxt = dirs.length > 0 ? dirs.join("・") + "の方向" : "すぐ足元";
+        return '匂い#' + (i + 1) + ': ' + dirTxt + '（距離' + dist + 'マス）から甘い香り';
       }).join(' / ');
     }
 
-    // 張りぼてなしの純粋なAI思考ループ
+    /* =====================================================================
+       【5. 空いている列に並んで通信 ➜ 通過したら💡電球がピカッと光る】
+       ===================================================================== */
     async function stepAiLife() {
       if (ROBOT.isStop) return;
 
       const btn = document.getElementById('think-btn');
       const lamp = document.getElementById('server-lamp');
+      const key = safeStorage.getItem('gemini_api_key') || '';
+      const model = getSelectedModel();
+
+      if (key.length <= 10) {
+        document.getElementById('thought-txt').innerHTML =
+          '<span style="color:#fde047; font-weight:bold;">⚠️ APIキーが設定されていません。</span><br>右上の「⚙️」から無料APIキーを入れると、自動で空いているドアを見つけて並びます。';
+        openModal('settingModal');
+        return;
+      }
+
+      if (ROBOT.realQuota <= 0) {
+        document.getElementById('thought-txt').innerHTML =
+          '<span style="color:#ef4444; font-weight:bold;">⚠️ 本日の通信枠（20回）を使い切りました。</span><br>日付が変わると夜中の0時に自動で20回にリセットされます。';
+        return;
+      }
+
       btn.disabled = true;
+      const shortModel = model.replace('gemini-', '');
+      btn.innerHTML = "🚪 " + shortModel + " の列に並んで通信中...";
+      lamp.className = "server-status status-yellow";
+      lamp.textContent = "⚡ " + shortModel + " 通過中...";
 
       const cx = ROBOT.pos.x, cy = ROBOT.pos.y, cz = ROBOT.pos.z;
       const actions = getPossibleActions(cx, cy, cz);
       const smell = scanSmell(cx, cy, cz);
       const touch = inspectSurroundings(cx, cy, cz);
 
-      let decision;
-      const key = safeStorage.getItem('gemini_api_key') || '';
+      try {
+        const result = await callOpenQueueWithRetry(cx, cy, cz, actions, smell, touch, key, model);
 
-      if (key.length > 10 && ROBOT.realQuota > 0) {
-        try {
-          lamp.className = "server-status status-yellow";
-          lamp.textContent = "⚡ Gemini 3.8 思考中...";
-          btn.innerHTML = "⚡ Gemini 3.8 が判断中...";
+        // ★ 完全にAPIを通過した瞬間！ ★
+        consumeQuota();
+        const usedShort = result.usedModel.replace('gemini-', '');
+        lamp.className = "server-status status-green";
+        lamp.textContent = "💡 通過成功 (" + usedShort + ")";
+        btn.innerHTML = "💡 思考完了・行動中...";
 
-          decision = await callGeminiAgent(cx, cy, cz, actions, smell, touch, key);
-          consumeQuota();
+        // 通過できた列を一番スムーズな列として記憶
+        selectModelFromRadar(result.usedModel);
 
-          lamp.className = "server-status status-green";
-          lamp.textContent = "🟢 通信良好 (3.8-flash)";
+        // 頭上の電球マークをピカッと光らせる！
+        triggerIdeaBulb(result.usedModel);
 
-        } catch (err) {
-          lamp.className = "server-status status-yellow";
-          lamp.textContent = "🟡 通信再試行（内蔵判断）";
-          decision = fallbackAgentDecision(actions);
+        await applyAgentAction(result.decision, actions);
+
+      } catch (err) {
+        lamp.className = "server-status status-red";
+        lamp.textContent = "❌ 通信未通過";
+
+        let errorDetail = err.message;
+        if (errorDetail.includes("503") || errorDetail.includes("high demand") || errorDetail.includes("429")) {
+          errorDetail = "いま並んだ列が混み合っています。右上の⚙️から『📡いまの混み具合を調べる』を押して、🟢のドアを確認してみてください。";
         }
-      } else {
-        lamp.className = "server-status status-yellow";
-        lamp.textContent = "⚙️ 内蔵判断で行動";
-        btn.innerHTML = "🤖 ロボが判断中...";
-        await new Promise(r => setTimeout(r, 200));
-        decision = fallbackAgentDecision(actions);
+
+        document.getElementById('thought-txt').innerHTML =
+          '<div style="color:#ef4444; font-weight:bold;">❌ 【ドア混雑中：ロボは待機しています】</div>' +
+          '<div style="font-size:10px; color:#cbd5e1; margin-top:2px;">' + errorDetail + '</div>' +
+          '<div style="font-size:10px; color:#94a3b8; margin-top:3px;">※通過しなかったため、電球は光らず通信枠（20回）も減っていません。</div>';
+
+      } finally {
+        btn.disabled = false;
+        const curShort = getSelectedModel().replace('gemini-', '');
+        btn.innerHTML = "⚡ 空いている列（" + curShort + "）で思考させる";
       }
-
-      btn.innerHTML = "行動中...";
-      await applyAgentAction(decision, actions);
-
-      btn.disabled = false;
-      btn.innerHTML = "🧠 AIに深く考えて行動させる";
     }
 
-    async function callGeminiAgent(cx, cy, cz, actions, smell, touch, key) {
+    async function callOpenQueueWithRetry(cx, cy, cz, actions, smell, touch, key, primaryModel) {
       const prompt = `あなたは箱庭世界で生きる小さな自律個体（#${ROBOT.gen}）です。
 あなたはプレイヤーや死（ゲームオーバー）という概念を知りません。
-あなたが頼りにできるのは、足元の感触、空間の匂い、そして足元に落ちていた「手帳の古い記録」だけです。
+あなたが頼りにできるのは、周囲1マスの手触り、空間の匂い、そして足元に落ちていた「手帳の古い記録」だけです。
 
 【身体の状態】
 ・❤️体力: ${ROBOT.stats.hp}/100（空腹がゼロになると激痛で削られる）
-・🍖空腹: ${ROBOT.stats.hunger}/100（1歩歩くと-1、時間でも減る）
+・🍖空腹: ${ROBOT.stats.hunger}/100（1歩歩くと-1、1分経過でも-1）
 ・⚡元気: ${ROBOT.stats.stamina}/100
 ・右手: ${ROBOT.hasApple ? "リンゴを持っている" : "空っぽ"}
 
-【周囲の状況】
+【周囲1マスの知覚と匂い】
 ・現在地: (${cx}, ${cy}, ${cz})
-・周囲の手触り: ${touch}
+・周囲6方向の手触り: ${touch}
 ・漂う匂い: ${smell}
 ・手帳の警告と過去の記録:
 ${ROBOT.diary.slice(-4).join("\n")}
@@ -701,63 +1049,63 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
   "note": "手帳に書き残す記録（40字以内）"
 }`;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            responseMimeType: "application/json"
+      const autoSwitch = getAutoSwitch();
+      // 起動時に調べた「空いているドア順」を活かして並ぶ列を作る
+      const candidateModels = autoSwitch
+        ? [...new Set([primaryModel, ...rankedOpenDoors])]
+        : [primaryModel];
+
+      let lastErr = null;
+
+      for (let mIdx = 0; mIdx < candidateModels.length; mIdx++) {
+        const targetModel = candidateModels[mIdx];
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${key}`;
+
+        // もし2番目以降の列に並び直した場合は画面でお知らせ
+        if (mIdx > 0) {
+          const lamp = document.getElementById('server-lamp');
+          lamp.textContent = "🔄 空き列(" + targetModel.replace('gemini-', '') + ")へ移動中...";
+        }
+
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const res = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                  temperature: 0.7,
+                  responseMimeType: "application/json"
+                }
+              })
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (!rawText) throw new Error("空の応答が返されました");
+              const parsed = JSON.parse(rawText);
+              return { decision: parsed, usedModel: targetModel };
+            }
+
+            const errTxt = await res.text();
+            lastErr = new Error(errTxt || `HTTP ${res.status}`);
+
+            if (res.status === 503 || res.status === 429) {
+              await new Promise(r => setTimeout(r, 800));
+              continue;
+            } else {
+              break;
+            }
+          } catch (e) {
+            lastErr = e;
+            await new Promise(r => setTimeout(r, 600));
           }
-        })
-      });
+        }
+      }
 
-      if (!res.ok) throw new Error("API_ERROR");
-      const data = await res.json();
-      return JSON.parse(data.candidates[0].content.parts[0].text);
-    }
-
-    function fallbackAgentDecision(actions) {
-      const eat = actions.find(a => a.type === "EAT_HAND" || a.type === "EAT_FIELD");
-      if (eat && ROBOT.stats.hunger <= 75) {
-        return {
-          feeling: "目の前から甘い匂いがする。",
-          reason: "手帳に『空腹ゼロで動けなくなる』とある。今食べてお腹を満たそう。",
-          actionId: eat.id,
-          belief: "リンゴはお腹の痛みを癒やしてくれる唯一の救いだ。",
-          note: "リンゴを食べて空腹を満たした。"
-        };
-      }
-      const pick = actions.find(a => a.type === "PICK_FIELD");
-      if (pick && !ROBOT.hasApple) {
-        return {
-          feeling: "足元にリンゴがある。",
-          reason: "いつ空腹になってもいいように、右手に拾って持ち歩こう。",
-          actionId: pick.id,
-          belief: "リンゴを手に持っていれば安心だ。",
-          note: "目の前のリンゴを拾って手に持った。"
-        };
-      }
-      const moves = actions.filter(a => a.type === "MOVE");
-      if (moves.length > 0) {
-        const m = moves[Math.floor(Math.random() * moves.length)];
-        return {
-          feeling: "周囲を探る。",
-          reason: "空腹がゼロになる前に、足場を確かめながら進んでみる。",
-          actionId: m.id,
-          belief: "足を止めれば、いつかお腹が空いて倒れてしまう。",
-          note: "足場を一歩進んだ。"
-        };
-      }
-      return {
-        feeling: "周りは壁ばかりだ。",
-        reason: "体力を保つため、一度座って息を整える。",
-        actionId: actions[actions.length - 1].id,
-        belief: "無理に動かず息を整えることも大切だ。",
-        note: "その場で息を整えた。"
-      };
+      throw lastErr || new Error("通信に失敗しました");
     }
 
     async function applyAgentAction(dec, actions) {
@@ -765,11 +1113,10 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
 
       if (dec.belief) {
         ROBOT.belief = dec.belief;
-        document.getElementById('diary-belief').textContent = ROBOT.belief;
       }
 
       document.getElementById('thought-txt').innerHTML =
-        '<div style="font-size:10px; color:#38bdf8; margin-bottom:2px;">👁️ 感覚: ' + dec.feeling + '</div>' +
+        '<div style="font-size:10px; color:#fde047; font-weight:bold; margin-bottom:2px;">💡 ドア通過成功！ 👁️ 知覚: ' + dec.feeling + '</div>' +
         '<div style="color:#fefcbf; font-weight:bold; margin-bottom:3px;">💭 「' + dec.reason + '」</div>' +
         '<div style="color:#86efac; font-size:10px;">⚡ 行動: ' + act.txt + '</div>';
 
@@ -785,7 +1132,7 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
         headM.rotation.y = 0;
 
         ROBOT.pos = { x: tx, y: ty, z: tz };
-        ROBOT.known[tx + ',' + ty + ',' + tz] = true;
+        markVision(tx, ty, tz);
         refreshFog();
 
         if (ty <= -2) changeCam('antfarm');
@@ -841,7 +1188,6 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
       updateHUD();
     }
 
-    // 全員共通の最終着：力尽きて手記を残す
     function triggerShutdown(reason) {
       ROBOT.isStop = true;
       chara.rotation.z = Math.PI / 2;
@@ -859,7 +1205,6 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
       updateHUD();
     }
 
-    // 次の個体への継承
     function respawnRobot() {
       ROBOT.gen++;
       ROBOT.isStop = false;
@@ -874,8 +1219,6 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
       changeCam('surface');
 
       ROBOT.belief = '前の個体#' + (ROBOT.gen - 1) + 'が書き残した警告どおり、空腹がゼロになる前に絶対にリンゴを見つける。';
-      document.getElementById('diary-belief').textContent = ROBOT.belief;
-
       ROBOT.diary.push('【個体#' + ROBOT.gen + 'の覚醒】\n目を覚ますと足元に手帳が落ちていた。前の自分が倒れる直前に書いた文字がある…。ボクはこの手帳を頼りに生き延びるぞ。');
 
       document.getElementById('think-btn').style.display = 'block';
@@ -883,10 +1226,9 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
 
       updateHUD();
       openModal('diaryModal');
-      testApiConnection();
+      scanDoorsAndPickBest(false);
     }
 
-    // アニメーションループ
     let clock = 0, isWalking = false;
     function renderLoop() {
       requestAnimationFrame(renderLoop);
@@ -899,6 +1241,22 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
       }
 
       for (const a of fieldApples) a.mesh.rotation.y += 0.03;
+
+      if (bulbTimer > 0 && bulbGroup) {
+        bulbTimer--;
+        bulbGroup.rotation.y += 0.12;
+        bulbGroup.position.y = 1.38 + Math.sin(clock * 6) * 0.06;
+        const scalePulse = 1 + Math.sin(clock * 10) * 0.15;
+        bulbHalo.scale.set(scalePulse, scalePulse, scalePulse);
+        updateBulbScreenPosition();
+
+        if (bulbTimer === 0) {
+          bulbGroup.visible = false;
+          bulbLight.intensity = 0;
+          eyeM.material.color.setHex(0x38bdf8);
+          document.getElementById('bulb-popup').style.display = 'none';
+        }
+      }
 
       if (!ROBOT.isStop && chara) {
         if (isWalking) {
@@ -950,14 +1308,32 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
       document.getElementById('v-morale').textContent = s.morale;
       document.getElementById('b-morale').style.width = s.morale + '%';
 
-      document.getElementById('ui-id').textContent = '🤖 個体#' + ROBOT.gen;
+      const curModel = getSelectedModel();
+      const shortName = curModel.replace('gemini-', '');
+      document.getElementById('ui-id').textContent = '🤖 個体#' + ROBOT.gen + ' (' + ROBOT.pos.x + ', ' + ROBOT.pos.y + ', ' + ROBOT.pos.z + ')';
+      document.getElementById('ui-brain-title').textContent = '🚪 選択列: ' + shortName;
       document.getElementById('diary-text').textContent = ROBOT.diary.join("\n\n");
       document.getElementById('diary-belief').textContent = ROBOT.belief;
+
+      const key = safeStorage.getItem('gemini_api_key') || '';
+      const badge = document.getElementById('ui-badge');
+      if (key.length > 10) {
+        badge.className = "badge badge-on";
+        badge.textContent = "⚡ 残: " + ROBOT.realQuota + "/20";
+      } else {
+        badge.className = "badge badge-off";
+        badge.textContent = "⚙️ キー未設定";
+      }
     }
 
     function openModal(id) {
       if (id === 'settingModal') {
+        const curModel = getSelectedModel();
         document.getElementById('setting-api-key').value = safeStorage.getItem('gemini_api_key') || '';
+        document.getElementById('setting-model').value = curModel;
+        document.getElementById('setting-auto-switch').checked = getAutoSwitch();
+        document.getElementById('setting-msg').textContent = '';
+        syncRadarSelection(curModel);
       }
       document.getElementById(id).style.display = 'flex';
     }
@@ -972,10 +1348,11 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
+    // ★ ゲームを開いた瞬間に3D水槽を立ち上げ、自動でドアの混み具合を調べる ★
     window.addEventListener('DOMContentLoaded', () => {
       init3D();
       updateHUD();
-      testApiConnection();
+      scanDoorsAndPickBest(false);
     });
   </script>
 </body>
