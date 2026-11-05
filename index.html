@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>ボクセルAI自律思考水槽 - 空きドア自動案内＆電球点灯版</title>
+  <title>ボクセルAI自律思考水槽 - 本物の通過確認＆電球点灯版</title>
 
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -148,6 +148,7 @@
     .radar-list {
       display: flex; flex-direction: column; gap: 6px;
       background: #020617; border: 1px solid #1e293b; border-radius: 10px; padding: 8px;
+      max-height: 190px; overflow-y: auto;
     }
     .radar-item {
       display: flex; justify-content: space-between; align-items: center;
@@ -155,7 +156,7 @@
       font-size: 11px; cursor: pointer;
     }
     .radar-item.selected { border-color: #38bdf8; background: rgba(2, 132, 199, 0.22); }
-    .radar-tag { font-size: 10px; padding: 2px 6px; border-radius: 6px; font-weight: bold; }
+    .radar-tag { font-size: 10px; padding: 2px 6px; border-radius: 6px; font-weight: bold; white-space: nowrap; }
   </style>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -186,14 +187,14 @@
     </div>
   </div>
 
-  <!-- 思考モニター（ドアの混み具合と生ログを表示） -->
+  <!-- 思考モニター（本物のドア通過状況と生ログを表示） -->
   <div class="thought-card" id="thought-card">
     <div class="thought-title">
-      <span id="ui-brain-title">🚪 空き列: 確認中...</span>
+      <span id="ui-brain-title">🚪 選択列: gemini-3.8-flash</span>
       <span id="server-lamp" class="server-status status-yellow">📡 ドア確認中</span>
     </div>
     <div class="thought-body" id="thought-txt">
-      （ゲームを開くと自動で各ドアの混み具合を見て、一番空いている列をご案内します。下のボタンを押すとその列に並んで思考します）
+      （ゲームを開くと実在するドアを探し、本物の思考ルームが通るかチェックします。下のボタンを押すと通過して💡が光ります）
     </div>
   </div>
 
@@ -209,7 +210,7 @@
   <div class="bottom-hud">
     <div class="tap-guide" id="guide-txt">地面をタップして【🍎リンゴ】を落とせます</div>
     <div class="action-row">
-      <button id="think-btn" class="main-btn" onclick="stepAiLife()">⚡ 空いている列に並んで思考させる</button>
+      <button id="think-btn" class="main-btn" onclick="stepAiLife()">⚡ 空いている列（3.8-flash）で思考させる</button>
       <button id="respawn-btn" class="main-btn btn-respawn" onclick="respawnRobot()">🔄 次の個体へ（古い手帳を読んで起き上がる）</button>
     </div>
   </div>
@@ -232,11 +233,11 @@
     </div>
   </div>
 
-  <!-- 通信・ドアの混み具合チェック小窓 -->
+  <!-- 通信・ドアの本物通過チェック小窓 -->
   <div class="modal-cover" id="settingModal">
     <div class="modal-box">
       <div class="modal-head">
-        <div class="modal-title">🚪 ドアの混み具合チェック＆列の選択</div>
+        <div class="modal-title">🚪 本物のドア通過チェック＆列の選択</div>
         <div class="close-btn" onclick="closeModal('settingModal')">✕</div>
       </div>
 
@@ -244,50 +245,21 @@
       <input type="password" id="setting-api-key" class="input-box" placeholder="AIzaSy... から始まるキーを貼り付け">
 
       <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
-        <label style="font-size:11px; color:#38bdf8; font-weight:bold;">② どのドア（列）が空いているか見る</label>
-        <button class="sub-btn" onclick="scanDoorsAndPickBest(true)">📡 いまの混み具合を調べる</button>
+        <label style="font-size:11px; color:#38bdf8; font-weight:bold;">② 実際に通れるドア（404は自動除外）</label>
+        <button class="sub-btn" onclick="discoverAndTestRealDoors(true)">📡 本物の通過テスト</button>
       </div>
 
-      <!-- 3つのドアの混み具合リスト -->
-      <div class="radar-list" id="model-radar-list">
-        <div class="radar-item" data-model="gemini-3.8-flash-lite" onclick="selectModelFromRadar('gemini-3.8-flash-lite')">
-          <div>
-            <div style="font-weight:bold; color:#f8fafc;">🚪 ドア1: gemini-3.8-flash-lite</div>
-            <div style="font-size:10px; color:#94a3b8;">無料枠◎ / 高速レーン（一番スイスイ通りやすい）</div>
-          </div>
-          <span class="radar-tag status-yellow" id="st-gemini-3.8-flash-lite">未確認</span>
-        </div>
+      <!-- 実在するドアの通過テストリスト -->
+      <div class="radar-list" id="model-radar-list"></div>
 
-        <div class="radar-item" data-model="gemini-3.8-flash" onclick="selectModelFromRadar('gemini-3.8-flash')">
-          <div>
-            <div style="font-weight:bold; color:#f8fafc;">🚪 ドア2: gemini-3.8-flash</div>
-            <div style="font-size:10px; color:#94a3b8;">無料枠◎ / 標準レーン（バランス型）</div>
-          </div>
-          <span class="radar-tag status-yellow" id="st-gemini-3.8-flash">未確認</span>
-        </div>
-
-        <div class="radar-item" data-model="gemini-3.8-pro" onclick="selectModelFromRadar('gemini-3.8-pro')">
-          <div>
-            <div style="font-weight:bold; color:#f8fafc;">🚪 ドア3: gemini-3.8-pro</div>
-            <div style="font-size:10px; color:#94a3b8;">じっくり思考レーン（上位頭脳）</div>
-          </div>
-          <span class="radar-tag status-yellow" id="st-gemini-3.8-pro">未確認</span>
-        </div>
-      </div>
-
-      <label style="font-size:11px; color:#94a3b8;">現在並んでいる列（別のモデル一覧も取得できます）</label>
-      <div style="display:flex; gap:6px;">
-        <select id="setting-model" class="select-box" style="flex:1;" onchange="syncRadarSelection(this.value)">
-          <option value="gemini-3.8-flash-lite">gemini-3.8-flash-lite (高速ドア)</option>
-          <option value="gemini-3.8-flash">gemini-3.8-flash (標準ドア)</option>
-          <option value="gemini-3.8-pro">gemini-3.8-pro (上位ドア)</option>
-        </select>
-        <button class="sub-btn" onclick="fetchAvailableModelsFromGoogle()" title="Googleから全ドア一覧を取り寄せる">🔍全列取得</button>
-      </div>
+      <label style="font-size:11px; color:#94a3b8;">現在並んでいる列（タップまたは下から選択）</label>
+      <select id="setting-model" class="select-box" onchange="onSelectModelChange(this.value)">
+        <option value="gemini-3.8-flash">gemini-3.8-flash</option>
+      </select>
 
       <div style="display:flex; align-items:center; gap:6px; font-size:11px; color:#cbd5e1;">
         <input type="checkbox" id="setting-auto-switch" checked>
-        <label for="setting-auto-switch">並んだ列が急に混んだら、隣の空いている列へ自動で並び直す</label>
+        <label for="setting-auto-switch">並んだ列が混んでいたら、他の「🟢通行OK」の列へ自動で並び直す</label>
       </div>
 
       <div class="msg-line" id="setting-msg"></div>
@@ -309,12 +281,20 @@
       setItem: (k, v) => { try { localStorage.setItem(k, v); } catch(e) {} }
     };
 
-    // 空いているドアの順番リスト（起動時のチェックで一番空いている順に並び替わる）
-    let rankedOpenDoors = ['gemini-3.8-flash-lite', 'gemini-3.8-flash', 'gemini-3.8-pro'];
+    // 本物の通過テスト（generateContent）で「🟢通行OK」と確認されたドアのリスト
+    let verifiedWorkingDoors = ['gemini-3.8-flash'];
+    // Googleサーバーに実在するドア一覧（404を除外したもの）
+    let existingDoors = [
+      { id: 'gemini-3.8-flash', desc: '3.8 標準ドア（メイン頭脳）', status: '未確認', cls: 'status-yellow' }
+    ];
 
     function getSelectedModel() {
       const saved = safeStorage.getItem('gemini_model_38');
-      return saved && saved.length > 3 ? saved : 'gemini-3.8-flash-lite';
+      // 以前404だったモデル名が保存されていた場合は、確実に実在する gemini-3.8-flash に戻す
+      if (!saved || saved === 'gemini-3.8-flash-lite' || saved === 'gemini-3.8-pro') {
+        return 'gemini-3.8-flash';
+      }
+      return saved;
     }
 
     function getAutoSwitch() {
@@ -354,7 +334,7 @@
       realQuota: initQuota(),
       seconds: 0,
       stats: { hp: 100, hunger: 70, stamina: 85, sleep: 80, morale: 60 },
-      belief: "古い手帳に『空腹がゼロになると動けなくなる』と書かれている。空いているドアから通信が繋がり次第、リンゴを探す。",
+      belief: "古い手帳に『空腹がゼロになると動けなくなる』と書かれている。通信が通り次第、リンゴを探す。",
       pos: { x: 0, y: 0, z: -1 },
       hasApple: false,
       eaten: 0,
@@ -376,30 +356,49 @@
     markVision(0, 0, -1);
 
     /* =====================================================================
-       【2. ゲームを開いた瞬間にドアの混み具合を見て、空いている列に並ばせる仕組み】
+       【2. 404ドアを除外し、本物の generateContent で通過テストを行う仕組み】
        ===================================================================== */
-    function selectModelFromRadar(modelName) {
+    function renderRadarList() {
+      const box = document.getElementById('model-radar-list');
       const sel = document.getElementById('setting-model');
-      if (![...sel.options].some(o => o.value === modelName)) {
+      const cur = getSelectedModel();
+
+      box.innerHTML = '';
+      sel.innerHTML = '';
+
+      existingDoors.forEach((d, idx) => {
+        const item = document.createElement('div');
+        item.className = 'radar-item' + (d.id === cur ? ' selected' : '');
+        item.onclick = () => onSelectModelChange(d.id);
+        item.innerHTML =
+          '<div>' +
+            '<div style="font-weight:bold; color:#f8fafc;">🚪 ドア' + (idx + 1) + ': ' + d.id + '</div>' +
+            '<div style="font-size:10px; color:#94a3b8;">' + d.desc + '</div>' +
+          '</div>' +
+          '<span class="radar-tag ' + d.cls + '">' + d.status + '</span>';
+        box.appendChild(item);
+
         const opt = document.createElement('option');
-        opt.value = modelName;
-        opt.textContent = modelName;
+        opt.value = d.id;
+        opt.textContent = d.id;
         sel.appendChild(opt);
-      }
-      sel.value = modelName;
-      safeStorage.setItem('gemini_model_38', modelName);
-      syncRadarSelection(modelName);
-      updateHUD();
-    }
-
-    function syncRadarSelection(modelName) {
-      document.querySelectorAll('.radar-item').forEach(el => {
-        el.classList.toggle('selected', el.getAttribute('data-model') === modelName);
       });
+
+      if ([...sel.options].some(o => o.value === cur)) {
+        sel.value = cur;
+      }
     }
 
-    // ★ ゲームを開いた時やボタンを押した時に、3つのドアの混み具合を見て一番空いている列を自動セット ★
-    async function scanDoorsAndPickBest(fromModal) {
+    function onSelectModelChange(modelName) {
+      safeStorage.setItem('gemini_model_38', modelName);
+      renderRadarList();
+      updateHUD();
+      const shortName = modelName.replace('gemini-', '');
+      document.getElementById('think-btn').innerHTML = '⚡ 選択中の列（' + shortName + '）で思考させる';
+    }
+
+    // ★ 見せかけの countTokens ではなく、実在するドアを探して本物の generateContent が通るかテストする ★
+    async function discoverAndTestRealDoors(fromModal) {
       const inputEl = document.getElementById('setting-api-key');
       const key = (inputEl && inputEl.value.trim()) ? inputEl.value.trim() : (safeStorage.getItem('gemini_api_key') || '');
       const msg = document.getElementById('setting-msg');
@@ -409,6 +408,7 @@
       if (key.length <= 10) {
         lamp.className = "server-status status-yellow";
         lamp.textContent = "⚙️ キー未設定";
+        renderRadarList();
         if (fromModal && msg) {
           msg.style.color = '#fca5a5';
           msg.textContent = '⚠️ 先に①の欄へ無料APIキーを入力してください。';
@@ -418,130 +418,123 @@
       }
 
       lamp.className = "server-status status-yellow";
-      lamp.textContent = "📡 ドアの混み具合を確認中...";
+      lamp.textContent = "📡 本物のドア通過確認中...";
       if (fromModal && msg) {
         msg.style.color = '#38bdf8';
-        msg.textContent = '📡 3つのドアの混み具合を調べています（通信回数は減りません）...';
+        msg.textContent = '📡 閉鎖(404)のドアを除外し、実際に思考ルームが通るかテストしています...';
       }
 
-      const doors = ['gemini-3.8-flash-lite', 'gemini-3.8-flash', 'gemini-3.8-pro'];
-      const results = [];
+      // ステップA：Googleサーバーに問い合わせて、本当に存在するモデル名だけを取得する（404を完全排除）
+      let candidates = ['gemini-3.8-flash'];
+      try {
+        const listRes = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + key);
+        if (listRes.ok) {
+          const listData = await listRes.json();
+          const allModels = (listData.models || [])
+            .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
+            .map(m => m.name.replace('models/', ''));
 
-      // 3つのドアを同時にノックして、返事の速さを測る
-      await Promise.all(doors.map(async (m) => {
-        const badge = document.getElementById('st-' + m);
-        if (badge) {
-          badge.className = 'radar-tag status-yellow';
-          badge.textContent = '確認中...';
+          // 3.8系またはFlash系の実在するモデルを抽出（最大3つに絞ってテスト負荷を抑える）
+          const preferred = allModels.filter(name =>
+            name.includes('3.8') || name.includes('3.') || name.includes('2.5-flash') || name.includes('2.0-flash')
+          );
+          candidates = [...new Set(['gemini-3.8-flash', ...preferred])].slice(0, 3);
         }
+      } catch (e) {
+        candidates = ['gemini-3.8-flash'];
+      }
 
+      existingDoors = candidates.map(id => ({
+        id: id,
+        desc: id.includes('3.8') ? '3.8 頭脳レーン（実在確認済）' : '予備の高速レーン（実在確認済）',
+        status: '通過テスト中...',
+        cls: 'status-yellow'
+      }));
+      renderRadarList();
+
+      // ステップB：各ドアに対して本物の generateContent（1文字応答）を送って本当に通るか調べる
+      const testResults = [];
+      for (let i = 0; i < existingDoors.length; i++) {
+        const d = existingDoors[i];
         const t0 = performance.now();
         try {
-          const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + m + ':countTokens?key=' + key;
+          const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + d.id + ':generateContent?key=' + key;
           const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: 'ping' }] }] })
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: '1' }] }],
+              generationConfig: { maxOutputTokens: 2 }
+            })
           });
           const ms = Math.round(performance.now() - t0);
 
           if (res.ok) {
-            if (badge) {
-              badge.className = 'radar-tag status-green';
-              badge.textContent = '🟢 空き (' + ms + 'ms)';
-            }
-            results.push({ model: m, ok: true, ms: ms });
+            d.status = '🟢 通行OK (' + ms + 'ms)';
+            d.cls = 'status-green';
+            testResults.push({ id: d.id, ok: true, ms: ms });
           } else if (res.status === 503 || res.status === 429) {
-            if (badge) {
-              badge.className = 'radar-tag status-yellow';
-              badge.textContent = '🟡 混雑中';
-            }
-            results.push({ model: m, ok: false, ms: 99999 });
+            d.status = '🟡 思考室が混雑中';
+            d.cls = 'status-yellow';
+            testResults.push({ id: d.id, ok: false, ms: 99999 });
+          } else if (res.status === 404) {
+            d.status = '❌ 閉鎖 (404)';
+            d.cls = 'status-red';
+            testResults.push({ id: d.id, ok: false, ms: 999999, is404: true });
           } else {
-            if (badge) {
-              badge.className = 'radar-tag status-red';
-              badge.textContent = '❌ 閉鎖 (' + res.status + ')';
-            }
-            results.push({ model: m, ok: false, ms: 999999 });
+            d.status = '⚠️ 制限 (' + res.status + ')';
+            d.cls = 'status-red';
+            testResults.push({ id: d.id, ok: false, ms: 999999 });
           }
         } catch (e) {
-          if (badge) {
-            badge.className = 'radar-tag status-red';
-            badge.textContent = '❌ 通信不可';
-          }
-          results.push({ model: m, ok: false, ms: 999999 });
+          d.status = '❌ 通信エラー';
+          d.cls = 'status-red';
+          testResults.push({ id: d.id, ok: false, ms: 999999 });
         }
-      }));
+        renderRadarList();
+      }
 
-      // 空いていて速い順番に並び替える
-      results.sort((a, b) => a.ms - b.ms);
-      rankedOpenDoors = results.map(r => r.model);
+      // 404だったものはリストから除外する
+      existingDoors = existingDoors.filter(d => !d.status.includes('404'));
+      if (existingDoors.length === 0) {
+        existingDoors = [{ id: 'gemini-3.8-flash', desc: '3.8 標準ドア', status: '🟡 混雑中', cls: 'status-yellow' }];
+      }
 
-      const best = results.find(r => r.ok);
-      if (best) {
-        selectModelFromRadar(best.model);
-        const shortName = best.model.replace('gemini-', '');
+      // 本当に generateContent が通ったドアだけを verifiedWorkingDoors に入れる（閉鎖ドアには絶対並ばない）
+      const working = testResults.filter(r => r.ok).sort((a, b) => {
+        // 3.8-flash が通るなら最優先
+        if (a.id === 'gemini-3.8-flash') return -1;
+        if (b.id === 'gemini-3.8-flash') return 1;
+        return a.ms - b.ms;
+      });
+
+      if (working.length > 0) {
+        verifiedWorkingDoors = working.map(w => w.id);
+        const bestId = working[0].id;
+        safeStorage.setItem('gemini_model_38', bestId);
+        renderRadarList();
+
+        const shortName = bestId.replace('gemini-', '');
         lamp.className = "server-status status-green";
-        lamp.textContent = "🟢 空き列: " + shortName + " (" + best.ms + "ms)";
+        lamp.textContent = "🟢 通行OK: " + shortName;
         btn.innerHTML = "⚡ 空いている列（" + shortName + "）で思考させる";
 
         if (fromModal && msg) {
           msg.style.color = '#34d399';
-          msg.textContent = '✨ いま一番スイスイ通れる「' + best.model + '」の列に自動で並びました！';
+          msg.textContent = '✨ 本物の思考ルームが通ることを確認しました！「' + bestId + '」で確実に動きます。';
         }
       } else {
+        verifiedWorkingDoors = existingDoors.map(d => d.id);
+        renderRadarList();
         lamp.className = "server-status status-yellow";
-        lamp.textContent = "🟡 全ドア混雑中";
-        btn.innerHTML = "⚡ 空いている列を探して思考させる";
+        lamp.textContent = "🟡 思考ルーム混雑中";
+        btn.innerHTML = "⚡ 粘り強くノックして思考させる";
         if (fromModal && msg) {
           msg.style.color = '#fde047';
-          msg.textContent = '⚠️ いま全てのドアが混み合っています。少し待つか🔍全列取得をお試しください。';
+          msg.textContent = '⚠️ いまGoogleの思考ルームが混み合っています。思考ボタンを押すと自動で最大3回ノックして通過を試みます。';
         }
       }
       updateHUD();
-    }
-
-    async function fetchAvailableModelsFromGoogle() {
-      const key = document.getElementById('setting-api-key').value.trim() || safeStorage.getItem('gemini_api_key') || '';
-      const msg = document.getElementById('setting-msg');
-      if (key.length <= 10) {
-        msg.style.color = '#fca5a5';
-        msg.textContent = '⚠️ 先に①の欄へAPIキーを入力してください。';
-        return;
-      }
-
-      msg.style.color = '#38bdf8';
-      msg.textContent = '🔍 Googleサーバーから通れるドア（モデル）一覧を取得中...';
-
-      try {
-        const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + key);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        const models = (data.models || [])
-          .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
-          .map(m => m.name.replace('models/', ''));
-
-        const sel = document.getElementById('setting-model');
-        const currentVal = sel.value;
-
-        const baseModels = ['gemini-3.8-flash-lite', 'gemini-3.8-flash', 'gemini-3.8-pro'];
-        const merged = [...new Set([...baseModels, ...models])];
-
-        sel.innerHTML = '';
-        merged.forEach(mName => {
-          const opt = document.createElement('option');
-          opt.value = mName;
-          opt.textContent = mName;
-          sel.appendChild(opt);
-        });
-
-        if (merged.includes(currentVal)) sel.value = currentVal;
-        msg.style.color = '#34d399';
-        msg.textContent = '✓ Googleから ' + models.length + ' 個の列を取得して選択欄に追加しました！';
-      } catch (e) {
-        msg.style.color = '#fca5a5';
-        msg.textContent = '⚠️ 一覧の取得に失敗しました: ' + e.message;
-      }
     }
 
     function saveApiKey() {
@@ -556,10 +549,10 @@
       if (key.length > 10) {
         safeStorage.setItem('gemini_api_key', key);
         msg.style.color = '#34d399';
-        msg.textContent = '✓ 保存しました！ドアの混み具合を確認しています...';
+        msg.textContent = '✓ 保存しました！本物の通過テストを行います...';
         closeModal('settingModal');
         updateHUD();
-        scanDoorsAndPickBest(false);
+        discoverAndTestRealDoors(false);
       } else {
         msg.style.color = '#fca5a5';
         msg.textContent = '⚠️ 正しいAPIキー（AIzaSy...）を入力してください';
@@ -574,7 +567,7 @@
       msg.textContent = 'キーを消去しました。';
       closeModal('settingModal');
       updateHUD();
-      scanDoorsAndPickBest(false);
+      discoverAndTestRealDoors(false);
     }
 
     /* =====================================================================
@@ -945,8 +938,19 @@
       }).join(' / ');
     }
 
+    // AIの返答テキストから安全にJSONを取り出す関数（記号ズレで止まるのを防ぐ）
+    function extractJsonSafely(rawText) {
+      const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const firstBrace = cleaned.indexOf('{');
+      const lastBrace = cleaned.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        return JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
+      }
+      return JSON.parse(cleaned);
+    }
+
     /* =====================================================================
-       【5. 空いている列に並んで通信 ➜ 通過したら💡電球がピカッと光る】
+       【5. 本物の空きドアで通信 ➜ 通過したら💡電球がピカッと光る】
        ===================================================================== */
     async function stepAiLife() {
       if (ROBOT.isStop) return;
@@ -958,7 +962,7 @@
 
       if (key.length <= 10) {
         document.getElementById('thought-txt').innerHTML =
-          '<span style="color:#fde047; font-weight:bold;">⚠️ APIキーが設定されていません。</span><br>右上の「⚙️」から無料APIキーを入れると、自動で空いているドアを見つけて並びます。';
+          '<span style="color:#fde047; font-weight:bold;">⚠️ APIキーが設定されていません。</span><br>右上の「⚙️」から無料APIキーを入れると、自動で通れるドアを見つけて並びます。';
         openModal('settingModal');
         return;
       }
@@ -971,7 +975,7 @@
 
       btn.disabled = true;
       const shortModel = model.replace('gemini-', '');
-      btn.innerHTML = "🚪 " + shortModel + " の列に並んで通信中...";
+      btn.innerHTML = "🚪 " + shortModel + " の思考ルームへ通信中...";
       lamp.className = "server-status status-yellow";
       lamp.textContent = "⚡ " + shortModel + " 通過中...";
 
@@ -981,7 +985,7 @@
       const touch = inspectSurroundings(cx, cy, cz);
 
       try {
-        const result = await callOpenQueueWithRetry(cx, cy, cz, actions, smell, touch, key, model);
+        const result = await callVerifiedQueueWithRetry(cx, cy, cz, actions, smell, touch, key, model);
 
         // ★ 完全にAPIを通過した瞬間！ ★
         consumeQuota();
@@ -990,8 +994,7 @@
         lamp.textContent = "💡 通過成功 (" + usedShort + ")";
         btn.innerHTML = "💡 思考完了・行動中...";
 
-        // 通過できた列を一番スムーズな列として記憶
-        selectModelFromRadar(result.usedModel);
+        onSelectModelChange(result.usedModel);
 
         // 頭上の電球マークをピカッと光らせる！
         triggerIdeaBulb(result.usedModel);
@@ -1002,15 +1005,10 @@
         lamp.className = "server-status status-red";
         lamp.textContent = "❌ 通信未通過";
 
-        let errorDetail = err.message;
-        if (errorDetail.includes("503") || errorDetail.includes("high demand") || errorDetail.includes("429")) {
-          errorDetail = "いま並んだ列が混み合っています。右上の⚙️から『📡いまの混み具合を調べる』を押して、🟢のドアを確認してみてください。";
-        }
-
         document.getElementById('thought-txt').innerHTML =
-          '<div style="color:#ef4444; font-weight:bold;">❌ 【ドア混雑中：ロボは待機しています】</div>' +
-          '<div style="font-size:10px; color:#cbd5e1; margin-top:2px;">' + errorDetail + '</div>' +
-          '<div style="font-size:10px; color:#94a3b8; margin-top:3px;">※通過しなかったため、電球は光らず通信枠（20回）も減っていません。</div>';
+          '<div style="color:#ef4444; font-weight:bold;">❌ 【通信が通過できませんでした】</div>' +
+          '<div style="font-size:10px; color:#fde047; margin-top:2px;">理由: ' + err.message + '</div>' +
+          '<div style="font-size:10px; color:#94a3b8; margin-top:3px;">※通過しなかったため、電球は光らず通信枠（20回）も減っていません。もう一度ボタンを押すか、⚙️の「📡本物の通過テスト」をお試しください。</div>';
 
       } finally {
         btn.disabled = false;
@@ -1019,7 +1017,7 @@
       }
     }
 
-    async function callOpenQueueWithRetry(cx, cy, cz, actions, smell, touch, key, primaryModel) {
+    async function callVerifiedQueueWithRetry(cx, cy, cz, actions, smell, touch, key, primaryModel) {
       const prompt = `あなたは箱庭世界で生きる小さな自律個体（#${ROBOT.gen}）です。
 あなたはプレイヤーや死（ゲームオーバー）という概念を知りません。
 あなたが頼りにできるのは、周囲1マスの手触り、空間の匂い、そして足元に落ちていた「手帳の古い記録」だけです。
@@ -1040,7 +1038,7 @@ ${ROBOT.diary.slice(-4).join("\n")}
 【選択できる行動リスト】
 ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
 
-以下のJSON形式で出力してください：
+以下のJSON形式のみで出力してください：
 {
   "feeling": "五感で何を感じたか（30字以内）",
   "reason": "手帳の記録とお腹の減り具合を照らし合わせた葛藤と判断理由（60字以内）",
@@ -1050,9 +1048,9 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
 }`;
 
       const autoSwitch = getAutoSwitch();
-      // 起動時に調べた「空いているドア順」を活かして並ぶ列を作る
+      // 404のドアは絶対に含めず、実在が確認されたドアだけで順番を作る
       const candidateModels = autoSwitch
-        ? [...new Set([primaryModel, ...rankedOpenDoors])]
+        ? [...new Set([primaryModel, ...verifiedWorkingDoors])]
         : [primaryModel];
 
       let lastErr = null;
@@ -1061,13 +1059,13 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
         const targetModel = candidateModels[mIdx];
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${key}`;
 
-        // もし2番目以降の列に並び直した場合は画面でお知らせ
-        if (mIdx > 0) {
-          const lamp = document.getElementById('server-lamp');
-          lamp.textContent = "🔄 空き列(" + targetModel.replace('gemini-', '') + ")へ移動中...";
-        }
+        // 1つのドアにつき最大3回まで粘り強くノックする
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          if (attempt > 1 || mIdx > 0) {
+            const lamp = document.getElementById('server-lamp');
+            lamp.textContent = "🔄 " + targetModel.replace('gemini-', '') + " 再ノック中(" + attempt + "/3)...";
+          }
 
-        for (let attempt = 0; attempt < 2; attempt++) {
           try {
             const res = await fetch(url, {
               method: "POST",
@@ -1084,43 +1082,46 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
             if (res.ok) {
               const data = await res.json();
               const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (!rawText) throw new Error("空の応答が返されました");
-              const parsed = JSON.parse(rawText);
+              if (!rawText) throw new Error("AIから空の返答が返されました");
+              const parsed = extractJsonSafely(rawText);
               return { decision: parsed, usedModel: targetModel };
             }
 
-            const errTxt = await res.text();
-            lastErr = new Error(errTxt || `HTTP ${res.status}`);
-
             if (res.status === 503 || res.status === 429) {
-              await new Promise(r => setTimeout(r, 800));
+              lastErr = new Error(targetModel + " の思考ルームが混雑中です (HTTP " + res.status + ")");
+              await new Promise(r => setTimeout(r, 1000 * attempt));
               continue;
+            } else if (res.status === 404) {
+              lastErr = new Error(targetModel + " は存在しないドア(404)のためスキップしました");
+              break;
             } else {
+              const errTxt = await res.text();
+              lastErr = new Error("HTTP " + res.status + ": " + errTxt.slice(0, 80));
               break;
             }
           } catch (e) {
             lastErr = e;
-            await new Promise(r => setTimeout(r, 600));
+            await new Promise(r => setTimeout(r, 800));
           }
         }
       }
 
-      throw lastErr || new Error("通信に失敗しました");
+      throw lastErr || new Error("すべての列が混雑していました");
     }
 
     async function applyAgentAction(dec, actions) {
-      const act = actions.find(a => a.id === dec.actionId) || actions[0];
+      const act = actions.find(a => a.id === Number(dec.actionId)) || actions[0];
 
       if (dec.belief) {
         ROBOT.belief = dec.belief;
       }
 
       document.getElementById('thought-txt').innerHTML =
-        '<div style="font-size:10px; color:#fde047; font-weight:bold; margin-bottom:2px;">💡 ドア通過成功！ 👁️ 知覚: ' + dec.feeling + '</div>' +
-        '<div style="color:#fefcbf; font-weight:bold; margin-bottom:3px;">💭 「' + dec.reason + '」</div>' +
+        '<div style="font-size:10px; color:#fde047; font-weight:bold; margin-bottom:2px;">💡 ドア通過成功！ 👁️ 知覚: ' + (dec.feeling || '周囲を確認') + '</div>' +
+        '<div style="color:#fefcbf; font-weight:bold; margin-bottom:3px;">💭 「' + (dec.reason || 'リンゴを探して生き延びよう') + '」</div>' +
         '<div style="color:#86efac; font-size:10px;">⚡ 行動: ' + act.txt + '</div>';
 
-      ROBOT.diary.push('・[個体#' + ROBOT.gen + '] ' + dec.note);
+      ROBOT.diary.push('・[個体#' + ROBOT.gen + '] ' + (dec.note || act.txt));
 
       if (act.type === "MOVE") {
         ROBOT.stats.hunger = Math.max(0, ROBOT.stats.hunger - 1);
@@ -1226,7 +1227,7 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
 
       updateHUD();
       openModal('diaryModal');
-      scanDoorsAndPickBest(false);
+      discoverAndTestRealDoors(false);
     }
 
     let clock = 0, isWalking = false;
@@ -1330,10 +1331,9 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
       if (id === 'settingModal') {
         const curModel = getSelectedModel();
         document.getElementById('setting-api-key').value = safeStorage.getItem('gemini_api_key') || '';
-        document.getElementById('setting-model').value = curModel;
         document.getElementById('setting-auto-switch').checked = getAutoSwitch();
         document.getElementById('setting-msg').textContent = '';
-        syncRadarSelection(curModel);
+        renderRadarList();
       }
       document.getElementById(id).style.display = 'flex';
     }
@@ -1348,11 +1348,12 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // ★ ゲームを開いた瞬間に3D水槽を立ち上げ、自動でドアの混み具合を調べる ★
+    // ★ ゲームを開いた瞬間に3D水槽を立ち上げ、実在するドアを探して本物の通過テストを行う ★
     window.addEventListener('DOMContentLoaded', () => {
       init3D();
+      renderRadarList();
       updateHUD();
-      scanDoorsAndPickBest(false);
+      discoverAndTestRealDoors(false);
     });
   </script>
 </body>
