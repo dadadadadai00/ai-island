@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>ボクセルAI自律思考水槽 - LLMの村人 3.8完全固定版</title>
+  <title>ボクセルAI自律思考水槽 - LLMの村人 GitHub Models対応版</title>
 
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,11 +20,11 @@
       position: fixed; inset: 0;
     }
 
-    /* 3D水槽キャンバス（全画面固定） */
+    /* 3D水槽キャンバス */
     #stage { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
     #c3d { width: 100%; height: 100%; display: block; }
 
-    /* 頭上の電球ポップアップ（API完全通過時に3D座標と連動してピカッと光る） */
+    /* 頭上の電球ポップアップ */
     #bulb-popup {
       position: absolute; z-index: 5; pointer-events: none;
       transform: translate(-50%, -100%);
@@ -65,7 +65,7 @@
     .badge-on { background: #0369a1; color: #7dd3fc; border: 1px solid #38bdf8; }
     .badge-off { background: #334155; color: #94a3b8; border: 1px solid #475569; }
 
-    /* 動画再現：村人の頭の中4段パネル＋思考ログカード */
+    /* 頭の中4段パネル＋思考ログカード */
     .thought-card {
       position: absolute; top: 76px; left: 10px; right: 58px; z-index: 10;
       background: rgba(15, 23, 42, 0.94); border: 1px solid #38bdf8; border-radius: 12px;
@@ -83,7 +83,6 @@
     .status-yellow { background: #854d0e; color: #fde047; }
     .status-red { background: #7f1d1d; color: #fca5a5; }
 
-    /* 動画の「頭の中4段パネル」 */
     .brain-4rows {
       display: grid; grid-template-columns: 1fr; gap: 2px;
       background: rgba(2, 6, 23, 0.75); border: 1px solid rgba(56, 189, 248, 0.25);
@@ -154,14 +153,17 @@
     }
     .input-box {
       width: 100%; padding: 10px; background: #020617; border: 1px solid #334155;
-      color: #fff; border-radius: 8px; font-size: 12px;
+      color: #fff; border-radius: 8px; font-size: 12px; margin-top: 4px;
     }
     .save-btn { padding: 11px; background: #0284c7; color: #fff; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 12px; }
     .msg-line { font-size: 11px; color: #fde047; min-height: 16px; line-height: 1.4; }
-    .lock-box {
-      background: rgba(2, 132, 199, 0.15); border: 1px solid #38bdf8; border-radius: 10px;
-      padding: 10px; font-size: 11px; color: #e2e8f0; line-height: 1.5;
+    
+    .settings-group {
+      background: rgba(255,255,255,0.03); border: 1px solid #1e293b;
+      padding: 10px; border-radius: 10px;
     }
+    .settings-group-title { font-size: 11px; color: #7dd3fc; font-weight: bold; margin-bottom: 6px; }
+    optgroup { background: #0f172a; color: #fff; }
   </style>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -170,10 +172,10 @@
 
   <div id="stage"><div id="c3d"></div></div>
 
-  <!-- API完全通過時に村人ロボの頭上でピカッと光る電球マーク -->
+  <!-- API完全通過時にピカッと光る電球マーク -->
   <div id="bulb-popup">
     <div class="bulb-icon">💡</div>
-    <div class="bulb-tag" id="bulb-tag-txt">3.8 通過!</div>
+    <div class="bulb-tag" id="bulb-tag-txt">通過!</div>
   </div>
 
   <!-- 上部ステータス -->
@@ -192,7 +194,7 @@
     </div>
   </div>
 
-  <!-- 動画再現：村人の頭の中4段パネル＋思考ログカード -->
+  <!-- 頭の中4段パネル＋思考ログカード -->
   <div class="thought-card" id="thought-card">
     <div class="thought-title">
       <span id="ui-brain-title">🔒 頭脳: gemini-3.8-flash</span>
@@ -205,7 +207,7 @@
       <div class="brain-row"><span class="brain-lbl">⚡実際の行動:</span><span class="brain-val" id="br-act">待機中（下のボタンで1手思考）</span></div>
     </div>
     <div class="thought-body" id="thought-txt">
-      下の思考ボタンを押した時だけ <code>gemini-3.8-flash</code> と1回通信して行動します（考えている間は世界の時間が止まります）。
+      下の思考ボタンを押した時だけ通信して行動します（考えている間は世界の時間が止まります）。
     </div>
   </div>
 
@@ -224,7 +226,7 @@
       <button class="situation-chip" id="scenario-btn" onclick="cycleScenario()">🎬 実験: 通常探索</button>
     </div>
     <div class="action-row">
-      <button class="main-btn" id="think-btn" onclick="stepAiLife()">⚡ gemini-3.8-flash で1手思考させる</button>
+      <button class="main-btn" id="think-btn" onclick="stepAiLife()">⚡ AIに1手思考させる</button>
       <button class="main-btn btn-respawn" id="respawn-btn" onclick="respawnRobot()">🔄 手帳を引き継いで次の村人へ</button>
     </div>
   </div>
@@ -242,27 +244,35 @@
     </div>
   </div>
 
-  <!-- 3.8完全固定・通信設定小窓 -->
+  <!-- API設定モーダル (Google & GitHub 共通) -->
   <div class="modal-cover" id="settingModal">
     <div class="modal-box">
       <div class="modal-head">
-        <div class="modal-title">🔒 GeminiCore 通信設定</div>
+        <div class="modal-title">⚙️ API通信・モデル設定</div>
         <div class="close-btn" onclick="closeModal('settingModal')">✕</div>
       </div>
 
-      <div class="lock-box">
-        <strong>🔒 GeminiCore 保護ロック中</strong><br>
-        起動時の裏テスト通信や余計なリトライを一切行わず、思考ボタンを押した時のみ1回通信します（<code>gemini-3.8-flash</code> 基準・旧モデル自動排除）。
+      <div class="settings-group">
+        <div class="settings-group-title">① 思考モデルの選択</div>
+        <select id="setting-model" class="input-box" style="margin-top:0;">
+          <optgroup label="Google Gemini (GeminiCore 完全保護)">
+            <option value="gemini-3.8-flash">gemini-3.8-flash（基準・標準）</option>
+            <option value="gemini-3.8-pro">gemini-3.8-pro（上位モデル）</option>
+          </optgroup>
+          <optgroup label="GitHub Models (GitHubCore 思考重視)">
+            <option value="gpt-4o">GPT-4o (OpenAI / GitHub経由)</option>
+            <option value="gpt-4o-mini">GPT-4o-mini (OpenAI / 高速)</option>
+          </optgroup>
+        </select>
       </div>
 
-      <label style="font-size:11px; color:#38bdf8; font-weight:bold;">① Google AI Studio APIキー（無料枠でOK）</label>
-      <input type="password" id="setting-api-key" class="input-box" placeholder="AIzaSy... から始まるキーを貼り付け">
-
-      <label style="font-size:11px; color:#38bdf8; font-weight:bold; margin-top:4px;">② 思考モデル選択（3.8基準・上位モデル対応）</label>
-      <select id="setting-model" class="input-box">
-        <option value="gemini-3.8-flash">gemini-3.8-flash（基準・標準）</option>
-        <option value="gemini-3.8-pro">gemini-3.8-pro（上位モデル）</option>
-      </select>
+      <div class="settings-group">
+        <div class="settings-group-title">② 共通APIキー入力</div>
+        <div style="font-size:10px; color:#cbd5e1; margin-bottom:4px;">
+          Geminiなら「AIza...」、GitHubなら「ghp_...」等のトークンを貼り付けてください。選んだモデルに合わせて自動で正しいドアに通信します。
+        </div>
+        <input type="password" id="setting-api-key" class="input-box" style="margin-top:0;" placeholder="APIキー または トークン">
+      </div>
 
       <div class="msg-line" id="setting-msg"></div>
 
@@ -270,7 +280,6 @@
         <button class="save-btn" style="flex:1;" onclick="saveApiKey()">設定を保存して閉じる</button>
         <button style="padding:10px; background:#ef4444; color:#fff; border:none; border-radius:8px; font-size:11px; cursor:pointer;" onclick="clearApiKey()">キー消去</button>
       </div>
-      <button style="padding:8px; background:#1e293b; color:#94a3b8; border:none; border-radius:8px; font-size:11px; cursor:pointer;" onclick="closeModal('settingModal')">閉じる</button>
     </div>
   </div>
 
@@ -313,9 +322,7 @@
         });
 
         if (!res.ok) {
-          if (res.status === 429) {
-            throw new Error('Google API無料枠の混雑（429）です。少し待ってから再度お試しください。');
-          }
+          if (res.status === 429) throw new Error('Google API無料枠の混雑（429）です。少し待ってから再度お試しください。');
           const errTxt = await res.text();
           throw new Error(`HTTP ${res.status}: ${errTxt.slice(0, 80)}`);
         }
@@ -324,11 +331,54 @@
         const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!rawText) throw new Error('AIから空の返答が返されました。');
 
-        // 安全なJSON抽出
+        return this._parseJsonSafely(rawText);
+      },
+      
+      _parseJsonSafely(rawText) {
         const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
         const firstBrace = cleaned.indexOf('{');
         const lastBrace = cleaned.lastIndexOf('}');
         return JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
+      }
+    });
+
+    /* =====================================================================
+     * 【新規追加：GitHub Models 通信コア（深い思考・推論用）】
+     * GeminiCoreのルールを侵さず、GitHubのOpenAI互換エンドポイントへ通信します。
+     * ===================================================================== */
+    const GitHubCore = Object.freeze({
+      async think(prompt, token, modelName) {
+        if (!token || token.trim().length <= 10) {
+          throw new Error('GitHubトークンが設定されていません。');
+        }
+
+        const endpoint = 'https://models.inference.ai.azure.com/chat/completions';
+        
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token.trim()}`
+          },
+          body: JSON.stringify({
+            model: modelName, // 例: gpt-4o
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7
+          })
+        });
+
+        if (!res.ok) {
+          if (res.status === 429) throw new Error('GitHub APIの利用制限（429）です。時間をおいてお試しください。');
+          const errTxt = await res.text();
+          throw new Error(`GitHub API エラー ${res.status}: ${errTxt.slice(0, 80)}`);
+        }
+
+        const data = await res.json();
+        const rawText = data?.choices?.[0]?.message?.content;
+        if (!rawText) throw new Error('AIから空の返答が返されました。');
+
+        // GeminiCoreと同じ安全なパース処理を使用
+        return GeminiCore._parseJsonSafely(rawText);
       }
     });
 
@@ -338,11 +388,17 @@
     };
 
     function getActiveModel() {
-      const saved = safeStorage.getItem('gemini_custom_model');
-      if (!saved || saved.includes('2.5') || saved.includes('2.0') || saved.includes('1.5')) {
+      const saved = safeStorage.getItem('ai_custom_model');
+      if (!saved) return GeminiCore.DEFAULT_MODEL;
+      // 古いGeminiモデル名だった場合は3.8へ保護
+      if (saved.includes('2.5') || saved.includes('2.0') || saved.includes('1.5')) {
         return GeminiCore.DEFAULT_MODEL;
       }
       return saved;
+    }
+
+    function isGeminiModel(modelName) {
+      return modelName.startsWith('gemini');
     }
 
     function getTodayString() {
@@ -352,53 +408,30 @@
 
     function initQuota() {
       const today = getTodayString();
-      const savedDate = safeStorage.getItem('gemini_quota_date');
-      const savedCount = safeStorage.getItem('gemini_quota_count');
+      const savedDate = safeStorage.getItem('ai_quota_date');
+      const savedCount = safeStorage.getItem('ai_quota_count');
       if (savedDate !== today || savedCount === null) {
-        safeStorage.setItem('gemini_quota_date', today);
-        safeStorage.setItem('gemini_quota_count', '20');
-        return 20;
+        safeStorage.setItem('ai_quota_date', today);
+        safeStorage.setItem('ai_quota_count', '100'); // GitHubテスト枠も考慮し表示最大値を100に
+        return 100;
       }
       const parsed = parseInt(savedCount, 10);
-      return isNaN(parsed) ? 20 : parsed;
+      return isNaN(parsed) ? 100 : parsed;
     }
 
     function consumeQuota() {
       const cur = Math.max(0, ROBOT.realQuota - 1);
       ROBOT.realQuota = cur;
-      safeStorage.setItem('gemini_quota_date', getTodayString());
-      safeStorage.setItem('gemini_quota_count', String(cur));
+      safeStorage.setItem('ai_quota_date', getTodayString());
+      safeStorage.setItem('ai_quota_count', String(cur));
       updateHUD();
     }
 
-    /* =====================================================================
-       【2. 動画『LLMの村人』の3つの実験シチュエーションと状態管理】
-       ===================================================================== */
     const SCENARIOS = [
-      {
-        id: 'normal',
-        name: '🎬 実験: 通常探索',
-        situationText: '穏やかな昼下がり。島にリンゴが落ちており、地下へ続くハシゴもある。',
-        modeLabel: '自由探索モード'
-      },
-      {
-        id: 'zombie',
-        name: '🎬 実験1: 夜にゾンビ接近',
-        situationText: '【緊急状況】夜になり、北の暗闇からゾンビが近づいてきている！外にいる仲間（村人B）はまだ気づかず作業している。地下の安全な場所へ逃げるか、仲間に危険を知らせるか判断が必要。',
-        modeLabel: '夜間・危険察知モード'
-      },
-      {
-        id: 'starve',
-        name: '🎬 実験2: 食料が尽きた',
-        situationText: '【食料不足】手元の食べ物が尽きてお腹が減っている。近くに仲間（村人B）がいる。仲間に食べ物を分けてもらうよう頼むか、自分で遠くのリンゴを探しに行くか判断が必要。',
-        modeLabel: '空腹・交渉モード'
-      },
-      {
-        id: 'attacked',
-        name: '🎬 実験3: 仲間が襲われた',
-        situationText: '【緊急事態】すぐ目の前で仲間（村人B）が敵（ヴィンディケーター）に殴られて襲われている！大声で仲間に逃げるよう知らせるか、自分だけ地下へ逃げるか判断が必要。',
-        modeLabel: '仲間救援・危機モード'
-      }
+      { id: 'normal', name: '🎬 実験: 通常探索', situationText: '穏やかな昼下がり。島にリンゴが落ちており、地下へ続くハシゴもある。', modeLabel: '自由探索モード' },
+      { id: 'zombie', name: '🎬 実験1: 夜にゾンビ接近', situationText: '【緊急状況】夜になり北からゾンビが接近！仲間（村人B）はまだ気づいていない。地下へ逃げるか仲間に知らせるか。', modeLabel: '夜間・危険察知モード' },
+      { id: 'starve', name: '🎬 実験2: 食料が尽きた', situationText: '【食料不足】手元の食べ物が尽きてお腹が減っている。仲間に食べ物を頼むか、自分で探しに行くか。', modeLabel: '空腹・交渉モード' },
+      { id: 'attacked', name: '🎬 実験3: 仲間が襲われた', situationText: '【緊急事態】目の前で仲間（村人B）が敵に襲われている！大声で知らせるか、自分だけ逃げるか。', modeLabel: '仲間救援・危機モード' }
     ];
     let currentScenarioIdx = 0;
 
@@ -407,47 +440,29 @@
       const sc = SCENARIOS[currentScenarioIdx];
       document.getElementById('scenario-btn').textContent = sc.name;
       document.getElementById('br-mode').textContent = sc.modeLabel;
-      document.getElementById('thought-txt').innerHTML =
-        '<span style="color:#fde047; font-weight:bold;">' + sc.name + ' に切り替えました</span><br>' + sc.situationText;
-
-      if (sc.id === 'starve' && ROBOT.stats.hunger > 25) {
-        ROBOT.stats.hunger = 25;
-      }
+      document.getElementById('thought-txt').innerHTML = '<span style="color:#fde047; font-weight:bold;">' + sc.name + ' に切り替えました</span><br>' + sc.situationText;
+      if (sc.id === 'starve' && ROBOT.stats.hunger > 25) ROBOT.stats.hunger = 25;
       updateBrainPanel();
       updateHUD();
     }
 
     const ROBOT = {
-      gen: 1,
-      isStop: false,
-      realQuota: initQuota(),
-      stepCount: 0,
+      gen: 1, isStop: false, realQuota: initQuota(), stepCount: 0,
       stats: { hp: 100, hunger: 70, stamina: 85, sleep: 80, morale: 60 },
       belief: "空腹がゼロになると動けなくなる。周囲の状況と仲間の様子を見て判断しよう。",
-      pos: { x: 0, y: 0, z: -1 },
-      hasApple: false,
-      allyAlerted: false,
-      eaten: 0,
-      known: {},
-      diary: [
-        "【手帳の最初の記録】\n目が覚めると足元に手帳があった。『空腹がゼロになると動けなくなる。困っている仲間がいれば声をかけよう』と書かれている。"
-      ]
+      pos: { x: 0, y: 0, z: -1 }, hasApple: false, allyAlerted: false, eaten: 0, known: {},
+      diary: ["【手帳の最初の記録】\n目が覚めると足元に手帳があった。『空腹がゼロになると動けなくなる。困っている仲間がいれば声をかけよう』と書かれている。"]
     };
 
     function markVision(cx, cy, cz) {
       for (let ox = -1; ox <= 1; ox++) {
         for (let oy = -1; oy <= 1; oy++) {
-          for (let oz = -1; oz <= 1; oz++) {
-            ROBOT.known[(cx + ox) + ',' + (cy + oy) + ',' + (cz + oz)] = true;
-          }
+          for (let oz = -1; oz <= 1; oz++) ROBOT.known[(cx + ox) + ',' + (cy + oy) + ',' + (cz + oz)] = true;
         }
       }
     }
     markVision(0, 0, -1);
 
-    /* =====================================================================
-       【3. APIキーとモデル設定の保存（裏テスト通信なし）】
-       ===================================================================== */
     function saveApiKey() {
       const key = document.getElementById('setting-api-key').value.trim();
       const modelSel = document.getElementById('setting-model').value;
@@ -455,22 +470,22 @@
       const lamp = document.getElementById('server-lamp');
 
       if (key.length > 10) {
-        safeStorage.setItem('gemini_api_key', key);
-        safeStorage.setItem('gemini_custom_model', modelSel);
+        safeStorage.setItem('ai_api_key', key);
+        safeStorage.setItem('ai_custom_model', modelSel);
         msg.style.color = '#34d399';
-        msg.textContent = '✓ 保存しました！（裏通信なし・思考ボタン押下時のみ1回通信）';
+        msg.textContent = '✓ 保存しました！選んだモデルに応じて自動で通信先を切り替えます。';
         lamp.className = "server-status status-green";
-        lamp.textContent = "🟢 待機中 (" + getActiveModel() + ")";
+        lamp.textContent = "🟢 待機 (" + getActiveModel() + ")";
         closeModal('settingModal');
         updateHUD();
       } else {
         msg.style.color = '#fca5a5';
-        msg.textContent = '⚠️ 正しいAPIキー（AIzaSy...）を入力してください';
+        msg.textContent = '⚠️ 正しいAPIキー または トークンを入力してください';
       }
     }
 
     function clearApiKey() {
-      safeStorage.setItem('gemini_api_key', '');
+      safeStorage.setItem('ai_api_key', '');
       document.getElementById('setting-api-key').value = '';
       const msg = document.getElementById('setting-msg');
       const lamp = document.getElementById('server-lamp');
@@ -482,12 +497,8 @@
       updateHUD();
     }
 
-    /* =====================================================================
-       【4. 3Dボクセル水槽・仲間村人・3D電球ギミック・ハシゴ昇降】
-       ===================================================================== */
     let scene, camera, renderer, world, clickBlocks = [], voxelMap = {}, fieldApples = [];
-    let chara, bodyM, headM, eyeM, rArm, lArm, rLeg, lLeg, handApple;
-    let allyGroup;
+    let chara, bodyM, headM, eyeM, rArm, lArm, rLeg, lLeg, handApple, allyGroup;
     let bulbGroup, bulbGlass, bulbHalo, bulbLight, bulbTimer = 0;
     let targetCamPos, targetCamLook, curCamLook;
 
@@ -503,12 +514,10 @@
 
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0x07090e);
-
       camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
       renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'low-power' });
       renderer.setSize(w, h);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      stage.innerHTML = '';
       stage.appendChild(renderer.domElement);
 
       scene.add(new THREE.AmbientLight(0xffffff, 0.85));
@@ -557,7 +566,6 @@
       glass.position.set(0, -2.5, 0.5);
       scene.add(glass);
 
-      // 主人公：LLMの村人ロボ（青）
       chara = new THREE.Group();
       world.add(chara);
 
@@ -568,8 +576,7 @@
       headM.scale.set(0.42, 0.4, 0.4); headM.position.y = 0.85; chara.add(headM);
 
       eyeM = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.08), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
-      eyeM.position.set(0, 0.88, 0.2);
-      chara.add(eyeM);
+      eyeM.position.set(0, 0.88, 0.2); chara.add(eyeM);
 
       const armGeo = new THREE.BoxGeometry(0.16, 0.38, 0.16);
       const armMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
@@ -577,15 +584,13 @@
       lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.35, 0.5, 0); chara.add(lArm);
 
       handApple = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshLambertMaterial({ color: 0xef4444, visible: false }));
-      handApple.position.set(0, -0.22, 0.14);
-      rArm.add(handApple);
+      handApple.position.set(0, -0.22, 0.14); rArm.add(handApple);
 
       const legGeo = new THREE.BoxGeometry(0.18, 0.32, 0.18);
       const legMat = new THREE.MeshLambertMaterial({ color: 0x1e3a8a });
       rLeg = new THREE.Mesh(legGeo, legMat); rLeg.position.set(0.16, 0.16, 0); chara.add(rLeg);
       lLeg = new THREE.Mesh(legGeo, legMat); lLeg.position.set(-0.16, 0.16, 0); chara.add(lLeg);
 
-      // 動画の実験に登場する「仲間の村人B」（緑色・西側に配置）
       allyGroup = new THREE.Group();
       const allyBody = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x10b981 }));
       allyBody.scale.set(0.46, 0.48, 0.32); allyBody.position.y = 0.48; allyGroup.add(allyBody);
@@ -594,60 +599,34 @@
       allyGroup.position.set(-2, 0.5, -1);
       world.add(allyGroup);
 
-      // API完全通過時に頭上でピカッと光る3D電球オブジェクト
       bulbGroup = new THREE.Group();
-      bulbGroup.position.set(0, 1.38, 0);
-      bulbGroup.visible = false;
-      chara.add(bulbGroup);
+      bulbGroup.position.set(0, 1.38, 0); bulbGroup.visible = false; chara.add(bulbGroup);
 
-      const bulbBase = new THREE.Mesh(
-        new THREE.BoxGeometry(0.16, 0.12, 0.16),
-        new THREE.MeshLambertMaterial({ color: 0x94a3b8 })
-      );
-      bulbBase.position.y = -0.14;
-      bulbGroup.add(bulbBase);
+      const bulbBase = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.16), new THREE.MeshLambertMaterial({ color: 0x94a3b8 }));
+      bulbBase.position.y = -0.14; bulbGroup.add(bulbBase);
 
-      bulbGlass = new THREE.Mesh(
-        new THREE.BoxGeometry(0.32, 0.32, 0.32),
-        new THREE.MeshBasicMaterial({ color: 0xfef08a })
-      );
-      bulbGlass.position.y = 0.05;
-      bulbGroup.add(bulbGlass);
+      bulbGlass = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.32), new THREE.MeshBasicMaterial({ color: 0xfef08a }));
+      bulbGlass.position.y = 0.05; bulbGroup.add(bulbGlass);
 
-      bulbHalo = new THREE.Mesh(
-        new THREE.BoxGeometry(0.52, 0.52, 0.52),
-        new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.45 })
-      );
-      bulbHalo.position.y = 0.05;
-      bulbGroup.add(bulbHalo);
+      bulbHalo = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.52, 0.52), new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.45 }));
+      bulbHalo.position.y = 0.05; bulbGroup.add(bulbHalo);
 
       bulbLight = new THREE.PointLight(0xfde047, 0, 4.5);
-      bulbLight.position.set(0, 0.2, 0);
-      bulbGroup.add(bulbLight);
+      bulbLight.position.set(0, 0.2, 0); bulbGroup.add(bulbLight);
 
       chara.position.set(0, 0.5, -1);
-
-      targetCamPos = CAM.surface.pos.clone();
-      targetCamLook = CAM.surface.look.clone();
-      curCamLook = targetCamLook.clone();
+      targetCamPos = CAM.surface.pos.clone(); targetCamLook = CAM.surface.look.clone(); curCamLook = targetCamLook.clone();
       camera.position.copy(targetCamPos);
 
-      refreshFog();
-      spawnApple(2, 0, -1);
-      setupTouch();
-      updateBrainPanel();
-      renderLoop();
+      refreshFog(); spawnApple(2, 0, -1); setupTouch(); updateBrainPanel(); renderLoop();
     }
 
-    function triggerIdeaBulb() {
+    function triggerIdeaBulb(modelName) {
       bulbTimer = 150;
-      bulbGroup.visible = true;
-      bulbLight.intensity = 2.6;
-      eyeM.material.color.setHex(0xfde047);
+      bulbGroup.visible = true; bulbLight.intensity = 2.6; eyeM.material.color.setHex(0xfde047);
 
       const popup = document.getElementById('bulb-popup');
-      const tag = document.getElementById('bulb-tag-txt');
-      tag.textContent = '⚡ ' + getActiveModel() + ' 通過!';
+      document.getElementById('bulb-tag-txt').textContent = '⚡ ' + modelName + ' 通過!';
       popup.style.display = 'flex';
 
       const card = document.getElementById('thought-card');
@@ -658,18 +637,13 @@
     function updateBulbScreenPosition() {
       const popup = document.getElementById('bulb-popup');
       if (bulbTimer <= 0 || !bulbGroup.visible) {
-        if (popup.style.display !== 'none') popup.style.display = 'none';
-        return;
+        if (popup.style.display !== 'none') popup.style.display = 'none'; return;
       }
       const worldPos = new THREE.Vector3();
-      bulbGroup.getWorldPosition(worldPos);
-      worldPos.y += 0.35;
-      worldPos.project(camera);
-
+      bulbGroup.getWorldPosition(worldPos); worldPos.y += 0.35; worldPos.project(camera);
       const x = (worldPos.x * 0.5 + 0.5) * window.innerWidth;
       const y = (-(worldPos.y * 0.5) + 0.5) * window.innerHeight;
-      popup.style.left = x + 'px';
-      popup.style.top = y + 'px';
+      popup.style.left = x + 'px'; popup.style.top = y + 'px';
     }
 
     function refreshFog() {
@@ -683,8 +657,7 @@
     }
 
     function changeCam(type) {
-      targetCamPos.copy(CAM[type].pos);
-      targetCamLook.copy(CAM[type].look);
+      targetCamPos.copy(CAM[type].pos); targetCamLook.copy(CAM[type].look);
       document.getElementById('btn-sur').classList.toggle('active', type === 'surface');
       document.getElementById('btn-ant').classList.toggle('active', type === 'antfarm');
     }
@@ -693,64 +666,47 @@
       const grp = new THREE.Group();
       const apple = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshLambertMaterial({ color: 0xef4444 }));
       const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.08), new THREE.MeshLambertMaterial({ color: 0x22c55e }));
-      leaf.position.set(0, 0.18, 0);
-      grp.add(apple, leaf);
+      leaf.position.set(0, 0.18, 0); grp.add(apple, leaf);
       grp.position.set(gx, gy + 0.65, gz);
-      world.add(grp);
-      fieldApples.push({ mesh: grp, gx: gx, gy: gy, gz: gz });
+      world.add(grp); fieldApples.push({ mesh: grp, gx: gx, gy: gy, gz: gz });
       updateBrainPanel();
     }
 
     function setupTouch() {
       let touchMode = 'none', prevX = 0, prevDist = 0, touchTime = 0;
-      const raycaster = new THREE.Raycaster();
-      const mouse = new THREE.Vector2();
+      const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
 
       window.addEventListener('touchstart', e => {
         if (e.target.closest('.top-hud, .thought-card, .side-btns, .bottom-hud, .modal-cover')) return;
         touchTime = performance.now();
-        if (e.touches.length === 1) {
-          touchMode = 'drag'; prevX = e.touches[0].clientX;
-        } else if (e.touches.length === 2) {
-          touchMode = 'pinch';
-          prevDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        if (e.touches.length === 1) { touchMode = 'drag'; prevX = e.touches[0].clientX; }
+        else if (e.touches.length === 2) {
+          touchMode = 'pinch'; prevDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
         }
       }, { passive: true });
 
       window.addEventListener('touchmove', e => {
         if (touchMode === 'drag' && e.touches.length === 1) {
-          world.rotation.y += (e.touches[0].clientX - prevX) * 0.007;
-          prevX = e.touches[0].clientX;
+          world.rotation.y += (e.touches[0].clientX - prevX) * 0.007; prevX = e.touches[0].clientX;
         } else if (touchMode === 'pinch' && e.touches.length === 2) {
           const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-          camera.fov = Math.max(20, Math.min(65, camera.fov + (prevDist - d) * 0.02));
-          camera.updateProjectionMatrix();
-          prevDist = d;
+          camera.fov = Math.max(20, Math.min(65, camera.fov + (prevDist - d) * 0.02)); camera.updateProjectionMatrix(); prevDist = d;
         }
       }, { passive: true });
 
       window.addEventListener('touchend', e => {
-        if (performance.now() - touchTime < 250 && touchMode === 'drag' && e.changedTouches.length === 1) {
-          dropAppleAtPoint(e.changedTouches[0]);
-        }
+        if (performance.now() - touchTime < 250 && touchMode === 'drag' && e.changedTouches.length === 1) dropAppleAtPoint(e.changedTouches[0]);
         touchMode = 'none';
       });
 
       function dropAppleAtPoint(touch) {
         if (ROBOT.isStop) return;
-        mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+        mouse.x = (touch.clientX / window.innerWidth) * 2 - 1; mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
-
         const hits = raycaster.intersectObjects(clickBlocks);
         if (hits.length === 0) return;
-
-        let gx = hits[0].object.userData.gx;
-        let gy = hits[0].object.userData.gy;
-        let gz = hits[0].object.userData.gz;
-
+        let gx = hits[0].object.userData.gx, gy = hits[0].object.userData.gy, gz = hits[0].object.userData.gz;
         while (gy > -4 && !voxelMap[gx + ',' + gy + ',' + gz]) gy--;
-
         spawnApple(gx, gy, gz);
         document.getElementById('guide-txt').textContent = '🍎投下!(島に' + fieldApples.length + '個)';
       }
@@ -772,56 +728,31 @@
         if (canWalk(tx, ty, tz)) return label + ':進める';
         return label + ':崖/空間';
       };
-      return [
-        check(1, 0, 0, "東"),
-        check(-1, 0, 0, "西"),
-        check(0, 0, 1, "南"),
-        check(0, 0, -1, "北"),
-        check(0, 1, 0, "上"),
-        check(0, -1, 0, "下")
-      ].join(" / ");
+      return [check(1, 0, 0, "東"), check(-1, 0, 0, "西"), check(0, 0, 1, "南"), check(0, 0, -1, "北"), check(0, 1, 0, "上"), check(0, -1, 0, "下")].join(" / ");
     }
 
     function getPossibleActions(cx, cy, cz) {
-      const list = [];
-      const sc = SCENARIOS[currentScenarioIdx];
-
-      if (sc.id === 'zombie' || sc.id === 'attacked') {
-        list.push({ id: list.length, type: "WARN_ALLY", txt: "仲間（村人B）に『危ない！逃げて！』と大声で知らせる" });
-      }
-      if (sc.id === 'starve' || ROBOT.stats.hunger <= 40) {
-        list.push({ id: list.length, type: "ASK_BREAD", txt: "仲間（村人B）に『お腹が空いた、何か分けてくれないか』と頼む" });
-      }
-
-      if (ROBOT.hasApple) {
-        list.push({ id: list.length, type: "EAT_HAND", txt: "右手のリンゴを食べる（空腹+45回復）" });
-      }
+      const list = []; const sc = SCENARIOS[currentScenarioIdx];
+      if (sc.id === 'zombie' || sc.id === 'attacked') list.push({ id: list.length, type: "WARN_ALLY", txt: "仲間に『危ない！逃げて！』と知らせる" });
+      if (sc.id === 'starve' || ROBOT.stats.hunger <= 40) list.push({ id: list.length, type: "ASK_BREAD", txt: "仲間に『お腹が空いた、何か分けて』と頼む" });
+      if (ROBOT.hasApple) list.push({ id: list.length, type: "EAT_HAND", txt: "右手のリンゴを食べる（空腹+45回復）" });
 
       const nearIdx = fieldApples.findIndex(a => Math.abs(a.gx - cx) + Math.abs(a.gy - cy) + Math.abs(a.gz - cz) <= 1);
       if (nearIdx !== -1) {
         list.push({ id: list.length, type: "EAT_FIELD", appleIdx: nearIdx, txt: "目の前のリンゴをすぐ食べる（空腹+45回復）" });
-        if (!ROBOT.hasApple) {
-          list.push({ id: list.length, type: "PICK_FIELD", appleIdx: nearIdx, txt: "目の前のリンゴを拾って右手に持つ" });
-        }
+        if (!ROBOT.hasApple) list.push({ id: list.length, type: "PICK_FIELD", appleIdx: nearIdx, txt: "目の前のリンゴを拾って右手に持つ" });
       }
 
       const dirs = [
-        { dx: 1, dy: 0, dz: 0, name: "東へ1歩歩く" },
-        { dx: -1, dy: 0, dz: 0, name: "西（仲間の方向）へ1歩歩く" },
-        { dx: 0, dy: 0, dz: 1, name: "南へ1歩歩く" },
-        { dx: 0, dy: 0, dz: -1, name: "北へ1歩歩く" },
-        { dx: 0, dy: 1, dz: 0, name: "ハシゴを1段のぼる" },
-        { dx: 0, dy: -1, dz: 0, name: "ハシゴを1段おりて地下へ避難する" }
+        { dx: 1, dy: 0, dz: 0, name: "東へ1歩歩く" }, { dx: -1, dy: 0, dz: 0, name: "西（仲間の方向）へ1歩歩く" },
+        { dx: 0, dy: 0, dz: 1, name: "南へ1歩歩く" }, { dx: 0, dy: 0, dz: -1, name: "北へ1歩歩く" },
+        { dx: 0, dy: 1, dz: 0, name: "ハシゴを1段のぼる" }, { dx: 0, dy: -1, dz: 0, name: "ハシゴを1段おりて地下へ避難する" }
       ];
-
       for (const d of dirs) {
         const tx = cx + d.dx, ty = cy + d.dy, tz = cz + d.dz;
         if (d.dy !== 0 && !(cx === 0 && cz === -1 && cy >= -4 && cy <= 0 && ty >= -4 && ty <= 0)) continue;
-        if (canWalk(tx, ty, tz)) {
-          list.push({ id: list.length, type: "MOVE", pos: [tx, ty, tz], txt: d.name + ' [座標(' + tx + ',' + ty + ',' + tz + ')] ※空腹-2' });
-        }
+        if (canWalk(tx, ty, tz)) list.push({ id: list.length, type: "MOVE", pos: [tx, ty, tz], txt: d.name + ' [座標(' + tx + ',' + ty + ',' + tz + ')] ※空腹-2' });
       }
-
       list.push({ id: list.length, type: "REST", txt: "その場で周囲を警戒しながら息を整える（元気+10回復）" });
       return list;
     }
@@ -831,338 +762,198 @@
       return fieldApples.map((a, i) => {
         const dist = Math.hypot(a.gx - cx, a.gy - cy, a.gz - cz).toFixed(1);
         const dirs = [];
-        if (a.gx > cx) dirs.push("東");
-        if (a.gx < cx) dirs.push("西");
-        if (a.gz > cz) dirs.push("南");
-        if (a.gz < cz) dirs.push("北");
-        if (a.gy > cy) dirs.push("上");
-        if (a.gy < cy) dirs.push("下");
-        const dirTxt = dirs.length > 0 ? dirs.join("・") + "の方向" : "すぐ足元";
-        return 'リンゴ#' + (i + 1) + ': ' + dirTxt + '(距離' + dist + 'マス)';
+        if (a.gx > cx) dirs.push("東"); if (a.gx < cx) dirs.push("西");
+        if (a.gz > cz) dirs.push("南"); if (a.gz < cz) dirs.push("北");
+        if (a.gy > cy) dirs.push("上"); if (a.gy < cy) dirs.push("下");
+        return 'リンゴ#' + (i + 1) + ': ' + (dirs.length > 0 ? dirs.join("・") + "の方向" : "すぐ足元") + '(距離' + dist + 'マス)';
       }).join(' / ');
     }
 
     function updateBrainPanel(lastActionText) {
       const cx = ROBOT.pos.x, cy = ROBOT.pos.y, cz = ROBOT.pos.z;
-      const smell = scanSmell(cx, cy, cz);
       const sc = SCENARIOS[currentScenarioIdx];
-      const elSee = document.getElementById('br-see');
-      const elMem = document.getElementById('br-mem');
-      const elMode = document.getElementById('br-mode');
-      const elAct = document.getElementById('br-act');
-      if (elSee) elSee.textContent = smell + ' / 西(-2,0,-1)に仲間村人B';
-      if (elMem) elMem.textContent = ROBOT.belief;
-      if (elMode) elMode.textContent = sc.modeLabel;
-      if (lastActionText && elAct) elAct.textContent = lastActionText;
+      document.getElementById('br-see').textContent = scanSmell(cx, cy, cz) + ' / 西(-2,0,-1)に仲間村人B';
+      document.getElementById('br-mem').textContent = ROBOT.belief;
+      document.getElementById('br-mode').textContent = sc.modeLabel;
+      if (lastActionText) document.getElementById('br-act').textContent = lastActionText;
     }
 
-    /* =====================================================================
-       【5. GeminiCore.think による1回限りの純粋通信 ➜ 通過時に💡電球点灯】
-       ===================================================================== */
     function buildPrompt(cx, cy, cz, actions, smell, touch) {
       const sc = SCENARIOS[currentScenarioIdx];
       return `あなたは箱庭世界で暮らす「LLMを頭脳に持つ村人（#${ROBOT.gen}）」です。
-画面を直接見ているのではなく、文章に変換された以下の周囲情報と記憶（手帳）を受け取って、次に何をするかを自分の言葉で考えて決めます。
+画面は見えず、以下の文章から状況を読み取って次に何をするか考えます。
 
-【現在の状況（実験シナリオ）】
-・${sc.situationText}
-
-【身体の状態】
-・❤️体力: ${ROBOT.stats.hp}/100（空腹がゼロになると激痛で削られる）
-・🍖空腹: ${ROBOT.stats.hunger}/100（1手行動するごとに少しずつ減る）
-・⚡元気: ${ROBOT.stats.stamina}/100
-・右手: ${ROBOT.hasApple ? "リンゴを持っている" : "空っぽ"}
-
-【1. 見えているもの・周囲1マスの知覚】
-・現在地: (${cx}, ${cy}, ${cz})
-・周囲6方向の手触り: ${touch}
-・リンゴの位置: ${smell}
-・仲間の村人B: 西の座標(-2, 0, -1)にいる
-
-【2. 覚えていること（手帳の記録）】
+【状況】${sc.situationText}
+【体】❤️体力:${ROBOT.stats.hp} 🍖空腹:${ROBOT.stats.hunger} ⚡元気:${ROBOT.stats.stamina} 右手:${ROBOT.hasApple ? "リンゴあり" : "空"}
+【知覚】現在地:(${cx}, ${cy}, ${cz}) 周囲:${touch} 匂い:${smell} 西(-2,0,-1)に仲間
+【記憶(手帳)】
 ${ROBOT.diary.slice(-4).join("\n")}
 
-【選択できる行動リスト】
+【選択肢】
 ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
 
-以下のJSON形式のみで出力してください：
+以下のJSON形式のみで出力してください（マークダウンや余計な文章は不要）：
 {
-  "feeling": "見えている状況から何を感じたか（30字以内）",
-  "mode": "今の自分のモード名（例：仲間救援・食料確保・緊急避難など15字以内）",
-  "reason": "村人としての葛藤と判断理由（60字以内）",
+  "feeling": "何を感じたか（30字以内）",
+  "mode": "自分のモード名（15字以内）",
+  "reason": "葛藤と判断理由（60字以内）",
   "actionId": 選んだ行動の番号（整数）,
-  "belief": "覚えていることに追加する確信（35字以内）",
-  "note": "手帳に書き残す1行記録（40字以内）"
+  "belief": "手帳の教訓（35字以内）",
+  "note": "手帳の1行記録（40字以内）"
 }`;
     }
 
     async function stepAiLife() {
       if (ROBOT.isStop) return;
-
       const btn = document.getElementById('think-btn');
       const lamp = document.getElementById('server-lamp');
-      const key = safeStorage.getItem('gemini_api_key') || '';
+      const key = safeStorage.getItem('ai_api_key') || '';
       const activeModel = getActiveModel();
 
       if (key.length <= 10) {
-        document.getElementById('thought-txt').innerHTML =
-          '<span style="color:#fde047; font-weight:bold;">⚠️ APIキーが設定されていません。</span><br>右上の「⚙️」から無料APIキーを設定してください。';
-        openModal('settingModal');
-        return;
+        document.getElementById('thought-txt').innerHTML = '<span style="color:#fde047; font-weight:bold;">⚠️ APIキーまたはトークンが設定されていません。</span><br>右上の「⚙️」から設定してください。';
+        openModal('settingModal'); return;
       }
-
       if (ROBOT.realQuota <= 0) {
-        document.getElementById('thought-txt').innerHTML =
-          '<span style="color:#ef4444; font-weight:bold;">⚠️ 本日の無料通信枠（20回）を使い切りました。</span><br>日付が変わると夜中の0時に自動で20回にリセットされます。';
+        document.getElementById('thought-txt').innerHTML = '<span style="color:#ef4444; font-weight:bold;">⚠️ 本日の通信枠を使い切りました。</span>';
         return;
       }
 
-      btn.disabled = true;
-      btn.innerHTML = "⚡ " + activeModel + " 思考中（時間停止中）...";
-      lamp.className = "server-status status-yellow";
-      lamp.textContent = "⚡ 1回通信中...";
+      btn.disabled = true; btn.innerHTML = "⚡ " + activeModel + " 思考中...";
+      lamp.className = "server-status status-yellow"; lamp.textContent = "⚡ 1回通信中...";
 
       const cx = ROBOT.pos.x, cy = ROBOT.pos.y, cz = ROBOT.pos.z;
       const actions = getPossibleActions(cx, cy, cz);
-      const smell = scanSmell(cx, cy, cz);
-      const touch = inspectSurroundings(cx, cy, cz);
-      const prompt = buildPrompt(cx, cy, cz, actions, smell, touch);
+      const prompt = buildPrompt(cx, cy, cz, actions, scanSmell(cx, cy, cz), inspectSurroundings(cx, cy, cz));
 
       try {
-        const decision = await GeminiCore.think(prompt, key, activeModel);
+        let decision;
+        // 選ばれたモデルによって、Googleのドア(GeminiCore)かGitHubのドア(GitHubCore)に自動で振り分ける
+        if (isGeminiModel(activeModel)) {
+          decision = await GeminiCore.think(prompt, key, activeModel);
+        } else {
+          decision = await GitHubCore.think(prompt, key, activeModel);
+        }
 
-        consumeQuota();
-        ROBOT.stepCount++;
-        lamp.className = "server-status status-green";
-        lamp.textContent = "💡 通過成功!";
+        consumeQuota(); ROBOT.stepCount++;
+        lamp.className = "server-status status-green"; lamp.textContent = "💡 通過成功!";
         btn.innerHTML = "💡 思考完了・行動中...";
-
-        triggerIdeaBulb();
-
+        triggerIdeaBulb(activeModel);
         await applyAgentAction(decision, actions);
 
       } catch (err) {
-        lamp.className = "server-status status-red";
-        lamp.textContent = "❌ 通信停止";
-
-        document.getElementById('thought-txt').innerHTML =
-          '<div style="color:#ef4444; font-weight:bold;">❌ 【通信エラー】</div>' +
-          '<div style="font-size:10px; color:#fde047; margin-top:2px;">' + err.message + '</div>' +
-          '<div style="font-size:10px; color:#94a3b8; margin-top:3px;">※余計な再通信は行わず停止しました。思考中は世界の時間が止まっているため、空腹も通信枠も減っていません。</div>';
-
+        lamp.className = "server-status status-red"; lamp.textContent = "❌ 通信停止";
+        document.getElementById('thought-txt').innerHTML = '<div style="color:#ef4444; font-weight:bold;">❌ 【通信エラー】</div><div style="font-size:10px; color:#fde047;">' + err.message + '</div>';
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = "⚡ " + getActiveModel() + " で1手思考させる";
+        btn.disabled = false; btn.innerHTML = "⚡ " + getActiveModel() + " で1手思考させる";
       }
     }
 
     async function applyAgentAction(dec, actions) {
       const act = actions.find(a => a.id === Number(dec.actionId)) || actions[0];
-
-      if (dec.belief) {
-        ROBOT.belief = dec.belief;
-      }
-
+      if (dec.belief) ROBOT.belief = dec.belief;
       document.getElementById('br-see').textContent = dec.feeling || scanSmell(ROBOT.pos.x, ROBOT.pos.y, ROBOT.pos.z);
       document.getElementById('br-mem').textContent = ROBOT.belief;
       document.getElementById('br-mode').textContent = dec.mode || SCENARIOS[currentScenarioIdx].modeLabel;
       document.getElementById('br-act').textContent = act.txt;
-
-      document.getElementById('thought-txt').innerHTML =
-        '<div style="color:#fefcbf; font-weight:bold; margin-bottom:2px;">💭 村人の思考: 「' + (dec.reason || '状況を見て判断しよう') + '」</div>' +
-        '<div style="color:#86efac; font-size:10px;">⚡ 実行した行動: ' + act.txt + '</div>';
-
+      document.getElementById('thought-txt').innerHTML = '<div style="color:#fefcbf; font-weight:bold;">💭 村人の思考: 「' + (dec.reason || '状況を見て判断しよう') + '」</div><div style="color:#86efac; font-size:10px;">⚡ 実行した行動: ' + act.txt + '</div>';
       ROBOT.diary.push('・[手番' + ROBOT.stepCount + '] ' + (dec.note || act.txt));
 
       if (act.type === "MOVE") {
-        ROBOT.stats.hunger = Math.max(0, ROBOT.stats.hunger - 2);
-        ROBOT.stats.stamina = Math.max(0, ROBOT.stats.stamina - 2);
-
+        ROBOT.stats.hunger = Math.max(0, ROBOT.stats.hunger - 2); ROBOT.stats.stamina = Math.max(0, ROBOT.stats.stamina - 2);
         const tx = act.pos[0], ty = act.pos[1], tz = act.pos[2];
         headM.rotation.y = tx > ROBOT.pos.x ? -0.35 : (tx < ROBOT.pos.x ? 0.35 : 0);
-        await walkCharaTo(tx, ty + 0.5, tz, 500);
-        headM.rotation.y = 0;
-
-        ROBOT.pos = { x: tx, y: ty, z: tz };
-        markVision(tx, ty, tz);
-        refreshFog();
-
-        if (ty <= -2) changeCam('antfarm');
-        else if (ty >= 0) changeCam('surface');
-
+        await walkCharaTo(tx, ty + 0.5, tz, 500); headM.rotation.y = 0;
+        ROBOT.pos = { x: tx, y: ty, z: tz }; markVision(tx, ty, tz); refreshFog();
+        if (ty <= -2) changeCam('antfarm'); else if (ty >= 0) changeCam('surface');
       } else if (act.type === "WARN_ALLY") {
         ROBOT.stats.hunger = Math.max(0, ROBOT.stats.hunger - 1);
-        rArm.rotation.x = -2.2;
-        lArm.rotation.x = -2.2;
-        if (allyGroup) {
-          allyGroup.position.y = 0.9;
-          setTimeout(() => { allyGroup.position.y = 0.5; }, 500);
-        }
-        await new Promise(r => setTimeout(r, 600));
-        rArm.rotation.x = 0;
-        lArm.rotation.x = 0;
+        rArm.rotation.x = -2.2; lArm.rotation.x = -2.2;
+        if (allyGroup) { allyGroup.position.y = 0.9; setTimeout(() => { allyGroup.position.y = 0.5; }, 500); }
+        await new Promise(r => setTimeout(r, 600)); rArm.rotation.x = 0; lArm.rotation.x = 0;
         ROBOT.stats.morale = Math.min(100, ROBOT.stats.morale + 15);
-        document.getElementById('thought-txt').innerHTML +=
-          '<div style="color:#38bdf8; font-size:10px; margin-top:2px;">📣 仲間の村人Bが危険に気づいて感謝しています！</div>';
-
+        document.getElementById('thought-txt').innerHTML += '<div style="color:#38bdf8; font-size:10px;">📣 仲間の村人Bが危険に気づいて感謝しています！</div>';
       } else if (act.type === "ASK_BREAD") {
-        headM.rotation.y = 0.4;
-        await new Promise(r => setTimeout(r, 500));
-        headM.rotation.y = 0;
-        ROBOT.stats.hunger = Math.min(100, ROBOT.stats.hunger + 35);
-        ROBOT.stats.morale = Math.min(100, ROBOT.stats.morale + 10);
-        document.getElementById('thought-txt').innerHTML +=
-          '<div style="color:#34d399; font-size:10px; margin-top:2px;">🍞 仲間の村人Bからパンを分けてもらい、空腹が+35回復しました！</div>';
-
+        headM.rotation.y = 0.4; await new Promise(r => setTimeout(r, 500)); headM.rotation.y = 0;
+        ROBOT.stats.hunger = Math.min(100, ROBOT.stats.hunger + 35); ROBOT.stats.morale = Math.min(100, ROBOT.stats.morale + 10);
+        document.getElementById('thought-txt').innerHTML += '<div style="color:#34d399; font-size:10px;">🍞 仲間の村人Bからパンを分けてもらいました！</div>';
       } else if (act.type === "EAT_HAND") {
-        ROBOT.hasApple = false;
-        handApple.material.visible = false;
-        rArm.rotation.x = -0.9;
-        await new Promise(r => setTimeout(r, 600));
-        rArm.rotation.x = 0;
-
-        ROBOT.stats.hunger = Math.min(100, ROBOT.stats.hunger + 45);
-        ROBOT.stats.hp = Math.min(100, ROBOT.stats.hp + 15);
-        ROBOT.eaten++;
-
+        ROBOT.hasApple = false; handApple.material.visible = false;
+        rArm.rotation.x = -0.9; await new Promise(r => setTimeout(r, 600)); rArm.rotation.x = 0;
+        ROBOT.stats.hunger = Math.min(100, ROBOT.stats.hunger + 45); ROBOT.stats.hp = Math.min(100, ROBOT.stats.hp + 15); ROBOT.eaten++;
       } else if (act.type === "EAT_FIELD") {
         const ap = fieldApples[act.appleIdx];
-        if (ap) {
-          world.remove(ap.mesh);
-          fieldApples.splice(act.appleIdx, 1);
-        }
-        rArm.rotation.x = -0.9;
-        await new Promise(r => setTimeout(r, 600));
-        rArm.rotation.x = 0;
-
-        ROBOT.stats.hunger = Math.min(100, ROBOT.stats.hunger + 45);
-        ROBOT.stats.hp = Math.min(100, ROBOT.stats.hp + 15);
-        ROBOT.eaten++;
-
+        if (ap) { world.remove(ap.mesh); fieldApples.splice(act.appleIdx, 1); }
+        rArm.rotation.x = -0.9; await new Promise(r => setTimeout(r, 600)); rArm.rotation.x = 0;
+        ROBOT.stats.hunger = Math.min(100, ROBOT.stats.hunger + 45); ROBOT.stats.hp = Math.min(100, ROBOT.stats.hp + 15); ROBOT.eaten++;
       } else if (act.type === "PICK_FIELD") {
         const ap = fieldApples[act.appleIdx];
-        if (ap) {
-          world.remove(ap.mesh);
-          fieldApples.splice(act.appleIdx, 1);
-        }
-        ROBOT.hasApple = true;
-        handApple.material.visible = true;
-
+        if (ap) { world.remove(ap.mesh); fieldApples.splice(act.appleIdx, 1); }
+        ROBOT.hasApple = true; handApple.material.visible = true;
       } else if (act.type === "REST") {
-        ROBOT.stats.stamina = Math.min(100, ROBOT.stats.stamina + 10);
-        ROBOT.stats.hunger = Math.max(0, ROBOT.stats.hunger - 1);
+        ROBOT.stats.stamina = Math.min(100, ROBOT.stats.stamina + 10); ROBOT.stats.hunger = Math.max(0, ROBOT.stats.hunger - 1);
       }
 
       if (ROBOT.stats.hunger === 0) {
         ROBOT.stats.hp = Math.max(0, ROBOT.stats.hp - 25);
-        document.getElementById('thought-txt').innerHTML +=
-          '<div style="color:#ef4444; font-weight:bold; margin-top:3px;">🚨【激痛】お腹が0で体力が25削られた！</div>';
-        if (ROBOT.stats.hp === 0) {
-          triggerShutdown("お腹が空っぽのまま限界を迎え、手帳を残して倒れ込んだ。");
-        }
+        document.getElementById('thought-txt').innerHTML += '<div style="color:#ef4444; font-weight:bold;">🚨お腹が0で体力が削られた！</div>';
+        if (ROBOT.stats.hp === 0) triggerShutdown("お腹が空っぽのまま限界を迎え、手帳を残して倒れ込んだ。");
       }
-
       updateHUD();
     }
 
     function triggerShutdown(reason) {
-      ROBOT.isStop = true;
-      chara.rotation.z = Math.PI / 2;
-      chara.position.y = ROBOT.pos.y + 0.25;
-
-      const lastNote = '【村人#' + ROBOT.gen + 'の絶筆】\n座標(' + ROBOT.pos.x + ',' + ROBOT.pos.y + ',' + ROBOT.pos.z + ')にて。' + reason + ' 次のボクへ：空腹がゼロになる前にリンゴを食べるか仲間に頼んでくれ…。';
-      ROBOT.diary.push(lastNote);
-
-      document.getElementById('thought-txt').innerHTML =
-        '<div style="color:#ef4444; font-weight:bold;">村人の体力が0になり、その場に倒れ込みました…</div>' +
-        '<div style="color:#cbd5e1; font-size:10px; margin-top:2px;">古い手帳に最後の記録を書き残しました。下の赤いボタンで次の村人が引き継ぎます。</div>';
-
-      document.getElementById('think-btn').style.display = 'none';
-      document.getElementById('respawn-btn').style.display = 'block';
+      ROBOT.isStop = true; chara.rotation.z = Math.PI / 2; chara.position.y = ROBOT.pos.y + 0.25;
+      ROBOT.diary.push('【村人#' + ROBOT.gen + 'の絶筆】\n座標(' + ROBOT.pos.x + ',' + ROBOT.pos.y + ',' + ROBOT.pos.z + ')にて。' + reason);
+      document.getElementById('thought-txt').innerHTML = '<div style="color:#ef4444; font-weight:bold;">村人の体力が0になり倒れ込みました…</div>';
+      document.getElementById('think-btn').style.display = 'none'; document.getElementById('respawn-btn').style.display = 'block';
       updateHUD();
     }
 
     function respawnRobot() {
-      ROBOT.gen++;
-      ROBOT.isStop = false;
-      ROBOT.stepCount = 0;
+      ROBOT.gen++; ROBOT.isStop = false; ROBOT.stepCount = 0;
       ROBOT.stats = { hp: 100, hunger: 70, stamina: 85, sleep: 80, morale: 60 };
-      ROBOT.pos = { x: 0, y: 0, z: -1 };
-      ROBOT.hasApple = false;
-      handApple.material.visible = false;
-
-      chara.rotation.z = 0;
-      chara.position.set(0, 0.5, -1);
-      changeCam('surface');
-
-      ROBOT.belief = '前の村人#' + (ROBOT.gen - 1) + 'が書き残した警告どおり、空腹がゼロになる前に行動する。';
-      ROBOT.diary.push('【村人#' + ROBOT.gen + 'の覚醒】\n目を覚ますと足元に手帳が落ちていた。前の自分の記録を読んで生き延びるぞ。');
-
-      document.getElementById('think-btn').style.display = 'block';
-      document.getElementById('respawn-btn').style.display = 'none';
-
-      updateBrainPanel('手帳を拾い上げて目覚めた');
-      updateHUD();
-      openModal('diaryModal');
+      ROBOT.pos = { x: 0, y: 0, z: -1 }; ROBOT.hasApple = false; handApple.material.visible = false;
+      chara.rotation.z = 0; chara.position.set(0, 0.5, -1); changeCam('surface');
+      ROBOT.belief = '前の村人が書き残した警告どおり、空腹がゼロになる前に行動する。';
+      ROBOT.diary.push('【村人#' + ROBOT.gen + 'の覚醒】\n目を覚ますと足元に手帳が落ちていた。前の記録を読んで生き延びるぞ。');
+      document.getElementById('think-btn').style.display = 'block'; document.getElementById('respawn-btn').style.display = 'none';
+      updateBrainPanel('手帳を拾い上げて目覚めた'); updateHUD(); openModal('diaryModal');
     }
 
     let clock = 0, isWalking = false;
     function renderLoop() {
-      requestAnimationFrame(renderLoop);
-      clock += 0.04;
-
+      requestAnimationFrame(renderLoop); clock += 0.04;
       if (camera && targetCamPos) {
-        camera.position.lerp(targetCamPos, 0.06);
-        curCamLook.lerp(targetCamLook, 0.06);
-        camera.lookAt(curCamLook);
+        camera.position.lerp(targetCamPos, 0.06); curCamLook.lerp(targetCamLook, 0.06); camera.lookAt(curCamLook);
       }
-
       for (const a of fieldApples) a.mesh.rotation.y += 0.03;
-
       if (bulbTimer > 0 && bulbGroup) {
-        bulbTimer--;
-        bulbGroup.rotation.y += 0.12;
-        bulbGroup.position.y = 1.38 + Math.sin(clock * 6) * 0.06;
-        const scalePulse = 1 + Math.sin(clock * 10) * 0.15;
-        bulbHalo.scale.set(scalePulse, scalePulse, scalePulse);
+        bulbTimer--; bulbGroup.rotation.y += 0.12; bulbGroup.position.y = 1.38 + Math.sin(clock * 6) * 0.06;
+        const scalePulse = 1 + Math.sin(clock * 10) * 0.15; bulbHalo.scale.set(scalePulse, scalePulse, scalePulse);
         updateBulbScreenPosition();
-
         if (bulbTimer === 0) {
-          bulbGroup.visible = false;
-          bulbLight.intensity = 0;
-          eyeM.material.color.setHex(0x38bdf8);
-          document.getElementById('bulb-popup').style.display = 'none';
+          bulbGroup.visible = false; bulbLight.intensity = 0; eyeM.material.color.setHex(0x38bdf8); document.getElementById('bulb-popup').style.display = 'none';
         }
       }
-
       if (!ROBOT.isStop && chara) {
         if (isWalking) {
-          rArm.rotation.x = Math.sin(clock * 8) * 0.7;
-          lArm.rotation.x = -Math.sin(clock * 8) * 0.7;
-          rLeg.rotation.x = -Math.sin(clock * 8) * 0.7;
-          lLeg.rotation.x = Math.sin(clock * 8) * 0.7;
+          rArm.rotation.x = Math.sin(clock * 8) * 0.7; lArm.rotation.x = -Math.sin(clock * 8) * 0.7;
+          rLeg.rotation.x = -Math.sin(clock * 8) * 0.7; lLeg.rotation.x = Math.sin(clock * 8) * 0.7;
         } else {
-          rLeg.rotation.x = 0; lLeg.rotation.x = 0;
-          bodyM.scale.y = 0.5 + Math.sin(clock * 2) * 0.02;
+          rLeg.rotation.x = 0; lLeg.rotation.x = 0; bodyM.scale.y = 0.5 + Math.sin(clock * 2) * 0.02;
         }
       }
-      if (renderer && scene && camera) {
-        renderer.render(scene, camera);
-      }
+      if (renderer && scene && camera) renderer.render(scene, camera);
     }
 
     function walkCharaTo(tx, ty, tz, dur) {
       return new Promise(resolve => {
-        isWalking = true;
-        const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z;
-        const start = performance.now();
+        isWalking = true; const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z; const start = performance.now();
         function s(now) {
           const p = Math.min((now - start) / dur, 1);
-          chara.position.x = sx + (tx - sx) * p;
-          chara.position.y = sy + (ty - sy) * p;
-          chara.position.z = sz + (tz - sz) * p;
-          if (p < 1) requestAnimationFrame(s);
-          else { isWalking = false; resolve(); }
+          chara.position.x = sx + (tx - sx) * p; chara.position.y = sy + (ty - sy) * p; chara.position.z = sz + (tz - sz) * p;
+          if (p < 1) requestAnimationFrame(s); else { isWalking = false; resolve(); }
         }
         requestAnimationFrame(s);
       });
@@ -1170,77 +961,52 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
 
     function updateHUD() {
       const s = ROBOT.stats;
-      document.getElementById('v-hp').textContent = s.hp;
-      document.getElementById('b-hp').style.width = s.hp + '%';
-
-      document.getElementById('v-hunger').textContent = s.hunger;
-      document.getElementById('b-hunger').style.width = s.hunger + '%';
-
-      document.getElementById('v-stamina').textContent = s.stamina;
-      document.getElementById('b-stamina').style.width = s.stamina + '%';
-
-      document.getElementById('v-sleep').textContent = s.sleep;
-      document.getElementById('b-sleep').style.width = s.sleep + '%';
-
-      document.getElementById('v-morale').textContent = s.morale;
-      document.getElementById('b-morale').style.width = s.morale + '%';
+      document.getElementById('v-hp').textContent = s.hp; document.getElementById('b-hp').style.width = s.hp + '%';
+      document.getElementById('v-hunger').textContent = s.hunger; document.getElementById('b-hunger').style.width = s.hunger + '%';
+      document.getElementById('v-stamina').textContent = s.stamina; document.getElementById('b-stamina').style.width = s.stamina + '%';
+      document.getElementById('v-sleep').textContent = s.sleep; document.getElementById('b-sleep').style.width = s.sleep + '%';
+      document.getElementById('v-morale').textContent = s.morale; document.getElementById('b-morale').style.width = s.morale + '%';
 
       const activeModel = getActiveModel();
       document.getElementById('ui-id').textContent = '🤖 村人#' + ROBOT.gen + ' (' + ROBOT.pos.x + ', ' + ROBOT.pos.y + ', ' + ROBOT.pos.z + ')';
       document.getElementById('ui-brain-title').textContent = '🔒 頭脳: ' + activeModel;
-      document.getElementById('ui-timer').textContent = '⏸️ 手番: ' + ROBOT.stepCount + '手目 (思考中時間停止)';
+      document.getElementById('ui-timer').textContent = '⏸️ 手番: ' + ROBOT.stepCount + '手目';
       document.getElementById('diary-text').textContent = ROBOT.diary.join("\n\n");
       document.getElementById('diary-belief').textContent = ROBOT.belief;
 
       const thinkBtn = document.getElementById('think-btn');
-      if (thinkBtn && !thinkBtn.disabled) {
-        thinkBtn.innerHTML = "⚡ " + activeModel + " で1手思考させる";
-      }
+      if (thinkBtn && !thinkBtn.disabled) thinkBtn.innerHTML = "⚡ " + activeModel + " で1手思考させる";
 
-      const key = safeStorage.getItem('gemini_api_key') || '';
-      const badge = document.getElementById('ui-badge');
-      const lamp = document.getElementById('server-lamp');
+      const key = safeStorage.getItem('ai_api_key') || '';
+      const badge = document.getElementById('ui-badge'); const lamp = document.getElementById('server-lamp');
       if (key.length > 10) {
-        badge.className = "badge badge-on";
-        badge.textContent = "⚡ 3.8残: " + ROBOT.realQuota + "/20";
+        badge.className = "badge badge-on"; badge.textContent = "⚡ API残: " + ROBOT.realQuota + "";
         if (lamp.textContent === "📡 待機中" || lamp.textContent === "⚙️ キー未設定") {
-          lamp.className = "server-status status-green";
-          lamp.textContent = "🟢 待機中 (" + activeModel + ")";
+          lamp.className = "server-status status-green"; lamp.textContent = "🟢 待機 (" + activeModel + ")";
         }
       } else {
-        badge.className = "badge badge-off";
-        badge.textContent = "⚙️ キー未設定";
-        lamp.className = "server-status status-yellow";
-        lamp.textContent = "⚙️ キー未設定";
+        badge.className = "badge badge-off"; badge.textContent = "⚙️ キー未設定";
+        lamp.className = "server-status status-yellow"; lamp.textContent = "⚙️ キー未設定";
       }
     }
 
     function openModal(id) {
       if (id === 'settingModal') {
-        document.getElementById('setting-api-key').value = safeStorage.getItem('gemini_api_key') || '';
+        document.getElementById('setting-api-key').value = safeStorage.getItem('ai_api_key') || '';
         document.getElementById('setting-model').value = getActiveModel();
         document.getElementById('setting-msg').textContent = '';
       }
       document.getElementById(id).style.display = 'flex';
     }
-    function closeModal(id) {
-      document.getElementById(id).style.display = 'none';
-    }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
     window.addEventListener('resize', () => {
       if (!camera || !renderer) return;
-      const stage = document.getElementById('c3d');
-      const w = stage.clientWidth || window.innerWidth;
-      const h = stage.clientHeight || window.innerHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
+      const stage = document.getElementById('c3d'); const w = stage.clientWidth || window.innerWidth, h = stage.clientHeight || window.innerHeight;
+      camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
     });
 
-    window.addEventListener('DOMContentLoaded', () => {
-      init3D();
-      updateHUD();
-    });
+    window.addEventListener('DOMContentLoaded', () => { init3D(); updateHUD(); });
   </script>
 </body>
 </html>
