@@ -12,13 +12,14 @@
   <meta name="theme-color" content="#07090e">
 
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100%; height: 100%; min-height: 100vh; min-height: 100dvh;
       overflow: hidden; background: #07090e; color: #f1f5f9;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      position: fixed; inset: 0;
+      position: fixed; inset: 0; user-select: none; -webkit-user-select: none;
     }
+    input, select, textarea, button { user-select: auto; -webkit-user-select: auto; }
 
     #stage { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
     #c3d { width: 100%; height: 100%; display: block; }
@@ -79,11 +80,19 @@
     .status-yellow { background: #854d0e; color: #fde047; }
     .status-red { background: #7f1d1d; color: #fca5a5; }
 
-    /* 頭脳クイック切り替えセレクト */
-    .brain-select {
-      background: #020617; color: #38bdf8; border: 1px solid #0284c7;
-      border-radius: 8px; font-size: 11px; font-weight: bold; padding: 2px 6px;
-      pointer-events: auto; cursor: pointer;
+    /* 頭脳クイック切り替えボタン群 */
+    .quick-switch-group {
+      display: flex; gap: 4px; pointer-events: auto;
+    }
+    .q-btn {
+      padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: bold;
+      border: 1px solid #334155; background: #0f172a; color: #94a3b8; cursor: pointer;
+    }
+    .q-btn.active-google {
+      background: #0284c7; color: #fff; border-color: #38bdf8;
+    }
+    .q-btn.active-github {
+      background: #6d28d9; color: #fff; border-color: #a78bfa;
     }
 
     .brain-4rows {
@@ -132,13 +141,11 @@
       background: linear-gradient(135deg, #0284c7, #2563eb); border: 1px solid #38bdf8;
       display: flex; align-items: center; justify-content: center; gap: 6px;
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+      transition: background 0.2s, border-color 0.2s;
     }
     .main-btn:active { transform: scale(0.98); }
     .main-btn.btn-github {
-      background: linear-gradient(135deg, #6366f1, #8b5cf6); border-color: #a78bfa;
-    }
-    .main-btn.btn-need-key {
-      background: linear-gradient(135deg, #854d0e, #a16207); border-color: #fde047; color: #fef08a;
+      background: linear-gradient(135deg, #6d28d9, #7c3aed); border: 1px solid #c4b5fd;
     }
     .main-btn:disabled { background: #334155 !important; border-color: #475569 !important; color: #94a3b8 !important; cursor: not-allowed; }
     .btn-respawn { background: linear-gradient(135deg, #dc2626, #991b1b); border: 1px solid #f87171; display: none; }
@@ -164,18 +171,28 @@
       width: 100%; padding: 10px; background: #020617; border: 1px solid #334155;
       color: #fff; border-radius: 8px; font-size: 12px; margin-top: 4px;
     }
-    .save-btn { padding: 11px; background: #0284c7; color: #fff; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 12px; }
+    .save-btn { padding: 12px; background: #0284c7; color: #fff; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 13px; }
     .msg-line { font-size: 11px; color: #fde047; min-height: 16px; line-height: 1.4; }
     
+    /* タップで選べるカード式設定グループ */
     .settings-group {
-      background: rgba(255,255,255,0.03); border: 1px solid #1e293b;
-      padding: 10px; border-radius: 10px;
+      background: rgba(255,255,255,0.03); border: 2px solid #1e293b;
+      padding: 12px; border-radius: 12px; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
     }
-    .settings-group-title { font-size: 11px; color: #7dd3fc; font-weight: bold; margin-bottom: 6px; }
-    .key-status-tag { font-size: 10px; margin-left: 6px; padding: 1px 6px; border-radius: 4px; }
+    .settings-group.selected-google {
+      border-color: #38bdf8; background: rgba(2, 132, 199, 0.15);
+    }
+    .settings-group.selected-github {
+      border-color: #a78bfa; background: rgba(109, 40, 217, 0.18);
+    }
+    .settings-group-title {
+      font-size: 12px; color: #f8fafc; font-weight: bold; margin-bottom: 6px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .key-status-tag { font-size: 10px; padding: 2px 7px; border-radius: 6px; }
     .tag-saved { background: #065f46; color: #34d399; }
     .tag-empty { background: #334155; color: #94a3b8; }
-    optgroup { background: #0f172a; color: #fff; }
   </style>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -200,7 +217,7 @@
     <div class="hud-sub">
       <span id="ui-id">🤖 村人#1 (0, 0, -1)</span>
       <span id="ui-badge" class="badge badge-off">⚙️ キー未設定</span>
-      <span id="ui-timer">⏸️ 手番: 0手目 (思考中時間停止)</span>
+      <span id="ui-timer">⏸️ 手番: 0手目</span>
     </div>
   </div>
 
@@ -208,12 +225,10 @@
     <div class="thought-title">
       <div style="display:flex; align-items:center; gap:6px;">
         <span>🧠 頭脳:</span>
-        <select id="quick-model-select" class="brain-select" onchange="onQuickModelChange(this.value)">
-          <option value="gemini-3.8-flash">Google Gemini 3.8</option>
-          <option value="gpt-4o">GitHub GPT-4o</option>
-          <option value="gpt-4o-mini">GitHub GPT-4o-mini</option>
-          <option value="gemini-3.8-pro">Google Gemini 3.8-pro</option>
-        </select>
+        <div class="quick-switch-group">
+          <button type="button" id="q-btn-google" class="q-btn active-google" onclick="selectModelAndRefresh('gemini-3.8-flash')">🟦 Google 3.8</button>
+          <button type="button" id="q-btn-github" class="q-btn" onclick="selectModelAndRefresh('gpt-4o')">🟪 GitHub GPT-4o</button>
+        </div>
       </div>
       <span id="server-lamp" class="server-status status-yellow">⚙️ キー未設定</span>
     </div>
@@ -241,7 +256,7 @@
       <button class="situation-chip" id="scenario-btn" onclick="cycleScenario()">🎬 実験: 通常探索</button>
     </div>
     <div class="action-row">
-      <button class="main-btn" id="think-btn" onclick="stepAiLife()">⚡ AIに1手思考させる</button>
+      <button class="main-btn" id="think-btn" onclick="stepAiLife()">⚡ gemini-3.8-flash で1手思考させる</button>
       <button class="main-btn btn-respawn" id="respawn-btn" onclick="respawnRobot()">🔄 手帳を引き継いで次の村人へ</button>
     </div>
   </div>
@@ -258,53 +273,37 @@
     </div>
   </div>
 
-  <!-- API設定モーダル（2つのキーを独立して完全保存） -->
+  <!-- API設定モーダル（カードをタップするだけで頭脳とボタンが切り替わる方式） -->
   <div class="modal-cover" id="settingModal">
     <div class="modal-box">
       <div class="modal-head">
-        <div class="modal-title">⚙️ 思考モデル＆キー設定</div>
+        <div class="modal-title">⚙️ 使いたい頭脳をタップして選択</div>
         <div class="close-btn" onclick="closeModal('settingModal')">✕</div>
       </div>
 
-      <!-- ① 思考モデル選択 -->
-      <div class="settings-group">
-        <div class="settings-group-title">① 使いたい頭脳（モデル）を選ぶ</div>
-        <select id="setting-model" class="input-box" style="margin-top:0;" onchange="onModelSelectChanged()">
-          <optgroup label="Google Gemini（表現力・生体描写）">
-            <option value="gemini-3.8-flash">gemini-3.8-flash（基準・推奨）</option>
-            <option value="gemini-3.8-pro">gemini-3.8-pro（じっくり上位頭脳）</option>
-          </optgroup>
-          <optgroup label="GitHub Models（深い推論・思考力）">
-            <option value="gpt-4o">GPT-4o（世界最高峰の思考）</option>
-            <option value="gpt-4o-mini">GPT-4o-mini（高速バランス型）</option>
-          </optgroup>
-        </select>
-      </div>
-
-      <!-- ② Google APIキー枠 -->
-      <div class="settings-group" id="grp-google-key">
+      <!-- ① Google Gemini カード -->
+      <div class="settings-group selected-google" id="grp-google-key" onclick="selectModelInModal('gemini-3.8-flash')">
         <div class="settings-group-title">
-          Google AI Studio キー (AIza...)
-          <span id="tag-google-status" class="key-status-tag tag-empty">未保存</span>
+          <span>🟦 Google Gemini 3.8 を使う</span>
+          <span id="tag-google-status" class="key-status-tag tag-empty">キー未保存</span>
         </div>
-        <input type="password" id="input-google-key" class="input-box" style="margin-top:0;" placeholder="GoogleのAPIキーを貼り付け" oninput="autoSaveKey('google', this.value)">
+        <div style="font-size:10px; color:#94a3b8; margin-bottom:6px;">Google AI Studio の無料キー（AIza...）</div>
+        <input type="password" id="input-google-key" class="input-box" placeholder="ここにGoogleキーを貼り付け" onclick="event.stopPropagation(); selectModelInModal('gemini-3.8-flash');" oninput="autoSaveKey('google', this.value)">
       </div>
 
-      <!-- ③ GitHub トークン枠 -->
-      <div class="settings-group" id="grp-github-key">
+      <!-- ② GitHub Models カード -->
+      <div class="settings-group" id="grp-github-key" onclick="selectModelInModal('gpt-4o')">
         <div class="settings-group-title">
-          GitHub トークン (ghp_...)
-          <span id="tag-github-status" class="key-status-tag tag-empty">未保存</span>
+          <span>🟪 GitHub GPT-4o を使う</span>
+          <span id="tag-github-status" class="key-status-tag tag-empty">キー未保存</span>
         </div>
-        <input type="password" id="input-github-key" class="input-box" style="margin-top:0;" placeholder="GitHubのトークンを貼り付け" oninput="autoSaveKey('github', this.value)">
+        <div style="font-size:10px; color:#94a3b8; margin-bottom:6px;">GitHub の無料トークン（ghp_...）</div>
+        <input type="password" id="input-github-key" class="input-box" placeholder="ここにGitHubトークンを貼り付け" onclick="event.stopPropagation(); selectModelInModal('gpt-4o');" oninput="autoSaveKey('github', this.value)">
       </div>
 
-      <div class="msg-line" id="setting-msg"></div>
+      <div class="msg-line" id="setting-msg">枠をタップすると使う頭脳が切り替わります。</div>
 
-      <div style="display:flex; gap:8px;">
-        <button class="save-btn" style="flex:1;" onclick="saveKeys()">設定を保存して閉じる</button>
-        <button style="padding:10px; background:#475569; color:#fff; border:none; border-radius:8px; font-size:11px; cursor:pointer;" onclick="closeModal('settingModal')">キャンセル</button>
-      </div>
+      <button class="save-btn" id="modal-save-btn" onclick="saveKeys()">🟦 Google Gemini 3.8 に決定して閉じる</button>
     </div>
   </div>
 
@@ -323,7 +322,7 @@
 
       async think(prompt, apiKey, customModel) {
         if (!apiKey || apiKey.trim().length <= 10) {
-          throw new Error('Google APIキーが設定されていません。右上の⚙️から入力してください。');
+          throw new Error('Google APIキーが設定されていません。');
         }
 
         let targetModel = customModel && customModel.trim() ? customModel.trim() : this.DEFAULT_MODEL;
@@ -372,7 +371,7 @@
     const GitHubCore = Object.freeze({
       async think(prompt, token, modelName) {
         if (!token || token.trim().length <= 10) {
-          throw new Error('GitHubトークンが設定されていません。右上の⚙️から入力してください。');
+          throw new Error('GitHubトークンが設定されていません。');
         }
 
         const endpoint = 'https://models.inference.ai.azure.com/chat/completions';
@@ -404,13 +403,21 @@
       }
     });
 
+    // プレビュー環境でもVercelでも100%確実に保存されるメモリ＋ストレージ二重保存
+    const memStore = {};
     const safeStorage = {
-      getItem: (k) => { try { return localStorage.getItem(k); } catch(e) { return null; } },
-      setItem: (k, v) => { try { localStorage.setItem(k, v); } catch(e) {} }
+      getItem: (k) => {
+        if (memStore[k] !== undefined) return memStore[k];
+        try { return localStorage.getItem(k); } catch(e) { return null; }
+      },
+      setItem: (k, v) => {
+        memStore[k] = String(v);
+        try { localStorage.setItem(k, String(v)); } catch(e) {}
+      }
     };
 
     function isGeminiModel(modelName) {
-      return modelName.startsWith('gemini');
+      return String(modelName).startsWith('gemini');
     }
 
     function getActiveModel() {
@@ -420,13 +427,12 @@
       return saved;
     }
 
-    // 選択されたモデルに応じたキーを自動で返す（完全自動切り替え）
     function getKeyForCurrentModel() {
       const m = getActiveModel();
       if (isGeminiModel(m)) {
         return safeStorage.getItem('key_google') || safeStorage.getItem('ai_api_key') || '';
       } else {
-        return safeStorage.getItem('key_github') || safeStorage.getItem('ai_api_key') || '';
+        return safeStorage.getItem('key_github') || '';
       }
     }
 
@@ -492,62 +498,82 @@
     }
     markVision(0, 0, -1);
 
-    // 画面上部のセレクトからワンタップで即時切り替え
-    function onQuickModelChange(newModel) {
-      safeStorage.setItem('ai_custom_model', newModel);
+    // 頭脳モデルを切り替えて即時画面＆ボタンを更新する共通関数
+    function selectModelAndRefresh(modelName) {
+      safeStorage.setItem('ai_custom_model', modelName);
       updateHUD();
       const card = document.getElementById('thought-card');
-      card.classList.add('flash-success');
-      setTimeout(() => card.classList.remove('flash-success'), 600);
+      if (card) {
+        card.classList.add('flash-success');
+        setTimeout(() => card.classList.remove('flash-success'), 500);
+      }
     }
 
-    // 設定画面内のセレクト変更時も即時保存・反映
-    function onModelSelectChanged() {
-      const sel = document.getElementById('setting-model');
-      if (!sel) return;
-      const selected = sel.value;
-      safeStorage.setItem('ai_custom_model', selected);
-      const isGem = isGeminiModel(selected);
+    // 設定モーダル内でカードをタップした時の処理
+    function selectModelInModal(modelName) {
+      safeStorage.setItem('ai_custom_model', modelName);
+      const isGem = isGeminiModel(modelName);
       const grpG = document.getElementById('grp-google-key');
       const grpGh = document.getElementById('grp-github-key');
-      if (grpG) grpG.style.borderColor = isGem ? '#38bdf8' : '#1e293b';
-      if (grpGh) grpGh.style.borderColor = !isGem ? '#38bdf8' : '#1e293b';
+      const saveBtn = document.getElementById('modal-save-btn');
+      const msg = document.getElementById('setting-msg');
+
+      if (grpG) grpG.className = 'settings-group ' + (isGem ? 'selected-google' : '');
+      if (grpGh) grpGh.className = 'settings-group ' + (!isGem ? 'selected-github' : '');
+      if (saveBtn) {
+        saveBtn.style.background = isGem ? '#0284c7' : '#6d28d9';
+        saveBtn.textContent = isGem ? '🟦 Google Gemini 3.8 に決定して閉じる' : '🟪 GitHub GPT-4o に決定して閉じる';
+      }
+      if (msg) {
+        msg.style.color = isGem ? '#38bdf8' : '#c4b5fd';
+        msg.textContent = isGem ? '✓ Google Gemini 3.8 を選択中' : '✓ GitHub GPT-4o を選択中';
+      }
       updateHUD();
     }
 
-    // 入力欄に貼り付けた瞬間に自動保存（保存ボタン押し忘れ防止）
+    // キー入力欄に貼り付けた瞬間に自動判別＆保存
     function autoSaveKey(type, val) {
       const trimmed = val.trim();
       if (type === 'google') {
-        if (trimmed.length > 5) safeStorage.setItem('key_google', trimmed);
-        const tagG = document.getElementById('tag-google-status');
-        if (tagG) { tagG.textContent = trimmed.length > 5 ? '保存済み' : '未保存'; tagG.className = 'key-status-tag ' + (trimmed.length > 5 ? 'tag-saved' : 'tag-empty'); }
+        safeStorage.setItem('key_google', trimmed);
+        selectModelInModal('gemini-3.8-flash');
       } else {
-        if (trimmed.length > 5) safeStorage.setItem('key_github', trimmed);
-        const tagGh = document.getElementById('tag-github-status');
-        if (tagGh) { tagGh.textContent = trimmed.length > 5 ? '保存済み' : '未保存'; tagGh.className = 'key-status-tag ' + (trimmed.length > 5 ? 'tag-saved' : 'tag-empty'); }
+        safeStorage.setItem('key_github', trimmed);
+        selectModelInModal('gpt-4o');
       }
+      refreshModalKeyTags();
       updateHUD();
     }
 
+    function refreshModalKeyTags() {
+      const gKey = safeStorage.getItem('key_google') || safeStorage.getItem('ai_api_key') || '';
+      const ghKey = safeStorage.getItem('key_github') || '';
+      const tagG = document.getElementById('tag-google-status');
+      const tagGh = document.getElementById('tag-github-status');
+
+      if (tagG) {
+        tagG.textContent = gKey.length > 5 ? '✓ キー保存済' : 'キー未保存';
+        tagG.className = 'key-status-tag ' + (gKey.length > 5 ? 'tag-saved' : 'tag-empty');
+      }
+      if (tagGh) {
+        tagGh.textContent = ghKey.length > 5 ? '✓ キー保存済' : 'キー未保存';
+        tagGh.className = 'key-status-tag ' + (ghKey.length > 5 ? 'tag-saved' : 'tag-empty');
+      }
+    }
+
     function saveKeys() {
-      const sel = document.getElementById('setting-model');
       const gInput = document.getElementById('input-google-key');
       const ghInput = document.getElementById('input-github-key');
-      const msg = document.getElementById('setting-msg');
 
-      if (sel) safeStorage.setItem('ai_custom_model', sel.value);
-      if (gInput && gInput.value.trim().length > 5) safeStorage.setItem('key_google', gInput.value.trim());
-      if (ghInput && ghInput.value.trim().length > 5) safeStorage.setItem('key_github', ghInput.value.trim());
-
-      if (msg) {
-        msg.style.color = '#34d399';
-        msg.textContent = '✓ 設定を保存しました！';
+      if (gInput && gInput.value.trim().length > 5) {
+        safeStorage.setItem('key_google', gInput.value.trim());
       }
-      setTimeout(() => {
-        closeModal('settingModal');
-        updateHUD();
-      }, 300);
+      if (ghInput && ghInput.value.trim().length > 5) {
+        safeStorage.setItem('key_github', ghInput.value.trim());
+      }
+
+      updateHUD();
+      closeModal('settingModal');
     }
 
     let scene, camera, renderer, world, clickBlocks = [], voxelMap = {}, fieldApples = [];
@@ -868,8 +894,10 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
       const currentKey = getKeyForCurrentModel();
 
       if (currentKey.length <= 5) {
-        document.getElementById('thought-txt').innerHTML = '<span style="color:#fde047; font-weight:bold;">⚠️ ' + activeModel + ' に必要なキーが設定されていません。</span><br>右上の「⚙️」からキーを入力してください。';
-        openModal('settingModal'); return;
+        const keyLabel = isGeminiModel(activeModel) ? 'Googleキー' : 'GitHubトークン';
+        document.getElementById('thought-txt').innerHTML = '<span style="color:#fde047; font-weight:bold;">⚠️ ' + activeModel + ' 用の' + keyLabel + 'が未入力です。</span><br>開いた設定画面にキーを貼り付けてください。';
+        openModal('settingModal');
+        return;
       }
       if (ROBOT.realQuota <= 0) {
         document.getElementById('thought-txt').innerHTML = '<span style="color:#ef4444; font-weight:bold;">⚠️ 本日の通信枠を使い切りました。</span>';
@@ -901,7 +929,8 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
         lamp.className = "server-status status-red"; lamp.textContent = "❌ 通信停止";
         document.getElementById('thought-txt').innerHTML = '<div style="color:#ef4444; font-weight:bold;">❌ 【通信エラー】</div><div style="font-size:10px; color:#fde047;">' + err.message + '</div>';
       } finally {
-        btn.disabled = false; btn.innerHTML = "⚡ " + getActiveModel() + " で1手思考させる";
+        btn.disabled = false;
+        updateHUD();
       }
     }
 
@@ -1029,49 +1058,42 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
       const bmrEl = document.getElementById('b-morale'); if (bmrEl) bmrEl.style.width = s.morale + '%';
 
       const activeModel = getActiveModel();
+      const isGem = isGeminiModel(activeModel);
+
       const idEl = document.getElementById('ui-id'); if (idEl) idEl.textContent = '🤖 村人#' + ROBOT.gen + ' (' + ROBOT.pos.x + ', ' + ROBOT.pos.y + ', ' + ROBOT.pos.z + ')';
       const timEl = document.getElementById('ui-timer'); if (timEl) timEl.textContent = '⏸️ 手番: ' + ROBOT.stepCount + '手目';
       const dtEl = document.getElementById('diary-text'); if (dtEl) dtEl.textContent = ROBOT.diary.join("\n\n");
       const dbEl = document.getElementById('diary-belief'); if (dbEl) dbEl.textContent = ROBOT.belief;
 
+      // 上部クイック切り替えボタンのハイライト更新
+      const qGoogle = document.getElementById('q-btn-google');
+      const qGithub = document.getElementById('q-btn-github');
+      if (qGoogle) qGoogle.className = 'q-btn ' + (isGem ? 'active-google' : '');
+      if (qGithub) qGithub.className = 'q-btn ' + (!isGem ? 'active-github' : '');
+
+      // 下のメイン思考ボタンは常に選択モデルの色と名前を表示！
       const thinkBtn = document.getElementById('think-btn');
+      if (thinkBtn && !thinkBtn.disabled) {
+        thinkBtn.className = 'main-btn ' + (isGem ? '' : 'btn-github');
+        thinkBtn.innerHTML = (isGem ? '🟦 ⚡ ' : '🟪 ⚡ ') + activeModel + ' で1手思考させる';
+      }
+
       const curKey = getKeyForCurrentModel();
       const badge = document.getElementById('ui-badge');
       const lamp = document.getElementById('server-lamp');
-      const isGem = isGeminiModel(activeModel);
-
-      // 画面上部のセレクトボックス値も連動
-      const quickSel = document.getElementById('quick-model-select');
-      if (quickSel && quickSel.value !== activeModel) quickSel.value = activeModel;
 
       if (curKey.length > 5) {
-        if (badge) { badge.className = "badge badge-on"; badge.textContent = "⚡ API残: " + ROBOT.realQuota + ""; }
+        if (badge) { badge.className = "badge badge-on"; badge.textContent = "⚡ API残: " + ROBOT.realQuota; }
         if (lamp) { lamp.className = "server-status status-green"; lamp.textContent = "🟢 待機中"; }
-        
-        if (thinkBtn && !thinkBtn.disabled) {
-          thinkBtn.className = "main-btn " + (isGem ? "" : "btn-github");
-          thinkBtn.innerHTML = "⚡ " + activeModel + " で1手思考させる";
-          thinkBtn.onclick = stepAiLife;
-        }
       } else {
-        const keyName = isGem ? "Googleキー" : "GitHubトークン";
         if (badge) { badge.className = "badge badge-off"; badge.textContent = "⚙️ キー未設定"; }
         if (lamp) { lamp.className = "server-status status-yellow"; lamp.textContent = "⚙️ キー未設定"; }
-        
-        if (thinkBtn && !thinkBtn.disabled) {
-          thinkBtn.className = "main-btn btn-need-key";
-          thinkBtn.innerHTML = "🔑 " + keyName + "を設定してね (タップ)";
-          thinkBtn.onclick = () => openModal('settingModal');
-        }
       }
     }
 
     function openModal(id) {
       if (id === 'settingModal') {
         const curModel = getActiveModel();
-        const selModelEl = document.getElementById('setting-model');
-        if (selModelEl) selModelEl.value = curModel;
-        
         const gKey = safeStorage.getItem('key_google') || safeStorage.getItem('ai_api_key') || '';
         const ghKey = safeStorage.getItem('key_github') || '';
 
@@ -1080,22 +1102,8 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
         if (inpG) inpG.value = gKey;
         if (inpGh) inpGh.value = ghKey;
 
-        const tagG = document.getElementById('tag-google-status');
-        const tagGh = document.getElementById('tag-github-status');
-
-        if (tagG) {
-          if (gKey.length > 5) { tagG.textContent = '保存済み'; tagG.className = 'key-status-tag tag-saved'; }
-          else { tagG.textContent = '未保存'; tagG.className = 'key-status-tag tag-empty'; }
-        }
-
-        if (tagGh) {
-          if (ghKey.length > 5) { tagGh.textContent = '保存済み'; tagGh.className = 'key-status-tag tag-saved'; }
-          else { tagGh.textContent = '未保存'; tagGh.className = 'key-status-tag tag-empty'; }
-        }
-
-        onModelSelectChanged();
-        const msgEl = document.getElementById('setting-msg');
-        if (msgEl) msgEl.textContent = '';
+        refreshModalKeyTags();
+        selectModelInModal(curModel);
       }
       const modalEl = document.getElementById(id);
       if (modalEl) modalEl.style.display = 'flex';
