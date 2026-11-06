@@ -80,7 +80,6 @@
     .status-yellow { background: #854d0e; color: #fde047; }
     .status-red { background: #7f1d1d; color: #fca5a5; }
 
-    /* 頭脳クイック切り替えボタン群 */
     .quick-switch-group {
       display: flex; gap: 4px; pointer-events: auto;
     }
@@ -174,7 +173,6 @@
     .save-btn { padding: 12px; background: #0284c7; color: #fff; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 13px; }
     .msg-line { font-size: 11px; color: #fde047; min-height: 16px; line-height: 1.4; }
     
-    /* タップで選べるカード式設定グループ */
     .settings-group {
       background: rgba(255,255,255,0.03); border: 2px solid #1e293b;
       padding: 12px; border-radius: 12px; cursor: pointer;
@@ -227,7 +225,7 @@
         <span>🧠 頭脳:</span>
         <div class="quick-switch-group">
           <button type="button" id="q-btn-google" class="q-btn active-google" onclick="selectModelAndRefresh('gemini-3.8-flash')">🟦 Google 3.8</button>
-          <button type="button" id="q-btn-github" class="q-btn" onclick="selectModelAndRefresh('gpt-4o')">🟪 GitHub GPT-4o</button>
+          <button type="button" id="q-btn-github" class="q-btn" onclick="selectModelAndRefresh('openai/gpt-oss-120b')">🟪 Groq 120B</button>
         </div>
       </div>
       <span id="server-lamp" class="server-status status-yellow">⚙️ キー未設定</span>
@@ -256,7 +254,7 @@
       <button class="situation-chip" id="scenario-btn" onclick="cycleScenario()">🎬 実験: 通常探索</button>
     </div>
     <div class="action-row">
-      <button class="main-btn" id="think-btn" onclick="stepAiLife()">⚡ gemini-3.8-flash で1手思考させる</button>
+      <button class="main-btn" id="think-btn" onclick="stepAiLife()">🟦 ⚡ gemini-3.8-flash で1手思考させる</button>
       <button class="main-btn btn-respawn" id="respawn-btn" onclick="respawnRobot()">🔄 手帳を引き継いで次の村人へ</button>
     </div>
   </div>
@@ -273,7 +271,6 @@
     </div>
   </div>
 
-  <!-- API設定モーダル（カードをタップするだけで頭脳とボタンが切り替わる方式） -->
   <div class="modal-cover" id="settingModal">
     <div class="modal-box">
       <div class="modal-head">
@@ -281,7 +278,6 @@
         <div class="close-btn" onclick="closeModal('settingModal')">✕</div>
       </div>
 
-      <!-- ① Google Gemini カード -->
       <div class="settings-group selected-google" id="grp-google-key" onclick="selectModelInModal('gemini-3.8-flash')">
         <div class="settings-group-title">
           <span>🟦 Google Gemini 3.8 を使う</span>
@@ -291,14 +287,13 @@
         <input type="password" id="input-google-key" class="input-box" placeholder="ここにGoogleキーを貼り付け" onclick="event.stopPropagation(); selectModelInModal('gemini-3.8-flash');" oninput="autoSaveKey('google', this.value)">
       </div>
 
-      <!-- ② GitHub Models カード -->
-      <div class="settings-group" id="grp-github-key" onclick="selectModelInModal('gpt-4o')">
+      <div class="settings-group" id="grp-github-key" onclick="selectModelInModal('openai/gpt-oss-120b')">
         <div class="settings-group-title">
-          <span>🟪 GitHub GPT-4o を使う</span>
+          <span>🟪 Groq (GPT-OSS-120B) を使う</span>
           <span id="tag-github-status" class="key-status-tag tag-empty">キー未保存</span>
         </div>
-        <div style="font-size:10px; color:#94a3b8; margin-bottom:6px;">GitHub の無料トークン（ghp_...）</div>
-        <input type="password" id="input-github-key" class="input-box" placeholder="ここにGitHubトークンを貼り付け" onclick="event.stopPropagation(); selectModelInModal('gpt-4o');" oninput="autoSaveKey('github', this.value)">
+        <div style="font-size:10px; color:#94a3b8; margin-bottom:6px;">Groq の無料キー（gsk_... / 1日1,000回・有効期限なし）</div>
+        <input type="password" id="input-github-key" class="input-box" placeholder="ここにGroqキー (gsk_...) を貼り付け" onclick="event.stopPropagation(); selectModelInModal('openai/gpt-oss-120b');" oninput="autoSaveKey('github', this.value)">
       </div>
 
       <div class="msg-line" id="setting-msg">枠をタップすると使う頭脳が切り替わります。</div>
@@ -366,33 +361,64 @@
     });
 
     /* =====================================================================
-     * 【GitHub Models 通信コア（深い推論・思考力）】
+     * 【Groq 通信コア（1日1,000回無料・ブラウザ直接CORS通信対応・深い推論）】
      * ===================================================================== */
-    const GitHubCore = Object.freeze({
-      async think(prompt, token, modelName) {
-        if (!token || token.trim().length <= 10) {
-          throw new Error('GitHubトークンが設定されていません。');
+    const GroqCore = Object.freeze({
+      DEFAULT_MODEL: 'openai/gpt-oss-120b',
+
+      async think(prompt, apiKey, modelName) {
+        if (!apiKey || apiKey.trim().length <= 10) {
+          throw new Error('GroqのAPIキー（gsk_...）が設定されていません。');
         }
 
-        const endpoint = 'https://models.inference.ai.azure.com/chat/completions';
-        
-        const res = await fetch(endpoint, {
+        const key = apiKey.trim();
+        const endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+        const targetModel = modelName || this.DEFAULT_MODEL;
+
+        let res = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token.trim()}`
+            'Authorization': `Bearer ${key}`
           },
           body: JSON.stringify({
-            model: modelName,
+            model: targetModel,
             messages: [{ role: 'user', content: prompt }],
-            temperature: 0.7
+            temperature: 0.7,
+            response_format: { type: 'json_object' }
           })
         });
 
+        if (res.status === 400 || res.status === 404) {
+          const mRes = await fetch('https://api.groq.com/openai/v1/models', {
+            headers: { 'Authorization': `Bearer ${key}` }
+          });
+          if (mRes.ok) {
+            const mData = await mRes.json();
+            const available = (mData.data || []).map(m => m.id).filter(id => !id.includes('whisper') && !id.includes('tts') && !id.includes('guard'));
+            const fallbackModel = available.find(id => id.includes('gpt-oss-120b') || id.includes('70b')) || available[0];
+            if (fallbackModel) {
+              res = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${key}`
+                },
+                body: JSON.stringify({
+                  model: fallbackModel,
+                  messages: [{ role: 'user', content: prompt }],
+                  temperature: 0.7
+                })
+              });
+            }
+          }
+        }
+
         if (!res.ok) {
-          if (res.status === 429) throw new Error('GitHub APIの利用制限（429）です。少し待ってからお試しください。');
+          if (res.status === 401) throw new Error('Groqキーが無効です（gsk_から始まるキーか確認してください）。');
+          if (res.status === 429) throw new Error('Groqの一時的な混雑（429）です。数秒待ってからお試しください。');
           const errTxt = await res.text();
-          throw new Error(`GitHub エラー ${res.status}: ${errTxt.slice(0, 80)}`);
+          throw new Error(`Groq エラー ${res.status}: ${errTxt.slice(0, 80)}`);
         }
 
         const data = await res.json();
@@ -403,7 +429,6 @@
       }
     });
 
-    // プレビュー環境でもVercelでも100%確実に保存されるメモリ＋ストレージ二重保存
     const memStore = {};
     const safeStorage = {
       getItem: (k) => {
@@ -498,7 +523,6 @@
     }
     markVision(0, 0, -1);
 
-    // 頭脳モデルを切り替えて即時画面＆ボタンを更新する共通関数
     function selectModelAndRefresh(modelName) {
       safeStorage.setItem('ai_custom_model', modelName);
       updateHUD();
@@ -509,7 +533,6 @@
       }
     }
 
-    // 設定モーダル内でカードをタップした時の処理
     function selectModelInModal(modelName) {
       safeStorage.setItem('ai_custom_model', modelName);
       const isGem = isGeminiModel(modelName);
@@ -522,16 +545,15 @@
       if (grpGh) grpGh.className = 'settings-group ' + (!isGem ? 'selected-github' : '');
       if (saveBtn) {
         saveBtn.style.background = isGem ? '#0284c7' : '#6d28d9';
-        saveBtn.textContent = isGem ? '🟦 Google Gemini 3.8 に決定して閉じる' : '🟪 GitHub GPT-4o に決定して閉じる';
+        saveBtn.textContent = isGem ? '🟦 Google Gemini 3.8 に決定して閉じる' : '🟪 Groq 120B に決定して閉じる';
       }
       if (msg) {
         msg.style.color = isGem ? '#38bdf8' : '#c4b5fd';
-        msg.textContent = isGem ? '✓ Google Gemini 3.8 を選択中' : '✓ GitHub GPT-4o を選択中';
+        msg.textContent = isGem ? '✓ Google Gemini 3.8 を選択中' : '✓ Groq (openai/gpt-oss-120b) を選択中';
       }
       updateHUD();
     }
 
-    // キー入力欄に貼り付けた瞬間に自動判別＆保存
     function autoSaveKey(type, val) {
       const trimmed = val.trim();
       if (type === 'google') {
@@ -539,7 +561,7 @@
         selectModelInModal('gemini-3.8-flash');
       } else {
         safeStorage.setItem('key_github', trimmed);
-        selectModelInModal('gpt-4o');
+        selectModelInModal('openai/gpt-oss-120b');
       }
       refreshModalKeyTags();
       updateHUD();
@@ -587,7 +609,9 @@
     };
 
     function init3D() {
+      if (typeof THREE === 'undefined') return;
       const stage = document.getElementById('c3d');
+      if (!stage || renderer) return;
       const w = stage.clientWidth || window.innerWidth || 360;
       const h = stage.clientHeight || window.innerHeight || 640;
 
@@ -894,7 +918,7 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
       const currentKey = getKeyForCurrentModel();
 
       if (currentKey.length <= 5) {
-        const keyLabel = isGeminiModel(activeModel) ? 'Googleキー' : 'GitHubトークン';
+        const keyLabel = isGeminiModel(activeModel) ? 'Googleキー' : 'Groqキー (gsk_...)';
         document.getElementById('thought-txt').innerHTML = '<span style="color:#fde047; font-weight:bold;">⚠️ ' + activeModel + ' 用の' + keyLabel + 'が未入力です。</span><br>開いた設定画面にキーを貼り付けてください。';
         openModal('settingModal');
         return;
@@ -916,7 +940,7 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
         if (isGeminiModel(activeModel)) {
           decision = await GeminiCore.think(prompt, currentKey, activeModel);
         } else {
-          decision = await GitHubCore.think(prompt, currentKey, activeModel);
+          decision = await GroqCore.think(prompt, currentKey, activeModel);
         }
 
         consumeQuota(); ROBOT.stepCount++;
@@ -1065,13 +1089,11 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
       const dtEl = document.getElementById('diary-text'); if (dtEl) dtEl.textContent = ROBOT.diary.join("\n\n");
       const dbEl = document.getElementById('diary-belief'); if (dbEl) dbEl.textContent = ROBOT.belief;
 
-      // 上部クイック切り替えボタンのハイライト更新
       const qGoogle = document.getElementById('q-btn-google');
       const qGithub = document.getElementById('q-btn-github');
       if (qGoogle) qGoogle.className = 'q-btn ' + (isGem ? 'active-google' : '');
       if (qGithub) qGithub.className = 'q-btn ' + (!isGem ? 'active-github' : '');
 
-      // 下のメイン思考ボタンは常に選択モデルの色と名前を表示！
       const thinkBtn = document.getElementById('think-btn');
       if (thinkBtn && !thinkBtn.disabled) {
         thinkBtn.className = 'main-btn ' + (isGem ? '' : 'btn-github');
@@ -1120,7 +1142,15 @@ ${JSON.stringify(actions.map(a => ({ id: a.id, 行動: a.txt })))}
       camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
     });
 
-    window.addEventListener('DOMContentLoaded', () => { init3D(); updateHUD(); });
+    function startApp() {
+      init3D();
+      updateHUD();
+    }
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', startApp);
+    } else {
+      startApp();
+    }
   </script>
 </body>
 </html>
