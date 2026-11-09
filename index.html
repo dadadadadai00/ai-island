@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>ボクセルAI自律思考水槽 - 昼夜・マイクラゲージ連動版</title>
+  <title>ボクセルAI自律思考水槽 - 視界音・アイテム配置・手帳版</title>
 
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -37,13 +37,13 @@
       overflow: visible;
       border-bottom: 2px solid #cbd5e1;
       z-index: 30;
-      transition: background-color 1s ease; /* 背景色の時間経過トランジション */
+      transition: background-color 1s ease;
     }
     #stage-3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; overflow: hidden; }
     #c3d { width: 100%; height: 100%; display: block; }
     canvas { display: block; width: 100% !important; height: 100% !important; }
 
-    /* 最上部：ゲージパネル（マイクラ方式） */
+    /* 最上部：ゲージ・設定の大枠 */
     .top-gauge-panel {
       position: absolute; top: 8px; left: 8px; right: 8px; z-index: 20;
       background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(8px);
@@ -61,7 +61,6 @@
     .bar-bg { background: #e2e8f0; height: 8px; border-radius: 5px; margin-top: 3px; overflow: hidden; padding: 1px; }
     .bar-fill { height: 100%; border-radius: 4px; transition: width 0.35s ease; }
 
-    /* ロボット状態表示バッジ ＆ 時計・手帳ボタン */
     .robot-status-row {
       display: flex; justify-content: space-between; align-items: center;
       margin-top: 6px; padding-top: 5px; border-top: 1px solid #e2e8f0;
@@ -72,12 +71,10 @@
       background: #fef9c3; color: #854d0e; border: 1.5px solid #fde047; line-height: 1.3;
     }
     .status-right-col { display: flex; align-items: center; gap: 6px; }
-
     .time-phase-badge {
       font-size: 10.5px; font-weight: 900; padding: 2px 7px; border-radius: 6px;
       background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;
     }
-
     .btn-setting-gear-inline {
       width: 28px; height: 28px; border-radius: 8px;
       background: #f1f5f9; border: 1.5px solid #cbd5e1;
@@ -86,48 +83,59 @@
     }
     .btn-setting-gear-inline:active { transform: scale(0.92); background: #e2e8f0; }
 
+    /* 枠外右下のサイドボタン列（日記帳） */
+    .side-btn-col {
+      position: absolute; top: 96px; right: 12px; z-index: 20;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .btn-side-circle {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(6px);
+      border: 2px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; cursor: pointer; transition: transform 0.2s;
+    }
+    .btn-side-circle:active { transform: scale(0.9); }
+
+    /* アイテム配置モードのキャンセルボタン */
+    .placement-cancel-bar {
+      position: absolute; top: 100px; left: 50%; transform: translateX(-50%); z-index: 25;
+      background: #ef4444; color: white; font-size: 13px; font-weight: 900;
+      padding: 8px 16px; border-radius: 20px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+      display: none; align-items: center; gap: 6px; cursor: pointer;
+    }
+    .placement-cancel-bar.active { display: flex; }
+
     /* 扇状メニュー本体 */
     .fan-menu-wrapper {
       position: absolute; bottom: -27px; left: 50%; transform: translateX(-50%);
-      z-index: 40; width: 340px; height: 195px;
-      pointer-events: none;
+      z-index: 40; width: 340px; height: 195px; pointer-events: none;
     }
     .fan-radial-container {
-      position: absolute; bottom: 0; left: 0;
-      width: 340px; height: 195px;
-      pointer-events: none; opacity: 0;
-      transform: scale(0.35);
-      transform-origin: 170px 168px;
+      position: absolute; bottom: 0; left: 0; width: 340px; height: 195px;
+      pointer-events: none; opacity: 0; transform: scale(0.35); transform-origin: 170px 168px;
       transition: transform 0.26s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease;
     }
     .fan-radial-container.open { opacity: 1; transform: scale(1); }
     .fan-svg { width: 100%; height: 100%; filter: drop-shadow(0 6px 18px rgba(15, 23, 42, 0.14)); overflow: visible; }
-    
     .fan-sector {
-      fill: rgba(255, 255, 255, 0.90); stroke: rgba(203, 213, 225, 0.95);
-      stroke-width: 1.5; stroke-linejoin: round;
-      cursor: pointer; pointer-events: none;
-      transition: fill 0.15s ease, transform 0.15s ease;
+      fill: rgba(255, 255, 255, 0.90); stroke: rgba(203, 213, 225, 0.95); stroke-width: 1.5; stroke-linejoin: round;
+      cursor: pointer; pointer-events: none; transition: fill 0.15s ease, transform 0.15s ease;
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     }
     .fan-radial-container.open .fan-sector { pointer-events: auto; }
     .fan-sector:hover, .fan-sector:active { fill: rgba(224, 242, 254, 0.96); stroke: #60a5fa; }
     .fan-sector-pink { fill: rgba(255, 228, 234, 0.92); stroke: rgba(244, 168, 184, 0.95); }
     .fan-sector-pink:hover, .fan-sector-pink:active { fill: rgba(254, 205, 215, 0.98); stroke: #f43f5e; }
-    
     .fan-label { font-size: 11.5px; font-weight: 900; fill: #334155; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
     .fan-label-pink { fill: #9f1239; }
     .fan-icon { font-size: 21px; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
 
-    /* ◯ボタン */
     .btn-circle-main {
-      position: absolute; left: 146px; top: 144px;
-      width: 48px; height: 48px; border-radius: 50%;
-      background: #ffffff; border: 2px solid #cbd5e1;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+      position: absolute; left: 146px; top: 144px; width: 48px; height: 48px; border-radius: 50%;
+      background: #ffffff; border: 2px solid #cbd5e1; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
       display: flex; align-items: center; justify-content: center;
-      cursor: pointer; pointer-events: auto;
-      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+      cursor: pointer; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
       transition: transform 0.2s ease, background 0.2s, border-color 0.2s;
     }
     .btn-circle-main:active { transform: scale(0.92); }
@@ -137,12 +145,10 @@
 
     /* ② 文章枠 */
     .bottom-window {
-      position: relative; z-index: 10;
-      flex: none; height: 142px;
+      position: relative; z-index: 10; flex: none; height: 142px;
       background: #ffffff; padding: 10px 12px 8px;
       display: flex; flex-direction: column; gap: 4px;
-      overflow-y: auto; border-top: 1.5px solid #cbd5e1;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.03);
+      overflow-y: auto; border-top: 1.5px solid #cbd5e1; box-shadow: 0 -2px 10px rgba(0,0,0,0.03);
     }
     .voice-header { display: flex; justify-content: space-between; align-items: center; }
     .voice-title { font-size: 12px; font-weight: 900; color: #475569; display: flex; align-items: center; gap: 4px; }
@@ -153,10 +159,8 @@
     .lamp-err { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
 
     .voice-bubble {
-      flex: 1; min-height: 68px;
-      background: #f8fafc; border: 1.5px solid #cbd5e1;
-      border-radius: 10px; padding: 7px 10px;
-      display: flex; flex-direction: column; justify-content: center;
+      flex: 1; min-height: 68px; background: #f8fafc; border: 1.5px solid #cbd5e1;
+      border-radius: 10px; padding: 7px 10px; display: flex; flex-direction: column; justify-content: center;
       transition: all 0.3s ease;
     }
     .voice-bubble.bubble-active { border-color: #60a5fa; background: #f0f9ff; }
@@ -169,50 +173,34 @@
 
     /* ③ フッター */
     .footer-bar {
-      flex: none;
-      padding: 8px 14px max(24px, calc(env(safe-area-inset-bottom) + 12px));
-      background: #f8fafc; border-top: 1.5px solid #e2e8f0;
-      display: flex; justify-content: center;
+      flex: none; padding: 8px 14px max(24px, calc(env(safe-area-inset-bottom) + 12px));
+      background: #f8fafc; border-top: 1.5px solid #e2e8f0; display: flex; justify-content: center;
     }
     .btn-think-now {
-      width: 100%; max-width: 440px; height: 48px;
-      border-radius: 14px; border: none; cursor: pointer;
+      width: 100%; max-width: 440px; height: 48px; border-radius: 14px; border: none; cursor: pointer;
       font-size: 16px; font-weight: 900; color: #ffffff;
-      background: linear-gradient(135deg, #60a5fa, #3b82f6);
-      border: 1.5px solid #93c5fd;
+      background: linear-gradient(135deg, #60a5fa, #3b82f6); border: 1.5px solid #93c5fd;
       box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+      display: flex; align-items: center; justify-content: center; gap: 6px; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     }
     .btn-think-now:active { transform: scale(0.97); }
-    .btn-think-now:disabled {
-      background: #cbd5e1 !important; border-color: #94a3b8 !important;
-      color: #64748b !important; cursor: not-allowed; box-shadow: none;
-    }
-    .btn-respawn {
-      background: linear-gradient(135deg, #f87171, #ef4444) !important;
-      border: 1.5px solid #fca5a5 !important;
-      box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35) !important;
-      display: none;
-    }
+    .btn-think-now:disabled { background: #cbd5e1 !important; border-color: #94a3b8 !important; color: #64748b !important; cursor: not-allowed; box-shadow: none; }
+    .btn-respawn { background: linear-gradient(135deg, #f87171, #ef4444) !important; border: 1.5px solid #fca5a5 !important; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35) !important; display: none; }
 
-    /* 共通モーダル */
+    /* モーダル */
     .modal-cover {
-      font-size: 14px; line-height: 1.4;
-      position: fixed; inset: 0; z-index: 100;
-      background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px);
-      display: none; align-items: center; justify-content: center; padding: 14px;
+      font-size: 14px; line-height: 1.4; position: fixed; inset: 0; z-index: 100;
+      background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 14px;
     }
     .modal-box {
-      width: 100%; max-width: 390px; background: #ffffff; border: 1.5px solid #cbd5e1;
-      border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
-      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.15); max-height: 90dvh; overflow-y: auto;
+      width: 100%; max-width: 390px; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 20px; padding: 16px;
+      display: flex; flex-direction: column; gap: 10px; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.15); max-height: 90dvh; overflow-y: auto;
     }
     .modal-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #f1f5f9; padding-bottom: 6px; }
     .modal-title { font-size: 15px; font-weight: 900; color: #334155; }
     .close-btn { font-size: 20px; color: #94a3b8; cursor: pointer; padding: 2px 6px; font-weight: bold; }
 
-    /* ガチャなどの中身は前回と同じ */
+    /* ガチャ */
     .gacha-stage-box { background: linear-gradient(180deg, #fff5f7 0%, #ffffff 100%); border: 1.5px solid #fbcfe8; border-radius: 16px; padding: 10px; display: flex; flex-direction: column; align-items: center; position: relative; overflow: hidden; }
     .gacha-svg-wrap { width: 220px; height: 250px; position: relative; }
     #gacha-handle-group { transform-origin: 110px 158px; transition: transform 0.65s cubic-bezier(0.45, 0.05, 0.55, 0.95); }
@@ -237,8 +225,8 @@
     .btn-modal-close { padding: 11px; border-radius: 12px; border: 1.5px solid #cbd5e1; background: #f1f5f9; color: #475569; font-size: 14px; font-weight: 900; cursor: pointer; }
     .btn-modal-close:active { transform: scale(0.96); background: #e2e8f0; }
 
-    /* 5x5 グリッド */
-    .grid-5x5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: #f8fafc; padding: 8px; border-radius: 14px; border: 1.5px solid #e2e8f0; }
+    /* グリッド 5x5, 5x2 */
+    .grid-5x5, .grid-5x2 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: #f8fafc; padding: 8px; border-radius: 14px; border: 1.5px solid #e2e8f0; }
     .grid-cell { aspect-ratio: 1 / 1; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 10px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s ease; overflow: hidden; }
     .grid-cell:active { transform: scale(0.93); }
     .grid-cell.filled { background: #f0f9ff; border-color: #93c5fd; }
@@ -248,7 +236,23 @@
     .cell-count { position: absolute; right: 3px; bottom: 2px; font-size: 9.5px; font-weight: 900; color: #1e293b; background: rgba(255, 255, 255, 0.92); padding: 0 3px; border-radius: 4px; border: 1px solid #cbd5e1; line-height: 1.2; }
     .cell-coord { position: absolute; top: 2px; left: 3px; font-size: 8px; font-weight: 700; color: #64748b; line-height: 1; }
 
-    /* 設定・その他 */
+    /* 手帳（ステータス）画面 */
+    .diary-robot-preview {
+      display: flex; align-items: center; justify-content: center; flex-direction: column;
+      background: linear-gradient(135deg, #e0f2fe, #bae6fd); padding: 16px;
+      border-radius: 16px; border: 2px solid #7dd3fc; margin-bottom: 4px;
+    }
+    .diary-robot-emoji { font-size: 64px; line-height: 1; margin-bottom: 4px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); }
+    .diary-tool-title { font-size: 13px; font-weight: 900; color: #0369a1; text-align: center; margin-top: 4px; }
+    
+    .btn-log-view {
+      width: 100%; padding: 12px; border-radius: 12px; border: 1.5px solid #fbbf24;
+      background: linear-gradient(135deg, #fde047, #facc15); color: #854d0e;
+      font-size: 14px; font-weight: 900; cursor: pointer; display: flex; justify-content: center; gap: 6px; margin-top: 8px;
+    }
+    .btn-log-view:active { transform: scale(0.97); }
+
+    /* 設定 */
     .settings-card { background: #f8fafc; border: 2px solid #e2e8f0; padding: 10px; border-radius: 12px; cursor: pointer; }
     .settings-card.selected-google { border-color: #60a5fa; background: #eff6ff; }
     .settings-card.selected-github { border-color: #c084fc; background: #faf5ff; }
@@ -268,38 +272,36 @@
 <body>
 
   <div class="app-container">
-
-    <!-- ① プレビュー（時間経過で背景色が美しく変わる！） -->
+    <!-- ① プレビュー -->
     <div class="top-window" id="sky-window">
       <div id="stage-3d"><div id="c3d"></div></div>
 
-      <!-- ★ マイクラ方式の3本ゲージ（HP・満腹・ごきげん） -->
+      <!-- 最上部：ゲージ大枠 -->
       <div class="top-gauge-panel">
         <div class="gauge-grid">
-          <div class="gauge-col">
-            <div class="gauge-label">❤️ たいりょく <span id="v-energy" class="gauge-num">100</span></div>
-            <div class="bar-bg"><div id="b-energy" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #f87171, #ef4444);"></div></div>
-          </div>
-          <div class="gauge-col">
-            <div class="gauge-label">🍙 おなか <span id="v-stamina" class="gauge-num">100</span></div>
-            <div class="bar-bg"><div id="b-stamina" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #fde047, #eab308);"></div></div>
-          </div>
-          <div class="gauge-col">
-            <div class="gauge-label">🎵 ごきげん <span id="v-mental" class="gauge-num">100</span></div>
-            <div class="bar-bg"><div id="b-mental" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #6ee7b7, #10b981);"></div></div>
-          </div>
+          <div class="gauge-col"><div class="gauge-label">❤️ たいりょく <span id="v-energy" class="gauge-num">100</span></div><div class="bar-bg"><div id="b-energy" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #f87171, #ef4444);"></div></div></div>
+          <div class="gauge-col"><div class="gauge-label">🍙 おなか <span id="v-stamina" class="gauge-num">100</span></div><div class="bar-bg"><div id="b-stamina" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #fde047, #eab308);"></div></div></div>
+          <div class="gauge-col"><div class="gauge-label">🎵 ごきげん <span id="v-mental" class="gauge-num">100</span></div><div class="bar-bg"><div id="b-mental" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #6ee7b7, #10b981);"></div></div></div>
         </div>
-
         <div class="robot-status-row">
           <span id="ui-robot-id" class="robot-id-tag">🤖 ロボ1ごう (0, 0)</span>
           <span id="ui-robot-drive" class="robot-drive-badge">😊 あんしん・まんぷく</span>
           <div class="status-right-col">
-            <!-- ★ 新しい時間帯バッジ -->
             <span id="ui-time-phase" class="time-phase-badge">☀️ 朝</span>
             <span id="ui-step-count" class="robot-id-tag">⭐ 0手目</span>
             <button type="button" class="btn-setting-gear-inline" onclick="openModal('settingModal')" title="せってい">⚙️</button>
           </div>
         </div>
+      </div>
+
+      <!-- 枠外右下のサイドボタン（手帳アイコン） -->
+      <div class="side-btn-col">
+        <button type="button" class="btn-side-circle" onclick="openDiaryModal()" title="手帳（ステータス）">📖</button>
+      </div>
+
+      <!-- アイテム配置キャンセルバー -->
+      <div id="placement-cancel-bar" class="placement-cancel-bar" onclick="cancelPlacementMode()">
+        ✕ 配置をやめる
       </div>
 
       <!-- 扇状メニュー -->
@@ -323,7 +325,7 @@
         <div class="voice-text" id="voice-text">
           ぼくはマス目の島に立つロボットだよ！<br>
           「おなか」が空きすぎると「たいりょく」が減って倒れちゃうよ。<br>
-          暗い夜中に歩き回るのもキケンだから気をつけてね！
+          暗い夜中は足元しか見えないから気をつけてね！
         </div>
       </div>
       <div class="action-note-row">
@@ -341,13 +343,29 @@
 
   <div id="toast-msg">💾 データを保存したよ</div>
 
-  <!-- モーダル群 (ガチャ・アイテム・整地・おやすみ・設定) は構造維持 -->
+  <!-- 【モーダル群】 -->
+  <!-- 📖 日記帳（ステータス）モーダル -->
+  <div class="modal-cover" id="diaryModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-title">📖 ロボット手帳（ステータス）</div>
+        <div class="close-btn" onclick="closeModal('diaryModal')">✕</div>
+      </div>
+      <div class="diary-robot-preview">
+        <div class="diary-robot-emoji">🤖</div>
+        <div style="font-size:14px; font-weight:900; color:#0f172a;" id="diary-robot-name">第1世代 ロボット</div>
+      </div>
+      <div class="diary-tool-title">🎒 宝箱から見つけた「どうぐ」(5×2マス)</div>
+      <div class="grid-5x2" id="robot-tools-grid"></div>
+      
+      <button type="button" class="btn-log-view" onclick="alert('ここに1日の記録（ログ）が表示される予定です！')">📝 1日のきろくを見る</button>
+    </div>
+  </div>
+
+  <!-- ガチャ -->
   <div class="modal-cover" id="gachaModal">
     <div class="modal-box" style="border-color:#fbcfe8;">
-      <div class="modal-head">
-        <div class="modal-title" style="color:#be185d;">🎰 パステル・ガチャガチャ</div>
-        <div id="gacha-slot-status" style="font-size:11px; font-weight:800; color:#64748b;">空き枠あり</div>
-      </div>
+      <div class="modal-head"><div class="modal-title" style="color:#be185d;">🎰 パステル・ガチャガチャ</div><div id="gacha-slot-status" style="font-size:11px; font-weight:800; color:#64748b;">空き枠あり</div></div>
       <div class="gacha-stage-box">
         <div class="gacha-svg-wrap">
           <svg viewBox="0 0 220 250" width="100%" height="100%">
@@ -367,27 +385,19 @@
             <rect x="48" y="112" width="124" height="14" rx="7" fill="#f472b6" stroke="#db2777" stroke-width="1.5" />
             <circle cx="110" cy="158" r="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="3" />
             <circle cx="110" cy="158" r="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
-            <g id="gacha-handle-group">
-              <rect x="88" y="152" width="44" height="12" rx="6" fill="#f472b6" stroke="#db2777" stroke-width="2" />
-              <circle cx="110" cy="158" r="7" fill="#ffffff" stroke="#db2777" stroke-width="2" />
-            </g>
-            <rect x="84" y="196" width="52" height="36" rx="10" fill="#be185d" stroke="#f472b6" stroke-width="2.5" />
-            <rect x="88" y="200" width="44" height="16" rx="5" fill="#831843" opacity="0.6" />
+            <g id="gacha-handle-group"><rect x="88" y="152" width="44" height="12" rx="6" fill="#f472b6" stroke="#db2777" stroke-width="2" /><circle cx="110" cy="158" r="7" fill="#ffffff" stroke="#db2777" stroke-width="2" /></g>
+            <rect x="84" y="196" width="52" height="36" rx="10" fill="#be185d" stroke="#f472b6" stroke-width="2.5" /><rect x="88" y="200" width="44" height="16" rx="5" fill="#831843" opacity="0.6" />
           </svg>
         </div>
         <div class="capsule-pop-overlay" id="capsule-pop-overlay">
           <div class="pop-capsule-stage" id="pop-capsule-stage">
-            <div class="cap-half-top" id="cap-half-top"></div>
-            <div class="cap-half-bottom"></div>
-            <div class="pop-reward-item">
-              <div class="pop-reward-icon" id="pop-reward-icon">🍎</div>
-              <div class="pop-reward-name" id="pop-reward-name">りんご ×1</div>
-            </div>
+            <div class="cap-half-top" id="cap-half-top"></div><div class="cap-half-bottom"></div>
+            <div class="pop-reward-item"><div class="pop-reward-icon" id="pop-reward-icon">🍎</div><div class="pop-reward-name" id="pop-reward-name">りんご ×1</div></div>
           </div>
           <div style="font-size:12px; font-weight:900; color:#64748b; margin-top:8px;" id="pop-status-msg"></div>
         </div>
       </div>
-      <div style="font-size:11px; color:#64748b; text-align:center;">🍎・🌳・🪨・🌿・🟫 がランダムに出るよ！</div>
+      <div style="font-size:11px; color:#64748b; text-align:center;">🍎・🌳・🪨・🌿・🎁(宝箱) がランダムに出るよ！</div>
       <div class="modal-footer-btns">
         <button type="button" class="btn-gacha-start" id="btn-gacha-spin" onclick="spinGachaMachine()">スタート</button>
         <button type="button" class="btn-modal-close" onclick="closeModal('gachaModal')">閉じる</button>
@@ -395,23 +405,23 @@
     </div>
   </div>
 
+  <!-- アイテム（持ち物） -->
   <div class="modal-cover" id="itemModal">
     <div class="modal-box">
       <div class="modal-head">
         <div class="modal-title">🎒 アイテム（5×5 もちもの袋）</div>
         <div id="item-bag-summary" style="font-size:11px; font-weight:800; color:#3b82f6;">0 / 25マス</div>
       </div>
+      <div style="font-size:12px; color:#64748b;">使いたいアイテムをタップして、島に置いてね（1マスに1個まで）。宝箱はロボットのどうぐになるよ！</div>
       <div class="grid-5x5" id="inventory-grid-5x5"></div>
       <button type="button" class="btn-modal-close" style="width:100%;" onclick="closeModal('itemModal')">閉じる</button>
     </div>
   </div>
 
+  <!-- 整地 -->
   <div class="modal-cover" id="cleanModal">
     <div class="modal-box">
-      <div class="modal-head">
-        <div class="modal-title">⛏️ 整地（島の5×5マス目マップ）</div>
-        <div class="close-btn" onclick="closeModal('cleanModal')">✕</div>
-      </div>
+      <div class="modal-head"><div class="modal-title">⛏️ 整地（島の5×5マス目マップ）</div><div class="close-btn" onclick="closeModal('cleanModal')">✕</div></div>
       <div class="grid-5x5" id="clean-grid-5x5"></div>
       <div class="modal-footer-btns">
         <button type="button" class="save-btn" style="background:#10b981;" onclick="cleanAllIslandFromModal()">✨ 島ぜんぶ整地</button>
@@ -422,12 +432,12 @@
 
   <div class="modal-cover" id="exitModal">
     <div class="modal-box" style="text-align:center; border-color:#f4a8b8; background:#fffafb;">
-      <div style="font-size:36px; margin-bottom:2px;">🌙</div>
-      <div style="font-size:16px; font-weight:900; color:#9f1239;">データを保存して終了しました</div>
+      <div style="font-size:36px; margin-bottom:2px;">🌙</div><div style="font-size:16px; font-weight:900; color:#9f1239;">データを保存して終了しました</div>
       <button type="button" class="save-btn" style="background:#f43f5e; margin-top:6px;" onclick="closeModal('exitModal')">もどる</button>
     </div>
   </div>
 
+  <!-- 設定 -->
   <div class="modal-cover" id="settingModal">
     <div class="modal-box">
       <div class="modal-head"><div class="modal-title">⚙️ AIのせってい</div><div class="close-btn" onclick="closeModal('settingModal')">✕</div></div>
@@ -455,109 +465,47 @@
     }
     cleanStrayTextNodes();
 
-    /**
-     * ============================================================
-     * 【永久保存版】生命の種 コアエンジン (LifeCore)
-     * ※1文字も書き換えません。「energy=たいりょく」「stamina=おなか」「mental=ごきげん」として外側から利用します。
-     * ============================================================
-     */
+    /* ================= LifeCore (変更なし) ================= */
     class LifeCore {
-      #energy = 100;
-      #stamina = 100;
-      #mental = 100;
-      #isAlive = true;
-      #memory = {};
-      #lastStateKey = null;
-      #lastAction = null;
-      #lastWellbeing = 100;
-      #lastDelta = 0;
-
-      constructor(savedData = null) {
-        if (savedData) this.importSave(savedData);
-        else this.#lastWellbeing = this.#calculateWellbeing();
-        Object.freeze(this);
-      }
-
-      #calculateWellbeing() {
-        if (!this.#isAlive) return 0;
-        return (this.#energy * 0.5) + (this.#stamina * 0.3) + (this.#mental * 0.2);
-      }
-
+      #energy = 100; #stamina = 100; #mental = 100; #isAlive = true; #memory = {};
+      #lastStateKey = null; #lastAction = null; #lastWellbeing = 100; #lastDelta = 0;
+      constructor(savedData = null) { if (savedData) this.importSave(savedData); else this.#lastWellbeing = this.#calculateWellbeing(); Object.freeze(this); }
+      #calculateWellbeing() { if (!this.#isAlive) return 0; return (this.#energy * 0.5) + (this.#stamina * 0.3) + (this.#mental * 0.2); }
       #determineCurrentDrive() {
-        if (this.#energy <= 0) return 'DEAD';
-        if (this.#stamina <= 0) return 'FAINT';
-        if (this.#energy <= 30) return 'STARVING';
-        if (this.#stamina <= 25) return 'EXHAUSTED';
-        if (this.#energy <= 60) return 'HUNGRY';
-        if (this.#mental <= 30) return 'BORED';
-        return 'PEACE';
+        if (this.#energy <= 0) return 'DEAD'; if (this.#stamina <= 0) return 'FAINT';
+        if (this.#energy <= 30) return 'STARVING'; if (this.#stamina <= 25) return 'EXHAUSTED';
+        if (this.#energy <= 60) return 'HUNGRY'; if (this.#mental <= 30) return 'BORED'; return 'PEACE';
       }
-
       tick(availableActions = []) {
         if (!this.#isAlive) return 'NONE';
-        this.#energy = Math.max(0, this.#energy - 2);
-        this.#stamina = Math.max(0, this.#stamina - 1);
-        this.#mental = Math.max(0, this.#mental - 1);
-
+        this.#energy = Math.max(0, this.#energy - 2); this.#stamina = Math.max(0, this.#stamina - 1); this.#mental = Math.max(0, this.#mental - 1);
         if (this.#energy <= 0) { this.#isAlive = false; this.#lastAction = 'NONE'; return 'NONE'; }
-        const currentDrive = this.#determineCurrentDrive();
-        this.#lastWellbeing = this.#calculateWellbeing();
-
+        const currentDrive = this.#determineCurrentDrive(); this.#lastWellbeing = this.#calculateWellbeing();
         if (currentDrive === 'FAINT') { this.#lastStateKey = 'FAINT'; this.#lastAction = 'FORCE_SLEEP'; return 'FORCE_SLEEP'; }
         if (!Array.isArray(availableActions) || availableActions.length === 0) return 'WAIT';
-
         if (!this.#memory[currentDrive]) this.#memory[currentDrive] = {};
         for (const act of availableActions) if (this.#memory[currentDrive][act] === undefined) this.#memory[currentDrive][act] = 0;
-
         const curiosityRate = (currentDrive === 'BORED') ? 0.7 : 0.2;
         let chosenAction;
-        if (Math.random() < curiosityRate) {
-          chosenAction = availableActions[Math.floor(Math.random() * availableActions.length)];
-        } else {
-          chosenAction = availableActions.reduce((best, current) => this.#memory[currentDrive][current] > this.#memory[currentDrive][best] ? current : best, availableActions[0]);
-        }
+        if (Math.random() < curiosityRate) { chosenAction = availableActions[Math.floor(Math.random() * availableActions.length)]; }
+        else { chosenAction = availableActions.reduce((best, current) => this.#memory[currentDrive][current] > this.#memory[currentDrive][best] ? current : best, availableActions[0]); }
         if (chosenAction === this.#lastAction) this.#mental = Math.max(0, this.#mental - 3);
-
-        this.#lastStateKey = currentDrive; this.#lastAction = chosenAction;
-        return chosenAction;
+        this.#lastStateKey = currentDrive; this.#lastAction = chosenAction; return chosenAction;
       }
-
       feedback(dEnergy = 0, dStamina = 0, dMental = 0) {
         if (!this.#isAlive) return;
-        if (this.#lastAction === 'FORCE_SLEEP') {
-          this.#stamina = Math.min(100, Math.max(0, this.#stamina + 30));
-          this.#lastDelta = 0; return;
-        }
-        this.#energy = Math.min(100, Math.max(0, this.#energy + dEnergy));
-        this.#stamina = Math.min(100, Math.max(0, this.#stamina + dStamina));
-        this.#mental = Math.min(100, Math.max(0, this.#mental + dMental));
-
+        if (this.#lastAction === 'FORCE_SLEEP') { this.#stamina = Math.min(100, Math.max(0, this.#stamina + 30)); this.#lastDelta = 0; return; }
+        this.#energy = Math.min(100, Math.max(0, this.#energy + dEnergy)); this.#stamina = Math.min(100, Math.max(0, this.#stamina + dStamina)); this.#mental = Math.min(100, Math.max(0, this.#mental + dMental));
         if (this.#energy <= 0) this.#isAlive = false;
-        const newWellbeing = this.#calculateWellbeing();
-        const reward = newWellbeing - this.#lastWellbeing;
-        this.#lastDelta = Number(reward.toFixed(2));
-
+        const newWellbeing = this.#calculateWellbeing(); const reward = newWellbeing - this.#lastWellbeing; this.#lastDelta = Number(reward.toFixed(2));
         if (this.#lastStateKey && this.#lastAction && this.#memory[this.#lastStateKey]) {
           const currentScore = this.#memory[this.#lastStateKey][this.#lastAction] || 0;
           this.#memory[this.#lastStateKey][this.#lastAction] = Number((currentScore + reward).toFixed(2));
         }
       }
-
-      getState() {
-        return Object.freeze({
-          isAlive: this.#isAlive, energy: this.#energy, stamina: this.#stamina, mental: this.#mental,
-          drive: this.#determineCurrentDrive(), lastAction: this.#lastAction, feelingDelta: this.#lastDelta,
-          memory: JSON.parse(JSON.stringify(this.#memory))
-        });
-      }
+      getState() { return Object.freeze({ isAlive: this.#isAlive, energy: this.#energy, stamina: this.#stamina, mental: this.#mental, drive: this.#determineCurrentDrive(), lastAction: this.#lastAction, feelingDelta: this.#lastDelta, memory: JSON.parse(JSON.stringify(this.#memory)) }); }
       exportSave() { return JSON.stringify({ e: this.#energy, s: this.#stamina, m: this.#mental, a: this.#isAlive, mem: this.#memory }); }
-      importSave(jsonString) {
-        try {
-          const data = JSON.parse(jsonString);
-          this.#energy = data.e ?? 100; this.#stamina = data.s ?? 100; this.#mental = data.m ?? 100;
-          this.#isAlive = data.a ?? true; this.#memory = data.mem ?? {}; this.#lastWellbeing = this.#calculateWellbeing();
-        } catch (err) {}
-      }
+      importSave(jsonString) { try { const data = JSON.parse(jsonString); this.#energy = data.e ?? 100; this.#stamina = data.s ?? 100; this.#mental = data.m ?? 100; this.#isAlive = data.a ?? true; this.#memory = data.mem ?? {}; this.#lastWellbeing = this.#calculateWellbeing(); } catch (err) {} }
     }
     Object.freeze(LifeCore); Object.freeze(LifeCore.prototype);
 
@@ -565,52 +513,32 @@
     const GeminiCore = Object.freeze({
       DEFAULT_MODEL: 'gemini-3.8-flash',
       async think(prompt, apiKey, customModel) {
-        let targetModel = customModel || this.DEFAULT_MODEL;
-        if (targetModel.includes('2.5') || targetModel.includes('2.0') || targetModel.includes('1.5')) targetModel = this.DEFAULT_MODEL;
+        let targetModel = customModel || this.DEFAULT_MODEL; if (targetModel.includes('2.5') || targetModel.includes('2.0') || targetModel.includes('1.5')) targetModel = this.DEFAULT_MODEL;
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey.trim()}`;
-        const res = await fetch(endpoint, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7, responseMimeType: 'application/json' } })
-        });
+        const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7, responseMimeType: 'application/json' } }) });
         if (!res.ok) throw new Error(`Google エラー (${res.status})`);
         const data = await res.json();
-        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        return this._parseJsonSafely(rawText);
+        return this._parseJsonSafely(data?.candidates?.[0]?.content?.parts?.[0]?.text);
       },
-      _parseJsonSafely(rawText) {
-        const cleaned = rawText.replace(/\x60{3}json/gi, '').replace(/\x60{3}/g, '').trim();
-        return JSON.parse(cleaned.substring(cleaned.indexOf('{'), cleaned.lastIndexOf('}') + 1));
-      }
+      _parseJsonSafely(rawText) { const cleaned = rawText.replace(/\x60{3}json/gi, '').replace(/\x60{3}/g, '').trim(); return JSON.parse(cleaned.substring(cleaned.indexOf('{'), cleaned.lastIndexOf('}') + 1)); }
     });
-
     const GroqCore = Object.freeze({
       DEFAULT_MODEL: 'openai/gpt-oss-120b',
       async think(prompt, apiKey, modelName) {
         const endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-        const res = await fetch(endpoint, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey.trim()}` },
-          body: JSON.stringify({ model: modelName || this.DEFAULT_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0.7, response_format: { type: 'json_object' } })
-        });
+        const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey.trim()}` }, body: JSON.stringify({ model: modelName || this.DEFAULT_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0.7, response_format: { type: 'json_object' } }) });
         if (!res.ok) throw new Error(`Groq エラー (${res.status})`);
-        const data = await res.json();
-        return GeminiCore._parseJsonSafely(data?.choices?.[0]?.message?.content);
+        const data = await res.json(); return GeminiCore._parseJsonSafely(data?.choices?.[0]?.message?.content);
       }
     });
 
+    /* ファンメニュー SVG */
     function buildFanMenuSVG() {
-      const svg = document.getElementById('fan-svg-root');
-      if (!svg) return;
+      const svg = document.getElementById('fan-svg-root'); if (!svg) return;
       const cx = 170, cy = 168, rIn = 30, rOut = 158, halfGap = 2.5;
-      const items = [
-        { id: 'gacha', icon: '🎰', label: 'ガチャ', startDeg: 180, endDeg: 135, isPink: false },
-        { id: 'item',  icon: '🎒', label: 'アイテム', startDeg: 135, endDeg: 90,  isPink: false },
-        { id: 'clean', icon: '⛏️', label: '整地', startDeg: 90,  endDeg: 45,  isPink: false },
-        { id: 'exit',  icon: '🚪', label: '終了', startDeg: 45,  endDeg: 0,   isPink: true }
-      ];
-      const degToRad = d => (d * Math.PI) / 180;
-      const radToDeg = r => (r * 180) / Math.PI;
-      const offsetIn = radToDeg(Math.asin(halfGap / rIn));
-      const offsetOut = radToDeg(Math.asin(halfGap / rOut));
+      const items = [{ id: 'gacha', icon: '🎰', label: 'ガチャ', startDeg: 180, endDeg: 135, isPink: false }, { id: 'item', icon: '🎒', label: 'アイテム', startDeg: 135, endDeg: 90, isPink: false }, { id: 'clean', icon: '⛏️', label: '整地', startDeg: 90, endDeg: 45, isPink: false }, { id: 'exit', icon: '🚪', label: '終了', startDeg: 45, endDeg: 0, isPink: true }];
+      const degToRad = d => (d * Math.PI) / 180, radToDeg = r => (r * 180) / Math.PI;
+      const offsetIn = radToDeg(Math.asin(halfGap / rIn)), offsetOut = radToDeg(Math.asin(halfGap / rOut));
       let html = '';
       for (const it of items) {
         const a1Out = degToRad(it.startDeg - offsetOut), a2Out = degToRad(it.endDeg + offsetOut);
@@ -622,8 +550,7 @@
         const dPath = `M ${x1Out} ${y1Out} A ${rOut} ${rOut} 0 0 1 ${x2Out} ${y2Out} L ${x2In} ${y2In} A ${rIn} ${rIn} 0 0 0 ${x1In} ${y1In} Z`;
         const midRad = degToRad((it.startDeg + it.endDeg) / 2);
         const centerX = cx + ((rIn + rOut) * 0.53) * Math.cos(midRad), centerY = cy - ((rIn + rOut) * 0.53) * Math.sin(midRad);
-        const sectorClass = it.isPink ? 'fan-sector fan-sector-pink' : 'fan-sector';
-        const labelClass  = it.isPink ? 'fan-label fan-label-pink' : 'fan-label';
+        const sectorClass = it.isPink ? 'fan-sector fan-sector-pink' : 'fan-sector', labelClass = it.isPink ? 'fan-label fan-label-pink' : 'fan-label';
         html += `<path class="${sectorClass}" d="${dPath}" onclick="triggerFanAction('${it.id}')"></path>
                  <text x="${centerX.toFixed(1)}" y="${(centerY - 10).toFixed(1)}" class="fan-icon">${it.icon}</text>
                  <text x="${centerX.toFixed(1)}" y="${(centerY + 12).toFixed(1)}" class="${labelClass}">${it.label}</text>`;
@@ -631,139 +558,98 @@
       svg.innerHTML = html;
     }
 
-    // =====================================================================
-    // ★ 朝〜夜中の5段階（時間帯定義と色の連動）
-    // =====================================================================
+    // ★ 5段階の環境・時間フェーズ
     const TIME_PHASES = [
-      { name: '☀️ 朝',   bg: 0xe0f2fe, sun: 0xfffaed, hemi: 0xffffff, tagColor: '#0ea5e9', tagBg: '#e0f2fe' },
-      { name: '☀️ 昼',   bg: 0xebf2f5, sun: 0xffffff, hemi: 0xcfd8dc, tagColor: '#0369a1', tagBg: '#ebf2f5' },
+      { name: '☀️ 朝', bg: 0xe0f2fe, sun: 0xfffaed, hemi: 0xffffff, tagColor: '#0ea5e9', tagBg: '#e0f2fe' },
+      { name: '☀️ 昼', bg: 0xebf2f5, sun: 0xffffff, hemi: 0xcfd8dc, tagColor: '#0369a1', tagBg: '#ebf2f5' },
       { name: '🌇 夕方', bg: 0xffedd5, sun: 0xfdba74, hemi: 0xfed7aa, tagColor: '#c2410c', tagBg: '#ffedd5' },
-      { name: '🌙 夜',   bg: 0x312e81, sun: 0x4f46e5, hemi: 0x4338ca, tagColor: '#a5b4fc', tagBg: '#312e81' },
+      { name: '🌙 夜', bg: 0x312e81, sun: 0x4f46e5, hemi: 0x4338ca, tagColor: '#a5b4fc', tagBg: '#312e81' },
       { name: '🌌 夜中', bg: 0x0f172a, sun: 0x1e1b4b, hemi: 0x312e81, tagColor: '#94a3b8', tagBg: '#0f172a' }
     ];
-
-    function getCurrentTimePhaseIdx() {
-      const cycle = ROBOT.stepCount % 20; // 20手で1日（1周）
-      if (cycle <= 3) return 0; // 朝
-      if (cycle <= 7) return 1; // 昼
-      if (cycle <= 11) return 2; // 夕方
-      if (cycle <= 15) return 3; // 夜
-      return 4; // 夜中 (16-19)
-    }
+    function getCurrentTimePhaseIdx() { const cycle = ROBOT.stepCount % 20; if (cycle <= 3) return 0; if (cycle <= 7) return 1; if (cycle <= 11) return 2; if (cycle <= 15) return 3; return 4; }
 
     const memStore = {};
-    const safeStorage = {
-      getItem: k => memStore[k] ?? (() => { try { return localStorage.getItem(k); } catch(e){ return null; } })(),
-      setItem: (k, v) => { memStore[k] = String(v); try { localStorage.setItem(k, String(v)); } catch(e){} },
-      removeItem: k => { delete memStore[k]; try { localStorage.removeItem(k); } catch(e){} }
-    };
-    function showToast(msg) {
-      const el = document.getElementById('toast-msg');
-      if (!el) return; el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 1800);
-    }
+    const safeStorage = { getItem: k => memStore[k] ?? (() => { try { return localStorage.getItem(k); } catch(e){ return null; } })(), setItem: (k, v) => { memStore[k] = String(v); try { localStorage.setItem(k, String(v)); } catch(e){} }, removeItem: k => { delete memStore[k]; try { localStorage.removeItem(k); } catch(e){} } };
+    function showToast(msg) { const el = document.getElementById('toast-msg'); if (!el) return; el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 1800); }
 
-    const DRIVE_JA = {
-      PEACE: '😊 あんしん・まんぷく', BORED: '🥱 たい屈（あそびたい！）', HUNGRY: '🍙 おなかすいた…',
-      EXHAUSTED: '💤 くたくた（ねむい）', STARVING: '🚨 はらぺこピンチ！！', FAINT: '💫 たおれて気絶中', DEAD: '💀 うごかなくなった'
-    };
+    const DRIVE_JA = { PEACE: '😊 あんしん・まんぷく', BORED: '🥱 たい屈（あそびたい！）', HUNGRY: '🍙 おなかすいた…', EXHAUSTED: '💤 くたくた（ねむい）', STARVING: '🚨 はらぺこピンチ！！', FAINT: '💫 たおれて気絶中', DEAD: '💀 うごかなくなった' };
 
+    // ★ 特賞「宝箱」を追加
     const GACHA_ITEMS = [
-      { type: 'apple', name: 'りんご', icon: '🍎', capColor: 'linear-gradient(135deg, #f9a8d4, #f472b6)' },
-      { type: 'tree',  name: '木',     icon: '🌳', capColor: 'linear-gradient(135deg, #6ee7b7, #10b981)' },
-      { type: 'stone', name: '石',     icon: '🪨', capColor: 'linear-gradient(135deg, #93c5fd, #60a5fa)' },
-      { type: 'grass', name: '草',     icon: '🌿', capColor: 'linear-gradient(135deg, #fde047, #eab308)' },
-      { type: 'dirt',  name: '土',     icon: '🟫', capColor: 'linear-gradient(135deg, #d8b4fe, #a855f7)' }
+      { type: 'apple', name: 'りんご', icon: '🍎', capColor: 'linear-gradient(135deg, #f9a8d4, #f472b6)', isTool: false },
+      { type: 'tree',  name: '木',     icon: '🌳', capColor: 'linear-gradient(135deg, #6ee7b7, #10b981)', isTool: false },
+      { type: 'stone', name: '石',     icon: '🪨', capColor: 'linear-gradient(135deg, #93c5fd, #60a5fa)', isTool: false },
+      { type: 'grass', name: '草',     icon: '🌿', capColor: 'linear-gradient(135deg, #fde047, #eab308)', isTool: false },
+      { type: 'chest', name: '宝箱',   icon: '🎁', capColor: 'linear-gradient(135deg, #fcd34d, #f59e0b)', isTool: true }
     ];
+    const CHEST_TOOLS = [ { name: 'オノ', icon: '🪓' }, { name: 'ピッケル', icon: '⛏️' }, { name: '虫あみ', icon: '🕸️' }, { name: 'スコップ', icon: '🥄' } ];
+    
     let inventorySlots = Array(25).fill(null);
+    let robotTools = Array(10).fill(null); // 5x2の道具箱
+    
+    // ★ 配置システムと音ログ
+    let placementMode = null; // 置くアイテムのtype
+    let recentSounds = []; // {x, z, text, age}
 
-    function getAvailableGachaTypes() {
-      const hasEmpty = inventorySlots.some(s => s === null);
-      if (hasEmpty) return GACHA_ITEMS;
-      return GACHA_ITEMS.filter(item => inventorySlots.some(s => s && s.type === item.type && s.count < 10));
-    }
-    function addItemToInventory(itemType) {
-      for (let i = 0; i < 25; i++) if (inventorySlots[i] && inventorySlots[i].type === itemType && inventorySlots[i].count < 10) { inventorySlots[i].count++; return i; }
-      for (let i = 0; i < 25; i++) if (inventorySlots[i] === null) { inventorySlots[i] = { type: itemType, count: 1 }; return i; }
-      return -1;
+    function getAvailableGachaTypes() { const hasEmpty = inventorySlots.some(s => s === null); if (hasEmpty) return GACHA_ITEMS; return GACHA_ITEMS.filter(item => inventorySlots.some(s => s && s.type === item.type && s.count < 10)); }
+    function addItemToInventory(itemType) { for (let i = 0; i < 25; i++) if (inventorySlots[i] && inventorySlots[i].type === itemType && inventorySlots[i].count < 10) { inventorySlots[i].count++; return i; } for (let i = 0; i < 25; i++) if (inventorySlots[i] === null) { inventorySlots[i] = { type: itemType, count: 1 }; return i; } return -1; }
+    function removeInventoryItem(itemType) { for (let i = 0; i < 25; i++) { if (inventorySlots[i] && inventorySlots[i].type === itemType) { inventorySlots[i].count--; if (inventorySlots[i].count <= 0) inventorySlots[i] = null; return true; } } return false; }
+    
+    // 宝箱から道具を引く
+    function addToolToRobot() {
+      const tool = CHEST_TOOLS[Math.floor(Math.random() * CHEST_TOOLS.length)];
+      for (let i = 0; i < 10; i++) { if (robotTools[i] === null) { robotTools[i] = tool; return tool; } }
+      return null; // 満杯
     }
 
     let life = new LifeCore();
-    const ROBOT = { gen: 1, stepCount: 0, pos: { x: 0, z: 0 }, rotY: 0, hasApple: false, lastVoice: "「おなか」が空きすぎると「たいりょく」が減って倒れちゃうよ。夜中に歩くのもキケンだよ！", lastActionNote: "待機中" };
+    const ROBOT = { gen: 1, stepCount: 0, pos: { x: 0, z: 0 }, rotY: 0, hasApple: false, lastVoice: "ぼくはマス目の島に立つロボットだよ！", lastActionNote: "待機中" };
 
-    function getActiveModel() {
-      const saved = safeStorage.getItem('ai_custom_model');
-      if (!saved) return GeminiCore.DEFAULT_MODEL;
-      if (saved.includes('2.5') || saved.includes('2.0') || saved.includes('1.5')) return GeminiCore.DEFAULT_MODEL;
-      return saved;
-    }
+    function getActiveModel() { const saved = safeStorage.getItem('ai_custom_model'); if (!saved) return GeminiCore.DEFAULT_MODEL; if (saved.includes('2.5') || saved.includes('2.0') || saved.includes('1.5')) return GeminiCore.DEFAULT_MODEL; return saved; }
     function getKeyForCurrentModel() { return getActiveModel().startsWith('gemini') ? (safeStorage.getItem('key_google') || '') : (safeStorage.getItem('key_github') || ''); }
 
+    // ★ リンゴだけでなく、すべてのオブジェクトを管理
+    let fieldObjects = []; // { gx, gz, type, mesh, meta }
+
     function saveWorldState() {
-      try {
-        safeStorage.setItem('island_game_save_clean', JSON.stringify({
-          lifeSave: life.exportSave(), robot: ROBOT, apples: fieldApples.map(a => ({ gx: a.gx, gz: a.gz })), inventory: inventorySlots
-        }));
-      } catch (e) {}
+      try { safeStorage.setItem('island_game_save_v2', JSON.stringify({ lifeSave: life.exportSave(), robot: ROBOT, objs: fieldObjects.map(o => ({ gx: o.gx, gz: o.gz, type: o.type })), inventory: inventorySlots, tools: robotTools })); } catch (e) {}
     }
-    let pendingLoadedApples = null;
+    let pendingLoadedObjs = null;
     function tryLoadWorldState() {
       try {
-        const data = JSON.parse(safeStorage.getItem('island_game_save_clean'));
-        if (!data || !data.lifeSave) return false;
-        life = new LifeCore(data.lifeSave);
-        Object.assign(ROBOT, data.robot);
-        pendingLoadedApples = Array.isArray(data.apples) ? data.apples : null;
+        const data = JSON.parse(safeStorage.getItem('island_game_save_v2')); if (!data || !data.lifeSave) return false;
+        life = new LifeCore(data.lifeSave); Object.assign(ROBOT, data.robot); pendingLoadedObjs = Array.isArray(data.objs) ? data.objs : null;
         if (Array.isArray(data.inventory) && data.inventory.length === 25) inventorySlots = data.inventory;
+        if (Array.isArray(data.tools) && data.tools.length === 10) robotTools = data.tools;
         return true;
       } catch (e) { return false; }
     }
-    function confirmResetGame() {
-      if (confirm('ほんとうに最初からやり直しますか？\n（覚えた記憶やロボットのデータがすべてリセットされます）')) {
-        safeStorage.removeItem('island_game_save_clean'); location.reload();
-      }
-    }
+    function confirmResetGame() { if (confirm('ほんとうに最初からやり直しますか？')) { safeStorage.removeItem('island_game_save_v2'); location.reload(); } }
 
     /* 3Dエンジン */
-    let scene, camera, renderer, world, clickBlocks = [], voxelMap = {}, fieldApples = [];
+    let scene, camera, renderer, world, clickBlocks = [];
     let chara, bodyM, headM, rArm, lArm, rLeg, lLeg, handApple;
     let hemiLight, sunLight;
     const MAP_SIZE = 5;
-
-    // ★ 色をじわ〜っと変化させるためのターゲット色
-    let targetBgColor = new THREE.Color(0xe0f2fe);
-    let targetHemiColor = new THREE.Color(0xffffff);
-    let targetSunColor = new THREE.Color(0xfffaed);
+    let targetBgColor = new THREE.Color(0xe0f2fe), targetHemiColor = new THREE.Color(0xffffff), targetSunColor = new THREE.Color(0xfffaed);
 
     function init3D() {
-      if (typeof THREE === 'undefined') return;
-      const stage = document.getElementById('c3d');
-      if (!stage || renderer) return;
+      if (typeof THREE === 'undefined') return; const stage = document.getElementById('c3d'); if (!stage || renderer) return;
       const w = Math.max(stage.clientWidth || window.innerWidth || 360, 240), h = Math.max(stage.clientHeight || 280, 200);
-
-      scene = new THREE.Scene();
-      const initialPhase = TIME_PHASES[getCurrentTimePhaseIdx()];
-      scene.background = new THREE.Color(initialPhase.bg);
-
+      scene = new THREE.Scene(); const initialPhase = TIME_PHASES[getCurrentTimePhaseIdx()]; scene.background = new THREE.Color(initialPhase.bg);
       camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100); camera.position.set(0, 7.8, 8.2); camera.lookAt(0, 0, 0);
-      renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(w, h); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      stage.appendChild(renderer.domElement);
-
+      renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(w, h); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); stage.appendChild(renderer.domElement);
       hemiLight = new THREE.HemisphereLight(initialPhase.hemi, 0x94a3b8, 1.15); scene.add(hemiLight);
       sunLight = new THREE.DirectionalLight(initialPhase.sun, 0.85); sunLight.position.set(5, 12, 6); scene.add(sunLight);
-
       world = new THREE.Group(); scene.add(world);
-      const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
-      const grassMat = new THREE.MeshLambertMaterial({ color: 0x7ca982 }), dirtMat = new THREE.MeshLambertMaterial({ color: 0xa89078 });
-
+      const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96), grassMat = new THREE.MeshLambertMaterial({ color: 0x7ca982 }), dirtMat = new THREE.MeshLambertMaterial({ color: 0xa89078 });
       const half = Math.floor(MAP_SIZE / 2);
       for (let x = -half; x <= half; x++) {
         for (let z = -half; z <= half; z++) {
-          const topB = new THREE.Mesh(boxGeo, grassMat); topB.position.set(x, 0, z); topB.userData = { gx: x, gz: z };
-          world.add(topB); clickBlocks.push(topB);
+          const topB = new THREE.Mesh(boxGeo, grassMat); topB.position.set(x, 0, z); topB.userData = { gx: x, gz: z }; world.add(topB); clickBlocks.push(topB);
           const underB = new THREE.Mesh(boxGeo, dirtMat); underB.position.set(x, -1, z); world.add(underB);
         }
       }
-
       chara = new THREE.Group(); world.add(chara);
       bodyM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x60a5fa })); bodyM.scale.set(0.52, 0.52, 0.38); bodyM.position.y = 0.5; chara.add(bodyM);
       headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0xe2e8f0 })); headM.scale.set(0.44, 0.42, 0.42); headM.position.y = 0.88; chara.add(headM);
@@ -775,58 +661,81 @@
       const legMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
       rLeg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.34, 0.2), legMat); rLeg.position.set(0.17, 0.17, 0); chara.add(rLeg);
       lLeg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.34, 0.2), legMat); lLeg.position.set(-0.17, 0.17, 0); chara.add(lLeg);
-
       chara.position.set(ROBOT.pos.x, 0.5, ROBOT.pos.z); chara.rotation.y = ROBOT.rotY || 0;
       if (ROBOT.hasApple && handApple) handApple.material.visible = true;
 
-      if (pendingLoadedApples && pendingLoadedApples.length > 0) {
-        for (const a of pendingLoadedApples) spawnApple(a.gx, a.gz, false);
-      } else { spawnApple(1, 0, false); }
+      if (pendingLoadedObjs && pendingLoadedObjs.length > 0) {
+        for (const o of pendingLoadedObjs) spawnObject(o.gx, o.gz, o.type, false);
+      } else { spawnObject(1, 0, 'apple', false); }
 
       setupTouchInteraction(); updateHUD(); renderLoop(); setTimeout(resizeRenderer, 150);
     }
 
-    function spawnApple(gx, gz, shouldSave = true) {
-      if (!world) return;
+    // ★ オブジェクトのスポーン（1マス1個制限あり）
+    function spawnObject(gx, gz, type, shouldSave = true) {
+      if (!world) return false;
+      // 1マスに1個制限
+      if (fieldObjects.some(o => o.gx === gx && o.gz === gz)) return false;
+
       const grp = new THREE.Group();
-      grp.add(new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.36), new THREE.MeshLambertMaterial({ color: 0xf87171 })));
-      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), new THREE.MeshLambertMaterial({ color: 0x86efac })); leaf.position.set(0, 0.22, 0); grp.add(leaf);
-      grp.position.set(gx, 0.65, gz); world.add(grp); fieldApples.push({ mesh: grp, gx: gx, gz: gz });
+      let color = 0xf87171;
+      if (type === 'tree') color = 0x10b981;
+      else if (type === 'stone') color = 0x94a3b8;
+      else if (type === 'grass') color = 0xa3e635;
+
+      const mainMesh = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.36), new THREE.MeshLambertMaterial({ color: color }));
+      grp.add(mainMesh);
+      if (type === 'apple') {
+        const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), new THREE.MeshLambertMaterial({ color: 0x86efac })); leaf.position.set(0, 0.22, 0); grp.add(leaf);
+      }
+      grp.position.set(gx, 0.65, gz); world.add(grp);
+      
+      const meta = GACHA_ITEMS.find(it => it.type === type);
+      fieldObjects.push({ mesh: grp, gx: gx, gz: gz, type: type, meta: meta });
+      
       if (shouldSave) saveWorldState();
+      return true;
     }
 
     function setupTouchInteraction() {
       const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
-      let touchStartTime = 0, prevX = 0;
-      const topWindow = document.querySelector('.top-window');
+      let touchStartTime = 0, prevX = 0; const topWindow = document.querySelector('.top-window');
       topWindow.addEventListener('touchstart', e => {
-        if (e.target.closest('.top-gauge-panel') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector')) return;
+        if (e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
         touchStartTime = performance.now(); if (e.touches.length === 1) prevX = e.touches[0].clientX;
       }, { passive: true });
       topWindow.addEventListener('touchmove', e => {
-        if (!world || e.touches.length !== 1) return;
-        if (e.target.closest('.top-gauge-panel') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector')) return;
+        if (!world || e.touches.length !== 1 || e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
         world.rotation.y += (e.touches[0].clientX - prevX) * 0.008; prevX = e.touches[0].clientX;
       }, { passive: true });
       topWindow.addEventListener('touchend', e => {
-        if (e.target.closest('.top-gauge-panel') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector')) return;
+        if (e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
         if (performance.now() - touchStartTime < 250 && e.changedTouches.length === 1) {
+          if (!placementMode) return; // 配置モード中のみクリックを許可
+          
           const rect = topWindow.getBoundingClientRect(); const touch = e.changedTouches[0];
           mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1; mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
           raycaster.setFromCamera(mouse, camera);
           const hits = raycaster.intersectObjects(clickBlocks);
-          if (hits.length > 0) { spawnApple(hits[0].object.userData.gx, hits[0].object.userData.gz, true); showToast('🍎 リンゴを置いたよ！'); }
+          if (hits.length > 0) {
+            const gx = hits[0].object.userData.gx, gz = hits[0].object.userData.gz;
+            if (spawnObject(gx, gz, placementMode, true)) {
+              removeInventoryItem(placementMode); // 配置成功したらカバンから減らす
+              const meta = GACHA_ITEMS.find(it => it.type === placementMode);
+              showToast(`✨ ${meta.icon} ${meta.name} を置いたよ！`);
+              recentSounds.push({ x: gx, z: gz, text: "トスン(何かを置いた音)", age: 0 }); // 音を記録
+              cancelPlacementMode();
+            } else {
+              showToast('⚠️ ここにはすでに物があるよ！');
+            }
+          }
         }
       });
     }
 
-    /* 扇状メニューのアクション */
+    /* 扇状メニューとサイドメニュー */
     let isFanMenuOpen = false;
-    function toggleFanMenu() {
-      isFanMenuOpen = !isFanMenuOpen;
-      document.getElementById('fanRadialMenu').classList.toggle('open', isFanMenuOpen);
-      document.getElementById('btn-circle-toggle').classList.toggle('active', isFanMenuOpen);
-    }
+    function toggleFanMenu() { isFanMenuOpen = !isFanMenuOpen; document.getElementById('fanRadialMenu').classList.toggle('open', isFanMenuOpen); document.getElementById('btn-circle-toggle').classList.toggle('active', isFanMenuOpen); }
     function closeFanMenu() { if (isFanMenuOpen) toggleFanMenu(); }
     function triggerFanAction(type) {
       closeFanMenu();
@@ -834,6 +743,16 @@
       else if (type === 'item') { renderInventoryGrid(); openModal('itemModal'); }
       else if (type === 'clean') { renderCleanGrid(); openModal('cleanModal'); }
       else if (type === 'exit') { saveWorldState(); openModal('exitModal'); }
+    }
+    
+    function openDiaryModal() {
+      document.getElementById('diary-robot-name').textContent = `第${ROBOT.gen}世代 ロボット`;
+      const grid = document.getElementById('robot-tools-grid');
+      grid.innerHTML = robotTools.map(t => {
+        if (!t) return `<div class="grid-cell" style="background:#f1f5f9;"></div>`;
+        return `<div class="grid-cell filled" onclick="showToast('${t.icon} ${t.name}')"><span class="cell-icon">${t.icon}</span></div>`;
+      }).join('');
+      openModal('diaryModal');
     }
 
     /* ガチャ演出 */
@@ -863,90 +782,138 @@
 
       await new Promise(r => setTimeout(r, 420));
       document.getElementById('pop-capsule-stage').classList.add('opened');
-      const slotIdx = addItemToInventory(chosen.type);
-      document.getElementById('pop-status-msg').textContent = `✨ パカッ！「${chosen.name}」が入ったよ！`;
-
-      // ★ガチャを回すと「ごきげん(Mental)が+30」あがるが「おなか(Stamina)が-10」減る！
-      life.feedback(0, -10, 30);
-      updateHUD();
-
-      if (chosen.type === 'apple') spawnApple(Math.floor(Math.random() * MAP_SIZE) - 2, Math.floor(Math.random() * MAP_SIZE) - 2, true);
-      else saveWorldState();
       
+      let msg = "";
+      if (chosen.type === 'chest') {
+        const tool = addToolToRobot();
+        if (tool) msg = `🎁 特賞！宝箱から「${tool.name}」が出た！手帳（道具箱）に入ったよ！`;
+        else msg = `🎁 宝箱を開けたけど、道具箱が満杯だったよ…`;
+      } else {
+        addItemToInventory(chosen.type);
+        msg = `✨ パカッ！「${chosen.name}」が入ったよ！`;
+        // ガチャで落ちてきた音
+        recentSounds.push({ x: 0, z: 0, text: "カチャッ(景品が出た音)", age: 0 });
+      }
+      
+      document.getElementById('pop-status-msg').textContent = msg;
+
+      life.feedback(0, -10, 30); updateHUD(); saveWorldState();
       await new Promise(r => setTimeout(r, 500));
       isGachaSpinning = false; updateGachaModalStatus();
     }
 
-    /* アイテム＆整地表示 */
+    /* アイテム＆配置モード */
     function renderInventoryGrid() {
       document.getElementById('inventory-grid-5x5').innerHTML = inventorySlots.map((s, i) => {
         if (!s) return `<div class="grid-cell"></div>`;
         const meta = GACHA_ITEMS.find(it => it.type === s.type);
-        return `<div class="grid-cell filled" onclick="showToast('${meta.icon} ${meta.name}（×${s.count}個）')"><span class="cell-icon">${meta.icon}</span><span class="cell-count">×${s.count}個</span></div>`;
+        // アイテムをタップしたら配置モードへ
+        return `<div class="grid-cell filled" onclick="startPlacementMode('${s.type}', '${meta.icon}', '${meta.name}')">
+          <span class="cell-icon">${meta.icon}</span><span class="cell-count">×${s.count}個</span>
+        </div>`;
       }).join('');
       document.getElementById('item-bag-summary').textContent = `${inventorySlots.filter(s=>s!==null).length} / 25マス`;
     }
+    
+    function startPlacementMode(type, icon, name) {
+      if (type === 'chest') { showToast("宝箱は置けません"); return; }
+      placementMode = type;
+      closeModal('itemModal');
+      document.getElementById('placement-cancel-bar').classList.add('active');
+      showToast(`👇 好きなマスをタップして「${name}」を置いてね！`);
+    }
+    function cancelPlacementMode() {
+      placementMode = null;
+      document.getElementById('placement-cancel-bar').classList.remove('active');
+    }
+
+    /* 整地 */
     function renderCleanGrid() {
       let html = '';
       for (let z = -2; z <= 2; z++) {
         for (let x = -2; x <= 2; x++) {
-          const isRobo = (ROBOT.pos.x === x && ROBOT.pos.z === z), count = fieldApples.filter(a => a.gx === x && a.gz === z).length;
+          const isRobo = (ROBOT.pos.x === x && ROBOT.pos.z === z);
+          const obj = fieldObjects.find(a => a.gx === x && a.gz === z);
           let icon = '🟩', badge = '', cls = 'terrain-cell';
-          if (isRobo && count > 0) { icon = '🤖🍎'; cls += ' has-obj'; }
+          if (isRobo && obj) { icon = `🤖${obj.meta.icon}`; cls += ' has-obj'; }
           else if (isRobo) { icon = '🤖'; }
-          else if (count > 0) { icon = '🍎'; badge = `<span class="cell-count">×${count}個</span>`; cls += ' has-obj'; }
-          html += `<div class="grid-cell ${cls}" onclick="cleanSingleCell(${x}, ${z})"><span class="cell-coord">${x},${z}</span><span class="cell-icon" style="font-size:18px;">${icon}</span>${badge}</div>`;
+          else if (obj) { icon = obj.meta.icon; cls += ' has-obj'; }
+          html += `<div class="grid-cell ${cls}" onclick="cleanSingleCell(${x}, ${z})"><span class="cell-coord">${x},${z}</span><span class="cell-icon" style="font-size:18px;">${icon}</span></div>`;
         }
       }
       document.getElementById('clean-grid-5x5').innerHTML = html;
     }
     function cleanSingleCell(gx, gz) {
-      fieldApples = fieldApples.filter(a => { if (a.gx === gx && a.gz === gz) { if (world) world.remove(a.mesh); return false; } return true; });
-      saveWorldState(); renderCleanGrid(); showToast(`⛏️ (${gx}, ${gz}) を整地したよ！`);
+      const idx = fieldObjects.findIndex(a => a.gx === gx && a.gz === gz);
+      if (idx !== -1) {
+        if (world) world.remove(fieldObjects[idx].mesh);
+        fieldObjects.splice(idx, 1);
+        saveWorldState(); renderCleanGrid(); showToast(`⛏️ (${gx}, ${gz}) を整地したよ！`);
+      }
     }
     function cleanAllIslandFromModal() {
-      for (const a of fieldApples) if (world) world.remove(a.mesh);
-      fieldApples = []; saveWorldState(); renderCleanGrid(); showToast('✨ 島ぜんぶを整地したよ！');
+      for (const a of fieldObjects) if (world) world.remove(a.mesh);
+      fieldObjects = []; saveWorldState(); renderCleanGrid(); showToast('✨ 島ぜんぶを整地したよ！');
     }
 
     /* ロボット行動まわり */
-    function getSurroundings(cx, cz) {
-      return [{l:"東",dx:1,dz:0},{l:"西",dx:-1,dz:0},{l:"南",dx:0,dz:1},{l:"北",dx:0,dz:-1}].map(d => {
-        const tx = cx + d.dx, tz = cz + d.dz;
-        return (tx < -2 || tx > 2 || tz < -2 || tz > 2) ? `${d.l}:崖` : `${d.l}:歩ける`;
-      }).join(' / ');
+    function getDirection(cx, cz, tx, tz) {
+      if (tx===cx && tz===cz) return "足元";
+      let d = ""; if (tz < cz) d += "北"; if (tz > cz) d += "南"; if (tx > cx) d += "東"; if (tx < cx) d += "西"; return d;
     }
 
-    // ★ 夜は遠くのリンゴが見えなくなる！
-    function getAppleInfo(cx, cz, isNight) {
-      if (fieldApples.length === 0) return "リンゴはありません";
-      return fieldApples.map((a, i) => {
-        const dist = Math.hypot(a.gx - cx, a.gz - cz);
-        if (a.gx === cx && a.gz === cz) return `🍎リンゴ#${i+1}:足元にある！(今すぐ取れる)`;
-        if (isNight && dist > 1.5) return `(暗くて遠くのリンゴは見えない)`; // 夜間視界制限
-        const dirs = []; if (a.gx > cx) dirs.push("東"); if (a.gx < cx) dirs.push("西"); if (a.gz > cz) dirs.push("南"); if (a.gz < cz) dirs.push("北");
-        return `🍎リンゴ#${i+1}:${dirs.join('')}方向(${a.gx}, ${a.gz}) 距離${dist.toFixed(1)}マス`;
-      }).filter(s => s !== `(暗くて遠くのリンゴは見えない)`).join(' / ') || "暗くて周りが見えない…";
+    // ★ 新しい「視界」と「音」のルール
+    function getEnvironmentInfo(cx, cz, timePhaseIdx) {
+      const isEvening = (timePhaseIdx === 2);
+      const isNight = (timePhaseIdx === 3 || timePhaseIdx === 4);
+      
+      let vision = [];
+      if (fieldObjects.length === 0) vision.push("周りに何もない");
+      
+      fieldObjects.forEach(obj => {
+        const dist = Math.max(Math.abs(obj.gx - cx), Math.abs(obj.gz - cz)); // チェビシェフ距離(マス数)
+        let canSee = true;
+        if (isNight && dist > 0) canSee = false; // 夜は足元のみ
+        if (isEvening && dist > 1) canSee = false; // 夕方は周囲1マスのみ
+        
+        if (canSee) {
+          const dir = getDirection(cx, cz, obj.gx, obj.gz);
+          vision.push(`[視界] ${dir}(距離${dist}歩)に${obj.meta.icon}${obj.meta.name}が見える`);
+        }
+      });
+      
+      if (vision.length === 0) vision.push("暗くて見えない…");
+
+      let sounds = recentSounds.map(s => {
+        const dir = getDirection(cx, cz, s.x, s.z);
+        return `[耳] ${dir}の方から『${s.text}』と聞こえる！`;
+      });
+      
+      return `【見えているもの】 ${vision.join(' / ')}\n【聞こえた音】 ${sounds.length > 0 ? sounds.join(' / ') : 'とくに音はしない'}`;
     }
 
     function getPossibleActions(cx, cz) {
       const list = [];
       if (ROBOT.hasApple) list.push({ key: "EAT_HAND", txt: "右手の🍎リンゴを食べる" });
-      const feetIdx = fieldApples.findIndex(a => a.gx === cx && a.gz === cz);
-      if (feetIdx !== -1) {
-        list.push({ key: "EAT_FIELD", appleIdx: feetIdx, txt: "足元の🍎リンゴを食べる" });
-        if (!ROBOT.hasApple) list.push({ key: "PICK_APPLE", appleIdx: feetIdx, txt: "足元の🍎リンゴをひろう" });
+      const objOnFeet = fieldObjects.find(a => a.gx === cx && a.gz === cz);
+      if (objOnFeet) {
+        if (objOnFeet.type === 'apple') {
+          list.push({ key: "EAT_FIELD", txt: "足元の🍎リンゴを食べる" });
+          if (!ROBOT.hasApple) list.push({ key: "PICK_APPLE", txt: "足元の🍎リンゴをひろう" });
+        } else {
+          list.push({ key: "OBSERVE_FEET", txt: `足元の${objOnFeet.meta.icon}をさわって観察する` });
+        }
       }
-      [{k:"MOVE_E",dx:1,dz:0,ry:Math.PI/2,n:"東に1歩"},{k:"MOVE_W",dx:-1,dz:0,ry:-Math.PI/2,n:"西に1歩"},{k:"MOVE_S",dx:0,dz:1,ry:0,n:"南(手前)に1歩"},{k:"MOVE_N",dx:0,dz:-1,ry:Math.PI,n:"北(奥)に1歩"}].forEach(d => {
+      [{k:"MOVE_E",dx:1,dz:0,ry:Math.PI/2,n:"東に1歩"},{k:"MOVE_W",dx:-1,dz:0,ry:-Math.PI/2,n:"西に1歩"},{k:"MOVE_S",dx:0,dz:1,ry:0,n:"南に1歩"},{k:"MOVE_N",dx:0,dz:-1,ry:Math.PI,n:"北に1歩"}].forEach(d => {
         const tx = cx + d.dx, tz = cz + d.dz;
-        if (tx >= -2 && tx <= 2 && tz >= -2 && tz <= 2) list.push({ key: d.k, pos: [tx, tz], rotY: d.ry, txt: `${d.n} (${tx}, ${tz})` });
+        if (tx >= -2 && tx <= 2 && tz >= -2 && tz <= 2) list.push({ key: d.k, pos: [tx, tz], rotY: d.ry, txt: `${d.n} (${tx}, ${tz})へ歩く` });
       });
       list.push({ key: "REST_HERE", txt: "ひとやすみする（休む）" });
       return list;
     }
 
     async function triggerThinkNow() {
-      closeFanMenu();
+      closeFanMenu(); cancelPlacementMode();
       const st = life.getState(); if (!st.isAlive) return;
 
       const btn = document.getElementById('btn-think-now'), lamp = document.getElementById('comm-lamp');
@@ -954,39 +921,34 @@
       const activeModel = getActiveModel(), currentKey = getKeyForCurrentModel();
 
       if (currentKey.length <= 5) { openModal('settingModal'); return; }
-
       btn.disabled = true; btn.innerHTML = '⚡ かんがえ中...';
       lamp.className = 'comm-lamp lamp-busy'; lamp.textContent = '⚡ 通信中...';
       bubble.className = 'voice-bubble bubble-active';
 
       const cx = ROBOT.pos.x, cz = ROBOT.pos.z;
       const actions = getPossibleActions(cx, cz);
-      
-      const timeIdx = getCurrentTimePhaseIdx();
-      const phaseData = TIME_PHASES[timeIdx];
-      const isNight = (timeIdx === 3 || timeIdx === 4); // 夜または夜中
+      const timeIdx = getCurrentTimePhaseIdx(); const phaseData = TIME_PHASES[timeIdx];
+      const toolsStr = robotTools.filter(t => t).map(t => `${t.icon}${t.name}`).join('、') || '何も持っていない';
 
       const prompt = `あなたは小さなマス目の島に立つロボットです。
-いまの体の状態と時間帯を見て、心の中で感じている「素直な叫び」を小学3年生にもわかる言葉で教えてください！
-※リンゴは乗らないと食べられません。
+いまの体の状態と時間帯・視界を見て、心の中で感じている「素直な叫び」を小学3年生にもわかる言葉で教えてください！
 
-【ロボットの今のじょうたい】
+【ロボットのいま】
 ・❤️ たいりょく(HP): ${st.energy}/100 （ゼロで倒れます！）
 ・🍙 おなか: ${st.stamina}/100 （ゼロのまま動くとHPが削られます）
 ・🎵 ごきげん: ${st.mental}/100
-・いまの時間帯: ${phaseData.name}
-・現在地: (${cx}, ${cz}) / 手にリンゴ: ${ROBOT.hasApple ? "持ってる" : "持ってない"}
-・リンゴの様子: ${getAppleInfo(cx, cz, isNight)}
-・島の端の様子: ${getSurroundings(cx, cz)}
+・いまの時間帯: ${phaseData.name} （夜は暗くて遠くが見えず、動くと体力が激減します）
+・現在地: (${cx}, ${cz}) / 道具箱の中身: ${toolsStr}
+・${getEnvironmentInfo(cx, cz, timeIdx)}
 
 【いま選べる行動】
 ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
 
 以下のJSON形式で答えてください：
 {
-  "feeling": "ロボットの素直な気持ちや叫び（例: 暗くてこわいよ！リンゴがあるから食べちゃおう！）（65字以内）",
+  "feeling": "ロボットの素直な気持ちや叫び（例: 暗くて足元しか見えないけど、北から音がしたぞ！）（65字以内）",
   "actionKey": "選んだ行動のkey",
-  "actionName": "やったことの短い説明（例: 東へ1歩あるいた）"
+  "actionName": "やったことの説明（例: 音のする北へ1歩あるいた）"
 }`;
 
       try {
@@ -1002,39 +964,36 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
 
         ROBOT.lastVoice = voiceText.innerHTML; ROBOT.lastActionNote = document.getElementById('action-note-text').textContent;
         ROBOT.stepCount++;
+        
+        // 音ログの古さを進める（3手前の音は消す）
+        recentSounds.forEach(s => s.age++);
+        recentSounds = recentSounds.filter(s => s.age < 3);
 
-        // ★ マイクラ方式の「10ポイント単位」のフィードバック計算
-        // LifeCoreは tick() で energy-2, stamina-1, mental-1 減る。それを加味して調整する。
         life.tick([actionKey]); 
         await executeWorldAction(actionKey, actions);
 
-        let dEnergy = 0;   // たいりょく増減
-        let dStamina = 0;  // おなか増減
-        let dMental = 0;   // ごきげん増減
-
+        let dEnergy = 0, dStamina = 0, dMental = 0;
         if (actionKey.startsWith('MOVE_')) {
-          dStamina = -9; // tickと合わせて合計 -10
-          // おなかが0のまま動くと、たいりょくが削られるペナルティ！
+          dStamina = -9;
           if (st.stamina <= 0) dEnergy -= 15;
-          // 夜ふかしペナルティ！
           if (timeIdx === 3) dEnergy -= 10;
           if (timeIdx === 4) { dEnergy -= 20; dMental -= 20; }
         } 
         else if (actionKey === 'REST_HERE') {
-          dStamina = -4; // tickと合わせて合計 -5
-          // 夜・夜中に寝ると体力全回復！
+          dStamina = -4;
           if (timeIdx === 3 || timeIdx === 4) { dEnergy += 100; dMental += 20; }
         }
         else if (actionKey === 'EAT_HAND' || actionKey === 'EAT_FIELD') {
-          dStamina = +50; // リンゴはおなかを回復
-          dMental += 10;
+          dStamina = +50; dMental += 10;
         }
         else if (actionKey === 'PICK_APPLE') {
-          dStamina = -4; // ひろうのは少し疲れる
+          dStamina = -4;
+        }
+        else if (actionKey === 'OBSERVE_FEET') {
+          dStamina = -4; dMental += 5; // 遊んでちょっと楽しい
         }
 
         life.feedback(dEnergy, dStamina, dMental);
-
         const afterState = life.getState();
         if (!afterState.isAlive) triggerRobotDown("「たいりょく」が0になって、動けなくなっちゃった…");
 
@@ -1050,19 +1009,24 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
 
     async function executeWorldAction(chosenKey, actions) {
       const act = actions.find(a => a.key === chosenKey) || actions[0];
+      const cx = ROBOT.pos.x, cz = ROBOT.pos.z;
+      const objIdx = fieldObjects.findIndex(a => a.gx === cx && a.gz === cz);
+      
       if (act.key === 'EAT_HAND') {
         ROBOT.hasApple = false; if (handApple) handApple.material.visible = false;
         if (rArm) rArm.rotation.x = -0.9; await new Promise(r => setTimeout(r, 450)); if (rArm) rArm.rotation.x = 0;
       } else if (act.key === 'EAT_FIELD') {
-        const ap = fieldApples[act.appleIdx]; if (ap && world) { world.remove(ap.mesh); fieldApples.splice(act.appleIdx, 1); }
+        if (objIdx !== -1) { if (world) world.remove(fieldObjects[objIdx].mesh); fieldObjects.splice(objIdx, 1); }
         if (rArm) rArm.rotation.x = -0.9; await new Promise(r => setTimeout(r, 450)); if (rArm) rArm.rotation.x = 0;
       } else if (act.key === 'PICK_APPLE') {
-        const ap = fieldApples[act.appleIdx]; if (ap && world) { world.remove(ap.mesh); fieldApples.splice(act.appleIdx, 1); }
+        if (objIdx !== -1) { if (world) world.remove(fieldObjects[objIdx].mesh); fieldObjects.splice(objIdx, 1); }
         ROBOT.hasApple = true; if (handApple) handApple.material.visible = true;
       } else if (act.pos) {
         const tx = act.pos[0], tz = act.pos[1];
         await walkCharaTo(tx, 0.5, tz, act.rotY !== undefined ? act.rotY : 0, 420);
         ROBOT.pos = { x: tx, z: tz }; ROBOT.rotY = act.rotY !== undefined ? act.rotY : ROBOT.rotY;
+      } else if (act.key === 'OBSERVE_FEET') {
+        if (rArm) rArm.rotation.z = -0.5; await new Promise(r => setTimeout(r, 450)); if (rArm) rArm.rotation.z = 0;
       }
     }
 
@@ -1081,7 +1045,7 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
 
       if (handApple) handApple.material.visible = false;
       if (chara) { chara.rotation.z = 0; chara.rotation.y = 0; chara.position.set(0, 0.5, 0); }
-      if (fieldApples.length === 0) spawnApple(1, 0, false);
+      if (fieldObjects.length === 0) spawnObject(1, 0, 'apple', false);
 
       document.getElementById('btn-think-now').style.display = 'flex'; document.getElementById('btn-respawn').style.display = 'none';
       document.getElementById('voice-text').textContent = ROBOT.lastVoice; document.getElementById('action-note-text').textContent = ROBOT.lastActionNote;
@@ -1097,44 +1061,30 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
       document.getElementById('ui-robot-drive').textContent = DRIVE_JA[st.drive] || st.drive;
       document.getElementById('ui-step-count').textContent = `⭐ ${ROBOT.stepCount}手目`;
 
-      // ★ 時間帯バッジの更新 ＆ ターゲット色の更新
       const phase = TIME_PHASES[getCurrentTimePhaseIdx()];
       const badge = document.getElementById('ui-time-phase');
-      badge.textContent = phase.name;
-      badge.style.color = phase.tagColor;
-      badge.style.background = phase.tagBg;
-      badge.style.borderColor = phase.tagColor;
+      badge.textContent = phase.name; badge.style.color = phase.tagColor; badge.style.background = phase.tagBg; badge.style.borderColor = phase.tagColor;
 
-      // 目標色を設定し、renderLoop内で徐々に遷移させる
-      targetBgColor.setHex(phase.bg);
-      targetHemiColor.setHex(phase.hemi);
-      targetSunColor.setHex(phase.sun);
+      targetBgColor.setHex(phase.bg); targetHemiColor.setHex(phase.hemi); targetSunColor.setHex(phase.sun);
       document.getElementById('sky-window').style.backgroundColor = '#' + phase.bg.toString(16).padStart(6, '0');
     }
 
     function selectModelInModal(m) {
-      safeStorage.setItem('ai_custom_model', m);
-      const isGem = m.startsWith('gemini');
+      safeStorage.setItem('ai_custom_model', m); const isGem = m.startsWith('gemini');
       document.getElementById('grp-google-key').className = 'settings-card ' + (isGem ? 'selected-google' : '');
       document.getElementById('grp-github-key').className = 'settings-card ' + (!isGem ? 'selected-github' : '');
       const b = document.getElementById('modal-save-btn');
       b.style.background = isGem ? '#3b82f6' : '#9333ea'; b.textContent = isGem ? '🟦 Google 3.8 に決定して閉じる' : '🟪 Groq 120B に決定して閉じる';
     }
-    function autoSaveKey(type, val) {
-      const t = val.trim();
-      if (type === 'google') { safeStorage.setItem('key_google', t); selectModelInModal('gemini-3.8-flash'); }
-      else { safeStorage.setItem('key_github', t); selectModelInModal('openai/gpt-oss-120b'); }
-    }
+    function autoSaveKey(type, val) { const t = val.trim(); if (type === 'google') { safeStorage.setItem('key_google', t); selectModelInModal('gemini-3.8-flash'); } else { safeStorage.setItem('key_github', t); selectModelInModal('openai/gpt-oss-120b'); } }
     function saveKeys() {
       const g = document.getElementById('input-google-key').value.trim(), gh = document.getElementById('input-github-key').value.trim();
-      if (g.length > 5) safeStorage.setItem('key_google', g);
-      if (gh.length > 5) safeStorage.setItem('key_github', gh);
+      if (g.length > 5) safeStorage.setItem('key_google', g); if (gh.length > 5) safeStorage.setItem('key_github', gh);
       closeModal('settingModal'); showToast('💾 設定をほぞんしたよ！');
     }
     function openModal(id) {
       if (id === 'settingModal') {
-        document.getElementById('input-google-key').value = safeStorage.getItem('key_google') || '';
-        document.getElementById('input-github-key').value = safeStorage.getItem('key_github') || '';
+        document.getElementById('input-google-key').value = safeStorage.getItem('key_google') || ''; document.getElementById('input-github-key').value = safeStorage.getItem('key_github') || '';
         selectModelInModal(getActiveModel());
       }
       document.getElementById(id).style.display = 'flex';
@@ -1144,13 +1094,10 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
     let clock = 0, isWalking = false;
     function renderLoop() {
       requestAnimationFrame(renderLoop); clock += 0.04;
-      for (const a of fieldApples) a.mesh.rotation.y += 0.03;
-
-      // ★ 背景や光の色をじんわりと変化させる（LERP補間）
+      for (const a of fieldObjects) a.mesh.rotation.y += 0.03;
       if (scene && scene.background) scene.background.lerp(targetBgColor, 0.02);
       if (hemiLight) hemiLight.color.lerp(targetHemiColor, 0.02);
       if (sunLight) sunLight.color.lerp(targetSunColor, 0.02);
-
       if (life.getState().isAlive && chara) {
         if (isWalking) {
           rArm.rotation.x = Math.sin(clock * 9) * 0.7; lArm.rotation.x = -Math.sin(clock * 9) * 0.7;
@@ -1161,20 +1108,16 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
       }
       if (renderer && scene && camera) renderer.render(scene, camera);
     }
-
     function walkCharaTo(tx, ty, tz, targetRotY, dur) {
       return new Promise(resolve => {
         if (!chara) { resolve(); return; }
-        isWalking = true;
-        const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z, sRotY = chara.rotation.y;
+        isWalking = true; const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z, sRotY = chara.rotation.y;
         let diffRot = (targetRotY - sRotY) % (Math.PI * 2);
         if (diffRot > Math.PI) diffRot -= Math.PI * 2; if (diffRot < -Math.PI) diffRot += Math.PI * 2;
-
         const start = performance.now();
         function s(now) {
           const p = Math.min((now - start) / dur, 1);
-          chara.position.set(sx + (tx - sx) * p, sy + (ty - sy) * p, sz + (tz - sz) * p);
-          chara.rotation.y = sRotY + diffRot * Math.min(p * 2, 1);
+          chara.position.set(sx + (tx - sx) * p, sy + (ty - sy) * p, sz + (tz - sz) * p); chara.rotation.y = sRotY + diffRot * Math.min(p * 2, 1);
           if (p < 1) requestAnimationFrame(s); else { chara.rotation.y = targetRotY; isWalking = false; resolve(); }
         }
         requestAnimationFrame(s);
@@ -1182,16 +1125,14 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
     }
 
     function resizeRenderer() {
-      if (!camera || !renderer) return;
-      const stage = document.querySelector('.top-window');
+      if (!camera || !renderer) return; const stage = document.querySelector('.top-window');
       const w = Math.max(stage?.clientWidth || window.innerWidth || 360, 240), h = Math.max(stage?.clientHeight || 280, 200);
       camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h, false);
     }
     window.addEventListener('resize', resizeRenderer);
 
     function startApp() {
-      cleanStrayTextNodes(); buildFanMenuSVG();
-      const isLoaded = tryLoadWorldState(); init3D();
+      cleanStrayTextNodes(); buildFanMenuSVG(); const isLoaded = tryLoadWorldState(); init3D();
       if (ROBOT.lastVoice) document.getElementById('voice-text').innerHTML = ROBOT.lastVoice;
       if (ROBOT.lastActionNote) document.getElementById('action-note-text').textContent = ROBOT.lastActionNote;
       updateHUD(); if (isLoaded) showToast('💾 つづきから再開したよ！');
