@@ -9,13 +9,13 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="theme-color" content="#f0f9ff">
+  <meta name="theme-color" content="#ebf2f5">
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100vw; height: 100vh; height: 100dvh;
-      overflow: hidden; background: #f8fafc; color: #1e293b;
+      overflow: hidden; background: #ebf2f5; color: #2d3748;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Maru Gothic ProN", "Meiryo", sans-serif;
       user-select: none; -webkit-user-select: none;
     }
@@ -29,29 +29,29 @@
     }
 
     /* ========================================================
-     * ① プレビュー（キャラクターのいる画面）：上下に大きく拡大
+     * ① プレビュー（キャラクターのいる画面）：目に優しい落ち着いたパステル調
      * ======================================================== */
     .top-window {
       position: relative;
-      flex: 1; min-height: 0; /* 下部枠を半分にした分、画面の大半をプレビューが占領 */
-      background: #e0f2fe; overflow: hidden;
-      border-bottom: 2px solid #bae6fd;
+      flex: 1; min-height: 0;
+      background: #ebf2f5; overflow: hidden;
+      border-bottom: 2px solid #cbd5e1;
     }
     #stage-3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
     #c3d { width: 100%; height: 100%; display: block; }
     canvas { display: block; width: 100% !important; height: 100% !important; }
 
-    /* 最上部：ゲージパネル（サイズ維持・右側に歯車ボタン用の余白を確保して重なり防止） */
+    /* 最上部：ゲージパネル（左右いっぱいに拡大） */
     .top-gauge-panel {
-      position: absolute; top: 8px; left: 8px; right: 54px; z-index: 20;
+      position: absolute; top: 8px; left: 8px; right: 8px; z-index: 20;
       background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(8px);
-      border: 1.5px solid #bae6fd; border-radius: 14px;
-      padding: 7px 9px; pointer-events: none;
-      box-shadow: 0 4px 14px rgba(186, 230, 253, 0.45);
+      border: 1.5px solid #d1d5db; border-radius: 14px;
+      padding: 8px 10px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
     }
     .gauge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .gauge-col {
-      background: #f8fafc; padding: 4px 5px; border-radius: 8px;
+      background: #f8fafc; padding: 4px 6px; border-radius: 8px;
       text-align: center; border: 1px solid #e2e8f0;
     }
     .gauge-label { font-size: 11px; font-weight: 800; color: #475569; }
@@ -59,52 +59,52 @@
     .bar-bg { background: #e2e8f0; height: 8px; border-radius: 5px; margin-top: 3px; overflow: hidden; padding: 1px; }
     .bar-fill { height: 100%; border-radius: 4px; transition: width 0.35s ease; }
 
-    /* ロボット状態表示バッジ */
+    /* ロボット状態表示バッジ ＆ 右下の歯車設定ボタン */
     .robot-status-row {
       display: flex; justify-content: space-between; align-items: center;
-      margin-top: 5px; padding-top: 4px; border-top: 1px solid #e2e8f0;
+      margin-top: 6px; padding-top: 5px; border-top: 1px solid #e2e8f0;
     }
     .robot-id-tag { font-size: 11px; font-weight: 800; color: #64748b; }
     .robot-drive-badge {
       font-size: 11px; font-weight: 900; padding: 2px 9px; border-radius: 12px;
       background: #fef9c3; color: #854d0e; border: 1.5px solid #fde047;
-      box-shadow: 0 1px 4px rgba(253, 224, 71, 0.4);
+    }
+    .status-right-col {
+      display: flex; align-items: center; gap: 6px;
     }
 
-    /* 右上：⚙️ 設定ボタン（ゲージパネルと独立配置） */
-    .btn-setting-gear {
-      position: absolute; top: 8px; right: 8px; z-index: 25;
-      width: 40px; height: 40px; border-radius: 12px;
-      background: rgba(255, 255, 255, 0.95); border: 2px solid #bae6fd;
-      color: #0284c7; font-size: 18px; display: flex; align-items: center; justify-content: center;
-      cursor: pointer; box-shadow: 0 4px 12px rgba(186, 230, 253, 0.5);
-      touch-action: manipulation;
+    /* 右下の⚙️ 設定ボタン（ゲージパネル内にすっきり収容） */
+    .btn-setting-gear-inline {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: #f1f5f9; border: 1.5px solid #cbd5e1;
+      color: #475569; font-size: 14px; display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation;
     }
-    .btn-setting-gear:active { transform: scale(0.92); }
+    .btn-setting-gear-inline:active { transform: scale(0.92); background: #e2e8f0; }
 
     /* リンゴ落下のヒント */
     .tap-hint-pill {
       position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 15;
-      background: rgba(255, 255, 255, 0.92); border: 1.5px solid #fde047;
-      color: #a16207; font-size: 11px; font-weight: 800; padding: 4px 14px; border-radius: 20px;
+      background: rgba(255, 255, 255, 0.94); border: 1.5px solid #fde047;
+      color: #92400e; font-size: 11px; font-weight: 800; padding: 4px 14px; border-radius: 20px;
       pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06); white-space: nowrap;
     }
 
     /* ========================================================
-     * ② 文章枠（ロボットのお気持ち）：上下半分のコンパクトサイズ
+     * ② 文章枠（ロボットのお気持ち）：3行分のゆったりサイズへ拡大
      * ======================================================== */
     .bottom-window {
-      flex: none; height: 118px; /* 高さを半分程度にコンパクト化 */
+      flex: none; height: 142px; /* 3行がゆったり入る高さへ拡大 */
       background: #ffffff; padding: 8px 12px;
-      display: flex; flex-direction: column; gap: 5px;
-      overflow-y: auto; border-top: 1px solid #e2e8f0;
+      display: flex; flex-direction: column; gap: 4px;
+      overflow-y: auto; border-top: 1.5px solid #cbd5e1;
       box-shadow: 0 -2px 10px rgba(0,0,0,0.03);
     }
     .voice-header {
       display: flex; justify-content: space-between; align-items: center;
     }
     .voice-title {
-      font-size: 12px; font-weight: 900; color: #0284c7;
+      font-size: 12px; font-weight: 900; color: #475569;
       display: flex; align-items: center; gap: 4px;
     }
     .comm-lamp {
@@ -115,23 +115,23 @@
     .lamp-ok { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
     .lamp-err { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
 
-    /* ロボットの心の声（パステル調・大文字で読みやすい） */
+    /* ロボットの心の声（3行分が綺麗に収まる設計） */
     .voice-bubble {
-      flex: 1; min-height: 48px;
-      background: #f8fafc; border: 1.5px solid #bae6fd;
-      border-radius: 10px; padding: 6px 10px;
+      flex: 1; min-height: 68px;
+      background: #f8fafc; border: 1.5px solid #cbd5e1;
+      border-radius: 10px; padding: 7px 10px;
       display: flex; flex-direction: column; justify-content: center;
       transition: all 0.3s ease;
     }
-    .voice-bubble.bubble-active { border-color: #38bdf8; background: #f0f9ff; }
+    .voice-bubble.bubble-active { border-color: #60a5fa; background: #f0f9ff; }
     .voice-bubble.bubble-error { border-color: #f87171; background: #fff1f2; }
 
     .voice-text {
-      font-size: 15px; font-weight: 900; line-height: 1.35;
-      color: #0f172a; word-break: break-all;
+      font-size: 14px; font-weight: 900; line-height: 1.45;
+      color: #1e293b; word-break: break-all;
     }
     .voice-error-text {
-      font-size: 12px; font-weight: 800; line-height: 1.35; color: #dc2626;
+      font-size: 12px; font-weight: 800; line-height: 1.4; color: #dc2626;
     }
 
     .action-note-row {
@@ -139,16 +139,16 @@
       font-size: 11px; font-weight: 800; color: #64748b;
     }
     .action-badge {
-      font-size: 10px; font-weight: 900; background: #e0f2fe; color: #0369a1;
-      padding: 1px 6px; border-radius: 5px; border: 1px solid #bae6fd;
+      font-size: 10px; font-weight: 900; background: #f1f5f9; color: #475569;
+      padding: 1px 6px; border-radius: 5px; border: 1px solid #cbd5e1;
     }
 
     /* ========================================================
-     * ③ フッター：パステルブルーの「今すぐ考える」ボタン
+     * ③ フッター：下部のホームバーと被らないよう余白を確保
      * ======================================================== */
     .footer-bar {
       flex: none;
-      padding: 8px 14px max(10px, env(safe-area-inset-bottom));
+      padding: 8px 14px max(24px, calc(env(safe-area-inset-bottom) + 12px));
       background: #f8fafc; border-top: 1.5px solid #e2e8f0;
       display: flex; justify-content: center;
     }
@@ -156,9 +156,9 @@
       width: 100%; max-width: 440px; height: 48px;
       border-radius: 14px; border: none; cursor: pointer;
       font-size: 16px; font-weight: 900; color: #ffffff;
-      background: linear-gradient(135deg, #38bdf8, #60a5fa);
+      background: linear-gradient(135deg, #60a5fa, #3b82f6);
       border: 1.5px solid #93c5fd;
-      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.4);
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
       display: flex; align-items: center; justify-content: center; gap: 6px;
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     }
@@ -174,34 +174,34 @@
       display: none;
     }
 
-    /* モーダル：清潔感のあるパステルホワイトカード */
+    /* モーダル：清潔感のあるパステルカード */
     .modal-cover {
       position: fixed; inset: 0; z-index: 100;
       background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px);
       display: none; align-items: center; justify-content: center; padding: 14px;
     }
     .modal-box {
-      width: 100%; max-width: 390px; background: #ffffff; border: 1.5px solid #bae6fd;
+      width: 100%; max-width: 390px; background: #ffffff; border: 1.5px solid #cbd5e1;
       border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
-      box-shadow: 0 16px 36px rgba(186, 230, 253, 0.6); max-height: 90dvh; overflow-y: auto;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.15); max-height: 90dvh; overflow-y: auto;
     }
     .modal-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #f1f5f9; padding-bottom: 6px; }
-    .modal-title { font-size: 15px; font-weight: 900; color: #0284c7; }
+    .modal-title { font-size: 15px; font-weight: 900; color: #334155; }
     .close-btn { font-size: 20px; color: #94a3b8; cursor: pointer; padding: 2px 6px; font-weight: bold; }
 
     .settings-card {
       background: #f8fafc; border: 2px solid #e2e8f0;
       padding: 10px; border-radius: 12px; cursor: pointer;
     }
-    .settings-card.selected-google { border-color: #38bdf8; background: #f0f9ff; }
+    .settings-card.selected-google { border-color: #60a5fa; background: #eff6ff; }
     .settings-card.selected-github { border-color: #c084fc; background: #faf5ff; }
     .input-box {
       width: 100%; padding: 8px 10px; background: #ffffff; border: 1.5px solid #cbd5e1;
       color: #0f172a; border-radius: 8px; font-size: 12px; margin-top: 5px;
     }
     .save-btn {
-      padding: 11px; background: #38bdf8; color: #fff; border: none; border-radius: 12px;
-      font-weight: 900; cursor: pointer; font-size: 14px; box-shadow: 0 3px 10px rgba(56, 189, 248, 0.35);
+      padding: 11px; background: #3b82f6; color: #fff; border: none; border-radius: 12px;
+      font-weight: 900; cursor: pointer; font-size: 14px; box-shadow: 0 3px 10px rgba(59, 130, 246, 0.3);
     }
     .reset-btn {
       padding: 10px; background: #fee2e2; color: #b91c1c;
@@ -211,8 +211,8 @@
 
     #toast-msg {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
-      background: rgba(255, 255, 255, 0.98); border: 2px solid #38bdf8; border-radius: 14px;
-      padding: 8px 18px; font-size: 13px; font-weight: 900; color: #0284c7; z-index: 50;
+      background: rgba(255, 255, 255, 0.98); border: 2px solid #60a5fa; border-radius: 14px;
+      padding: 8px 18px; font-size: 13px; font-weight: 900; color: #1e3a8a; z-index: 50;
       opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       box-shadow: 0 4px 16px rgba(0,0,0,0.12);
     }
@@ -225,43 +225,43 @@
 
   <div class="app-container">
 
-    <!-- ① プレビュー（キャラクターのいる画面）：画面の大半を占める広い3Dビュー -->
+    <!-- ① プレビュー（目に優しい落ち着いたパステルトーン） -->
     <div class="top-window">
       <div id="stage-3d"><div id="c3d"></div></div>
 
-      <!-- 最上部 3本ゲージ（パステルカラー・すべて100ポイント計算） -->
+      <!-- 最上部 3本ゲージ（左右いっぱいに拡大） -->
       <div class="top-gauge-panel">
         <div class="gauge-grid">
           <div class="gauge-col">
             <div class="gauge-label">🍎 いのち <span id="v-energy" class="gauge-num">100</span></div>
-            <div class="bar-bg"><div id="b-energy" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #fca5a5, #f87171);"></div></div>
+            <div class="bar-bg"><div id="b-energy" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #f87171, #ef4444);"></div></div>
           </div>
           <div class="gauge-col">
             <div class="gauge-label">⚡ たいりょく <span id="v-stamina" class="gauge-num">100</span></div>
-            <div class="bar-bg"><div id="b-stamina" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #fef08a, #facc15);"></div></div>
+            <div class="bar-bg"><div id="b-stamina" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #fde047, #eab308);"></div></div>
           </div>
           <div class="gauge-col">
             <div class="gauge-label">🎵 きぶん <span id="v-mental" class="gauge-num">100</span></div>
-            <div class="bar-bg"><div id="b-mental" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #a7f3d0, #34d399);"></div></div>
+            <div class="bar-bg"><div id="b-mental" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #6ee7b7, #10b981);"></div></div>
           </div>
         </div>
 
-        <!-- 小学生でもわかるロボットの状態 -->
+        <!-- 小学生でもわかるロボットの状態 ＆ 右下に⚙️設定ボタン -->
         <div class="robot-status-row">
           <span id="ui-robot-id" class="robot-id-tag">🤖 ロボ1ごう (0, 0)</span>
           <span id="ui-robot-drive" class="robot-drive-badge">😊 あんしん・まんぷく</span>
-          <span id="ui-step-count" class="robot-id-tag">⭐ 0手目</span>
+          <div class="status-right-col">
+            <span id="ui-step-count" class="robot-id-tag">⭐ 0手目</span>
+            <button type="button" class="btn-setting-gear-inline" onclick="openModal('settingModal')" title="せってい">⚙️</button>
+          </div>
         </div>
       </div>
-
-      <!-- 右上 ⚙️ 設定ボタン（重なり解消） -->
-      <button type="button" class="btn-setting-gear" onclick="openModal('settingModal')" title="せってい">⚙️</button>
 
       <!-- リンゴ落下のヒント -->
       <div class="tap-hint-pill" id="tap-hint">👆 マス目をタップすると🍎リンゴが落ちるよ！</div>
     </div>
 
-    <!-- ② 文章枠（ロボットのお気持ち）：上下半分のコンパクトサイズ -->
+    <!-- ② 文章枠（ロボットのお気持ち）：3行分のゆったりサイズ -->
     <div class="bottom-window">
       <div class="voice-header">
         <span class="voice-title">💭 ロボのきもち・心のさけび</span>
@@ -272,7 +272,8 @@
       <div class="voice-bubble" id="voice-bubble">
         <div class="voice-text" id="voice-text">
           ぼくはマス目の島に立つロボットだよ！<br>
-          下の「⚡ 今すぐ考える」ボタンを押すと、ほんとうに自分で考えて島を歩くよ！
+          下の「⚡ 今すぐ考える」ボタンを押すと、ほんとうに自分で考えて島を歩くよ！<br>
+          リンゴのマスに乗って、お腹いっぱい食べさせてね！
         </div>
       </div>
 
@@ -283,7 +284,7 @@
       </div>
     </div>
 
-    <!-- ③ フッター：パステルブルーの「今すぐ考える」ボタンのみ -->
+    <!-- ③ フッター：下部のバーと被らないゆったり余白 -->
     <div class="footer-bar">
       <button type="button" class="btn-think-now" id="btn-think-now" onclick="triggerThinkNow()">
         ⚡ 今すぐ考える
@@ -298,7 +299,7 @@
   <!-- 一時通知トースト -->
   <div id="toast-msg">💾 データを保存したよ</div>
 
-  <!-- 設定モーダル（パステル調・最下部に初期化ボタン） -->
+  <!-- 設定モーダル（最下部に初期化ボタン） -->
   <div class="modal-cover" id="settingModal">
     <div class="modal-box">
       <div class="modal-head">
@@ -308,7 +309,7 @@
 
       <!-- Google Gemini カード -->
       <div class="settings-card selected-google" id="grp-google-key" onclick="selectModelInModal('gemini-3.8-flash')">
-        <div style="font-size:13px; font-weight:900; color:#0284c7;">🟦 Google Gemini 3.8（じっくり派）</div>
+        <div style="font-size:13px; font-weight:900; color:#2563eb;">🟦 Google Gemini 3.8（じっくり派）</div>
         <div style="font-size:11px; color:#64748b; margin:3px 0;">Google AI Studio の無料キー（AIza...）を入れてね。</div>
         <input type="password" id="input-google-key" class="input-box" placeholder="ここにGoogleキーを貼り付け" onclick="event.stopPropagation(); selectModelInModal('gemini-3.8-flash');" oninput="autoSaveKey('google', this.value)">
       </div>
@@ -322,7 +323,7 @@
 
       <button type="button" class="save-btn" id="modal-save-btn" onclick="saveKeys()">決定してとじる</button>
 
-      <!-- 最下部の初期化ボタン（パステル赤） -->
+      <!-- 最下部の初期化ボタン -->
       <button type="button" class="reset-btn" onclick="confirmResetGame()">🔄 データを消して最初からやり直す（初期化）</button>
     </div>
   </div>
@@ -609,9 +610,9 @@
       gen: 1,
       stepCount: 0,
       pos: { x: 0, z: 0 },
-      rotY: 0, // 向き（0: 南, PI: 北, PI/2: 東, -PI/2: 西）
+      rotY: 0,
       hasApple: false,
-      lastVoice: "ぼくはマス目の島に立つロボットだよ！\n下の「⚡ 今すぐ考える」ボタンを押すと、ほんとうに自分で考えて島を歩くよ！",
+      lastVoice: "ぼくはマス目の島に立つロボットだよ！\n下の「⚡ 今すぐ考える」ボタンを押すと、ほんとうに自分で考えて島を歩くよ！\nリンゴのマスに乗って、お腹いっぱい食べさせてね！",
       lastActionNote: "待機中（まだ動いていないよ）"
     };
 
@@ -681,12 +682,12 @@
     }
 
     // =====================================================================
-    // プレビュー（マス目マップ 3D）：パステルカラー＆明るい世界
+    // プレビュー（マス目マップ 3D）：落ち着いたセージグリーン＆モカパステル
     // =====================================================================
     let scene, camera, renderer, world, clickBlocks = [], voxelMap = {}, fieldApples = [];
     let chara, bodyM, headM, rArm, lArm, rLeg, lLeg, handApple;
 
-    const MAP_SIZE = 5; // 5x5マス（-2 〜 +2）
+    const MAP_SIZE = 5;
 
     function init3D() {
       if (typeof THREE === 'undefined') return;
@@ -697,7 +698,8 @@
       const h = Math.max(stage.clientHeight || 280, 200);
 
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xe0f2fe); // パステルスカイブルーの明るい背景
+      // 目に優しいソフトペールスカイ
+      scene.background = new THREE.Color(0xebf2f5);
 
       camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100);
       camera.position.set(0, 7.8, 8.2);
@@ -709,11 +711,11 @@
       stage.innerHTML = '';
       stage.appendChild(renderer.domElement);
 
-      // 柔らかく明るい自然光（パステル調）
-      const hemiLight = new THREE.HemisphereLight(0xffffff, 0xbae6fd, 1.4);
+      // 眩しすぎない柔らかい自然光
+      const hemiLight = new THREE.HemisphereLight(0xffffff, 0xcfd8dc, 1.15);
       scene.add(hemiLight);
 
-      const sun = new THREE.DirectionalLight(0xffedd5, 0.95);
+      const sun = new THREE.DirectionalLight(0xfffaed, 0.75);
       sun.position.set(5, 12, 6);
       scene.add(sun);
 
@@ -721,9 +723,9 @@
       scene.add(world);
 
       const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
-      // パステルグリーン芝生 & パステルアースブラウン土台
-      const grassMat = new THREE.MeshLambertMaterial({ color: 0x4ade80 });
-      const dirtMat = new THREE.MeshLambertMaterial({ color: 0xd97706 });
+      // 目に優しい落ち着いたセージグリーン芝生 ＆ モカサンド土台
+      const grassMat = new THREE.MeshLambertMaterial({ color: 0x7ca982 });
+      const dirtMat = new THREE.MeshLambertMaterial({ color: 0xa89078 });
 
       const half = Math.floor(MAP_SIZE / 2);
       for (let x = -half; x <= half; x++) {
@@ -741,22 +743,22 @@
         }
       }
 
-      // ロボットモデル（可愛いパステルブルー）
+      // ロボットモデル（優しいスレートブルー）
       chara = new THREE.Group();
       world.add(chara);
 
-      bodyM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x38bdf8 }));
+      bodyM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x60a5fa }));
       bodyM.scale.set(0.52, 0.52, 0.38); bodyM.position.y = 0.5; chara.add(bodyM);
 
-      headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0xbae6fd }));
+      headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0xe2e8f0 }));
       headM.scale.set(0.44, 0.42, 0.42); headM.position.y = 0.88; chara.add(headM);
 
-      // おめめ（前面 +z 方向）
-      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.1, 0.08), new THREE.MeshBasicMaterial({ color: 0x0284c7 }));
+      // おめめ
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.1, 0.08), new THREE.MeshBasicMaterial({ color: 0x1e3a8a }));
       eye.position.set(0, 0.9, 0.22); chara.add(eye);
 
       const armGeo = new THREE.BoxGeometry(0.18, 0.38, 0.18);
-      const armMat = new THREE.MeshLambertMaterial({ color: 0x0284c7 });
+      const armMat = new THREE.MeshLambertMaterial({ color: 0x3b82f6 });
       rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.37, 0.5, 0); chara.add(rArm);
       lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.37, 0.5, 0); chara.add(lArm);
 
@@ -764,7 +766,7 @@
       handApple.position.set(0, -0.2, 0.15); rArm.add(handApple);
 
       const legGeo = new THREE.BoxGeometry(0.2, 0.34, 0.2);
-      const legMat = new THREE.MeshLambertMaterial({ color: 0x0369a1 });
+      const legMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
       rLeg = new THREE.Mesh(legGeo, legMat); rLeg.position.set(0.17, 0.17, 0); chara.add(rLeg);
       lLeg = new THREE.Mesh(legGeo, legMat); lLeg.position.set(-0.17, 0.17, 0); chara.add(lLeg);
 
@@ -772,7 +774,6 @@
       chara.rotation.y = ROBOT.rotY || 0;
       if (ROBOT.hasApple && handApple) handApple.material.visible = true;
 
-      // 保存リンゴの復元、または初期リンゴ
       if (pendingLoadedApples && pendingLoadedApples.length > 0) {
         for (const a of pendingLoadedApples) spawnApple(a.gx, a.gz, false);
       } else {
@@ -789,7 +790,7 @@
       if (!world) return;
       const grp = new THREE.Group();
       const apple = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.36), new THREE.MeshLambertMaterial({ color: 0xf87171 }));
-      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), new THREE.MeshLambertMaterial({ color: 0x4ade80 }));
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), new THREE.MeshLambertMaterial({ color: 0x86efac }));
       leaf.position.set(0, 0.22, 0); grp.add(apple, leaf);
       grp.position.set(gx, 0.65, gz);
       world.add(grp);
@@ -807,7 +808,7 @@
 
       const topWindow = document.querySelector('.top-window');
       topWindow.addEventListener('touchstart', e => {
-        if (e.target.closest('.top-gauge-panel, .btn-setting-gear')) return;
+        if (e.target.closest('.top-gauge-panel')) return;
         touchStartTime = performance.now();
         if (e.touches.length === 1) prevX = e.touches[0].clientX;
       }, { passive: true });
@@ -865,16 +866,12 @@
       }).join(' / ');
     }
 
-    // =====================================================================
-    // 行動リストの作成（そのマスに乗らないと取得できないルール）
-    // =====================================================================
     function getPossibleActions(cx, cz) {
       const list = [];
       if (ROBOT.hasApple) {
         list.push({ key: "EAT_HAND", txt: "右手の🍎リンゴを食べる" });
       }
 
-      // ★ルール変更：同じマス（足元）に乗っている時だけ、拾う・食べるが可能！
       const atFeetIdx = fieldApples.findIndex(a => a.gx === cx && a.gz === cz);
       if (atFeetIdx !== -1) {
         list.push({ key: "EAT_FIELD", appleIdx: atFeetIdx, txt: "足元の🍎リンゴを食べる" });
@@ -884,7 +881,6 @@
       }
 
       const half = Math.floor(MAP_SIZE / 2);
-      // 向きの角度：南=0, 北=PI, 東=PI/2, 西=-PI/2
       const dirs = [
         { key: "MOVE_E", dx: 1, dz: 0, rotY: Math.PI / 2, name: "東を向いて1歩進む" },
         { key: "MOVE_W", dx: -1, dz: 0, rotY: -Math.PI / 2, name: "西を向いて1歩進む" },
@@ -961,7 +957,6 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
           decision = await GroqCore.think(prompt, currentKey, activeModel);
         }
 
-        // 張りぼて禁止：通信成功が確定したここでのみ文章を更新！
         lamp.className = 'comm-lamp lamp-ok';
         lamp.textContent = '🟢 通信OK!';
 
@@ -977,11 +972,9 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
         ROBOT.lastActionNote = actionName;
         ROBOT.stepCount++;
 
-        // LifeCoreの行動決定と、世界の実行
         life.tick([actionKey]);
         await executeWorldAction(actionKey, actions);
 
-        // ★体力計算：通信完了後に「体力ゲージ -10ポイント」
         let dEnergy = -2;
         let dMental = +3;
         if (actionKey === 'EAT_HAND' || actionKey === 'EAT_FIELD') {
@@ -996,7 +989,6 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
         }
 
       } catch (err) {
-        // 通信失敗時は誤魔化さずエラーを表示
         lamp.className = 'comm-lamp lamp-err';
         lamp.textContent = '❌ 通信エラー';
         bubble.className = 'voice-bubble bubble-error';
@@ -1009,9 +1001,6 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
       }
     }
 
-    // =====================================================================
-    // 世界のアクション実行（向きを変えて歩く処理）
-    // =====================================================================
     async function executeWorldAction(chosenKey, actions) {
       const act = actions.find(a => a.key === chosenKey) || actions[0];
 
@@ -1034,7 +1023,6 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
         if (handApple) handApple.material.visible = true;
       } else if (act.pos) {
         const tx = act.pos[0], tz = act.pos[1];
-        // ★カニ歩き解消：目標のマスに向きを合わせてから歩く！
         await walkCharaTo(tx, 0.5, tz, act.rotY !== undefined ? act.rotY : 0, 420);
         ROBOT.pos = { x: tx, z: tz };
         ROBOT.rotY = act.rotY !== undefined ? act.rotY : ROBOT.rotY;
@@ -1115,7 +1103,7 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
       if (grpG) grpG.className = 'settings-card ' + (isGem ? 'selected-google' : '');
       if (grpGh) grpGh.className = 'settings-card ' + (!isGem ? 'selected-github' : '');
       if (saveBtn) {
-        saveBtn.style.background = isGem ? '#38bdf8' : '#c084fc';
+        saveBtn.style.background = isGem ? '#3b82f6' : '#9333ea';
         saveBtn.textContent = isGem ? '🟦 Google 3.8 に決定して閉じる' : '🟪 Groq 120B に決定して閉じる';
       }
     }
@@ -1177,7 +1165,6 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
       if (renderer && scene && camera) renderer.render(scene, camera);
     }
 
-    // ★歩行と旋回のアニメーション（進行方向へクルッと向く）
     function walkCharaTo(tx, ty, tz, targetRotY, dur) {
       return new Promise(resolve => {
         if (!chara) { resolve(); return; }
@@ -1185,7 +1172,6 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
         const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z;
         const sRotY = chara.rotation.y;
         
-        // 角度差を最短ルートで回す
         let diffRot = (targetRotY - sRotY) % (Math.PI * 2);
         if (diffRot > Math.PI) diffRot -= Math.PI * 2;
         if (diffRot < -Math.PI) diffRot += Math.PI * 2;
@@ -1193,12 +1179,10 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
         const start = performance.now();
         function s(now) {
           const p = Math.min((now - start) / dur, 1);
-          // 位置の補間
           chara.position.x = sx + (tx - sx) * p;
           chara.position.y = sy + (ty - sy) * p;
           chara.position.z = sz + (tz - sz) * p;
-          // 向きの補間
-          chara.rotation.y = sRotY + diffRot * Math.min(p * 2, 1); // 最初の半分で向きを完了
+          chara.rotation.y = sRotY + diffRot * Math.min(p * 2, 1);
 
           if (p < 1) requestAnimationFrame(s);
           else {
