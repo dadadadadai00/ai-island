@@ -82,19 +82,76 @@
     }
     .btn-setting-gear-inline:active { transform: scale(0.92); background: #e2e8f0; }
 
-    /* リンゴ落下のヒント */
-    .tap-hint-pill {
-      position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 15;
-      background: rgba(255, 255, 255, 0.94); border: 1.5px solid #fde047;
-      color: #92400e; font-size: 11px; font-weight: 800; padding: 4px 14px; border-radius: 20px;
-      pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06); white-space: nowrap;
+    /* ========================================================
+     * ★ 新設：シンプル◯ボタン ＆ 上に広がる白色透過の扇状メニュー
+     * ======================================================== */
+    .fan-menu-wrapper {
+      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+      z-index: 25; display: flex; flex-direction: column; align-items: center;
+    }
+
+    /* 扇状メニュー（3分割アーク） */
+    .fan-radial-container {
+      position: absolute; bottom: 58px; left: 50%; transform: translateX(-50%) scale(0.6);
+      width: 240px; height: 125px;
+      pointer-events: none; opacity: 0;
+      transform-origin: 50% 100%;
+      transition: all 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .fan-radial-container.open {
+      pointer-events: auto; opacity: 1;
+      transform: translateX(-50%) scale(1);
+    }
+
+    .fan-svg {
+      width: 100%; height: 100%; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.1));
+    }
+    .fan-sector {
+      fill: rgba(255, 255, 255, 0.88);
+      stroke: rgba(203, 213, 225, 0.95);
+      stroke-width: 1.5;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      touch-action: manipulation;
+    }
+    .fan-sector:hover, .fan-sector:active {
+      fill: rgba(239, 246, 255, 0.96);
+      stroke: #60a5fa;
+    }
+    .fan-label {
+      font-size: 11px; font-weight: 900; fill: #334155;
+      pointer-events: none; text-anchor: middle; dominant-baseline: middle;
+    }
+    .fan-icon {
+      font-size: 16px; pointer-events: none; text-anchor: middle; dominant-baseline: middle;
+    }
+
+    /* シンプル◯ボタン（白色・中央配置） */
+    .btn-circle-main {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: #ffffff; border: 1.5px solid #cbd5e1;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+      transition: transform 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s;
+    }
+    .btn-circle-main:active { transform: scale(0.92); }
+    .btn-circle-main.active {
+      background: #f1f5f9; border-color: #94a3b8;
+    }
+    .circle-icon {
+      font-size: 18px; color: #475569; transition: transform 0.25s ease;
+      line-height: 1; font-weight: bold;
+    }
+    .btn-circle-main.active .circle-icon {
+      transform: rotate(45deg); color: #ef4444;
     }
 
     /* ========================================================
-     * ② 文章枠（ロボットのお気持ち）：3行分のゆったりサイズへ拡大
+     * ② 文章枠（ロボットのお気持ち）：3行分のゆったりサイズ
      * ======================================================== */
     .bottom-window {
-      flex: none; height: 142px; /* 3行がゆったり入る高さへ拡大 */
+      flex: none; height: 142px;
       background: #ffffff; padding: 8px 12px;
       display: flex; flex-direction: column; gap: 4px;
       overflow-y: auto; border-top: 1.5px solid #cbd5e1;
@@ -144,7 +201,7 @@
     }
 
     /* ========================================================
-     * ③ フッター：下部のホームバーと被らないよう余白を確保
+     * ③ フッター：下部のバーと被らないゆったり余白
      * ======================================================== */
     .footer-bar {
       flex: none;
@@ -257,8 +314,43 @@
         </div>
       </div>
 
-      <!-- リンゴ落下のヒント -->
-      <div class="tap-hint-pill" id="tap-hint">👆 マス目をタップすると🍎リンゴが落ちるよ！</div>
+      <!-- ★ 新設：シンプル◯ボタン ＆ 上に広がる白色透過の扇状3分割メニュー -->
+      <div class="fan-menu-wrapper">
+        <div class="fan-radial-container" id="fanRadialMenu">
+          <svg class="fan-svg" viewBox="0 0 240 125">
+            <!-- 扇形パーツ（左：アイテム） 角度: 162°〜118° -->
+            <path class="fan-sector" id="sector-item"
+              d="M 28 106 A 98 98 0 0 1 73 34 L 88 64 A 62 62 0 0 0 59 109 Z"
+              onclick="triggerFanAction('item')"></path>
+            <!-- 扇形パーツ（中：ガチャガチャ） 角度: 112°〜68° -->
+            <path class="fan-sector" id="sector-gacha"
+              d="M 83 29 A 98 98 0 0 1 157 29 L 143 61 A 62 62 0 0 0 97 61 Z"
+              onclick="triggerFanAction('gacha')"></path>
+            <!-- 扇形パーツ（右：整地） 角度: 62°〜18° -->
+            <path class="fan-sector" id="sector-clean"
+              d="M 167 34 A 98 98 0 0 1 212 106 L 181 109 A 62 62 0 0 0 152 64 Z"
+              onclick="triggerFanAction('clean')"></path>
+
+            <!-- アイコンと文字（左：アイテム） -->
+            <text x="58" y="70" class="fan-icon">🎒</text>
+            <text x="58" y="86" class="fan-label">アイテム</text>
+
+            <!-- アイコンと文字（中：ガチャ） -->
+            <text x="120" y="38" class="fan-icon">🎰</text>
+            <text x="120" y="54" class="fan-label">ガチャ</text>
+
+            <!-- アイコンと文字（右：整地） -->
+            <text x="182" y="70" class="fan-icon">⛏️</text>
+            <text x="182" y="86" class="fan-label">整地</text>
+          </svg>
+        </div>
+
+        <!-- シンプル◯ボタン（白色） -->
+        <button type="button" class="btn-circle-main" id="btn-circle-toggle" onclick="toggleFanMenu()" title="メニューをひらく">
+          <span class="circle-icon" id="circle-icon">＋</span>
+        </button>
+      </div>
+
     </div>
 
     <!-- ② 文章枠（ロボットのお気持ち）：3行分のゆったりサイズ -->
@@ -698,7 +790,6 @@
       const h = Math.max(stage.clientHeight || 280, 200);
 
       scene = new THREE.Scene();
-      // 目に優しいソフトペールスカイ
       scene.background = new THREE.Color(0xebf2f5);
 
       camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100);
@@ -711,7 +802,6 @@
       stage.innerHTML = '';
       stage.appendChild(renderer.domElement);
 
-      // 眩しすぎない柔らかい自然光
       const hemiLight = new THREE.HemisphereLight(0xffffff, 0xcfd8dc, 1.15);
       scene.add(hemiLight);
 
@@ -723,7 +813,6 @@
       scene.add(world);
 
       const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
-      // 目に優しい落ち着いたセージグリーン芝生 ＆ モカサンド土台
       const grassMat = new THREE.MeshLambertMaterial({ color: 0x7ca982 });
       const dirtMat = new THREE.MeshLambertMaterial({ color: 0xa89078 });
 
@@ -743,7 +832,6 @@
         }
       }
 
-      // ロボットモデル（優しいスレートブルー）
       chara = new THREE.Group();
       world.add(chara);
 
@@ -753,7 +841,6 @@
       headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0xe2e8f0 }));
       headM.scale.set(0.44, 0.42, 0.42); headM.position.y = 0.88; chara.add(headM);
 
-      // おめめ
       const eye = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.1, 0.08), new THREE.MeshBasicMaterial({ color: 0x1e3a8a }));
       eye.position.set(0, 0.9, 0.22); chara.add(eye);
 
@@ -796,7 +883,6 @@
       world.add(grp);
       fieldApples.push({ mesh: grp, gx: gx, gz: gz });
 
-      document.getElementById('tap-hint').textContent = `🍎 リンゴが落ちたよ！ (島に${fieldApples.length}こ)`;
       if (shouldSave) saveWorldState();
     }
 
@@ -808,19 +894,21 @@
 
       const topWindow = document.querySelector('.top-window');
       topWindow.addEventListener('touchstart', e => {
-        if (e.target.closest('.top-gauge-panel')) return;
+        if (e.target.closest('.top-gauge-panel') || e.target.closest('.fan-menu-wrapper')) return;
         touchStartTime = performance.now();
         if (e.touches.length === 1) prevX = e.touches[0].clientX;
       }, { passive: true });
 
       topWindow.addEventListener('touchmove', e => {
         if (!world || e.touches.length !== 1) return;
+        if (e.target.closest('.top-gauge-panel') || e.target.closest('.fan-menu-wrapper')) return;
         const dx = e.touches[0].clientX - prevX;
         world.rotation.y += dx * 0.008;
         prevX = e.touches[0].clientX;
       }, { passive: true });
 
       topWindow.addEventListener('touchend', e => {
+        if (e.target.closest('.top-gauge-panel') || e.target.closest('.fan-menu-wrapper')) return;
         if (performance.now() - touchStartTime < 250 && e.changedTouches.length === 1) {
           const rect = topWindow.getBoundingClientRect();
           const touch = e.changedTouches[0];
@@ -832,9 +920,69 @@
             const gx = hits[0].object.userData.gx;
             const gz = hits[0].object.userData.gz;
             spawnApple(gx, gz, true);
+            showToast('🍎 リンゴを置いたよ！');
           }
         }
       });
+    }
+
+    // =====================================================================
+    // ★ 扇状メニューの開閉とアクション
+    // =====================================================================
+    let isFanMenuOpen = false;
+
+    function toggleFanMenu() {
+      isFanMenuOpen = !isFanMenuOpen;
+      const fan = document.getElementById('fanRadialMenu');
+      const btn = document.getElementById('btn-circle-toggle');
+      if (isFanMenuOpen) {
+        fan.classList.add('open');
+        btn.classList.add('active');
+      } else {
+        fan.classList.remove('open');
+        btn.classList.remove('active');
+      }
+    }
+
+    function closeFanMenu() {
+      if (!isFanMenuOpen) return;
+      isFanMenuOpen = false;
+      document.getElementById('fanRadialMenu').classList.remove('open');
+      document.getElementById('btn-circle-toggle').classList.remove('active');
+    }
+
+    function triggerFanAction(type) {
+      closeFanMenu();
+      if (type === 'item') {
+        // アイテム：ロボットの目の前（またはランダムな空きマス）にリンゴを落とす
+        const half = Math.floor(MAP_SIZE / 2);
+        const rx = Math.floor(Math.random() * MAP_SIZE) - half;
+        const rz = Math.floor(Math.random() * MAP_SIZE) - half;
+        spawnApple(rx, rz, true);
+        showToast('🎒 リンゴを1こ出したよ！');
+      } else if (type === 'gacha') {
+        // ガチャガチャ：島にランダムで2〜3個のリンゴが降ってくる！
+        const half = Math.floor(MAP_SIZE / 2);
+        for (let i = 0; i < 2; i++) {
+          const rx = Math.floor(Math.random() * MAP_SIZE) - half;
+          const rz = Math.floor(Math.random() * MAP_SIZE) - half;
+          spawnApple(rx, rz, false);
+        }
+        saveWorldState();
+        showToast('🎰 ガチャ！リンゴが降ってきた！');
+      } else if (type === 'clean') {
+        // 整地：島に落ちすぎたリンゴをすべて回収して地面をきれいにする
+        if (fieldApples.length === 0) {
+          showToast('⛏️ 整地：すでに綺麗だよ！');
+          return;
+        }
+        for (const a of fieldApples) {
+          if (world) world.remove(a.mesh);
+        }
+        fieldApples = [];
+        saveWorldState();
+        showToast('⛏️ 整地：島をきれいに掃除したよ！');
+      }
     }
 
     function getSurroundings(cx, cz) {
@@ -902,6 +1050,7 @@
     // 思考実行（張りぼて禁止・通信成功時のみ反映・体力-10）
     // =====================================================================
     async function triggerThinkNow() {
+      closeFanMenu();
       const st = life.getState();
       if (!st.isAlive) return;
 
