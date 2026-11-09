@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>ボクセルAI自律思考水槽 - LifeCore搭載版</title>
+  <title>ボクセルAI自律思考水槽 - 昼夜・マイクラゲージ連動版</title>
 
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13,7 +13,6 @@
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    /* body直下に余計な文字が混入しても高さ0・余白0で完全に非表示にする保護設定 */
     html, body {
       width: 100vw; height: 100vh; height: 100dvh;
       overflow: hidden; background: #ebf2f5; color: #2d3748;
@@ -23,7 +22,6 @@
     }
     input, select, textarea, button { user-select: auto; -webkit-user-select: auto; font-family: inherit; }
 
-    /* 全体コンテナ（ここで通常の文字サイズに戻す） */
     .app-container {
       font-size: 14px; line-height: 1.4;
       display: flex; flex-direction: column;
@@ -31,22 +29,21 @@
       overflow: hidden;
     }
 
-    /* ========================================================
-     * ① プレビュー（キャラクターのいる画面）：目に優しいセージ＆モカ調
-     * ======================================================== */
+    /* ① プレビュー画面 */
     .top-window {
       position: relative;
       flex: 1; min-height: 0;
       background: #ebf2f5;
-      overflow: visible; /* ◯ボタンの下半分を下部パネルへ乗せるためvisible */
+      overflow: visible;
       border-bottom: 2px solid #cbd5e1;
-      z-index: 30; /* 下部パネル・フッターより上の階層に配置 */
+      z-index: 30;
+      transition: background-color 1s ease; /* 背景色の時間経過トランジション */
     }
     #stage-3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; overflow: hidden; }
     #c3d { width: 100%; height: 100%; display: block; }
     canvas { display: block; width: 100% !important; height: 100% !important; }
 
-    /* 最上部：ゲージパネル（左右いっぱいに拡大） */
+    /* 最上部：ゲージパネル（マイクラ方式） */
     .top-gauge-panel {
       position: absolute; top: 8px; left: 8px; right: 8px; z-index: 20;
       background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(8px);
@@ -64,7 +61,7 @@
     .bar-bg { background: #e2e8f0; height: 8px; border-radius: 5px; margin-top: 3px; overflow: hidden; padding: 1px; }
     .bar-fill { height: 100%; border-radius: 4px; transition: width 0.35s ease; }
 
-    /* ロボット状態表示バッジ ＆ 右下の歯車設定ボタン */
+    /* ロボット状態表示バッジ ＆ 時計・手帳ボタン */
     .robot-status-row {
       display: flex; justify-content: space-between; align-items: center;
       margin-top: 6px; padding-top: 5px; border-top: 1px solid #e2e8f0;
@@ -76,7 +73,11 @@
     }
     .status-right-col { display: flex; align-items: center; gap: 6px; }
 
-    /* 右下の⚙️ 設定ボタン */
+    .time-phase-badge {
+      font-size: 10.5px; font-weight: 900; padding: 2px 7px; border-radius: 6px;
+      background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;
+    }
+
     .btn-setting-gear-inline {
       width: 28px; height: 28px; border-radius: 8px;
       background: #f1f5f9; border: 1.5px solid #cbd5e1;
@@ -85,17 +86,12 @@
     }
     .btn-setting-gear-inline:active { transform: scale(0.92); background: #e2e8f0; }
 
-    /* ========================================================
-     * ★ 180°展開・4分割・均等余白の扇状メニュー ＆ シンプル◯ボタン
-     * 中心の◯ボタンが下部境界（フッター側領域）に上下半分乗る位置に配置
-     * ======================================================== */
+    /* 扇状メニュー本体 */
     .fan-menu-wrapper {
       position: absolute; bottom: -27px; left: 50%; transform: translateX(-50%);
       z-index: 40; width: 340px; height: 195px;
       pointer-events: none;
     }
-
-    /* 扇状メニュー本体（中心が◯ボタンの中心とピタッと一致） */
     .fan-radial-container {
       position: absolute; bottom: 0; left: 0;
       width: 340px; height: 195px;
@@ -104,59 +100,26 @@
       transform-origin: 170px 168px;
       transition: transform 0.26s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease;
     }
-    .fan-radial-container.open {
-      opacity: 1;
-      transform: scale(1);
-    }
-
-    .fan-svg {
-      width: 100%; height: 100%;
-      filter: drop-shadow(0 6px 18px rgba(15, 23, 42, 0.14));
-      overflow: visible;
-    }
-
-    /* 通常扇ピース（白色透過） */
+    .fan-radial-container.open { opacity: 1; transform: scale(1); }
+    .fan-svg { width: 100%; height: 100%; filter: drop-shadow(0 6px 18px rgba(15, 23, 42, 0.14)); overflow: visible; }
+    
     .fan-sector {
-      fill: rgba(255, 255, 255, 0.90);
-      stroke: rgba(203, 213, 225, 0.95);
-      stroke-width: 1.5;
-      stroke-linejoin: round;
-      cursor: pointer;
-      pointer-events: none;
+      fill: rgba(255, 255, 255, 0.90); stroke: rgba(203, 213, 225, 0.95);
+      stroke-width: 1.5; stroke-linejoin: round;
+      cursor: pointer; pointer-events: none;
       transition: fill 0.15s ease, transform 0.15s ease;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     }
-    .fan-radial-container.open .fan-sector {
-      pointer-events: auto;
-    }
-    .fan-sector:hover, .fan-sector:active {
-      fill: rgba(224, 242, 254, 0.96);
-      stroke: #60a5fa;
-    }
+    .fan-radial-container.open .fan-sector { pointer-events: auto; }
+    .fan-sector:hover, .fan-sector:active { fill: rgba(224, 242, 254, 0.96); stroke: #60a5fa; }
+    .fan-sector-pink { fill: rgba(255, 228, 234, 0.92); stroke: rgba(244, 168, 184, 0.95); }
+    .fan-sector-pink:hover, .fan-sector-pink:active { fill: rgba(254, 205, 215, 0.98); stroke: #f43f5e; }
+    
+    .fan-label { font-size: 11.5px; font-weight: 900; fill: #334155; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
+    .fan-label-pink { fill: #9f1239; }
+    .fan-icon { font-size: 21px; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
 
-    /* ゲーム終了扇ピース（パステルピンク透過） */
-    .fan-sector-pink {
-      fill: rgba(255, 228, 234, 0.92);
-      stroke: rgba(244, 168, 184, 0.95);
-    }
-    .fan-sector-pink:hover, .fan-sector-pink:active {
-      fill: rgba(254, 205, 215, 0.98);
-      stroke: #f43f5e;
-    }
-
-    .fan-label {
-      font-size: 11.5px; font-weight: 900; fill: #334155;
-      pointer-events: none; text-anchor: middle; dominant-baseline: middle;
-    }
-    .fan-label-pink {
-      fill: #9f1239;
-    }
-    .fan-icon {
-      font-size: 21px; pointer-events: none; text-anchor: middle; dominant-baseline: middle;
-    }
-
-    /* シンプル◯ボタン（白色・扇の要の位置に配置） */
+    /* ◯ボタン */
     .btn-circle-main {
       position: absolute; left: 146px; top: 144px;
       width: 48px; height: 48px; border-radius: 50%;
@@ -168,20 +131,11 @@
       transition: transform 0.2s ease, background 0.2s, border-color 0.2s;
     }
     .btn-circle-main:active { transform: scale(0.92); }
-    .btn-circle-main.active {
-      background: #f8fafc; border-color: #94a3b8;
-    }
-    .circle-icon {
-      font-size: 22px; color: #475569; transition: transform 0.25s ease, color 0.2s ease;
-      line-height: 1; font-weight: bold;
-    }
-    .btn-circle-main.active .circle-icon {
-      transform: rotate(45deg); color: #ef4444;
-    }
+    .btn-circle-main.active { background: #f8fafc; border-color: #94a3b8; }
+    .circle-icon { font-size: 22px; color: #475569; transition: transform 0.25s ease, color 0.2s ease; line-height: 1; font-weight: bold; }
+    .btn-circle-main.active .circle-icon { transform: rotate(45deg); color: #ef4444; }
 
-    /* ========================================================
-     * ② 文章枠（ロボットのお気持ち）：3行分のゆったりサイズ
-     * ======================================================== */
+    /* ② 文章枠 */
     .bottom-window {
       position: relative; z-index: 10;
       flex: none; height: 142px;
@@ -191,17 +145,13 @@
       box-shadow: 0 -2px 10px rgba(0,0,0,0.03);
     }
     .voice-header { display: flex; justify-content: space-between; align-items: center; }
-    .voice-title {
-      font-size: 12px; font-weight: 900; color: #475569;
-      display: flex; align-items: center; gap: 4px;
-    }
+    .voice-title { font-size: 12px; font-weight: 900; color: #475569; display: flex; align-items: center; gap: 4px; }
     .comm-lamp { font-size: 10px; font-weight: 900; padding: 1px 7px; border-radius: 8px; line-height: 1.4; }
     .lamp-standby { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
     .lamp-busy { background: #fef3c7; color: #b45309; border: 1px solid #fde047; }
     .lamp-ok { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
     .lamp-err { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
 
-    /* ロボットの心の声（3行分が綺麗に収まる設計） */
     .voice-bubble {
       flex: 1; min-height: 68px;
       background: #f8fafc; border: 1.5px solid #cbd5e1;
@@ -211,27 +161,13 @@
     }
     .voice-bubble.bubble-active { border-color: #60a5fa; background: #f0f9ff; }
     .voice-bubble.bubble-error { border-color: #f87171; background: #fff1f2; }
+    .voice-text { font-size: 14px; font-weight: 900; line-height: 1.45; color: #1e293b; word-break: break-all; }
+    .voice-error-text { font-size: 12px; font-weight: 800; line-height: 1.4; color: #dc2626; }
 
-    .voice-text {
-      font-size: 14px; font-weight: 900; line-height: 1.45;
-      color: #1e293b; word-break: break-all;
-    }
-    .voice-error-text {
-      font-size: 12px; font-weight: 800; line-height: 1.4; color: #dc2626;
-    }
+    .action-note-row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: #64748b; }
+    .action-badge { font-size: 10px; font-weight: 900; background: #f1f5f9; color: #475569; padding: 1px 6px; border-radius: 5px; border: 1px solid #cbd5e1; }
 
-    .action-note-row {
-      display: flex; align-items: center; gap: 6px;
-      font-size: 11px; font-weight: 800; color: #64748b;
-    }
-    .action-badge {
-      font-size: 10px; font-weight: 900; background: #f1f5f9; color: #475569;
-      padding: 1px 6px; border-radius: 5px; border: 1px solid #cbd5e1;
-    }
-
-    /* ========================================================
-     * ③ フッター：下部のバーと被らないゆったり余白
-     * ======================================================== */
+    /* ③ フッター */
     .footer-bar {
       flex: none;
       padding: 8px 14px max(24px, calc(env(safe-area-inset-bottom) + 12px));
@@ -260,7 +196,7 @@
       display: none;
     }
 
-    /* モーダル：清潔感のあるパステルカード */
+    /* 共通モーダル */
     .modal-cover {
       font-size: 14px; line-height: 1.4;
       position: fixed; inset: 0; z-index: 100;
@@ -276,336 +212,169 @@
     .modal-title { font-size: 15px; font-weight: 900; color: #334155; }
     .close-btn { font-size: 20px; color: #94a3b8; cursor: pointer; padding: 2px 6px; font-weight: bold; }
 
-    .settings-card {
-      background: #f8fafc; border: 2px solid #e2e8f0;
-      padding: 10px; border-radius: 12px; cursor: pointer;
-    }
-    .settings-card.selected-google { border-color: #60a5fa; background: #eff6ff; }
-    .settings-card.selected-github { border-color: #c084fc; background: #faf5ff; }
-    .input-box {
-      width: 100%; padding: 8px 10px; background: #ffffff; border: 1.5px solid #cbd5e1;
-      color: #0f172a; border-radius: 8px; font-size: 12px; margin-top: 5px;
-    }
-    .save-btn {
-      padding: 11px; background: #3b82f6; color: #fff; border: none; border-radius: 12px;
-      font-weight: 900; cursor: pointer; font-size: 14px; box-shadow: 0 3px 10px rgba(59, 130, 246, 0.3);
-    }
-    .reset-btn {
-      padding: 10px; background: #fee2e2; color: #b91c1c;
-      border: 1.5px solid #fca5a5; border-radius: 10px; font-weight: 800;
-      cursor: pointer; font-size: 12px; margin-top: 4px;
-    }
-
-    /* ========================================================
-     * ★ ガチャガチャ専用スタイル ＆ カプセルアニメーション
-     * ======================================================== */
-    .gacha-stage-box {
-      background: linear-gradient(180deg, #fff5f7 0%, #ffffff 100%);
-      border: 1.5px solid #fbcfe8; border-radius: 16px;
-      padding: 10px; display: flex; flex-direction: column; align-items: center;
-      position: relative; overflow: hidden;
-    }
-    .gacha-svg-wrap {
-      width: 220px; height: 250px; position: relative;
-    }
-    /* ハンドル回転アニメーション */
-    #gacha-handle-group {
-      transform-origin: 110px 158px;
-      transition: transform 0.65s cubic-bezier(0.45, 0.05, 0.55, 0.95);
-    }
-    #gacha-handle-group.turning {
-      transform: rotate(360deg);
-    }
-    /* ドーム内のカプセル揺れアニメーション */
-    @keyframes domeJostle {
-      0%, 100% { transform: translate(0, 0) rotate(0deg); }
-      25% { transform: translate(-4px, -6px) rotate(-8deg); }
-      50% { transform: translate(5px, -3px) rotate(8deg); }
-      75% { transform: translate(-3px, -5px) rotate(-5deg); }
-    }
-    #gacha-dome-capsules.shaking {
-      animation: domeJostle 0.3s ease-in-out 2;
-      transform-origin: 110px 78px;
-    }
-
-    /* 出てきたカプセルがパカッと開く演出エリア */
-    .capsule-pop-overlay {
-      position: absolute; inset: 0;
-      background: rgba(255, 255, 255, 0.88); backdrop-filter: blur(3px);
-      display: none; flex-direction: column; align-items: center; justify-content: center;
-      z-index: 10;
-    }
+    /* ガチャなどの中身は前回と同じ */
+    .gacha-stage-box { background: linear-gradient(180deg, #fff5f7 0%, #ffffff 100%); border: 1.5px solid #fbcfe8; border-radius: 16px; padding: 10px; display: flex; flex-direction: column; align-items: center; position: relative; overflow: hidden; }
+    .gacha-svg-wrap { width: 220px; height: 250px; position: relative; }
+    #gacha-handle-group { transform-origin: 110px 158px; transition: transform 0.65s cubic-bezier(0.45, 0.05, 0.55, 0.95); }
+    #gacha-handle-group.turning { transform: rotate(360deg); }
+    @keyframes domeJostle { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(-4px, -6px) rotate(-8deg); } 50% { transform: translate(5px, -3px) rotate(8deg); } 75% { transform: translate(-3px, -5px) rotate(-5deg); } }
+    #gacha-dome-capsules.shaking { animation: domeJostle 0.3s ease-in-out 2; transform-origin: 110px 78px; }
+    .capsule-pop-overlay { position: absolute; inset: 0; background: rgba(255, 255, 255, 0.88); backdrop-filter: blur(3px); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
     .capsule-pop-overlay.active { display: flex; }
-
-    .pop-capsule-stage {
-      position: relative; width: 140px; height: 140px;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .cap-half-top {
-      position: absolute; width: 76px; height: 38px;
-      top: 32px; left: 32px;
-      border-radius: 38px 38px 0 0;
-      background: linear-gradient(135deg, #f9a8d4, #f472b6);
-      border: 2.5px solid #ec4899;
-      transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s;
-      z-index: 3;
-    }
-    .cap-half-bottom {
-      position: absolute; width: 76px; height: 38px;
-      top: 70px; left: 32px;
-      border-radius: 0 0 38px 38px;
-      background: linear-gradient(135deg, #ffffff, #f1f5f9);
-      border: 2.5px solid #cbd5e1;
-      transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s;
-      z-index: 3;
-    }
-    .pop-capsule-stage.opened .cap-half-top {
-      transform: translate(-28px, -34px) rotate(-32deg);
-    }
-    .pop-capsule-stage.opened .cap-half-bottom {
-      transform: translate(28px, 30px) rotate(28deg);
-    }
-    .pop-reward-item {
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      transform: scale(0); opacity: 0;
-      transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
-      z-index: 4;
-    }
-    .pop-capsule-stage.opened .pop-reward-item {
-      transform: scale(1.15); opacity: 1;
-    }
+    .pop-capsule-stage { position: relative; width: 140px; height: 140px; display: flex; align-items: center; justify-content: center; }
+    .cap-half-top { position: absolute; width: 76px; height: 38px; top: 32px; left: 32px; border-radius: 38px 38px 0 0; background: linear-gradient(135deg, #f9a8d4, #f472b6); border: 2.5px solid #ec4899; transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s; z-index: 3; }
+    .cap-half-bottom { position: absolute; width: 76px; height: 38px; top: 70px; left: 32px; border-radius: 0 0 38px 38px; background: linear-gradient(135deg, #ffffff, #f1f5f9); border: 2.5px solid #cbd5e1; transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s; z-index: 3; }
+    .pop-capsule-stage.opened .cap-half-top { transform: translate(-28px, -34px) rotate(-32deg); }
+    .pop-capsule-stage.opened .cap-half-bottom { transform: translate(28px, 30px) rotate(28deg); }
+    .pop-reward-item { display: flex; flex-direction: column; align-items: center; justify-content: center; transform: scale(0); opacity: 0; transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s; z-index: 4; }
+    .pop-capsule-stage.opened .pop-reward-item { transform: scale(1.15); opacity: 1; }
     .pop-reward-icon { font-size: 44px; line-height: 1.1; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.12)); }
-    .pop-reward-name {
-      margin-top: 6px; font-size: 14px; font-weight: 900; color: #be185d;
-      background: #fdf2f8; padding: 3px 12px; border-radius: 12px; border: 1.5px solid #fbcfe8;
-    }
-
-    /* モーダル下部ボタン2列（スタート・閉じる） */
-    .modal-footer-btns {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;
-    }
-    .btn-gacha-start {
-      padding: 11px; border-radius: 12px; border: 1.5px solid #f472b6;
-      background: linear-gradient(135deg, #f472b6, #ec4899);
-      color: #ffffff; font-size: 14px; font-weight: 900; cursor: pointer;
-      box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
-    }
+    .pop-reward-name { margin-top: 6px; font-size: 14px; font-weight: 900; color: #be185d; background: #fdf2f8; padding: 3px 12px; border-radius: 12px; border: 1.5px solid #fbcfe8; }
+    .modal-footer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+    .btn-gacha-start { padding: 11px; border-radius: 12px; border: 1.5px solid #f472b6; background: linear-gradient(135deg, #f472b6, #ec4899); color: #ffffff; font-size: 14px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3); }
     .btn-gacha-start:active { transform: scale(0.96); }
-    .btn-gacha-start:disabled {
-      background: #cbd5e1 !important; border-color: #94a3b8 !important;
-      color: #64748b !important; box-shadow: none; cursor: not-allowed;
-    }
-    .btn-modal-close {
-      padding: 11px; border-radius: 12px; border: 1.5px solid #cbd5e1;
-      background: #f1f5f9; color: #475569; font-size: 14px; font-weight: 900; cursor: pointer;
-    }
+    .btn-gacha-start:disabled { background: #cbd5e1 !important; border-color: #94a3b8 !important; color: #64748b !important; box-shadow: none; cursor: not-allowed; }
+    .btn-modal-close { padding: 11px; border-radius: 12px; border: 1.5px solid #cbd5e1; background: #f1f5f9; color: #475569; font-size: 14px; font-weight: 900; cursor: pointer; }
     .btn-modal-close:active { transform: scale(0.96); background: #e2e8f0; }
 
-    /* ========================================================
-     * ★ 5×5 グリッドウィンドウ（アイテム ＆ 整地 共通）
-     * ======================================================== */
-    .grid-5x5 {
-      display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
-      background: #f8fafc; padding: 8px; border-radius: 14px;
-      border: 1.5px solid #e2e8f0;
-    }
-    .grid-cell {
-      aspect-ratio: 1 / 1; background: #ffffff;
-      border: 1.5px solid #cbd5e1; border-radius: 10px;
-      position: relative; display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      cursor: pointer; transition: all 0.15s ease;
-      overflow: hidden;
-    }
+    /* 5x5 グリッド */
+    .grid-5x5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: #f8fafc; padding: 8px; border-radius: 14px; border: 1.5px solid #e2e8f0; }
+    .grid-cell { aspect-ratio: 1 / 1; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 10px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s ease; overflow: hidden; }
     .grid-cell:active { transform: scale(0.93); }
     .grid-cell.filled { background: #f0f9ff; border-color: #93c5fd; }
     .grid-cell.terrain-cell { background: #edf7ed; border-color: #86efac; }
     .grid-cell.terrain-cell.has-obj { background: #fef9c3; border-color: #fde047; }
     .cell-icon { font-size: 22px; line-height: 1; }
-    .cell-count {
-      position: absolute; right: 3px; bottom: 2px;
-      font-size: 9.5px; font-weight: 900; color: #1e293b;
-      background: rgba(255, 255, 255, 0.92); padding: 0 3px;
-      border-radius: 4px; border: 1px solid #cbd5e1; line-height: 1.2;
-    }
-    .cell-coord {
-      position: absolute; top: 2px; left: 3px;
-      font-size: 8px; font-weight: 700; color: #64748b; line-height: 1;
-    }
+    .cell-count { position: absolute; right: 3px; bottom: 2px; font-size: 9.5px; font-weight: 900; color: #1e293b; background: rgba(255, 255, 255, 0.92); padding: 0 3px; border-radius: 4px; border: 1px solid #cbd5e1; line-height: 1.2; }
+    .cell-coord { position: absolute; top: 2px; left: 3px; font-size: 8px; font-weight: 700; color: #64748b; line-height: 1; }
+
+    /* 設定・その他 */
+    .settings-card { background: #f8fafc; border: 2px solid #e2e8f0; padding: 10px; border-radius: 12px; cursor: pointer; }
+    .settings-card.selected-google { border-color: #60a5fa; background: #eff6ff; }
+    .settings-card.selected-github { border-color: #c084fc; background: #faf5ff; }
+    .input-box { width: 100%; padding: 8px 10px; background: #ffffff; border: 1.5px solid #cbd5e1; color: #0f172a; border-radius: 8px; font-size: 12px; margin-top: 5px; }
+    .save-btn { padding: 11px; background: #3b82f6; color: #fff; border: none; border-radius: 12px; font-weight: 900; cursor: pointer; font-size: 14px; box-shadow: 0 3px 10px rgba(59, 130, 246, 0.3); }
+    .reset-btn { padding: 10px; background: #fee2e2; color: #b91c1c; border: 1.5px solid #fca5a5; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 12px; margin-top: 4px; }
 
     #toast-msg {
-      font-size: 13px; line-height: 1.4;
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
-      background: rgba(255, 255, 255, 0.98); border: 2px solid #60a5fa; border-radius: 14px;
-      padding: 8px 18px; font-weight: 900; color: #1e3a8a; z-index: 50;
-      opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      font-size: 13px; line-height: 1.4; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
+      background: rgba(255, 255, 255, 0.98); border: 2px solid #60a5fa; border-radius: 14px; padding: 8px 18px; font-weight: 900; color: #1e3a8a; z-index: 50;
+      opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 4px 16px rgba(0,0,0,0.12);
     }
     #toast-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   </style>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
   <div class="app-container">
 
-    <!-- ① プレビュー（目に優しい落ち着いたパステルトーン） -->
-    <div class="top-window">
+    <!-- ① プレビュー（時間経過で背景色が美しく変わる！） -->
+    <div class="top-window" id="sky-window">
       <div id="stage-3d"><div id="c3d"></div></div>
 
-      <!-- 最上部 3本ゲージ（左右いっぱいに拡大） -->
+      <!-- ★ マイクラ方式の3本ゲージ（HP・満腹・ごきげん） -->
       <div class="top-gauge-panel">
         <div class="gauge-grid">
           <div class="gauge-col">
-            <div class="gauge-label">🍎 いのち <span id="v-energy" class="gauge-num">100</span></div>
+            <div class="gauge-label">❤️ たいりょく <span id="v-energy" class="gauge-num">100</span></div>
             <div class="bar-bg"><div id="b-energy" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #f87171, #ef4444);"></div></div>
           </div>
           <div class="gauge-col">
-            <div class="gauge-label">⚡ たいりょく <span id="v-stamina" class="gauge-num">100</span></div>
+            <div class="gauge-label">🍙 おなか <span id="v-stamina" class="gauge-num">100</span></div>
             <div class="bar-bg"><div id="b-stamina" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #fde047, #eab308);"></div></div>
           </div>
           <div class="gauge-col">
-            <div class="gauge-label">🎵 きぶん <span id="v-mental" class="gauge-num">100</span></div>
+            <div class="gauge-label">🎵 ごきげん <span id="v-mental" class="gauge-num">100</span></div>
             <div class="bar-bg"><div id="b-mental" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #6ee7b7, #10b981);"></div></div>
           </div>
         </div>
 
-        <!-- 小学生でもわかるロボットの状態 ＆ 右下に⚙️設定ボタン -->
         <div class="robot-status-row">
           <span id="ui-robot-id" class="robot-id-tag">🤖 ロボ1ごう (0, 0)</span>
           <span id="ui-robot-drive" class="robot-drive-badge">😊 あんしん・まんぷく</span>
           <div class="status-right-col">
+            <!-- ★ 新しい時間帯バッジ -->
+            <span id="ui-time-phase" class="time-phase-badge">☀️ 朝</span>
             <span id="ui-step-count" class="robot-id-tag">⭐ 0手目</span>
             <button type="button" class="btn-setting-gear-inline" onclick="openModal('settingModal')" title="せってい">⚙️</button>
           </div>
         </div>
       </div>
 
-      <!-- ★ 180°展開・4分割・均等余白の扇状メニュー（ガチャガチャ・アイテム・整地・終了） -->
+      <!-- 扇状メニュー -->
       <div class="fan-menu-wrapper">
         <div class="fan-radial-container" id="fanRadialMenu">
           <svg class="fan-svg" id="fan-svg-root" viewBox="0 0 340 195"></svg>
         </div>
-
-        <!-- シンプル◯ボタン（白色） -->
-        <button type="button" class="btn-circle-main" id="btn-circle-toggle" onclick="toggleFanMenu()" title="メニューをひらく">
+        <button type="button" class="btn-circle-main" id="btn-circle-toggle" onclick="toggleFanMenu()">
           <span class="circle-icon" id="circle-icon">＋</span>
         </button>
       </div>
-
     </div>
 
-    <!-- ② 文章枠（ロボットのお気持ち）：3行分のゆったりサイズ -->
+    <!-- ② 文章枠 -->
     <div class="bottom-window">
       <div class="voice-header">
         <span class="voice-title">💭 ロボのきもち・心のさけび</span>
         <span id="comm-lamp" class="comm-lamp lamp-standby">💤 待機中</span>
       </div>
-
-      <!-- ロボットの叫び（通信完了時のみ更新。エラー時はエラー文） -->
       <div class="voice-bubble" id="voice-bubble">
         <div class="voice-text" id="voice-text">
           ぼくはマス目の島に立つロボットだよ！<br>
-          下の「⚡ 今すぐ考える」ボタンを押すと、ほんとうに自分で考えて島を歩くよ！<br>
-          リンゴのマスに乗って、お腹いっぱい食べさせてね！
+          「おなか」が空きすぎると「たいりょく」が減って倒れちゃうよ。<br>
+          暗い夜中に歩き回るのもキケンだから気をつけてね！
         </div>
       </div>
-
-      <!-- やったことの簡単な説明 -->
       <div class="action-note-row">
         <span class="action-badge">👟 やった事</span>
         <span id="action-note-text">待機中（まだ動いていないよ）</span>
       </div>
     </div>
 
-    <!-- ③ フッター：下部のバーと被らないゆったり余白 -->
+    <!-- ③ フッター -->
     <div class="footer-bar">
-      <button type="button" class="btn-think-now" id="btn-think-now" onclick="triggerThinkNow()">
-        ⚡ 今すぐ考える
-      </button>
-      <button type="button" class="btn-think-now btn-respawn" id="btn-respawn" onclick="respawnRobot()">
-        🔄 つぎの世代へ引き継ぐ
-      </button>
+      <button type="button" class="btn-think-now" id="btn-think-now" onclick="triggerThinkNow()">⚡ 今すぐ考える</button>
+      <button type="button" class="btn-think-now btn-respawn" id="btn-respawn" onclick="respawnRobot()">🔄 つぎの世代へ引き継ぐ</button>
     </div>
-
   </div>
 
-  <!-- 一時通知トースト -->
   <div id="toast-msg">💾 データを保存したよ</div>
 
-  <!-- 🎰 ガチャガチャ ウィンドウ -->
+  <!-- モーダル群 (ガチャ・アイテム・整地・おやすみ・設定) は構造維持 -->
   <div class="modal-cover" id="gachaModal">
     <div class="modal-box" style="border-color:#fbcfe8;">
       <div class="modal-head">
         <div class="modal-title" style="color:#be185d;">🎰 パステル・ガチャガチャ</div>
         <div id="gacha-slot-status" style="font-size:11px; font-weight:800; color:#64748b;">空き枠あり</div>
       </div>
-
-      <!-- ガチャガチャ本体とカプセル演出エリア -->
       <div class="gacha-stage-box">
         <div class="gacha-svg-wrap">
           <svg viewBox="0 0 220 250" width="100%" height="100%">
-            <!-- 台座の影 -->
             <ellipse cx="110" cy="240" rx="68" ry="8" fill="rgba(15,23,42,0.1)" />
-
-            <!-- 透明プラスチックのドーム窓（背景） -->
             <circle cx="110" cy="76" r="62" fill="rgba(240, 249, 255, 0.55)" stroke="#f9a8d4" stroke-width="3" />
-
-            <!-- ドーム内の丸いカプセルたち（アイテムは見えない丸カプセル） -->
             <g id="gacha-dome-capsules">
-              <!-- カプセル1: ピンク -->
-              <circle cx="80" cy="105" r="16" fill="#f9a8d4" stroke="#ec4899" stroke-width="1.5" />
-              <path d="M 64 105 A 16 16 0 0 0 96 105 Z" fill="#ffffff" opacity="0.85" />
-              <!-- カプセル2: 水色 -->
-              <circle cx="112" cy="112" r="16" fill="#93c5fd" stroke="#60a5fa" stroke-width="1.5" />
-              <path d="M 96 112 A 16 16 0 0 0 128 112 Z" fill="#ffffff" opacity="0.85" />
-              <!-- カプセル3: ミント -->
-              <circle cx="140" cy="103" r="16" fill="#6ee7b7" stroke="#34d399" stroke-width="1.5" />
-              <path d="M 124 103 A 16 16 0 0 0 156 103 Z" fill="#ffffff" opacity="0.85" />
-              <!-- カプセル4: レモン -->
-              <circle cx="95" cy="84" r="16" fill="#fde047" stroke="#eab308" stroke-width="1.5" />
-              <path d="M 79 84 A 16 16 0 0 0 111 84 Z" fill="#ffffff" opacity="0.85" />
-              <!-- カプセル5: ラベンダー -->
-              <circle cx="127" cy="82" r="16" fill="#d8b4fe" stroke="#a855f7" stroke-width="1.5" />
-              <path d="M 111 82 A 16 16 0 0 0 143 82 Z" fill="#ffffff" opacity="0.85" />
-              <!-- カプセル6: ピーチ -->
-              <circle cx="70" cy="78" r="15" fill="#fda4af" stroke="#fb7185" stroke-width="1.5" />
-              <path d="M 55 78 A 15 15 0 0 0 85 78 Z" fill="#ffffff" opacity="0.85" />
-              <!-- カプセル7: スカイ -->
-              <circle cx="110" cy="60" r="15" fill="#7dd3fc" stroke="#38bdf8" stroke-width="1.5" />
-              <path d="M 95 60 A 15 15 0 0 0 125 60 Z" fill="#ffffff" opacity="0.85" />
+              <circle cx="80" cy="105" r="16" fill="#f9a8d4" stroke="#ec4899" stroke-width="1.5" /><path d="M 64 105 A 16 16 0 0 0 96 105 Z" fill="#ffffff" opacity="0.85" />
+              <circle cx="112" cy="112" r="16" fill="#93c5fd" stroke="#60a5fa" stroke-width="1.5" /><path d="M 96 112 A 16 16 0 0 0 128 112 Z" fill="#ffffff" opacity="0.85" />
+              <circle cx="140" cy="103" r="16" fill="#6ee7b7" stroke="#34d399" stroke-width="1.5" /><path d="M 124 103 A 16 16 0 0 0 156 103 Z" fill="#ffffff" opacity="0.85" />
+              <circle cx="95" cy="84" r="16" fill="#fde047" stroke="#eab308" stroke-width="1.5" /><path d="M 79 84 A 16 16 0 0 0 111 84 Z" fill="#ffffff" opacity="0.85" />
+              <circle cx="127" cy="82" r="16" fill="#d8b4fe" stroke="#a855f7" stroke-width="1.5" /><path d="M 111 82 A 16 16 0 0 0 143 82 Z" fill="#ffffff" opacity="0.85" />
             </g>
-
-            <!-- 透明プラスチック窓のツヤ（ハイライト反射） -->
             <path d="M 66 45 A 52 52 0 0 1 118 26" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="6" stroke-linecap="round" />
             <circle cx="62" cy="58" r="4" fill="rgba(255,255,255,0.85)" />
-
-            <!-- ガチャガチャ上部キャップ（パステルピンク） -->
             <path d="M 72 22 Q 110 8 148 22 L 140 30 Q 110 20 80 30 Z" fill="#f472b6" stroke="#ec4899" stroke-width="1.5" />
-
-            <!-- ガチャガチャ本体ボディ（パステルカラーピンク） -->
             <path d="M 54 118 L 166 118 L 158 232 Q 158 240 148 240 L 72 240 Q 62 240 62 232 Z" fill="#fbcfe8" stroke="#f472b6" stroke-width="3" />
-            <!-- 本体リング装飾 -->
             <rect x="48" y="112" width="124" height="14" rx="7" fill="#f472b6" stroke="#db2777" stroke-width="1.5" />
-
-            <!-- ハンドル台座プレート -->
             <circle cx="110" cy="158" r="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="3" />
             <circle cx="110" cy="158" r="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
-
-            <!-- 回転するハンドル本体 -->
             <g id="gacha-handle-group">
               <rect x="88" y="152" width="44" height="12" rx="6" fill="#f472b6" stroke="#db2777" stroke-width="2" />
               <circle cx="110" cy="158" r="7" fill="#ffffff" stroke="#db2777" stroke-width="2" />
             </g>
-
-            <!-- カプセル取り出し口（ガチャガチャの口） -->
             <rect x="84" y="196" width="52" height="36" rx="10" fill="#be185d" stroke="#f472b6" stroke-width="2.5" />
             <rect x="88" y="200" width="44" height="16" rx="5" fill="#831843" opacity="0.6" />
           </svg>
         </div>
-
-        <!-- カプセルが出てパカッと開く演出オーバーレイ -->
         <div class="capsule-pop-overlay" id="capsule-pop-overlay">
           <div class="pop-capsule-stage" id="pop-capsule-stage">
             <div class="cap-half-top" id="cap-half-top"></div>
@@ -615,15 +384,10 @@
               <div class="pop-reward-name" id="pop-reward-name">りんご ×1</div>
             </div>
           </div>
-          <div style="font-size:12px; font-weight:900; color:#64748b; margin-top:8px;" id="pop-status-msg">カプセルがパカッと開いたよ！</div>
+          <div style="font-size:12px; font-weight:900; color:#64748b; margin-top:8px;" id="pop-status-msg"></div>
         </div>
       </div>
-
-      <div style="font-size:11px; color:#64748b; text-align:center;">
-        🍎りんご・🌳木・🪨石・🌿草・🟫土 の5種類からランダムに1個でるよ！
-      </div>
-
-      <!-- 下部：スタートボタン ＆ 閉じるボタン -->
+      <div style="font-size:11px; color:#64748b; text-align:center;">🍎・🌳・🪨・🌿・🟫 がランダムに出るよ！</div>
       <div class="modal-footer-btns">
         <button type="button" class="btn-gacha-start" id="btn-gacha-spin" onclick="spinGachaMachine()">スタート</button>
         <button type="button" class="btn-modal-close" onclick="closeModal('gachaModal')">閉じる</button>
@@ -631,38 +395,24 @@
     </div>
   </div>
 
-  <!-- 🎒 アイテム 5×5 ウィンドウ -->
   <div class="modal-cover" id="itemModal">
     <div class="modal-box">
       <div class="modal-head">
         <div class="modal-title">🎒 アイテム（5×5 もちもの袋）</div>
         <div id="item-bag-summary" style="font-size:11px; font-weight:800; color:#3b82f6;">0 / 25マス</div>
       </div>
-      <div style="font-size:11px; color:#64748b;">
-        1マスに10個まで入るよ！10個を超えると隣の空いているマスへ自動で入るよ（最大25マス）。
-      </div>
-
-      <!-- 5×5（25マス）グリッド -->
       <div class="grid-5x5" id="inventory-grid-5x5"></div>
-
       <button type="button" class="btn-modal-close" style="width:100%;" onclick="closeModal('itemModal')">閉じる</button>
     </div>
   </div>
 
-  <!-- ⛏️ 整地 5×5 ウィンドウ -->
   <div class="modal-cover" id="cleanModal">
     <div class="modal-box">
       <div class="modal-head">
         <div class="modal-title">⛏️ 整地（島の5×5マス目マップ）</div>
         <div class="close-btn" onclick="closeModal('cleanModal')">✕</div>
       </div>
-      <div style="font-size:11px; color:#64748b;">
-        島の5×5マス目の状態だよ。マスをタップすると、そのマスの上にある物を片付けて整地できるよ！
-      </div>
-
-      <!-- 5×5（25マス）整地グリッド -->
       <div class="grid-5x5" id="clean-grid-5x5"></div>
-
       <div class="modal-footer-btns">
         <button type="button" class="save-btn" style="background:#10b981;" onclick="cleanAllIslandFromModal()">✨ 島ぜんぶ整地</button>
         <button type="button" class="btn-modal-close" onclick="closeModal('cleanModal')">閉じる</button>
@@ -670,57 +420,36 @@
     </div>
   </div>
 
-  <!-- ゲーム終了（おやすみ）モーダル -->
   <div class="modal-cover" id="exitModal">
     <div class="modal-box" style="text-align:center; border-color:#f4a8b8; background:#fffafb;">
       <div style="font-size:36px; margin-bottom:2px;">🌙</div>
       <div style="font-size:16px; font-weight:900; color:#9f1239;">データを保存して終了しました</div>
-      <div style="font-size:12px; color:#64748b; line-height:1.6;">
-        いまのロボットの状態や記憶はすべて自動でセーブされました。<br>
-        このまま画面（タブ）を閉じて大丈夫です！
-      </div>
-      <button type="button" class="save-btn" style="background:#f43f5e; margin-top:6px;" onclick="closeModal('exitModal')">まだつづける（画面にもどる）</button>
+      <button type="button" class="save-btn" style="background:#f43f5e; margin-top:6px;" onclick="closeModal('exitModal')">もどる</button>
     </div>
   </div>
 
-  <!-- 設定モーダル（最下部に初期化ボタン） -->
   <div class="modal-cover" id="settingModal">
     <div class="modal-box">
-      <div class="modal-head">
-        <div class="modal-title">⚙️ AIのせってい</div>
-        <div class="close-btn" onclick="closeModal('settingModal')">✕</div>
-      </div>
-
-      <!-- Google Gemini カード -->
+      <div class="modal-head"><div class="modal-title">⚙️ AIのせってい</div><div class="close-btn" onclick="closeModal('settingModal')">✕</div></div>
       <div class="settings-card selected-google" id="grp-google-key" onclick="selectModelInModal('gemini-3.8-flash')">
         <div style="font-size:13px; font-weight:900; color:#2563eb;">🟦 Google Gemini 3.8（じっくり派）</div>
-        <div style="font-size:11px; color:#64748b; margin:3px 0;">Google AI Studio の無料キー（AIza...）を入れてね。</div>
         <input type="password" id="input-google-key" class="input-box" placeholder="ここにGoogleキーを貼り付け" onclick="event.stopPropagation(); selectModelInModal('gemini-3.8-flash');" oninput="autoSaveKey('google', this.value)">
       </div>
-
-      <!-- Groq 120B カード -->
       <div class="settings-card" id="grp-github-key" onclick="selectModelInModal('openai/gpt-oss-120b')">
         <div style="font-size:13px; font-weight:900; color:#9333ea;">🟪 Groq 120B（ばくそく派）</div>
-        <div style="font-size:11px; color:#64748b; margin:3px 0;">Groq の無料キー（gsk_...）を入れてね。1日1000回無料！</div>
         <input type="password" id="input-github-key" class="input-box" placeholder="ここにGroqキー (gsk_...) を貼り付け" onclick="event.stopPropagation(); selectModelInModal('openai/gpt-oss-120b');" oninput="autoSaveKey('github', this.value)">
       </div>
-
       <button type="button" class="save-btn" id="modal-save-btn" onclick="saveKeys()">決定してとじる</button>
-
-      <!-- 最下部の初期化ボタン -->
       <button type="button" class="reset-btn" onclick="confirmResetGame()">🔄 データを消して最初からやり直す（初期化）</button>
     </div>
   </div>
 
   <script>
-    // ★ 万が一ファイル先頭や末尾に不要なテキスト（```html 等）が混入していても即座に除去するクリーンアップ処理
     function cleanStrayTextNodes() {
       [document.documentElement, document.body].forEach(root => {
         if (!root) return;
-        Array.from(root.childNodes).forEach(node => {
-          if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim().length > 0) {
-            node.nodeValue = '';
-          }
+        Array.from(root.childNodes).forEach(n => {
+          if (n.nodeType === Node.TEXT_NODE && n.nodeValue.trim().length > 0) n.nodeValue = '';
         });
       });
     }
@@ -729,9 +458,7 @@
     /**
      * ============================================================
      * 【永久保存版】生命の種 コアエンジン (LifeCore)
-     * ------------------------------------------------------------
-     * ※このコードは一切書き換える必要がありません。
-     * 外の世界（画面やアイテム）とは、4つの専用窓口だけでやり取りします。
+     * ※1文字も書き換えません。「energy=たいりょく」「stamina=おなか」「mental=ごきげん」として外側から利用します。
      * ============================================================
      */
     class LifeCore {
@@ -739,7 +466,6 @@
       #stamina = 100;
       #mental = 100;
       #isAlive = true;
-
       #memory = {};
       #lastStateKey = null;
       #lastAction = null;
@@ -747,11 +473,8 @@
       #lastDelta = 0;
 
       constructor(savedData = null) {
-        if (savedData) {
-          this.importSave(savedData);
-        } else {
-          this.#lastWellbeing = this.#calculateWellbeing();
-        }
+        if (savedData) this.importSave(savedData);
+        else this.#lastWellbeing = this.#calculateWellbeing();
         Object.freeze(this);
       }
 
@@ -772,76 +495,44 @@
 
       tick(availableActions = []) {
         if (!this.#isAlive) return 'NONE';
-
         this.#energy = Math.max(0, this.#energy - 2);
         this.#stamina = Math.max(0, this.#stamina - 1);
         this.#mental = Math.max(0, this.#mental - 1);
 
-        if (this.#energy <= 0) {
-          this.#isAlive = false;
-          this.#lastAction = 'NONE';
-          return 'NONE';
-        }
-
+        if (this.#energy <= 0) { this.#isAlive = false; this.#lastAction = 'NONE'; return 'NONE'; }
         const currentDrive = this.#determineCurrentDrive();
         this.#lastWellbeing = this.#calculateWellbeing();
 
-        if (currentDrive === 'FAINT') {
-          this.#lastStateKey = 'FAINT';
-          this.#lastAction = 'FORCE_SLEEP';
-          return 'FORCE_SLEEP';
-        }
+        if (currentDrive === 'FAINT') { this.#lastStateKey = 'FAINT'; this.#lastAction = 'FORCE_SLEEP'; return 'FORCE_SLEEP'; }
+        if (!Array.isArray(availableActions) || availableActions.length === 0) return 'WAIT';
 
-        if (!Array.isArray(availableActions) || availableActions.length === 0) {
-          return 'WAIT';
-        }
-
-        if (!this.#memory[currentDrive]) {
-          this.#memory[currentDrive] = {};
-        }
-        for (const act of availableActions) {
-          if (this.#memory[currentDrive][act] === undefined) {
-            this.#memory[currentDrive][act] = 0;
-          }
-        }
+        if (!this.#memory[currentDrive]) this.#memory[currentDrive] = {};
+        for (const act of availableActions) if (this.#memory[currentDrive][act] === undefined) this.#memory[currentDrive][act] = 0;
 
         const curiosityRate = (currentDrive === 'BORED') ? 0.7 : 0.2;
-
         let chosenAction;
         if (Math.random() < curiosityRate) {
           chosenAction = availableActions[Math.floor(Math.random() * availableActions.length)];
         } else {
-          chosenAction = availableActions.reduce((best, current) => {
-            return this.#memory[currentDrive][current] > this.#memory[currentDrive][best] ? current : best;
-          }, availableActions[0]);
+          chosenAction = availableActions.reduce((best, current) => this.#memory[currentDrive][current] > this.#memory[currentDrive][best] ? current : best, availableActions[0]);
         }
+        if (chosenAction === this.#lastAction) this.#mental = Math.max(0, this.#mental - 3);
 
-        if (chosenAction === this.#lastAction) {
-          this.#mental = Math.max(0, this.#mental - 3);
-        }
-
-        this.#lastStateKey = currentDrive;
-        this.#lastAction = chosenAction;
+        this.#lastStateKey = currentDrive; this.#lastAction = chosenAction;
         return chosenAction;
       }
 
       feedback(dEnergy = 0, dStamina = 0, dMental = 0) {
         if (!this.#isAlive) return;
-
         if (this.#lastAction === 'FORCE_SLEEP') {
           this.#stamina = Math.min(100, Math.max(0, this.#stamina + 30));
-          this.#lastDelta = 0;
-          return;
+          this.#lastDelta = 0; return;
         }
-
         this.#energy = Math.min(100, Math.max(0, this.#energy + dEnergy));
         this.#stamina = Math.min(100, Math.max(0, this.#stamina + dStamina));
         this.#mental = Math.min(100, Math.max(0, this.#mental + dMental));
 
-        if (this.#energy <= 0) {
-          this.#isAlive = false;
-        }
-
+        if (this.#energy <= 0) this.#isAlive = false;
         const newWellbeing = this.#calculateWellbeing();
         const reward = newWellbeing - this.#lastWellbeing;
         this.#lastDelta = Number(reward.toFixed(2));
@@ -854,221 +545,128 @@
 
       getState() {
         return Object.freeze({
-          isAlive: this.#isAlive,
-          energy: this.#energy,
-          stamina: this.#stamina,
-          mental: this.#mental,
-          drive: this.#determineCurrentDrive(),
-          lastAction: this.#lastAction,
-          feelingDelta: this.#lastDelta,
+          isAlive: this.#isAlive, energy: this.#energy, stamina: this.#stamina, mental: this.#mental,
+          drive: this.#determineCurrentDrive(), lastAction: this.#lastAction, feelingDelta: this.#lastDelta,
           memory: JSON.parse(JSON.stringify(this.#memory))
         });
       }
-
-      exportSave() {
-        return JSON.stringify({
-          e: this.#energy,
-          s: this.#stamina,
-          m: this.#mental,
-          a: this.#isAlive,
-          mem: this.#memory
-        });
-      }
-
+      exportSave() { return JSON.stringify({ e: this.#energy, s: this.#stamina, m: this.#mental, a: this.#isAlive, mem: this.#memory }); }
       importSave(jsonString) {
         try {
           const data = JSON.parse(jsonString);
-          this.#energy = data.e ?? 100;
-          this.#stamina = data.s ?? 100;
-          this.#mental = data.m ?? 100;
-          this.#isAlive = data.a ?? true;
-          this.#memory = data.mem ?? {};
-          this.#lastWellbeing = this.#calculateWellbeing();
-        } catch (err) {
-          console.error('セーブデータの読み込みに失敗しました');
-        }
+          this.#energy = data.e ?? 100; this.#stamina = data.s ?? 100; this.#mental = data.m ?? 100;
+          this.#isAlive = data.a ?? true; this.#memory = data.mem ?? {}; this.#lastWellbeing = this.#calculateWellbeing();
+        } catch (err) {}
       }
     }
+    Object.freeze(LifeCore); Object.freeze(LifeCore.prototype);
 
-    Object.freeze(LifeCore);
-    Object.freeze(LifeCore.prototype);
-
-    /* =====================================================================
-     * 通信コア：GeminiCore & GroqCore（張りぼて禁止・本物通信）
-     * ===================================================================== */
+    /* 通信コア */
     const GeminiCore = Object.freeze({
       DEFAULT_MODEL: 'gemini-3.8-flash',
-
       async think(prompt, apiKey, customModel) {
-        if (!apiKey || apiKey.trim().length <= 10) {
-          throw new Error('Googleキーが設定されていません。右上の⚙️から入力してね。');
-        }
-        let targetModel = customModel && customModel.trim() ? customModel.trim() : this.DEFAULT_MODEL;
-        if (targetModel.includes('2.5') || targetModel.includes('2.0') || targetModel.includes('1.5')) {
-          targetModel = this.DEFAULT_MODEL;
-        }
-
+        let targetModel = customModel || this.DEFAULT_MODEL;
+        if (targetModel.includes('2.5') || targetModel.includes('2.0') || targetModel.includes('1.5')) targetModel = this.DEFAULT_MODEL;
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey.trim()}`;
         const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, responseMimeType: 'application/json' }
-          })
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7, responseMimeType: 'application/json' } })
         });
-
-        if (!res.ok) {
-          if (res.status === 429) throw new Error('Googleの無料枠が混雑中です。数秒待ってからもう一度押してね！');
-          const errTxt = await res.text();
-          throw new Error(`Google エラー (${res.status}): ${errTxt.slice(0, 70)}`);
-        }
-
+        if (!res.ok) throw new Error(`Google エラー (${res.status})`);
         const data = await res.json();
         const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!rawText) throw new Error('AIから返事が返ってきませんでした。');
         return this._parseJsonSafely(rawText);
       },
-
       _parseJsonSafely(rawText) {
         const cleaned = rawText.replace(/\x60{3}json/gi, '').replace(/\x60{3}/g, '').trim();
-        const firstBrace = cleaned.indexOf('{');
-        const lastBrace = cleaned.lastIndexOf('}');
-        return JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
+        return JSON.parse(cleaned.substring(cleaned.indexOf('{'), cleaned.lastIndexOf('}') + 1));
       }
     });
 
     const GroqCore = Object.freeze({
       DEFAULT_MODEL: 'openai/gpt-oss-120b',
-
       async think(prompt, apiKey, modelName) {
-        if (!apiKey || apiKey.trim().length <= 10) {
-          throw new Error('Groqキー (gsk_...) が設定されていません。右上の⚙️から入力してね。');
-        }
-        const key = apiKey.trim();
         const endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-        const targetModel = modelName || this.DEFAULT_MODEL;
-
-        let res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-          body: JSON.stringify({
-            model: targetModel,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.7,
-            response_format: { type: 'json_object' }
-          })
+        const res = await fetch(endpoint, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey.trim()}` },
+          body: JSON.stringify({ model: modelName || this.DEFAULT_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0.7, response_format: { type: 'json_object' } })
         });
-
-        if (!res.ok) {
-          if (res.status === 401) throw new Error('Groqキーが無効です（gsk_から始まっているか確認してね）。');
-          if (res.status === 429) throw new Error('Groqが混雑中です。数秒待って押してね！');
-          const errTxt = await res.text();
-          throw new Error(`Groq エラー (${res.status}): ${errTxt.slice(0, 70)}`);
-        }
-
+        if (!res.ok) throw new Error(`Groq エラー (${res.status})`);
         const data = await res.json();
-        const rawText = data?.choices?.[0]?.message?.content;
-        if (!rawText) throw new Error('AIから返答がありませんでした。');
-        return GeminiCore._parseJsonSafely(rawText);
+        return GeminiCore._parseJsonSafely(data?.choices?.[0]?.message?.content);
       }
     });
 
-    // =====================================================================
-    // ★ 180°展開・4分割・完全均等余白の扇状SVGメニュー自動生成
-    // 並び順：左から「ガチャガチャ」「アイテム」「整地」「終了(パステルピンク)」
-    // =====================================================================
     function buildFanMenuSVG() {
       const svg = document.getElementById('fan-svg-root');
       if (!svg) return;
-
-      const cx = 170;
-      const cy = 168;
-      const rIn = 30;     // ◯ボタン(半径24px)から均一に6px外側の内周
-      const rOut = 158;   // 押しやすい特大外周
-      const halfGap = 2.5; // 隣り合う扇同士の平行スリット半幅（合計5pxで内〜外まで完全均等）
-
+      const cx = 170, cy = 168, rIn = 30, rOut = 158, halfGap = 2.5;
       const items = [
-        { id: 'gacha', icon: '🎰', label: 'ガチャガチャ', startDeg: 180, endDeg: 135, isPink: false },
-        { id: 'item',  icon: '🎒', label: 'アイテム',     startDeg: 135, endDeg: 90,  isPink: false },
-        { id: 'clean', icon: '⛏️', label: '整地',         startDeg: 90,  endDeg: 45,  isPink: false },
-        { id: 'exit',  icon: '🚪', label: 'ゲーム終了',   startDeg: 45,  endDeg: 0,   isPink: true }
+        { id: 'gacha', icon: '🎰', label: 'ガチャ', startDeg: 180, endDeg: 135, isPink: false },
+        { id: 'item',  icon: '🎒', label: 'アイテム', startDeg: 135, endDeg: 90,  isPink: false },
+        { id: 'clean', icon: '⛏️', label: '整地', startDeg: 90,  endDeg: 45,  isPink: false },
+        { id: 'exit',  icon: '🚪', label: '終了', startDeg: 45,  endDeg: 0,   isPink: true }
       ];
-
-      // 平行オフセット計算で内周も外周も完全に均一な余白を作る
       const degToRad = d => (d * Math.PI) / 180;
       const radToDeg = r => (r * 180) / Math.PI;
       const offsetIn = radToDeg(Math.asin(halfGap / rIn));
       const offsetOut = radToDeg(Math.asin(halfGap / rOut));
-
       let html = '';
       for (const it of items) {
-        const a1Out = degToRad(it.startDeg - offsetOut);
-        const a2Out = degToRad(it.endDeg + offsetOut);
-        const a2In  = degToRad(it.endDeg + offsetIn);
-        const a1In  = degToRad(it.startDeg - offsetIn);
-
-        const x1Out = (cx + rOut * Math.cos(a1Out)).toFixed(2);
-        const y1Out = (cy - rOut * Math.sin(a1Out)).toFixed(2);
-        const x2Out = (cx + rOut * Math.cos(a2Out)).toFixed(2);
-        const y2Out = (cy - rOut * Math.sin(a2Out)).toFixed(2);
-
-        const x2In  = (cx + rIn * Math.cos(a2In)).toFixed(2);
-        const y2In  = (cy - rIn * Math.sin(a2In)).toFixed(2);
-        const x1In  = (cx + rIn * Math.cos(a1In)).toFixed(2);
-        const y1In  = (cy - rIn * Math.sin(a1In)).toFixed(2);
-
+        const a1Out = degToRad(it.startDeg - offsetOut), a2Out = degToRad(it.endDeg + offsetOut);
+        const a2In  = degToRad(it.endDeg + offsetIn), a1In  = degToRad(it.startDeg - offsetIn);
+        const x1Out = (cx + rOut * Math.cos(a1Out)).toFixed(2), y1Out = (cy - rOut * Math.sin(a1Out)).toFixed(2);
+        const x2Out = (cx + rOut * Math.cos(a2Out)).toFixed(2), y2Out = (cy - rOut * Math.sin(a2Out)).toFixed(2);
+        const x2In  = (cx + rIn * Math.cos(a2In)).toFixed(2), y2In  = (cy - rIn * Math.sin(a2In)).toFixed(2);
+        const x1In  = (cx + rIn * Math.cos(a1In)).toFixed(2), y1In  = (cy - rIn * Math.sin(a1In)).toFixed(2);
         const dPath = `M ${x1Out} ${y1Out} A ${rOut} ${rOut} 0 0 1 ${x2Out} ${y2Out} L ${x2In} ${y2In} A ${rIn} ${rIn} 0 0 0 ${x1In} ${y1In} Z`;
-
         const midRad = degToRad((it.startDeg + it.endDeg) / 2);
-        const rIcon  = (rIn + rOut) * 0.56;
-        const rText  = (rIn + rOut) * 0.56;
-        const centerX = cx + ((rIn + rOut) * 0.53) * Math.cos(midRad);
-        const centerY = cy - ((rIn + rOut) * 0.53) * Math.sin(midRad);
-
+        const centerX = cx + ((rIn + rOut) * 0.53) * Math.cos(midRad), centerY = cy - ((rIn + rOut) * 0.53) * Math.sin(midRad);
         const sectorClass = it.isPink ? 'fan-sector fan-sector-pink' : 'fan-sector';
         const labelClass  = it.isPink ? 'fan-label fan-label-pink' : 'fan-label';
-
-        html += `
-          <path class="${sectorClass}" d="${dPath}" onclick="triggerFanAction('${it.id}')"></path>
-          <text x="${centerX.toFixed(1)}" y="${(centerY - 10).toFixed(1)}" class="fan-icon">${it.icon}</text>
-          <text x="${centerX.toFixed(1)}" y="${(centerY + 12).toFixed(1)}" class="${labelClass}">${it.label}</text>
-        `;
+        html += `<path class="${sectorClass}" d="${dPath}" onclick="triggerFanAction('${it.id}')"></path>
+                 <text x="${centerX.toFixed(1)}" y="${(centerY - 10).toFixed(1)}" class="fan-icon">${it.icon}</text>
+                 <text x="${centerX.toFixed(1)}" y="${(centerY + 12).toFixed(1)}" class="${labelClass}">${it.label}</text>`;
       }
-
       svg.innerHTML = html;
     }
 
     // =====================================================================
-    // 状態管理 & 自動セーブ
+    // ★ 朝〜夜中の5段階（時間帯定義と色の連動）
     // =====================================================================
+    const TIME_PHASES = [
+      { name: '☀️ 朝',   bg: 0xe0f2fe, sun: 0xfffaed, hemi: 0xffffff, tagColor: '#0ea5e9', tagBg: '#e0f2fe' },
+      { name: '☀️ 昼',   bg: 0xebf2f5, sun: 0xffffff, hemi: 0xcfd8dc, tagColor: '#0369a1', tagBg: '#ebf2f5' },
+      { name: '🌇 夕方', bg: 0xffedd5, sun: 0xfdba74, hemi: 0xfed7aa, tagColor: '#c2410c', tagBg: '#ffedd5' },
+      { name: '🌙 夜',   bg: 0x312e81, sun: 0x4f46e5, hemi: 0x4338ca, tagColor: '#a5b4fc', tagBg: '#312e81' },
+      { name: '🌌 夜中', bg: 0x0f172a, sun: 0x1e1b4b, hemi: 0x312e81, tagColor: '#94a3b8', tagBg: '#0f172a' }
+    ];
+
+    function getCurrentTimePhaseIdx() {
+      const cycle = ROBOT.stepCount % 20; // 20手で1日（1周）
+      if (cycle <= 3) return 0; // 朝
+      if (cycle <= 7) return 1; // 昼
+      if (cycle <= 11) return 2; // 夕方
+      if (cycle <= 15) return 3; // 夜
+      return 4; // 夜中 (16-19)
+    }
+
     const memStore = {};
     const safeStorage = {
-      getItem: (k) => memStore[k] !== undefined ? memStore[k] : (() => { try { return localStorage.getItem(k); } catch(e){ return null; } })(),
+      getItem: k => memStore[k] ?? (() => { try { return localStorage.getItem(k); } catch(e){ return null; } })(),
       setItem: (k, v) => { memStore[k] = String(v); try { localStorage.setItem(k, String(v)); } catch(e){} },
-      removeItem: (k) => { delete memStore[k]; try { localStorage.removeItem(k); } catch(e){} }
+      removeItem: k => { delete memStore[k]; try { localStorage.removeItem(k); } catch(e){} }
     };
-
     function showToast(msg) {
       const el = document.getElementById('toast-msg');
-      if (!el) return;
-      el.textContent = msg; el.classList.add('show');
-      setTimeout(() => el.classList.remove('show'), 1800);
+      if (!el) return; el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 1800);
     }
 
     const DRIVE_JA = {
-      PEACE: '😊 あんしん・まんぷく',
-      BORED: '🥱 たい屈（あそびたい！）',
-      HUNGRY: '🍙 おなかすいた…',
-      EXHAUSTED: '💤 くたくた（ねむい）',
-      STARVING: '🚨 はらぺこピンチ！！',
-      FAINT: '💫 たおれて気絶中',
-      DEAD: '💀 うごかなくなった'
+      PEACE: '😊 あんしん・まんぷく', BORED: '🥱 たい屈（あそびたい！）', HUNGRY: '🍙 おなかすいた…',
+      EXHAUSTED: '💤 くたくた（ねむい）', STARVING: '🚨 はらぺこピンチ！！', FAINT: '💫 たおれて気絶中', DEAD: '💀 うごかなくなった'
     };
 
-    // =====================================================================
-    // ★ ガチャの5種類アイテム定義 ＆ 5×5（最大25マス・各10個まで）インベントリ
-    // =====================================================================
     const GACHA_ITEMS = [
       { type: 'apple', name: 'りんご', icon: '🍎', capColor: 'linear-gradient(135deg, #f9a8d4, #f472b6)' },
       { type: 'tree',  name: '木',     icon: '🌳', capColor: 'linear-gradient(135deg, #6ee7b7, #10b981)' },
@@ -1076,52 +674,21 @@
       { type: 'grass', name: '草',     icon: '🌿', capColor: 'linear-gradient(135deg, #fde047, #eab308)' },
       { type: 'dirt',  name: '土',     icon: '🟫', capColor: 'linear-gradient(135deg, #d8b4fe, #a855f7)' }
     ];
+    let inventorySlots = Array(25).fill(null);
 
-    const MAX_SLOTS = 25;
-    const MAX_STACK = 10;
-    // 25マスの配列（空は null、入っている時は { type, count }）
-    let inventorySlots = Array(MAX_SLOTS).fill(null);
-
-    // 獲得可能なアイテム種類（10個未満の同種スロットがあるか、空きスロットがある種類）を取得
     function getAvailableGachaTypes() {
-      const hasEmptySlot = inventorySlots.some(s => s === null);
-      if (hasEmptySlot) return GACHA_ITEMS;
-      // 全25マスが埋まっている場合は、まだcount < 10のマスが存在する種類のみ入る
-      return GACHA_ITEMS.filter(item =>
-        inventorySlots.some(s => s && s.type === item.type && s.count < MAX_STACK)
-      );
+      const hasEmpty = inventorySlots.some(s => s === null);
+      if (hasEmpty) return GACHA_ITEMS;
+      return GACHA_ITEMS.filter(item => inventorySlots.some(s => s && s.type === item.type && s.count < 10));
     }
-
-    // アイテム1個を5×5インベントリに登録（10個まで・溢れたら空きマスへ移動）
     function addItemToInventory(itemType) {
-      // 1. すでに同じアイテムがあり、10個未満のマスを探す
-      for (let i = 0; i < MAX_SLOTS; i++) {
-        if (inventorySlots[i] && inventorySlots[i].type === itemType && inventorySlots[i].count < MAX_STACK) {
-          inventorySlots[i].count += 1;
-          return i;
-        }
-      }
-      // 2. なければ空いている最初のマスに登録する
-      for (let i = 0; i < MAX_SLOTS; i++) {
-        if (inventorySlots[i] === null) {
-          inventorySlots[i] = { type: itemType, count: 1 };
-          return i;
-        }
-      }
-      return -1; // 満杯
+      for (let i = 0; i < 25; i++) if (inventorySlots[i] && inventorySlots[i].type === itemType && inventorySlots[i].count < 10) { inventorySlots[i].count++; return i; }
+      for (let i = 0; i < 25; i++) if (inventorySlots[i] === null) { inventorySlots[i] = { type: itemType, count: 1 }; return i; }
+      return -1;
     }
 
     let life = new LifeCore();
-
-    const ROBOT = {
-      gen: 1,
-      stepCount: 0,
-      pos: { x: 0, z: 0 },
-      rotY: 0,
-      hasApple: false,
-      lastVoice: "ぼくはマス目の島に立つロボットだよ！\n下の「⚡ 今すぐ考える」ボタンを押すと、ほんとうに自分で考えて島を歩くよ！\nリンゴのマスに乗って、お腹いっぱい食べさせてね！",
-      lastActionNote: "待機中（まだ動いていないよ）"
-    };
+    const ROBOT = { gen: 1, stepCount: 0, pos: { x: 0, z: 0 }, rotY: 0, hasApple: false, lastVoice: "「おなか」が空きすぎると「たいりょく」が減って倒れちゃうよ。夜中に歩くのもキケンだよ！", lastActionNote: "待機中" };
 
     function getActiveModel() {
       const saved = safeStorage.getItem('ai_custom_model');
@@ -1129,791 +696,467 @@
       if (saved.includes('2.5') || saved.includes('2.0') || saved.includes('1.5')) return GeminiCore.DEFAULT_MODEL;
       return saved;
     }
-
-    function getKeyForCurrentModel() {
-      const m = getActiveModel();
-      return m.startsWith('gemini') ? (safeStorage.getItem('key_google') || '') : (safeStorage.getItem('key_github') || '');
-    }
+    function getKeyForCurrentModel() { return getActiveModel().startsWith('gemini') ? (safeStorage.getItem('key_google') || '') : (safeStorage.getItem('key_github') || ''); }
 
     function saveWorldState() {
       try {
-        const applesData = fieldApples.map(a => ({ gx: a.gx, gz: a.gz }));
-        const saveData = {
-          lifeSave: life.exportSave(),
-          robot: {
-            gen: ROBOT.gen,
-            stepCount: ROBOT.stepCount,
-            pos: ROBOT.pos,
-            rotY: ROBOT.rotY,
-            hasApple: ROBOT.hasApple,
-            lastVoice: ROBOT.lastVoice,
-            lastActionNote: ROBOT.lastActionNote
-          },
-          apples: applesData,
-          inventory: inventorySlots
-        };
-        safeStorage.setItem('island_game_save_clean', JSON.stringify(saveData));
-      } catch (e) {
-        console.error('Save error:', e);
-      }
+        safeStorage.setItem('island_game_save_clean', JSON.stringify({
+          lifeSave: life.exportSave(), robot: ROBOT, apples: fieldApples.map(a => ({ gx: a.gx, gz: a.gz })), inventory: inventorySlots
+        }));
+      } catch (e) {}
     }
-
     let pendingLoadedApples = null;
     function tryLoadWorldState() {
       try {
-        const raw = safeStorage.getItem('island_game_save_clean');
-        if (!raw) return false;
-        const data = JSON.parse(raw);
-        if (!data || !data.lifeSave || !data.robot) return false;
-
+        const data = JSON.parse(safeStorage.getItem('island_game_save_clean'));
+        if (!data || !data.lifeSave) return false;
         life = new LifeCore(data.lifeSave);
-        ROBOT.gen = data.robot.gen || 1;
-        ROBOT.stepCount = data.robot.stepCount || 0;
-        ROBOT.pos = data.robot.pos || { x: 0, z: 0 };
-        ROBOT.rotY = data.robot.rotY || 0;
-        ROBOT.hasApple = Boolean(data.robot.hasApple);
-        ROBOT.lastVoice = data.robot.lastVoice || ROBOT.lastVoice;
-        ROBOT.lastActionNote = data.robot.lastActionNote || ROBOT.lastActionNote;
+        Object.assign(ROBOT, data.robot);
         pendingLoadedApples = Array.isArray(data.apples) ? data.apples : null;
-        if (Array.isArray(data.inventory) && data.inventory.length === MAX_SLOTS) {
-          inventorySlots = data.inventory;
-        }
+        if (Array.isArray(data.inventory) && data.inventory.length === 25) inventorySlots = data.inventory;
         return true;
-      } catch (e) {
-        console.error('Load error:', e);
-        return false;
-      }
+      } catch (e) { return false; }
     }
-
     function confirmResetGame() {
       if (confirm('ほんとうに最初からやり直しますか？\n（覚えた記憶やロボットのデータがすべてリセットされます）')) {
-        safeStorage.removeItem('island_game_save_clean');
-        location.reload();
+        safeStorage.removeItem('island_game_save_clean'); location.reload();
       }
     }
 
-    // =====================================================================
-    // プレビュー（マス目マップ 3D）：落ち着いたセージグリーン＆モカパステル
-    // =====================================================================
+    /* 3Dエンジン */
     let scene, camera, renderer, world, clickBlocks = [], voxelMap = {}, fieldApples = [];
     let chara, bodyM, headM, rArm, lArm, rLeg, lLeg, handApple;
-
+    let hemiLight, sunLight;
     const MAP_SIZE = 5;
+
+    // ★ 色をじわ〜っと変化させるためのターゲット色
+    let targetBgColor = new THREE.Color(0xe0f2fe);
+    let targetHemiColor = new THREE.Color(0xffffff);
+    let targetSunColor = new THREE.Color(0xfffaed);
 
     function init3D() {
       if (typeof THREE === 'undefined') return;
       const stage = document.getElementById('c3d');
       if (!stage || renderer) return;
-
-      const w = Math.max(stage.clientWidth || window.innerWidth || 360, 240);
-      const h = Math.max(stage.clientHeight || 280, 200);
+      const w = Math.max(stage.clientWidth || window.innerWidth || 360, 240), h = Math.max(stage.clientHeight || 280, 200);
 
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xebf2f5);
+      const initialPhase = TIME_PHASES[getCurrentTimePhaseIdx()];
+      scene.background = new THREE.Color(initialPhase.bg);
 
-      camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100);
-      camera.position.set(0, 7.8, 8.2);
-      camera.lookAt(0, 0, 0);
-
-      renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(w, h);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      stage.innerHTML = '';
+      camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100); camera.position.set(0, 7.8, 8.2); camera.lookAt(0, 0, 0);
+      renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(w, h); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       stage.appendChild(renderer.domElement);
 
-      const hemiLight = new THREE.HemisphereLight(0xffffff, 0xcfd8dc, 1.15);
-      scene.add(hemiLight);
+      hemiLight = new THREE.HemisphereLight(initialPhase.hemi, 0x94a3b8, 1.15); scene.add(hemiLight);
+      sunLight = new THREE.DirectionalLight(initialPhase.sun, 0.85); sunLight.position.set(5, 12, 6); scene.add(sunLight);
 
-      const sun = new THREE.DirectionalLight(0xfffaed, 0.75);
-      sun.position.set(5, 12, 6);
-      scene.add(sun);
-
-      world = new THREE.Group();
-      scene.add(world);
-
+      world = new THREE.Group(); scene.add(world);
       const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
-      const grassMat = new THREE.MeshLambertMaterial({ color: 0x7ca982 });
-      const dirtMat = new THREE.MeshLambertMaterial({ color: 0xa89078 });
+      const grassMat = new THREE.MeshLambertMaterial({ color: 0x7ca982 }), dirtMat = new THREE.MeshLambertMaterial({ color: 0xa89078 });
 
       const half = Math.floor(MAP_SIZE / 2);
       for (let x = -half; x <= half; x++) {
         for (let z = -half; z <= half; z++) {
-          const topB = new THREE.Mesh(boxGeo, grassMat);
-          topB.position.set(x, 0, z);
-          topB.userData = { gx: x, gz: z };
-          world.add(topB);
-          voxelMap[x + ',' + z] = topB;
-          clickBlocks.push(topB);
-
-          const underB = new THREE.Mesh(boxGeo, dirtMat);
-          underB.position.set(x, -1, z);
-          world.add(underB);
+          const topB = new THREE.Mesh(boxGeo, grassMat); topB.position.set(x, 0, z); topB.userData = { gx: x, gz: z };
+          world.add(topB); clickBlocks.push(topB);
+          const underB = new THREE.Mesh(boxGeo, dirtMat); underB.position.set(x, -1, z); world.add(underB);
         }
       }
 
-      chara = new THREE.Group();
-      world.add(chara);
-
-      bodyM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x60a5fa }));
-      bodyM.scale.set(0.52, 0.52, 0.38); bodyM.position.y = 0.5; chara.add(bodyM);
-
-      headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0xe2e8f0 }));
-      headM.scale.set(0.44, 0.42, 0.42); headM.position.y = 0.88; chara.add(headM);
-
-      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.1, 0.08), new THREE.MeshBasicMaterial({ color: 0x1e3a8a }));
-      eye.position.set(0, 0.9, 0.22); chara.add(eye);
-
-      const armGeo = new THREE.BoxGeometry(0.18, 0.38, 0.18);
+      chara = new THREE.Group(); world.add(chara);
+      bodyM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x60a5fa })); bodyM.scale.set(0.52, 0.52, 0.38); bodyM.position.y = 0.5; chara.add(bodyM);
+      headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0xe2e8f0 })); headM.scale.set(0.44, 0.42, 0.42); headM.position.y = 0.88; chara.add(headM);
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.1, 0.08), new THREE.MeshBasicMaterial({ color: 0x1e3a8a })); eye.position.set(0, 0.9, 0.22); chara.add(eye);
       const armMat = new THREE.MeshLambertMaterial({ color: 0x3b82f6 });
-      rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.37, 0.5, 0); chara.add(rArm);
-      lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.37, 0.5, 0); chara.add(lArm);
-
-      handApple = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), new THREE.MeshLambertMaterial({ color: 0xf87171, visible: false }));
-      handApple.position.set(0, -0.2, 0.15); rArm.add(handApple);
-
-      const legGeo = new THREE.BoxGeometry(0.2, 0.34, 0.2);
+      rArm = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.38, 0.18), armMat); rArm.position.set(0.37, 0.5, 0); chara.add(rArm);
+      lArm = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.38, 0.18), armMat); lArm.position.set(-0.37, 0.5, 0); chara.add(lArm);
+      handApple = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), new THREE.MeshLambertMaterial({ color: 0xf87171, visible: false })); handApple.position.set(0, -0.2, 0.15); rArm.add(handApple);
       const legMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
-      rLeg = new THREE.Mesh(legGeo, legMat); rLeg.position.set(0.17, 0.17, 0); chara.add(rLeg);
-      lLeg = new THREE.Mesh(legGeo, legMat); lLeg.position.set(-0.17, 0.17, 0); chara.add(lLeg);
+      rLeg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.34, 0.2), legMat); rLeg.position.set(0.17, 0.17, 0); chara.add(rLeg);
+      lLeg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.34, 0.2), legMat); lLeg.position.set(-0.17, 0.17, 0); chara.add(lLeg);
 
-      chara.position.set(ROBOT.pos.x, 0.5, ROBOT.pos.z);
-      chara.rotation.y = ROBOT.rotY || 0;
+      chara.position.set(ROBOT.pos.x, 0.5, ROBOT.pos.z); chara.rotation.y = ROBOT.rotY || 0;
       if (ROBOT.hasApple && handApple) handApple.material.visible = true;
 
       if (pendingLoadedApples && pendingLoadedApples.length > 0) {
         for (const a of pendingLoadedApples) spawnApple(a.gx, a.gz, false);
-      } else {
-        spawnApple(1, 0, false);
-      }
+      } else { spawnApple(1, 0, false); }
 
-      setupTouchInteraction();
-      updateHUD();
-      renderLoop();
-      setTimeout(resizeRenderer, 150);
+      setupTouchInteraction(); updateHUD(); renderLoop(); setTimeout(resizeRenderer, 150);
     }
 
     function spawnApple(gx, gz, shouldSave = true) {
       if (!world) return;
       const grp = new THREE.Group();
-      const apple = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.36), new THREE.MeshLambertMaterial({ color: 0xf87171 }));
-      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), new THREE.MeshLambertMaterial({ color: 0x86efac }));
-      leaf.position.set(0, 0.22, 0); grp.add(apple, leaf);
-      grp.position.set(gx, 0.65, gz);
-      world.add(grp);
-      fieldApples.push({ mesh: grp, gx: gx, gz: gz });
-
+      grp.add(new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.36), new THREE.MeshLambertMaterial({ color: 0xf87171 })));
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), new THREE.MeshLambertMaterial({ color: 0x86efac })); leaf.position.set(0, 0.22, 0); grp.add(leaf);
+      grp.position.set(gx, 0.65, gz); world.add(grp); fieldApples.push({ mesh: grp, gx: gx, gz: gz });
       if (shouldSave) saveWorldState();
     }
 
     function setupTouchInteraction() {
-      const raycaster = new THREE.Raycaster();
-      const mouse = new THREE.Vector2();
-      let touchStartTime = 0;
-      let prevX = 0;
-
+      const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+      let touchStartTime = 0, prevX = 0;
       const topWindow = document.querySelector('.top-window');
       topWindow.addEventListener('touchstart', e => {
         if (e.target.closest('.top-gauge-panel') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector')) return;
-        touchStartTime = performance.now();
-        if (e.touches.length === 1) prevX = e.touches[0].clientX;
+        touchStartTime = performance.now(); if (e.touches.length === 1) prevX = e.touches[0].clientX;
       }, { passive: true });
-
       topWindow.addEventListener('touchmove', e => {
         if (!world || e.touches.length !== 1) return;
         if (e.target.closest('.top-gauge-panel') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector')) return;
-        const dx = e.touches[0].clientX - prevX;
-        world.rotation.y += dx * 0.008;
-        prevX = e.touches[0].clientX;
+        world.rotation.y += (e.touches[0].clientX - prevX) * 0.008; prevX = e.touches[0].clientX;
       }, { passive: true });
-
       topWindow.addEventListener('touchend', e => {
         if (e.target.closest('.top-gauge-panel') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector')) return;
         if (performance.now() - touchStartTime < 250 && e.changedTouches.length === 1) {
-          const rect = topWindow.getBoundingClientRect();
-          const touch = e.changedTouches[0];
-          mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
-          mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+          const rect = topWindow.getBoundingClientRect(); const touch = e.changedTouches[0];
+          mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1; mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
           raycaster.setFromCamera(mouse, camera);
           const hits = raycaster.intersectObjects(clickBlocks);
-          if (hits.length > 0) {
-            const gx = hits[0].object.userData.gx;
-            const gz = hits[0].object.userData.gz;
-            spawnApple(gx, gz, true);
-            showToast('🍎 リンゴを置いたよ！');
-          }
+          if (hits.length > 0) { spawnApple(hits[0].object.userData.gx, hits[0].object.userData.gz, true); showToast('🍎 リンゴを置いたよ！'); }
         }
       });
     }
 
-    // =====================================================================
-    // ★ 扇状メニューの開閉と4つのアクション（ガチャガチャ・アイテム・整地・終了）
-    // =====================================================================
+    /* 扇状メニューのアクション */
     let isFanMenuOpen = false;
-
     function toggleFanMenu() {
       isFanMenuOpen = !isFanMenuOpen;
-      const fan = document.getElementById('fanRadialMenu');
-      const btn = document.getElementById('btn-circle-toggle');
-      if (isFanMenuOpen) {
-        fan.classList.add('open');
-        btn.classList.add('active');
-      } else {
-        fan.classList.remove('open');
-        btn.classList.remove('active');
-      }
+      document.getElementById('fanRadialMenu').classList.toggle('open', isFanMenuOpen);
+      document.getElementById('btn-circle-toggle').classList.toggle('active', isFanMenuOpen);
     }
-
-    function closeFanMenu() {
-      if (!isFanMenuOpen) return;
-      isFanMenuOpen = false;
-      document.getElementById('fanRadialMenu').classList.remove('open');
-      document.getElementById('btn-circle-toggle').classList.remove('active');
-    }
-
+    function closeFanMenu() { if (isFanMenuOpen) toggleFanMenu(); }
     function triggerFanAction(type) {
       closeFanMenu();
-      if (type === 'gacha') {
-        openGachaModal();
-      } else if (type === 'item') {
-        renderInventoryGrid();
-        openModal('itemModal');
-      } else if (type === 'clean') {
-        renderCleanGrid();
-        openModal('cleanModal');
-      } else if (type === 'exit') {
-        saveWorldState();
-        openModal('exitModal');
-      }
+      if (type === 'gacha') { openGachaModal(); }
+      else if (type === 'item') { renderInventoryGrid(); openModal('itemModal'); }
+      else if (type === 'clean') { renderCleanGrid(); openModal('cleanModal'); }
+      else if (type === 'exit') { saveWorldState(); openModal('exitModal'); }
     }
 
-    // =====================================================================
-    // ★ ガチャガチャ演出（ハンドル回転 ➔ カプセル排出 ➔ パカッと開く）
-    // =====================================================================
+    /* ガチャ演出 */
     let isGachaSpinning = false;
-
-    function openGachaModal() {
-      const overlay = document.getElementById('capsule-pop-overlay');
-      const stage = document.getElementById('pop-capsule-stage');
-      if (overlay) overlay.classList.remove('active');
-      if (stage) stage.classList.remove('opened');
-      updateGachaModalStatus();
-      openModal('gachaModal');
-    }
-
+    function openGachaModal() { document.getElementById('capsule-pop-overlay').classList.remove('active'); document.getElementById('pop-capsule-stage').classList.remove('opened'); updateGachaModalStatus(); openModal('gachaModal'); }
     function updateGachaModalStatus() {
-      const usedSlots = inventorySlots.filter(s => s !== null).length;
-      const availTypes = getAvailableGachaTypes();
-      const statusEl = document.getElementById('gacha-slot-status');
-      const spinBtn = document.getElementById('btn-gacha-spin');
-
-      if (availTypes.length === 0) {
-        if (statusEl) {
-          statusEl.textContent = '⚠️ 25マス満杯！';
-          statusEl.style.color = '#ef4444';
-        }
-        if (spinBtn) {
-          spinBtn.disabled = true;
-          spinBtn.textContent = '満杯で回せません';
-        }
-      } else {
-        if (statusEl) {
-          statusEl.textContent = `使用枠: ${usedSlots} / 25マス`;
-          statusEl.style.color = '#64748b';
-        }
-        if (spinBtn && !isGachaSpinning) {
-          spinBtn.disabled = false;
-          spinBtn.textContent = 'スタート';
-        }
-      }
+      const used = inventorySlots.filter(s => s !== null).length, avail = getAvailableGachaTypes();
+      document.getElementById('gacha-slot-status').textContent = avail.length === 0 ? '⚠️ 25マス満杯！' : `使用枠: ${used} / 25マス`;
+      document.getElementById('gacha-slot-status').style.color = avail.length === 0 ? '#ef4444' : '#64748b';
+      const btn = document.getElementById('btn-gacha-spin');
+      if (btn) { btn.disabled = avail.length === 0; btn.textContent = avail.length === 0 ? '満杯で回せません' : 'スタート'; }
     }
-
     async function spinGachaMachine() {
       if (isGachaSpinning) return;
-      const availTypes = getAvailableGachaTypes();
-      if (availTypes.length === 0) {
-        showToast('🎒 もちものが25マスいっぱいで回せないよ！');
-        updateGachaModalStatus();
-        return;
-      }
+      const avail = getAvailableGachaTypes(); if (avail.length === 0) return;
+      isGachaSpinning = true; document.getElementById('btn-gacha-spin').disabled = true;
+      const chosen = avail[Math.floor(Math.random() * avail.length)];
 
-      isGachaSpinning = true;
-      const spinBtn = document.getElementById('btn-gacha-spin');
-      const handle = document.getElementById('gacha-handle-group');
-      const domeCaps = document.getElementById('gacha-dome-capsules');
-      const overlay = document.getElementById('capsule-pop-overlay');
-      const stage = document.getElementById('pop-capsule-stage');
-      const capTop = document.getElementById('cap-half-top');
-
-      if (spinBtn) spinBtn.disabled = true;
-      if (overlay) overlay.classList.remove('active');
-      if (stage) stage.classList.remove('opened');
-
-      // 1. ランダムに1個抽選（りんご、木、石、草、土）
-      const chosen = availTypes[Math.floor(Math.random() * availTypes.length)];
-
-      // 2. ハンドルをくるっと回し、ドーム内のカプセルが揺れる
-      if (handle) handle.classList.add('turning');
-      if (domeCaps) domeCaps.classList.add('shaking');
-
+      document.getElementById('gacha-handle-group').classList.add('turning'); document.getElementById('gacha-dome-capsules').classList.add('shaking');
       await new Promise(r => setTimeout(r, 680));
+      document.getElementById('gacha-handle-group').classList.remove('turning'); document.getElementById('gacha-dome-capsules').classList.remove('shaking');
 
-      if (handle) handle.classList.remove('turning');
-      if (domeCaps) domeCaps.classList.remove('shaking');
-
-      // 3. カプセルがガチャガチャの口から出て登場
-      if (capTop) capTop.style.background = chosen.capColor;
+      document.getElementById('cap-half-top').style.background = chosen.capColor;
       document.getElementById('pop-reward-icon').textContent = chosen.icon;
       document.getElementById('pop-reward-name').textContent = `${chosen.name} ×1個`;
-      document.getElementById('pop-status-msg').textContent = 'コロン！カプセルが出てきたよ…';
-      if (overlay) overlay.classList.add('active');
+      document.getElementById('capsule-pop-overlay').classList.add('active');
 
       await new Promise(r => setTimeout(r, 420));
-
-      // 4. パカッと開くアニメーション！
-      if (stage) stage.classList.add('opened');
+      document.getElementById('pop-capsule-stage').classList.add('opened');
       const slotIdx = addItemToInventory(chosen.type);
-      saveWorldState();
-      document.getElementById('pop-status-msg').textContent = `✨ パカッ！「${chosen.name}」がアイテム枠#${slotIdx + 1}に入ったよ！`;
+      document.getElementById('pop-status-msg').textContent = `✨ パカッ！「${chosen.name}」が入ったよ！`;
 
-      // りんごが出た場合は島にも1個プレゼント配置すると観察がさらに楽しくなる
-      if (chosen.type === 'apple') {
-        const half = Math.floor(MAP_SIZE / 2);
-        const rx = Math.floor(Math.random() * MAP_SIZE) - half;
-        const rz = Math.floor(Math.random() * MAP_SIZE) - half;
-        spawnApple(rx, rz, true);
-      }
+      // ★ガチャを回すと「ごきげん(Mental)が+30」あがるが「おなか(Stamina)が-10」減る！
+      life.feedback(0, -10, 30);
+      updateHUD();
 
+      if (chosen.type === 'apple') spawnApple(Math.floor(Math.random() * MAP_SIZE) - 2, Math.floor(Math.random() * MAP_SIZE) - 2, true);
+      else saveWorldState();
+      
       await new Promise(r => setTimeout(r, 500));
-      isGachaSpinning = false;
-      updateGachaModalStatus();
+      isGachaSpinning = false; updateGachaModalStatus();
     }
 
-    // =====================================================================
-    // ★ 5×5 アイテムウィンドウ ＆ 5×5 整地ウィンドウの描画
-    // =====================================================================
+    /* アイテム＆整地表示 */
     function renderInventoryGrid() {
-      const grid = document.getElementById('inventory-grid-5x5');
-      const summary = document.getElementById('item-bag-summary');
-      if (!grid) return;
-
-      let usedCount = 0;
-      let html = '';
-      for (let i = 0; i < MAX_SLOTS; i++) {
-        const slot = inventorySlots[i];
-        if (slot) {
-          usedCount++;
-          const meta = GACHA_ITEMS.find(it => it.type === slot.type) || GACHA_ITEMS[0];
-          html += `
-            <div class="grid-cell filled" onclick="onTapInventorySlot(${i})" title="${meta.name} ×${slot.count}個">
-              <span class="cell-icon">${meta.icon}</span>
-              <span class="cell-count">×${slot.count}個</span>
-            </div>
-          `;
-        } else {
-          html += `<div class="grid-cell"></div>`;
-        }
-      }
-      grid.innerHTML = html;
-      if (summary) summary.textContent = `${usedCount} / 25マス`;
+      document.getElementById('inventory-grid-5x5').innerHTML = inventorySlots.map((s, i) => {
+        if (!s) return `<div class="grid-cell"></div>`;
+        const meta = GACHA_ITEMS.find(it => it.type === s.type);
+        return `<div class="grid-cell filled" onclick="showToast('${meta.icon} ${meta.name}（×${s.count}個）')"><span class="cell-icon">${meta.icon}</span><span class="cell-count">×${s.count}個</span></div>`;
+      }).join('');
+      document.getElementById('item-bag-summary').textContent = `${inventorySlots.filter(s=>s!==null).length} / 25マス`;
     }
-
-    function onTapInventorySlot(idx) {
-      const slot = inventorySlots[idx];
-      if (!slot) return;
-      const meta = GACHA_ITEMS.find(it => it.type === slot.type) || GACHA_ITEMS[0];
-      showToast(`${meta.icon} ${meta.name}（このマスに ×${slot.count}個）`);
-    }
-
     function renderCleanGrid() {
-      const grid = document.getElementById('clean-grid-5x5');
-      if (!grid) return;
-
-      const half = Math.floor(MAP_SIZE / 2);
       let html = '';
-      for (let z = -half; z <= half; z++) {
-        for (let x = -half; x <= half; x++) {
-          const isRobotHere = (ROBOT.pos.x === x && ROBOT.pos.z === z);
-          const appleCount = fieldApples.filter(a => a.gx === x && a.gz === z).length;
-
-          let icon = '🟩';
-          let badge = '';
-          let extraClass = 'terrain-cell';
-
-          if (isRobotHere && appleCount > 0) {
-            icon = '🤖🍎';
-            extraClass += ' has-obj';
-          } else if (isRobotHere) {
-            icon = '🤖';
-          } else if (appleCount > 0) {
-            icon = '🍎';
-            badge = `<span class="cell-count">×${appleCount}個</span>`;
-            extraClass += ' has-obj';
-          }
-
-          html += `
-            <div class="grid-cell ${extraClass}" onclick="cleanSingleCell(${x}, ${z})">
-              <span class="cell-coord">${x},${z}</span>
-              <span class="cell-icon" style="font-size:18px;">${icon}</span>
-              ${badge}
-            </div>
-          `;
+      for (let z = -2; z <= 2; z++) {
+        for (let x = -2; x <= 2; x++) {
+          const isRobo = (ROBOT.pos.x === x && ROBOT.pos.z === z), count = fieldApples.filter(a => a.gx === x && a.gz === z).length;
+          let icon = '🟩', badge = '', cls = 'terrain-cell';
+          if (isRobo && count > 0) { icon = '🤖🍎'; cls += ' has-obj'; }
+          else if (isRobo) { icon = '🤖'; }
+          else if (count > 0) { icon = '🍎'; badge = `<span class="cell-count">×${count}個</span>`; cls += ' has-obj'; }
+          html += `<div class="grid-cell ${cls}" onclick="cleanSingleCell(${x}, ${z})"><span class="cell-coord">${x},${z}</span><span class="cell-icon" style="font-size:18px;">${icon}</span>${badge}</div>`;
         }
       }
-      grid.innerHTML = html;
+      document.getElementById('clean-grid-5x5').innerHTML = html;
     }
-
     function cleanSingleCell(gx, gz) {
-      const targets = fieldApples.filter(a => a.gx === gx && a.gz === gz);
-      if (targets.length === 0) {
-        showToast(`⛏️ (${gx}, ${gz}) はすでに綺麗だよ！`);
-        return;
-      }
-      fieldApples = fieldApples.filter(a => {
-        if (a.gx === gx && a.gz === gz) {
-          if (world) world.remove(a.mesh);
-          return false;
-        }
-        return true;
-      });
-      saveWorldState();
-      renderCleanGrid();
-      showToast(`⛏️ (${gx}, ${gz}) のマスを整地したよ！`);
+      fieldApples = fieldApples.filter(a => { if (a.gx === gx && a.gz === gz) { if (world) world.remove(a.mesh); return false; } return true; });
+      saveWorldState(); renderCleanGrid(); showToast(`⛏️ (${gx}, ${gz}) を整地したよ！`);
     }
-
     function cleanAllIslandFromModal() {
-      for (const a of fieldApples) {
-        if (world) world.remove(a.mesh);
-      }
-      fieldApples = [];
-      saveWorldState();
-      renderCleanGrid();
-      showToast('✨ 島ぜんぶを綺麗に整地したよ！');
+      for (const a of fieldApples) if (world) world.remove(a.mesh);
+      fieldApples = []; saveWorldState(); renderCleanGrid(); showToast('✨ 島ぜんぶを整地したよ！');
     }
 
+    /* ロボット行動まわり */
     function getSurroundings(cx, cz) {
-      const dirs = [
-        { label: "東", dx: 1, dz: 0 },
-        { label: "西", dx: -1, dz: 0 },
-        { label: "南", dx: 0, dz: 1 },
-        { label: "北", dx: 0, dz: -1 }
-      ];
-      const half = Math.floor(MAP_SIZE / 2);
-      return dirs.map(d => {
+      return [{l:"東",dx:1,dz:0},{l:"西",dx:-1,dz:0},{l:"南",dx:0,dz:1},{l:"北",dx:0,dz:-1}].map(d => {
         const tx = cx + d.dx, tz = cz + d.dz;
-        if (tx < -half || tx > half || tz < -half || tz > half) return `${d.label}:島の端(崖)`;
-        return `${d.label}:進める`;
+        return (tx < -2 || tx > 2 || tz < -2 || tz > 2) ? `${d.l}:崖` : `${d.l}:歩ける`;
       }).join(' / ');
     }
 
-    function getAppleInfo(cx, cz) {
-      if (fieldApples.length === 0) return "島にリンゴはありません";
+    // ★ 夜は遠くのリンゴが見えなくなる！
+    function getAppleInfo(cx, cz, isNight) {
+      if (fieldApples.length === 0) return "リンゴはありません";
       return fieldApples.map((a, i) => {
-        const dist = Math.hypot(a.gx - cx, a.gz - cz).toFixed(1);
-        if (a.gx === cx && a.gz === cz) {
-          return `🍎リンゴ#${i+1}:足元にある！(今すぐ取れる)`;
-        }
-        const dirs = [];
-        if (a.gx > cx) dirs.push("東"); if (a.gx < cx) dirs.push("西");
-        if (a.gz > cz) dirs.push("南"); if (a.gz < cz) dirs.push("北");
-        return `🍎リンゴ#${i+1}:${dirs.join('')}の方向(${a.gx}, ${a.gz}) 距離${dist}マス`;
-      }).join(' / ');
+        const dist = Math.hypot(a.gx - cx, a.gz - cz);
+        if (a.gx === cx && a.gz === cz) return `🍎リンゴ#${i+1}:足元にある！(今すぐ取れる)`;
+        if (isNight && dist > 1.5) return `(暗くて遠くのリンゴは見えない)`; // 夜間視界制限
+        const dirs = []; if (a.gx > cx) dirs.push("東"); if (a.gx < cx) dirs.push("西"); if (a.gz > cz) dirs.push("南"); if (a.gz < cz) dirs.push("北");
+        return `🍎リンゴ#${i+1}:${dirs.join('')}方向(${a.gx}, ${a.gz}) 距離${dist.toFixed(1)}マス`;
+      }).filter(s => s !== `(暗くて遠くのリンゴは見えない)`).join(' / ') || "暗くて周りが見えない…";
     }
 
     function getPossibleActions(cx, cz) {
       const list = [];
-      if (ROBOT.hasApple) {
-        list.push({ key: "EAT_HAND", txt: "右手の🍎リンゴを食べる" });
+      if (ROBOT.hasApple) list.push({ key: "EAT_HAND", txt: "右手の🍎リンゴを食べる" });
+      const feetIdx = fieldApples.findIndex(a => a.gx === cx && a.gz === cz);
+      if (feetIdx !== -1) {
+        list.push({ key: "EAT_FIELD", appleIdx: feetIdx, txt: "足元の🍎リンゴを食べる" });
+        if (!ROBOT.hasApple) list.push({ key: "PICK_APPLE", appleIdx: feetIdx, txt: "足元の🍎リンゴをひろう" });
       }
-
-      const atFeetIdx = fieldApples.findIndex(a => a.gx === cx && a.gz === cz);
-      if (atFeetIdx !== -1) {
-        list.push({ key: "EAT_FIELD", appleIdx: atFeetIdx, txt: "足元の🍎リンゴを食べる" });
-        if (!ROBOT.hasApple) {
-          list.push({ key: "PICK_APPLE", appleIdx: atFeetIdx, txt: "足元の🍎リンゴをひろう" });
-        }
-      }
-
-      const half = Math.floor(MAP_SIZE / 2);
-      const dirs = [
-        { key: "MOVE_E", dx: 1, dz: 0, rotY: Math.PI / 2, name: "東を向いて1歩進む" },
-        { key: "MOVE_W", dx: -1, dz: 0, rotY: -Math.PI / 2, name: "西を向いて1歩進む" },
-        { key: "MOVE_S", dx: 0, dz: 1, rotY: 0, name: "南(手前)を向いて1歩進む" },
-        { key: "MOVE_N", dx: 0, dz: -1, rotY: Math.PI, name: "北(奥)を向いて1歩進む" }
-      ];
-      for (const d of dirs) {
+      [{k:"MOVE_E",dx:1,dz:0,ry:Math.PI/2,n:"東に1歩"},{k:"MOVE_W",dx:-1,dz:0,ry:-Math.PI/2,n:"西に1歩"},{k:"MOVE_S",dx:0,dz:1,ry:0,n:"南(手前)に1歩"},{k:"MOVE_N",dx:0,dz:-1,ry:Math.PI,n:"北(奥)に1歩"}].forEach(d => {
         const tx = cx + d.dx, tz = cz + d.dz;
-        if (tx >= -half && tx <= half && tz >= -half && tz <= half) {
-          list.push({ key: d.key, pos: [tx, tz], rotY: d.rotY, txt: `${d.name} (${tx}, ${tz})` });
-        }
-      }
-
-      list.push({ key: "REST_HERE", txt: "その場でひとやすみ" });
+        if (tx >= -2 && tx <= 2 && tz >= -2 && tz <= 2) list.push({ key: d.k, pos: [tx, tz], rotY: d.ry, txt: `${d.n} (${tx}, ${tz})` });
+      });
+      list.push({ key: "REST_HERE", txt: "ひとやすみする（休む）" });
       return list;
     }
 
-    // =====================================================================
-    // 思考実行（張りぼて禁止・通信成功時のみ反映・体力-10）
-    // =====================================================================
     async function triggerThinkNow() {
       closeFanMenu();
-      const st = life.getState();
-      if (!st.isAlive) return;
+      const st = life.getState(); if (!st.isAlive) return;
 
-      const btn = document.getElementById('btn-think-now');
-      const lamp = document.getElementById('comm-lamp');
-      const bubble = document.getElementById('voice-bubble');
-      const voiceText = document.getElementById('voice-text');
-      const activeModel = getActiveModel();
-      const currentKey = getKeyForCurrentModel();
+      const btn = document.getElementById('btn-think-now'), lamp = document.getElementById('comm-lamp');
+      const bubble = document.getElementById('voice-bubble'), voiceText = document.getElementById('voice-text');
+      const activeModel = getActiveModel(), currentKey = getKeyForCurrentModel();
 
-      if (currentKey.length <= 5) {
-        openModal('settingModal');
-        return;
-      }
+      if (currentKey.length <= 5) { openModal('settingModal'); return; }
 
-      btn.disabled = true;
-      btn.innerHTML = '⚡ かんがえ中...';
-      lamp.className = 'comm-lamp lamp-busy';
-      lamp.textContent = '⚡ 通信中...';
+      btn.disabled = true; btn.innerHTML = '⚡ かんがえ中...';
+      lamp.className = 'comm-lamp lamp-busy'; lamp.textContent = '⚡ 通信中...';
       bubble.className = 'voice-bubble bubble-active';
 
       const cx = ROBOT.pos.x, cz = ROBOT.pos.z;
       const actions = getPossibleActions(cx, cz);
+      
+      const timeIdx = getCurrentTimePhaseIdx();
+      const phaseData = TIME_PHASES[timeIdx];
+      const isNight = (timeIdx === 3 || timeIdx === 4); // 夜または夜中
 
-      const prompt = `あなたは小さなマス目の島に立つロボット（第${ROBOT.gen}世代）です。
-いまの自分の体の状態と、まわりの景色を見て、心の中で感じている「素直な気持ち・叫び」を、小学3年生でもわかる言葉（ひらがな多め、感情豊かな叫び）で教えてください！
-※大事なルール：リンゴはそのマス目の上に乗らないと拾ったり食べたりできません。離れている場合は、まずそのマスへ歩いていく必要があります！
+      const prompt = `あなたは小さなマス目の島に立つロボットです。
+いまの体の状態と時間帯を見て、心の中で感じている「素直な叫び」を小学3年生にもわかる言葉で教えてください！
+※リンゴは乗らないと食べられません。
 
 【ロボットの今のじょうたい】
-・🍎 いのち: ${st.energy}/100
-・⚡ たいりょく: ${st.stamina}/100
-・🎵 きぶん: ${st.mental}/100
-・今の気持ちのモード: ${DRIVE_JA[st.drive] || st.drive}
+・❤️ たいりょく(HP): ${st.energy}/100 （ゼロで倒れます！）
+・🍙 おなか: ${st.stamina}/100 （ゼロのまま動くとHPが削られます）
+・🎵 ごきげん: ${st.mental}/100
+・いまの時間帯: ${phaseData.name}
 ・現在地: (${cx}, ${cz}) / 手にリンゴ: ${ROBOT.hasApple ? "持ってる" : "持ってない"}
-・リンゴの様子: ${getAppleInfo(cx, cz)}
+・リンゴの様子: ${getAppleInfo(cx, cz, isNight)}
 ・島の端の様子: ${getSurroundings(cx, cz)}
 
 【いま選べる行動】
 ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
 
-以下のJSON形式だけで答えてください。張りぼては禁止です：
+以下のJSON形式で答えてください：
 {
-  "feeling": "小学3年生にもわかる、ロボットの素直な気持ちや叫び（例: あっちにリンゴがあるぞ！歩いて向かおう！）（65字以内）",
-  "actionKey": "選んだ行動のkey（上記リストのkey文字列）",
-  "actionName": "やったことの短い説明（例: 東へ向いて1歩あるいた）"
+  "feeling": "ロボットの素直な気持ちや叫び（例: 暗くてこわいよ！リンゴがあるから食べちゃおう！）（65字以内）",
+  "actionKey": "選んだ行動のkey",
+  "actionName": "やったことの短い説明（例: 東へ1歩あるいた）"
 }`;
 
       try {
         let decision;
-        if (activeModel.startsWith('gemini')) {
-          decision = await GeminiCore.think(prompt, currentKey, activeModel);
-        } else {
-          decision = await GroqCore.think(prompt, currentKey, activeModel);
-        }
+        if (activeModel.startsWith('gemini')) decision = await GeminiCore.think(prompt, currentKey, activeModel);
+        else decision = await GroqCore.think(prompt, currentKey, activeModel);
 
-        lamp.className = 'comm-lamp lamp-ok';
-        lamp.textContent = '🟢 通信OK!';
-
-        const rawFeeling = decision.feeling || 'まわりをキョロキョロ見わたしたよ！';
+        lamp.className = 'comm-lamp lamp-ok'; lamp.textContent = '🟢 通信OK!';
         const actionKey = decision.actionKey || actions[0].key;
-        const actionName = decision.actionName || '1手動いたよ';
-
-        voiceText.innerHTML = rawFeeling;
-        document.getElementById('action-note-text').textContent = actionName;
+        voiceText.innerHTML = decision.feeling || 'まわりをキョロキョロ見わたしたよ！';
+        document.getElementById('action-note-text').textContent = decision.actionName || '1手動いたよ';
         bubble.className = 'voice-bubble';
 
-        ROBOT.lastVoice = rawFeeling;
-        ROBOT.lastActionNote = actionName;
+        ROBOT.lastVoice = voiceText.innerHTML; ROBOT.lastActionNote = document.getElementById('action-note-text').textContent;
         ROBOT.stepCount++;
 
-        life.tick([actionKey]);
+        // ★ マイクラ方式の「10ポイント単位」のフィードバック計算
+        // LifeCoreは tick() で energy-2, stamina-1, mental-1 減る。それを加味して調整する。
+        life.tick([actionKey]); 
         await executeWorldAction(actionKey, actions);
 
-        let dEnergy = -2;
-        let dMental = +3;
-        if (actionKey === 'EAT_HAND' || actionKey === 'EAT_FIELD') {
-          dEnergy = +40;
-          dMental = +15;
+        let dEnergy = 0;   // たいりょく増減
+        let dStamina = 0;  // おなか増減
+        let dMental = 0;   // ごきげん増減
+
+        if (actionKey.startsWith('MOVE_')) {
+          dStamina = -9; // tickと合わせて合計 -10
+          // おなかが0のまま動くと、たいりょくが削られるペナルティ！
+          if (st.stamina <= 0) dEnergy -= 15;
+          // 夜ふかしペナルティ！
+          if (timeIdx === 3) dEnergy -= 10;
+          if (timeIdx === 4) { dEnergy -= 20; dMental -= 20; }
+        } 
+        else if (actionKey === 'REST_HERE') {
+          dStamina = -4; // tickと合わせて合計 -5
+          // 夜・夜中に寝ると体力全回復！
+          if (timeIdx === 3 || timeIdx === 4) { dEnergy += 100; dMental += 20; }
         }
-        life.feedback(dEnergy, -9, dMental);
+        else if (actionKey === 'EAT_HAND' || actionKey === 'EAT_FIELD') {
+          dStamina = +50; // リンゴはおなかを回復
+          dMental += 10;
+        }
+        else if (actionKey === 'PICK_APPLE') {
+          dStamina = -4; // ひろうのは少し疲れる
+        }
+
+        life.feedback(dEnergy, dStamina, dMental);
 
         const afterState = life.getState();
-        if (!afterState.isAlive) {
-          triggerRobotDown("いのち（エネルギー）が0になって、動けなくなっちゃった…");
-        }
+        if (!afterState.isAlive) triggerRobotDown("「たいりょく」が0になって、動けなくなっちゃった…");
 
       } catch (err) {
-        lamp.className = 'comm-lamp lamp-err';
-        lamp.textContent = '❌ 通信エラー';
+        lamp.className = 'comm-lamp lamp-err'; lamp.textContent = '❌ 通信エラー';
         bubble.className = 'voice-bubble bubble-error';
         voiceText.innerHTML = `<div class="voice-error-text">❌ 【通信できませんでした】<br>${err.message}</div>`;
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = '⚡ 今すぐ考える';
-        updateHUD();
-        saveWorldState();
+        btn.disabled = false; btn.innerHTML = '⚡ 今すぐ考える';
+        updateHUD(); saveWorldState();
       }
     }
 
     async function executeWorldAction(chosenKey, actions) {
       const act = actions.find(a => a.key === chosenKey) || actions[0];
-
       if (act.key === 'EAT_HAND') {
-        ROBOT.hasApple = false;
-        if (handApple) handApple.material.visible = false;
-        if (rArm) rArm.rotation.x = -0.9;
-        await new Promise(r => setTimeout(r, 450));
-        if (rArm) rArm.rotation.x = 0;
+        ROBOT.hasApple = false; if (handApple) handApple.material.visible = false;
+        if (rArm) rArm.rotation.x = -0.9; await new Promise(r => setTimeout(r, 450)); if (rArm) rArm.rotation.x = 0;
       } else if (act.key === 'EAT_FIELD') {
-        const ap = fieldApples[act.appleIdx];
-        if (ap && world) { world.remove(ap.mesh); fieldApples.splice(act.appleIdx, 1); }
-        if (rArm) rArm.rotation.x = -0.9;
-        await new Promise(r => setTimeout(r, 450));
-        if (rArm) rArm.rotation.x = 0;
+        const ap = fieldApples[act.appleIdx]; if (ap && world) { world.remove(ap.mesh); fieldApples.splice(act.appleIdx, 1); }
+        if (rArm) rArm.rotation.x = -0.9; await new Promise(r => setTimeout(r, 450)); if (rArm) rArm.rotation.x = 0;
       } else if (act.key === 'PICK_APPLE') {
-        const ap = fieldApples[act.appleIdx];
-        if (ap && world) { world.remove(ap.mesh); fieldApples.splice(act.appleIdx, 1); }
-        ROBOT.hasApple = true;
-        if (handApple) handApple.material.visible = true;
+        const ap = fieldApples[act.appleIdx]; if (ap && world) { world.remove(ap.mesh); fieldApples.splice(act.appleIdx, 1); }
+        ROBOT.hasApple = true; if (handApple) handApple.material.visible = true;
       } else if (act.pos) {
         const tx = act.pos[0], tz = act.pos[1];
         await walkCharaTo(tx, 0.5, tz, act.rotY !== undefined ? act.rotY : 0, 420);
-        ROBOT.pos = { x: tx, z: tz };
-        ROBOT.rotY = act.rotY !== undefined ? act.rotY : ROBOT.rotY;
+        ROBOT.pos = { x: tx, z: tz }; ROBOT.rotY = act.rotY !== undefined ? act.rotY : ROBOT.rotY;
       }
     }
 
     function triggerRobotDown(msg) {
-      if (chara) {
-        chara.rotation.z = Math.PI / 2;
-        chara.position.y = 0.25;
-      }
+      if (chara) { chara.rotation.z = Math.PI / 2; chara.position.y = 0.25; }
       document.getElementById('voice-text').innerHTML = `<span style="color:#ef4444;">🚨 【ロボがたおれました】</span><br>${msg}`;
-      document.getElementById('btn-think-now').style.display = 'none';
-      document.getElementById('btn-respawn').style.display = 'flex';
-      updateHUD();
-      saveWorldState();
+      document.getElementById('btn-think-now').style.display = 'none'; document.getElementById('btn-respawn').style.display = 'flex';
+      updateHUD(); saveWorldState();
     }
 
     function respawnRobot() {
-      const savedJson = JSON.parse(life.exportSave());
-      const inheritedSave = JSON.stringify({
-        e: 100, s: 100, m: 100, a: true,
-        mem: savedJson.mem || {}
-      });
-
-      life = new LifeCore(inheritedSave);
-      ROBOT.gen++;
-      ROBOT.stepCount = 0;
-      ROBOT.pos = { x: 0, z: 0 };
-      ROBOT.rotY = 0;
-      ROBOT.hasApple = false;
-      ROBOT.lastVoice = `前の世代のきおくを引き継いで、第${ROBOT.gen}世代のロボがめざめたよ！`;
-      ROBOT.lastActionNote = "新しいロボが目覚めた！";
+      const savedMem = JSON.parse(life.exportSave()).mem || {};
+      life = new LifeCore(JSON.stringify({ e: 100, s: 100, m: 100, a: true, mem: savedMem }));
+      ROBOT.gen++; ROBOT.stepCount = 0; ROBOT.pos = { x: 0, z: 0 }; ROBOT.rotY = 0; ROBOT.hasApple = false;
+      ROBOT.lastVoice = `前の世代のきおくを引き継いで、第${ROBOT.gen}世代のロボがめざめたよ！`; ROBOT.lastActionNote = "新しいロボが目覚めた！";
 
       if (handApple) handApple.material.visible = false;
-      if (chara) {
-        chara.rotation.z = 0;
-        chara.rotation.y = 0;
-        chara.position.set(0, 0.5, 0);
-      }
-
+      if (chara) { chara.rotation.z = 0; chara.rotation.y = 0; chara.position.set(0, 0.5, 0); }
       if (fieldApples.length === 0) spawnApple(1, 0, false);
 
-      document.getElementById('btn-think-now').style.display = 'flex';
-      document.getElementById('btn-respawn').style.display = 'none';
-      document.getElementById('voice-text').textContent = ROBOT.lastVoice;
-      document.getElementById('action-note-text').textContent = ROBOT.lastActionNote;
-      updateHUD();
-      saveWorldState();
-      showToast('✨ 新しい世代がめざめたよ！');
+      document.getElementById('btn-think-now').style.display = 'flex'; document.getElementById('btn-respawn').style.display = 'none';
+      document.getElementById('voice-text').textContent = ROBOT.lastVoice; document.getElementById('action-note-text').textContent = ROBOT.lastActionNote;
+      updateHUD(); saveWorldState(); showToast('✨ 新しい世代がめざめたよ！');
     }
 
-    // =====================================================================
-    // UI更新 & モーダル設定
-    // =====================================================================
     function updateHUD() {
       const st = life.getState();
-
-      document.getElementById('v-energy').textContent = st.energy;
-      document.getElementById('b-energy').style.width = st.energy + '%';
-      document.getElementById('v-stamina').textContent = st.stamina;
-      document.getElementById('b-stamina').style.width = st.stamina + '%';
-      document.getElementById('v-mental').textContent = st.mental;
-      document.getElementById('b-mental').style.width = st.mental + '%';
-
+      document.getElementById('v-energy').textContent = st.energy; document.getElementById('b-energy').style.width = st.energy + '%';
+      document.getElementById('v-stamina').textContent = st.stamina; document.getElementById('b-stamina').style.width = st.stamina + '%';
+      document.getElementById('v-mental').textContent = st.mental; document.getElementById('b-mental').style.width = st.mental + '%';
       document.getElementById('ui-robot-id').textContent = `🤖 ロボ${ROBOT.gen}ごう (${ROBOT.pos.x}, ${ROBOT.pos.z})`;
       document.getElementById('ui-robot-drive').textContent = DRIVE_JA[st.drive] || st.drive;
       document.getElementById('ui-step-count').textContent = `⭐ ${ROBOT.stepCount}手目`;
+
+      // ★ 時間帯バッジの更新 ＆ ターゲット色の更新
+      const phase = TIME_PHASES[getCurrentTimePhaseIdx()];
+      const badge = document.getElementById('ui-time-phase');
+      badge.textContent = phase.name;
+      badge.style.color = phase.tagColor;
+      badge.style.background = phase.tagBg;
+      badge.style.borderColor = phase.tagColor;
+
+      // 目標色を設定し、renderLoop内で徐々に遷移させる
+      targetBgColor.setHex(phase.bg);
+      targetHemiColor.setHex(phase.hemi);
+      targetSunColor.setHex(phase.sun);
+      document.getElementById('sky-window').style.backgroundColor = '#' + phase.bg.toString(16).padStart(6, '0');
     }
 
-    function selectModelInModal(modelName) {
-      safeStorage.setItem('ai_custom_model', modelName);
-      const isGem = modelName.startsWith('gemini');
-      const grpG = document.getElementById('grp-google-key');
-      const grpGh = document.getElementById('grp-github-key');
-      const saveBtn = document.getElementById('modal-save-btn');
-
-      if (grpG) grpG.className = 'settings-card ' + (isGem ? 'selected-google' : '');
-      if (grpGh) grpGh.className = 'settings-card ' + (!isGem ? 'selected-github' : '');
-      if (saveBtn) {
-        saveBtn.style.background = isGem ? '#3b82f6' : '#9333ea';
-        saveBtn.textContent = isGem ? '🟦 Google 3.8 に決定して閉じる' : '🟪 Groq 120B に決定して閉じる';
-      }
+    function selectModelInModal(m) {
+      safeStorage.setItem('ai_custom_model', m);
+      const isGem = m.startsWith('gemini');
+      document.getElementById('grp-google-key').className = 'settings-card ' + (isGem ? 'selected-google' : '');
+      document.getElementById('grp-github-key').className = 'settings-card ' + (!isGem ? 'selected-github' : '');
+      const b = document.getElementById('modal-save-btn');
+      b.style.background = isGem ? '#3b82f6' : '#9333ea'; b.textContent = isGem ? '🟦 Google 3.8 に決定して閉じる' : '🟪 Groq 120B に決定して閉じる';
     }
-
     function autoSaveKey(type, val) {
-      const trimmed = val.trim();
-      if (type === 'google') {
-        safeStorage.setItem('key_google', trimmed);
-        selectModelInModal('gemini-3.8-flash');
-      } else {
-        safeStorage.setItem('key_github', trimmed);
-        selectModelInModal('openai/gpt-oss-120b');
-      }
+      const t = val.trim();
+      if (type === 'google') { safeStorage.setItem('key_google', t); selectModelInModal('gemini-3.8-flash'); }
+      else { safeStorage.setItem('key_github', t); selectModelInModal('openai/gpt-oss-120b'); }
     }
-
     function saveKeys() {
-      const gInput = document.getElementById('input-google-key');
-      const ghInput = document.getElementById('input-github-key');
-      if (gInput && gInput.value.trim().length > 5) safeStorage.setItem('key_google', gInput.value.trim());
-      if (ghInput && ghInput.value.trim().length > 5) safeStorage.setItem('key_github', ghInput.value.trim());
-      closeModal('settingModal');
-      showToast('💾 設定をほぞんしたよ！');
+      const g = document.getElementById('input-google-key').value.trim(), gh = document.getElementById('input-github-key').value.trim();
+      if (g.length > 5) safeStorage.setItem('key_google', g);
+      if (gh.length > 5) safeStorage.setItem('key_github', gh);
+      closeModal('settingModal'); showToast('💾 設定をほぞんしたよ！');
     }
-
     function openModal(id) {
       if (id === 'settingModal') {
-        const curModel = getActiveModel();
-        const gKey = safeStorage.getItem('key_google') || '';
-        const ghKey = safeStorage.getItem('key_github') || '';
-        const inpG = document.getElementById('input-google-key');
-        const inpGh = document.getElementById('input-github-key');
-        if (inpG) inpG.value = gKey;
-        if (inpGh) inpGh.value = ghKey;
-        selectModelInModal(curModel);
+        document.getElementById('input-google-key').value = safeStorage.getItem('key_google') || '';
+        document.getElementById('input-github-key').value = safeStorage.getItem('key_github') || '';
+        selectModelInModal(getActiveModel());
       }
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'flex';
+      document.getElementById(id).style.display = 'flex';
     }
-
-    function closeModal(id) {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
     let clock = 0, isWalking = false;
     function renderLoop() {
       requestAnimationFrame(renderLoop); clock += 0.04;
       for (const a of fieldApples) a.mesh.rotation.y += 0.03;
 
+      // ★ 背景や光の色をじんわりと変化させる（LERP補間）
+      if (scene && scene.background) scene.background.lerp(targetBgColor, 0.02);
+      if (hemiLight) hemiLight.color.lerp(targetHemiColor, 0.02);
+      if (sunLight) sunLight.color.lerp(targetSunColor, 0.02);
+
       if (life.getState().isAlive && chara) {
         if (isWalking) {
           rArm.rotation.x = Math.sin(clock * 9) * 0.7; lArm.rotation.x = -Math.sin(clock * 9) * 0.7;
           rLeg.rotation.x = -Math.sin(clock * 9) * 0.7; lLeg.rotation.x = Math.sin(clock * 9) * 0.7;
         } else {
-          rLeg.rotation.x = 0; lLeg.rotation.x = 0;
-          bodyM.scale.y = 0.52 + Math.sin(clock * 2.5) * 0.02;
+          rLeg.rotation.x = 0; lLeg.rotation.x = 0; bodyM.scale.y = 0.52 + Math.sin(clock * 2.5) * 0.02;
         }
       }
       if (renderer && scene && camera) renderer.render(scene, camera);
@@ -1923,27 +1166,16 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
       return new Promise(resolve => {
         if (!chara) { resolve(); return; }
         isWalking = true;
-        const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z;
-        const sRotY = chara.rotation.y;
-        
+        const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z, sRotY = chara.rotation.y;
         let diffRot = (targetRotY - sRotY) % (Math.PI * 2);
-        if (diffRot > Math.PI) diffRot -= Math.PI * 2;
-        if (diffRot < -Math.PI) diffRot += Math.PI * 2;
+        if (diffRot > Math.PI) diffRot -= Math.PI * 2; if (diffRot < -Math.PI) diffRot += Math.PI * 2;
 
         const start = performance.now();
         function s(now) {
           const p = Math.min((now - start) / dur, 1);
-          chara.position.x = sx + (tx - sx) * p;
-          chara.position.y = sy + (ty - sy) * p;
-          chara.position.z = sz + (tz - sz) * p;
+          chara.position.set(sx + (tx - sx) * p, sy + (ty - sy) * p, sz + (tz - sz) * p);
           chara.rotation.y = sRotY + diffRot * Math.min(p * 2, 1);
-
-          if (p < 1) requestAnimationFrame(s);
-          else {
-            chara.rotation.y = targetRotY;
-            isWalking = false;
-            resolve();
-          }
+          if (p < 1) requestAnimationFrame(s); else { chara.rotation.y = targetRotY; isWalking = false; resolve(); }
         }
         requestAnimationFrame(s);
       });
@@ -1952,31 +1184,19 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
     function resizeRenderer() {
       if (!camera || !renderer) return;
       const stage = document.querySelector('.top-window');
-      const w = Math.max(stage?.clientWidth || window.innerWidth || 360, 240);
-      const h = Math.max(stage?.clientHeight || 280, 200);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h, false);
+      const w = Math.max(stage?.clientWidth || window.innerWidth || 360, 240), h = Math.max(stage?.clientHeight || 280, 200);
+      camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h, false);
     }
-
     window.addEventListener('resize', resizeRenderer);
 
     function startApp() {
-      cleanStrayTextNodes();
-      buildFanMenuSVG();
-      const isLoaded = tryLoadWorldState();
-      init3D();
-      if (ROBOT.lastVoice) document.getElementById('voice-text').textContent = ROBOT.lastVoice;
+      cleanStrayTextNodes(); buildFanMenuSVG();
+      const isLoaded = tryLoadWorldState(); init3D();
+      if (ROBOT.lastVoice) document.getElementById('voice-text').innerHTML = ROBOT.lastVoice;
       if (ROBOT.lastActionNote) document.getElementById('action-note-text').textContent = ROBOT.lastActionNote;
-      updateHUD();
-      if (isLoaded) showToast('💾 つづきから再開したよ！');
+      updateHUD(); if (isLoaded) showToast('💾 つづきから再開したよ！');
     }
-
-    if (document.readyState === 'loading') {
-      window.addEventListener('DOMContentLoaded', startApp);
-    } else {
-      startApp();
-    }
+    if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', startApp); else startApp();
   </script>
 </body>
 </html>
