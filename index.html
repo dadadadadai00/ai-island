@@ -1,1984 +1,1776 @@
-```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>ボクセルAI自律思考水槽 - 自然な白波と円形海版</title>
-
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="theme-color" content="#ebf2f5">
-
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      width: 100vw; height: 100vh; height: 100dvh;
-      overflow: hidden; background: #0f172a; color: #2d3748;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Maru Gothic ProN", "Meiryo", sans-serif;
-      font-size: 14px; line-height: 1.4;
-      user-select: none; -webkit-user-select: none;
-    }
-    input, select, textarea, button { user-select: auto; -webkit-user-select: auto; font-family: inherit; }
-
-    .app-container {
-      font-size: 14px; line-height: 1.4;
-      display: flex; flex-direction: column;
-      width: 100%; height: 100%; height: 100dvh;
-      overflow: hidden;
-    }
-
-    .top-window {
-      position: relative;
-      flex: 1 1 auto; min-height: 240px;
-      background: #0f2b46;
-      overflow: visible;
-      border-bottom: 2px solid #cbd5e1;
-      z-index: 30;
-      transition: background-color 1s ease;
-    }
-    #stage-3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; overflow: hidden; }
-    #c3d { width: 100%; height: 100%; display: block; }
-    canvas { display: block; width: 100% !important; height: 100% !important; }
-
-    .top-gauge-panel {
-      position: absolute; top: 8px; left: 8px; right: 8px; z-index: 20;
-      background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(8px);
-      border: 1.5px solid #d1d5db; border-radius: 14px;
-      padding: 8px 10px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
-    }
-    .gauge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-    .gauge-col {
-      background: #f8fafc; padding: 4px 6px; border-radius: 8px;
-      text-align: center; border: 1px solid #e2e8f0;
-    }
-    .gauge-label { font-size: 11px; font-weight: 800; color: #475569; line-height: 1.3; }
-    .gauge-num { font-size: 13px; font-weight: 900; color: #0f172a; margin-left: 2px; }
-    .bar-bg { background: #e2e8f0; height: 8px; border-radius: 5px; margin-top: 3px; overflow: hidden; padding: 1px; }
-    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.35s ease; }
-
-    .robot-status-row {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-top: 6px; padding-top: 5px; border-top: 1px solid #e2e8f0;
-    }
-    .robot-id-tag { font-size: 11px; font-weight: 800; color: #64748b; line-height: 1.2; }
-    .speed-badge {
-      font-size: 10px; font-weight: 900; padding: 2px 7px; border-radius: 6px;
-      background: #fef08a; color: #854d0e; border: 1px solid #fde047;
-    }
-    .robot-drive-badge {
-      font-size: 11px; font-weight: 900; padding: 2px 9px; border-radius: 12px;
-      background: #fef9c3; color: #854d0e; border: 1.5px solid #fde047; line-height: 1.3;
-    }
-    .status-right-col { display: flex; align-items: center; gap: 6px; }
-    .time-phase-badge {
-      font-size: 10.5px; font-weight: 900; padding: 2px 7px; border-radius: 6px;
-      background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;
-    }
-    .btn-setting-gear-inline {
-      width: 28px; height: 28px; border-radius: 8px;
-      background: #f1f5f9; border: 1.5px solid #cbd5e1;
-      color: #475569; font-size: 14px; display: inline-flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation;
-    }
-    .btn-setting-gear-inline:active { transform: scale(0.92); background: #e2e8f0; }
-
-    .side-btn-col {
-      position: absolute; top: 96px; right: 12px; z-index: 20;
-      display: flex; flex-direction: column; gap: 10px;
-    }
-    .btn-side-circle {
-      width: 42px; height: 42px; border-radius: 50%;
-      background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(6px);
-      border: 2px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px; cursor: pointer; transition: transform 0.2s;
-    }
-    .btn-side-circle:active { transform: scale(0.9); }
-
-    .placement-cancel-bar {
-      position: absolute; top: 100px; left: 50%; transform: translateX(-50%); z-index: 25;
-      background: #ef4444; color: white; font-size: 13px; font-weight: 900;
-      padding: 8px 16px; border-radius: 20px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-      display: none; align-items: center; gap: 6px; cursor: pointer;
-    }
-    .placement-cancel-bar.active { display: flex; }
-
-    .fan-menu-wrapper {
-      position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
-      z-index: 40; width: 340px; height: 195px; pointer-events: none;
-    }
-    .fan-radial-container {
-      position: absolute; bottom: 0; left: 0; width: 340px; height: 195px;
-      pointer-events: none; opacity: 0; transform: scale(0.35); transform-origin: 170px 168px;
-      transition: transform 0.26s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease;
-    }
-    .fan-radial-container.open { opacity: 1; transform: scale(1); }
-    .fan-svg { width: 100%; height: 100%; filter: drop-shadow(0 6px 18px rgba(15, 23, 42, 0.25)); overflow: visible; }
-    .fan-sector {
-      fill: rgba(255, 255, 255, 0.92); stroke: rgba(203, 213, 225, 0.95); stroke-width: 1.5; stroke-linejoin: round;
-      cursor: pointer; pointer-events: none; transition: fill 0.15s ease, transform 0.15s ease;
-      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-    }
-    .fan-radial-container.open .fan-sector { pointer-events: auto; }
-    .fan-sector:hover, .fan-sector:active { fill: rgba(224, 242, 254, 0.96); stroke: #60a5fa; }
-    .fan-sector-pink { fill: rgba(255, 228, 234, 0.92); stroke: rgba(244, 168, 184, 0.95); }
-    .fan-sector-pink:hover, .fan-sector-pink:active { fill: rgba(254, 205, 215, 0.98); stroke: #f43f5e; }
-    .fan-label { font-size: 11.5px; font-weight: 900; fill: #334155; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
-    .fan-label-pink { fill: #9f1239; }
-    .fan-icon { font-size: 21px; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
-
-    .btn-circle-main {
-      position: absolute; left: 146px; top: 144px; width: 48px; height: 48px; border-radius: 50%;
-      background: #ffffff; border: 2px solid #cbd5e1; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-      transition: transform 0.2s ease, background 0.2s, border-color 0.2s;
-    }
-    .btn-circle-main:active { transform: scale(0.92); }
-    .btn-circle-main.active { background: #f8fafc; border-color: #94a3b8; }
-    .circle-icon { font-size: 22px; color: #475569; transition: transform 0.25s ease, color 0.2s ease; line-height: 1; font-weight: bold; }
-    .btn-circle-main.active .circle-icon { transform: rotate(45deg); color: #ef4444; }
-
-    .bottom-window {
-      position: relative; z-index: 10; flex: none; height: 154px;
-      background: #ffffff; padding: 8px 12px 6px;
-      display: flex; flex-direction: column; gap: 4px;
-      overflow: hidden; border-top: 1.5px solid #cbd5e1; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
-    }
-    .voice-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
-    .voice-title { font-size: 12px; font-weight: 900; color: #475569; display: flex; align-items: center; gap: 4px; }
-    .comm-lamp { font-size: 10px; font-weight: 900; padding: 1px 7px; border-radius: 8px; line-height: 1.4; }
-    .lamp-standby { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
-    .lamp-busy { background: #fef3c7; color: #b45309; border: 1px solid #fde047; }
-    .lamp-ok { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
-    .lamp-err { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
-
-    .voice-bubble {
-      flex: 1; min-height: 62px; max-height: 82px; background: #f8fafc; border: 1.5px solid #cbd5e1;
-      border-radius: 10px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: flex-start;
-      overflow-y: auto; -webkit-overflow-scrolling: touch; transition: all 0.3s ease;
-    }
-    .voice-bubble.bubble-active { border-color: #60a5fa; background: #f0f9ff; }
-    .voice-bubble.bubble-error { border-color: #f87171; background: #fff1f2; }
-    .voice-text { font-size: 13px; font-weight: 800; line-height: 1.45; color: #1e293b; word-break: break-all; }
-    .voice-error-text { font-size: 12px; font-weight: 800; line-height: 1.4; color: #dc2626; }
-
-    .action-note-row { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 800; color: #64748b; margin-top: 1px; }
-    .action-badge { font-size: 10px; font-weight: 900; background: #f1f5f9; color: #475569; padding: 1px 6px; border-radius: 5px; border: 1px solid #cbd5e1; }
-
-    .footer-bar {
-      flex: none; padding: 8px 14px max(24px, calc(env(safe-area-inset-bottom) + 12px));
-      background: #f8fafc; border-top: 1.5px solid #e2e8f0; display: flex; justify-content: center;
-    }
-    .btn-think-now {
-      width: 100%; max-width: 440px; height: 48px; border-radius: 14px; border: none; cursor: pointer;
-      font-size: 16px; font-weight: 900; color: #ffffff;
-      background: linear-gradient(135deg, #60a5fa, #3b82f6); border: 1.5px solid #93c5fd;
-      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
-      display: flex; align-items: center; justify-content: center; gap: 6px; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-    }
-    .btn-think-now:active { transform: scale(0.97); }
-    .btn-think-now:disabled { background: #cbd5e1 !important; border-color: #94a3b8 !important; color: #64748b !important; cursor: not-allowed; box-shadow: none; }
-    .btn-respawn { background: linear-gradient(135deg, #f87171, #ef4444) !important; border: 1.5px solid #fca5a5 !important; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35) !important; display: none; }
-
-    .modal-cover {
-      font-size: 14px; line-height: 1.4; position: fixed; inset: 0; z-index: 100;
-      background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 14px;
-    }
-    .modal-box {
-      width: 100%; max-width: 390px; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 20px; padding: 16px;
-      display: flex; flex-direction: column; gap: 10px; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2); max-height: 90dvh; overflow-y: auto;
-    }
-    .modal-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #f1f5f9; padding-bottom: 6px; }
-    .modal-title { font-size: 15px; font-weight: 900; color: #334155; }
-    .close-btn { font-size: 20px; color: #94a3b8; cursor: pointer; padding: 2px 6px; font-weight: bold; }
-
-    .gacha-stage-box { background: linear-gradient(180deg, #fff5f7 0%, #ffffff 100%); border: 1.5px solid #fbcfe8; border-radius: 16px; padding: 10px; display: flex; flex-direction: column; align-items: center; position: relative; overflow: hidden; }
-    .gacha-svg-wrap { width: 220px; height: 250px; position: relative; }
-    #gacha-handle-group { transform-origin: 110px 158px; transition: transform 0.65s cubic-bezier(0.45, 0.05, 0.55, 0.95); }
-    #gacha-handle-group.turning { transform: rotate(360deg); }
-    @keyframes domeJostle { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(-4px, -6px) rotate(-8deg); } 50% { transform: translate(5px, -3px) rotate(8deg); } 75% { transform: translate(-3px, -5px) rotate(-5deg); } }
-    #gacha-dome-capsules.shaking { animation: domeJostle 0.3s ease-in-out 2; transform-origin: 110px 78px; }
-    .capsule-pop-overlay { position: absolute; inset: 0; background: rgba(255, 255, 255, 0.88); backdrop-filter: blur(3px); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
-    .capsule-pop-overlay.active { display: flex; }
-    .pop-capsule-stage { position: relative; width: 140px; height: 140px; display: flex; align-items: center; justify-content: center; }
-    .cap-half-top { position: absolute; width: 76px; height: 38px; top: 32px; left: 32px; border-radius: 38px 38px 0 0; background: linear-gradient(135deg, #f9a8d4, #f472b6); border: 2.5px solid #ec4899; transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s; z-index: 3; }
-    .cap-half-bottom { position: absolute; width: 76px; height: 38px; top: 70px; left: 32px; border-radius: 0 0 38px 38px; background: linear-gradient(135deg, #ffffff, #f1f5f9); border: 2.5px solid #cbd5e1; transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s; z-index: 3; }
-    .pop-capsule-stage.opened .cap-half-top { transform: translate(-28px, -34px) rotate(-32deg); }
-    .pop-capsule-stage.opened .cap-half-bottom { transform: translate(28px, 30px) rotate(28deg); }
-    .pop-reward-item { display: flex; flex-direction: column; align-items: center; justify-content: center; transform: scale(0); opacity: 0; transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s; z-index: 4; }
-    .pop-capsule-stage.opened .pop-reward-item { transform: scale(1.15); opacity: 1; }
-    .pop-reward-icon { font-size: 44px; line-height: 1.1; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.12)); }
-    .pop-reward-name { margin-top: 6px; font-size: 14px; font-weight: 900; color: #be185d; background: #fdf2f8; padding: 3px 12px; border-radius: 12px; border: 1.5px solid #fbcfe8; }
-    .modal-footer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
-    .btn-gacha-start { padding: 11px; border-radius: 12px; border: 1.5px solid #f472b6; background: linear-gradient(135deg, #f472b6, #ec4899); color: #ffffff; font-size: 14px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3); }
-    .btn-gacha-start:active { transform: scale(0.96); }
-    .btn-gacha-start:disabled { background: #cbd5e1 !important; border-color: #94a3b8 !important; color: #64748b !important; box-shadow: none; cursor: not-allowed; }
-    .btn-modal-close { padding: 11px; border-radius: 12px; border: 1.5px solid #cbd5e1; background: #f1f5f9; color: #475569; font-size: 14px; font-weight: 900; cursor: pointer; }
-    .btn-modal-close:active { transform: scale(0.96); background: #e2e8f0; }
-
-    .grid-5x5, .grid-5x2 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: #f8fafc; padding: 8px; border-radius: 14px; border: 1.5px solid #e2e8f0; }
-    .grid-cell { aspect-ratio: 1 / 1; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 10px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s ease; overflow: hidden; }
-    .grid-cell:active { transform: scale(0.93); }
-    .grid-cell.filled { background: #f0f9ff; border-color: #93c5fd; }
-    .grid-cell.terrain-cell { background: #edf7ed; border-color: #86efac; }
-    .grid-cell.terrain-cell.has-obj { background: #fef9c3; border-color: #fde047; }
-    .cell-icon { font-size: 22px; line-height: 1; }
-    .cell-count { position: absolute; right: 3px; bottom: 2px; font-size: 9.5px; font-weight: 900; color: #1e293b; background: rgba(255, 255, 255, 0.92); padding: 0 3px; border-radius: 4px; border: 1px solid #cbd5e1; line-height: 1.2; }
-    .cell-coord { position: absolute; top: 2px; left: 3px; font-size: 8px; font-weight: 700; color: #64748b; line-height: 1; }
-    .cell-step-lvl { position: absolute; right: 3px; top: 2px; font-size: 8.5px; font-weight: 900; color: #047857; background: #ecfdf5; padding: 0 3px; border-radius: 4px; border: 1px solid #a7f3d0; line-height: 1.2; }
-
-    .diary-robot-preview {
-      display: flex; align-items: center; justify-content: center; flex-direction: column;
-      background: linear-gradient(135deg, #e0f2fe, #bae6fd); padding: 16px;
-      border-radius: 16px; border: 2px solid #7dd3fc; margin-bottom: 4px;
-    }
-    .diary-robot-emoji { font-size: 64px; line-height: 1.1; margin-bottom: 4px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); }
-    .diary-tool-title { font-size: 13px; font-weight: 900; color: #0369a1; text-align: center; margin-top: 4px; }
-    
-    .btn-log-view {
-      width: 100%; padding: 12px; border-radius: 12px; border: 1.5px solid #fbbf24;
-      background: linear-gradient(135deg, #fde047, #facc15); color: #854d0e;
-      font-size: 14px; font-weight: 900; cursor: pointer; display: flex; justify-content: center; gap: 6px; margin-top: 8px;
-    }
-    .btn-log-view:active { transform: scale(0.97); }
-
-    .settings-card { background: #f8fafc; border: 2px solid #e2e8f0; padding: 10px; border-radius: 12px; cursor: pointer; }
-    .settings-card.selected-google { border-color: #60a5fa; background: #eff6ff; }
-    .settings-card.selected-github { border-color: #c084fc; background: #faf5ff; }
-    .input-box { width: 100%; padding: 8px 10px; background: #ffffff; border: 1.5px solid #cbd5e1; color: #0f172a; border-radius: 8px; font-size: 12px; margin-top: 5px; }
-    .save-btn { padding: 11px; background: #3b82f6; color: #fff; border: none; border-radius: 12px; font-weight: 900; cursor: pointer; font-size: 14px; box-shadow: 0 3px 10px rgba(59, 130, 246, 0.3); }
-    .reset-btn { padding: 10px; background: #fee2e2; color: #b91c1c; border: 1.5px solid #fca5a5; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 12px; margin-top: 4px; }
-
-    #toast-msg {
-      font-size: 13px; line-height: 1.4; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
-      background: rgba(255, 255, 255, 0.98); border: 2px solid #60a5fa; border-radius: 14px; padding: 8px 18px; font-weight: 900; color: #1e3a8a; z-index: 150;
-      opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-    }
-    #toast-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>ボクセルAI自律思考水槽 - 海固定・星空見上げ＆スッキリUI版</title>
+​<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ebf2f5">
+​<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+width: 100vw; height: 100vh; height: 100dvh;
+overflow: hidden; background: #0f172a; color: #2d3748;
+font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Maru Gothic ProN", "Meiryo", sans-serif;
+font-size: 14px; line-height: 1.4;
+user-select: none; -webkit-user-select: none;
+}
+input, select, textarea, button { user-select: auto; -webkit-user-select: auto; font-family: inherit; }
+​.app-container {
+font-size: 14px; line-height: 1.4;
+display: flex; flex-direction: column;
+width: 100%; height: 100%; height: 100dvh;
+overflow: hidden;
+}
+​.top-window {
+position: relative;
+flex: 1 1 auto; min-height: 240px;
+background: #0f2b46;
+overflow: visible;
+border-bottom: 2px solid #cbd5e1;
+z-index: 30;
+transition: background-color 1s ease;
+}
+#stage-3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; overflow: hidden; }
+#c3d { width: 100%; height: 100%; display: block; }
+canvas { display: block; width: 100% !important; height: 100% !important; }
+​.top-gauge-panel {
+position: absolute; top: 8px; left: 8px; right: 8px; z-index: 20;
+background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(8px);
+border: 1.5px solid #d1d5db; border-radius: 14px;
+padding: 8px 10px;
+box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.top-gauge-panel.gauge-hidden {
+opacity: 0;
+pointer-events: none;
+transform: translateY(-8px);
+}
+.gauge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.gauge-col {
+background: #f8fafc; padding: 4px 6px; border-radius: 8px;
+text-align: center; border: 1px solid #e2e8f0;
+}
+.gauge-label { font-size: 11px; font-weight: 800; color: #475569; line-height: 1.3; }
+.gauge-num { font-size: 13px; font-weight: 900; color: #0f172a; margin-left: 2px; }
+.bar-bg { background: #e2e8f0; height: 8px; border-radius: 5px; margin-top: 3px; overflow: hidden; padding: 1px; }
+.bar-fill { height: 100%; border-radius: 4px; transition: width 0.35s ease; }
+​.robot-status-row {
+display: flex; justify-content: space-between; align-items: center;
+margin-top: 6px; padding-top: 5px; border-top: 1px solid #e2e8f0;
+gap: 6px;
+}
+.status-left-group { display: flex; align-items: center; gap: 6px; flex-shrink: 1; min-width: 0; }
+.status-right-group { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+​.robot-id-tag { font-size: 11.5px; font-weight: 900; color: #334155; line-height: 1.2; white-space: nowrap; }
+.day-badge {
+font-size: 10.5px; font-weight: 900; padding: 2px 7px; border-radius: 6px;
+background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; line-height: 1.2; white-space: nowrap;
+}
+.time-phase-badge {
+font-size: 10.5px; font-weight: 900; padding: 2px 7px; border-radius: 6px;
+background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; line-height: 1.2; white-space: nowrap;
+}
+.robot-drive-badge {
+font-size: 11px; font-weight: 900; padding: 2px 8px; border-radius: 12px;
+background: #fef9c3; color: #854d0e; border: 1.5px solid #fde047; line-height: 1.3; white-space: nowrap;
+}
+.btn-setting-gear-inline {
+width: 28px; height: 28px; border-radius: 8px;
+background: #f1f5f9; border: 1.5px solid #cbd5e1;
+color: #475569; font-size: 14px; display: inline-flex; align-items: center; justify-content: center;
+cursor: pointer; touch-action: manipulation; flex-shrink: 0;
+}
+.btn-setting-gear-inline:active { transform: scale(0.92); background: #e2e8f0; }
+​.side-btn-col {
+position: absolute; top: 130px; right: 12px; z-index: 20;
+display: flex; flex-direction: column; gap: 10px;
+}
+.btn-side-circle {
+width: 42px; height: 42px; border-radius: 50%;
+background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(6px);
+border: 2px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+display: flex; align-items: center; justify-content: center;
+font-size: 20px; cursor: pointer; transition: transform 0.2s;
+}
+.btn-side-circle:active { transform: scale(0.9); }
+​.placement-cancel-bar {
+position: absolute; top: 100px; left: 50%; transform: translateX(-50%); z-index: 25;
+background: #ef4444; color: white; font-size: 13px; font-weight: 900;
+padding: 8px 16px; border-radius: 20px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+display: none; align-items: center; gap: 6px; cursor: pointer;
+}
+.placement-cancel-bar.active { display: flex; }
+​.fan-menu-wrapper {
+position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+z-index: 40; width: 340px; height: 195px; pointer-events: none;
+}
+.fan-radial-container {
+position: absolute; bottom: 0; left: 0; width: 340px; height: 195px;
+pointer-events: none; opacity: 0; transform: scale(0.35); transform-origin: 170px 168px;
+transition: transform 0.26s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease;
+}
+.fan-radial-container.open { opacity: 1; transform: scale(1); }
+.fan-svg { width: 100%; height: 100%; filter: drop-shadow(0 6px 18px rgba(15, 23, 42, 0.25)); overflow: visible; }
+.fan-sector {
+fill: rgba(255, 255, 255, 0.92); stroke: rgba(203, 213, 225, 0.95); stroke-width: 1.5; stroke-linejoin: round;
+cursor: pointer; pointer-events: none; transition: fill 0.15s ease, transform 0.15s ease;
+touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.fan-radial-container.open .fan-sector { pointer-events: auto; }
+.fan-sector:hover, .fan-sector:active { fill: rgba(224, 242, 254, 0.96); stroke: #60a5fa; }
+.fan-sector-pink { fill: rgba(255, 228, 234, 0.92); stroke: rgba(244, 168, 184, 0.95); }
+.fan-sector-pink:hover, .fan-sector-pink:active { fill: rgba(254, 205, 215, 0.98); stroke: #f43f5e; }
+.fan-label { font-size: 11.5px; font-weight: 900; fill: #334155; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
+.fan-label-pink { fill: #9f1239; }
+.fan-icon { font-size: 21px; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
+​.btn-circle-main {
+position: absolute; left: 146px; top: 144px; width: 48px; height: 48px; border-radius: 50%;
+background: #ffffff; border: 2px solid #cbd5e1; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+display: flex; align-items: center; justify-content: center;
+cursor: pointer; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+transition: transform 0.2s ease, background 0.2s, border-color 0.2s;
+}
+.btn-circle-main:active { transform: scale(0.92); }
+.btn-circle-main.active { background: #f8fafc; border-color: #94a3b8; }
+.circle-icon { font-size: 22px; color: #475569; transition: transform 0.25s ease, color 0.2s ease; line-height: 1; font-weight: bold; }
+.btn-circle-main.active .circle-icon { transform: rotate(45deg); color: #ef4444; }
+​.bottom-window {
+position: relative; z-index: 10; flex: none; height: 154px;
+background: #ffffff; padding: 8px 12px 6px;
+display: flex; flex-direction: column; gap: 4px;
+overflow: hidden; border-top: 1.5px solid #cbd5e1; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+}
+.voice-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+.voice-title { font-size: 12px; font-weight: 900; color: #475569; display: flex; align-items: center; gap: 4px; }
+.comm-lamp { font-size: 10px; font-weight: 900; padding: 1px 7px; border-radius: 8px; line-height: 1.4; }
+.lamp-standby { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
+.lamp-busy { background: #fef3c7; color: #b45309; border: 1px solid #fde047; }
+.lamp-ok { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+.lamp-err { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+​.voice-bubble {
+flex: 1; min-height: 62px; max-height: 82px; background: #f8fafc; border: 1.5px solid #cbd5e1;
+border-radius: 10px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: flex-start;
+overflow-y: auto; -webkit-overflow-scrolling: touch; transition: all 0.3s ease;
+}
+.voice-bubble.bubble-active { border-color: #60a5fa; background: #f0f9ff; }
+.voice-bubble.bubble-error { border-color: #f87171; background: #fff1f2; }
+.voice-text { font-size: 13px; font-weight: 800; line-height: 1.45; color: #1e293b; word-break: break-all; }
+.voice-error-text { font-size: 12px; font-weight: 800; line-height: 1.4; color: #dc2626; }
+​.action-note-row { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 800; color: #64748b; margin-top: 1px; }
+.action-badge { font-size: 10px; font-weight: 900; background: #f1f5f9; color: #475569; padding: 1px 6px; border-radius: 5px; border: 1px solid #cbd5e1; }
+​.footer-bar {
+flex: none; padding: 8px 14px max(24px, calc(env(safe-area-inset-bottom) + 12px));
+background: #f8fafc; border-top: 1.5px solid #e2e8f0; display: flex; justify-content: center;
+}
+.btn-think-now {
+width: 100%; max-width: 440px; height: 48px; border-radius: 14px; border: none; cursor: pointer;
+font-size: 16px; font-weight: 900; color: #ffffff;
+background: linear-gradient(135deg, #60a5fa, #3b82f6); border: 1.5px solid #93c5fd;
+box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+display: flex; align-items: center; justify-content: center; gap: 6px; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.btn-think-now:active { transform: scale(0.97); }
+.btn-think-now:disabled { background: #cbd5e1 !important; border-color: #94a3b8 !important; color: #64748b !important; cursor: not-allowed; box-shadow: none; }
+.btn-respawn { background: linear-gradient(135deg, #f87171, #ef4444) !important; border: 1.5px solid #fca5a5 !important; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35) !important; display: none; }
+​.modal-cover {
+font-size: 14px; line-height: 1.4; position: fixed; inset: 0; z-index: 100;
+background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 14px;
+}
+.modal-box {
+width: 100%; max-width: 390px; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 20px; padding: 16px;
+display: flex; flex-direction: column; gap: 10px; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2); max-height: 90dvh; overflow-y: auto;
+}
+.modal-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #f1f5f9; padding-bottom: 6px; }
+.modal-title { font-size: 15px; font-weight: 900; color: #334155; }
+.close-btn { font-size: 20px; color: #94a3b8; cursor: pointer; padding: 2px 6px; font-weight: bold; }
+​.gacha-stage-box { background: linear-gradient(180deg, #fff5f7 0%, #ffffff 100%); border: 1.5px solid #fbcfe8; border-radius: 16px; padding: 10px; display: flex; flex-direction: column; align-items: center; position: relative; overflow: hidden; }
+.gacha-svg-wrap { width: 220px; height: 250px; position: relative; }
+#gacha-handle-group { transform-origin: 110px 158px; transition: transform 0.65s cubic-bezier(0.45, 0.05, 0.55, 0.95); }
+#gacha-handle-group.turning { transform: rotate(360deg); }
+@keyframes domeJostle { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(-4px, -6px) rotate(-8deg); } 50% { transform: translate(5px, -3px) rotate(8deg); } 75% { transform: translate(-3px, -5px) rotate(-5deg); } }
+#gacha-dome-capsules.shaking { animation: domeJostle 0.3s ease-in-out 2; transform-origin: 110px 78px; }
+.capsule-pop-overlay { position: absolute; inset: 0; background: rgba(255, 255, 255, 0.88); backdrop-filter: blur(3px); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+.capsule-pop-overlay.active { display: flex; }
+.pop-capsule-stage { position: relative; width: 140px; height: 140px; display: flex; align-items: center; justify-content: center; }
+.cap-half-top { position: absolute; width: 76px; height: 38px; top: 32px; left: 32px; border-radius: 38px 38px 0 0; background: linear-gradient(135deg, #f9a8d4, #f472b6); border: 2.5px solid #ec4899; transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s; z-index: 3; }
+.cap-half-bottom { position: absolute; width: 76px; height: 38px; top: 70px; left: 32px; border-radius: 0 0 38px 38px; background: linear-gradient(135deg, #ffffff, #f1f5f9); border: 2.5px solid #cbd5e1; transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s; z-index: 3; }
+.pop-capsule-stage.opened .cap-half-top { transform: translate(-28px, -34px) rotate(-32deg); }
+.pop-capsule-stage.opened .cap-half-bottom { transform: translate(28px, 30px) rotate(28deg); }
+.pop-reward-item { display: flex; flex-direction: column; align-items: center; justify-content: center; transform: scale(0); opacity: 0; transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s; z-index: 4; }
+.pop-capsule-stage.opened .pop-reward-item { transform: scale(1.15); opacity: 1; }
+.pop-reward-icon { font-size: 44px; line-height: 1.1; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.12)); }
+.pop-reward-name { margin-top: 6px; font-size: 14px; font-weight: 900; color: #be185d; background: #fdf2f8; padding: 3px 12px; border-radius: 12px; border: 1.5px solid #fbcfe8; }
+.modal-footer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+.btn-gacha-start { padding: 11px; border-radius: 12px; border: 1.5px solid #f472b6; background: linear-gradient(135deg, #f472b6, #ec4899); color: #ffffff; font-size: 14px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3); }
+.btn-gacha-start:active { transform: scale(0.96); }
+.btn-gacha-start:disabled { background: #cbd5e1 !important; border-color: #94a3b8 !important; color: #64748b !important; box-shadow: none; cursor: not-allowed; }
+.btn-modal-close { padding: 11px; border-radius: 12px; border: 1.5px solid #cbd5e1; background: #f1f5f9; color: #475569; font-size: 14px; font-weight: 900; cursor: pointer; }
+.btn-modal-close:active { transform: scale(0.96); background: #e2e8f0; }
+​.grid-5x5, .grid-5x2 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: #f8fafc; padding: 8px; border-radius: 14px; border: 1.5px solid #e2e8f0; }
+.grid-cell { aspect-ratio: 1 / 1; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 10px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s ease; overflow: hidden; }
+.grid-cell:active { transform: scale(0.93); }
+.grid-cell.filled { background: #f0f9ff; border-color: #93c5fd; }
+.grid-cell.terrain-cell { background: #edf7ed; border-color: #86efac; }
+.grid-cell.terrain-cell.has-obj { background: #fef9c3; border-color: #fde047; }
+.cell-icon { font-size: 22px; line-height: 1; }
+.cell-count { position: absolute; right: 3px; bottom: 2px; font-size: 9.5px; font-weight: 900; color: #1e293b; background: rgba(255, 255, 255, 0.92); padding: 0 3px; border-radius: 4px; border: 1px solid #cbd5e1; line-height: 1.2; }
+.cell-coord { position: absolute; top: 2px; left: 3px; font-size: 8px; font-weight: 700; color: #64748b; line-height: 1; }
+.cell-step-lvl { position: absolute; right: 3px; top: 2px; font-size: 8.5px; font-weight: 900; color: #047857; background: #ecfdf5; padding: 0 3px; border-radius: 4px; border: 1px solid #a7f3d0; line-height: 1.2; }
+​.diary-robot-preview {
+display: flex; align-items: center; justify-content: center; flex-direction: column;
+background: linear-gradient(135deg, #e0f2fe, #bae6fd); padding: 16px;
+border-radius: 16px; border: 2px solid #7dd3fc; margin-bottom: 4px;
+}
+.diary-robot-emoji { font-size: 64px; line-height: 1.1; margin-bottom: 4px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); }
+.diary-tool-title { font-size: 13px; font-weight: 900; color: #0369a1; text-align: center; margin-top: 4px; }
+​.btn-log-view {
+width: 100%; padding: 12px; border-radius: 12px; border: 1.5px solid #fbbf24;
+background: linear-gradient(135deg, #fde047, #facc15); color: #854d0e;
+font-size: 14px; font-weight: 900; cursor: pointer; display: flex; justify-content: center; gap: 6px; margin-top: 8px;
+}
+.btn-log-view:active { transform: scale(0.97); }
+​.settings-card { background: #f8fafc; border: 2px solid #e2e8f0; padding: 10px; border-radius: 12px; cursor: pointer; }
+.settings-card.selected-google { border-color: #60a5fa; background: #eff6ff; }
+.settings-card.selected-github { border-color: #c084fc; background: #faf5ff; }
+.input-box { width: 100%; padding: 8px 10px; background: #ffffff; border: 1.5px solid #cbd5e1; color: #0f172a; border-radius: 8px; font-size: 12px; margin-top: 5px; }
+.save-btn { padding: 11px; background: #3b82f6; color: #fff; border: none; border-radius: 12px; font-weight: 900; cursor: pointer; font-size: 14px; box-shadow: 0 3px 10px rgba(59, 130, 246, 0.3); }
+.reset-btn { padding: 10px; background: #fee2e2; color: #b91c1c; border: 1.5px solid #fca5a5; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 12px; margin-top: 4px; }
+​#toast-msg {
+font-size: 13px; line-height: 1.4; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
+background: rgba(255, 255, 255, 0.98); border: 2px solid #60a5fa; border-radius: 14px; padding: 8px 18px; font-weight: 900; color: #1e3a8a; z-index: 150;
+opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+#toast-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-
-  <div class="app-container">
-    <div class="top-window" id="sky-window">
-      <div id="stage-3d"><div id="c3d"></div></div>
-
-      <div class="top-gauge-panel">
-        <div class="gauge-grid">
-          <div class="gauge-col"><div class="gauge-label">❤️ たいりょく <span id="v-energy" class="gauge-num">100</span></div><div class="bar-bg"><div id="b-energy" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #f87171, #ef4444);"></div></div></div>
-          <div class="gauge-col"><div class="gauge-label">🍙 おなか <span id="v-stamina" class="gauge-num">100</span></div><div class="bar-bg"><div id="b-stamina" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #fde047, #eab308);"></div></div></div>
-          <div class="gauge-col"><div class="gauge-label">🎵 ごきげん <span id="v-mental" class="gauge-num">100</span></div><div class="bar-bg"><div id="b-mental" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #6ee7b7, #10b981);"></div></div></div>
-        </div>
-        <div class="robot-status-row">
-          <div style="display:flex; align-items:center; gap:5px;">
-            <span id="ui-robot-id" class="robot-id-tag">🤖 ロボ1ごう (0, 0)</span>
-            <span id="ui-speed-tag" class="speed-badge">⚡ 速度 3</span>
-          </div>
-          <span id="ui-robot-drive" class="robot-drive-badge">😊 あんしん・まんぷく</span>
-          <div class="status-right-col">
-            <span id="ui-time-phase" class="time-phase-badge">☀️ 朝</span>
-            <span id="ui-step-count" class="robot-id-tag">⭐ 0手目</span>
-            <button type="button" class="btn-setting-gear-inline" onclick="openModal('settingModal')" title="せってい">⚙️</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="side-btn-col">
-        <button type="button" class="btn-side-circle" onclick="openDiaryModal()" title="手帳（ステータス）">📖</button>
-      </div>
-
-      <div id="placement-cancel-bar" class="placement-cancel-bar" onclick="cancelPlacementMode()">
-        ✕ 配置をやめる
-      </div>
-
-      <div class="fan-menu-wrapper">
-        <div class="fan-radial-container" id="fanRadialMenu">
-          <svg class="fan-svg" id="fan-svg-root" viewBox="0 0 340 195"></svg>
-        </div>
-        <button type="button" class="btn-circle-main" id="btn-circle-toggle" onclick="toggleFanMenu()">
-          <span class="circle-icon" id="circle-icon">＋</span>
-        </button>
-      </div>
-    </div>
-
-    <div class="bottom-window">
-      <div class="voice-header">
-        <span class="voice-title">💭 ロボのきもち・心のさけび</span>
-        <span id="comm-lamp" class="comm-lamp lamp-standby">💤 待機中</span>
-      </div>
-      <div class="voice-bubble" id="voice-bubble">
-        <div class="voice-text" id="voice-text">
-          ここは世界の果て。四角い大地のまわりを丸い海が包み込み、白い波しぶきを立てながら外の滝へと流れ落ちているよ。<br>
-          泡立つ滝のずっと下には、この世界を支える古代遺跡のカメさんが眠っているんだって！
-        </div>
-      </div>
-      <div class="action-note-row">
-        <div style="display:flex; align-items:center; gap:5px;">
-          <span class="action-badge">👟 やった事</span>
-          <span id="action-note-text">待機中（まだ動いていないよ）</span>
-        </div>
-        <span id="physics-note-text" style="font-size:10px; color:#3b82f6; font-weight:800;">中央静止中</span>
-      </div>
-    </div>
-
-    <div class="footer-bar">
-      <button type="button" class="btn-think-now" id="btn-think-now" onclick="triggerThinkNow()">⚡ 今すぐ考える</button>
-      <button type="button" class="btn-think-now btn-respawn" id="btn-respawn" onclick="respawnRobot()">🔄 つぎの世代へ引き継ぐ</button>
-    </div>
-  </div>
-
-  <div id="toast-msg">💾 データを保存したよ</div>
-
-  <div class="modal-cover" id="diaryModal" style="display:none;">
-    <div class="modal-box">
-      <div class="modal-head">
-        <div class="modal-title">📖 ロボット手帳（ステータス）</div>
-        <div class="close-btn" onclick="closeModal('diaryModal')">✕</div>
-      </div>
-      <div class="diary-robot-preview">
-        <div class="diary-robot-emoji">🤖</div>
-        <div style="font-size:14px; font-weight:900; color:#0f172a;" id="diary-robot-name">第1世代 ロボット</div>
-        <div style="font-size:11px; color:#475569; margin-top:2px;" id="diary-robot-pos-sub">位置: (0, 0) / サブマス [2, 2]</div>
-      </div>
-      <div class="diary-tool-title">🎒 宝箱から見つけた「どうぐ」(5×2マス)</div>
-      <div class="grid-5x2" id="robot-tools-grid"></div>
-      
-      <button type="button" class="btn-log-view" onclick="showToast('📝 1日の記録は準備中だよ！')">📝 1日のきろくを見る</button>
-    </div>
-  </div>
-
-  <div class="modal-cover" id="gachaModal" style="display:none;">
-    <div class="modal-box" style="border-color:#fbcfe8;">
-      <div class="modal-head"><div class="modal-title" style="color:#be185d;">🎰 パステル・ガチャガチャ</div><div id="gacha-slot-status" style="font-size:11px; font-weight:800; color:#64748b;">空き枠あり</div></div>
-      <div class="gacha-stage-box">
-        <div class="gacha-svg-wrap">
-          <svg viewBox="0 0 220 250" width="100%" height="100%">
-            <ellipse cx="110" cy="240" rx="68" ry="8" fill="rgba(15,23,42,0.1)" />
-            <circle cx="110" cy="76" r="62" fill="rgba(240, 249, 255, 0.55)" stroke="#f9a8d4" stroke-width="3" />
-            <g id="gacha-dome-capsules">
-              <circle cx="80" cy="105" r="16" fill="#f9a8d4" stroke="#ec4899" stroke-width="1.5" /><path d="M 64 105 A 16 16 0 0 0 96 105 Z" fill="#ffffff" opacity="0.85" />
-              <circle cx="112" cy="112" r="16" fill="#93c5fd" stroke="#60a5fa" stroke-width="1.5" /><path d="M 96 112 A 16 16 0 0 0 128 112 Z" fill="#ffffff" opacity="0.85" />
-              <circle cx="140" cy="103" r="16" fill="#6ee7b7" stroke="#34d399" stroke-width="1.5" /><path d="M 124 103 A 16 16 0 0 0 156 103 Z" fill="#ffffff" opacity="0.85" />
-              <circle cx="95" cy="84" r="16" fill="#fde047" stroke="#eab308" stroke-width="1.5" /><path d="M 79 84 A 16 16 0 0 0 111 84 Z" fill="#ffffff" opacity="0.85" />
-              <circle cx="127" cy="82" r="16" fill="#d8b4fe" stroke="#a855f7" stroke-width="1.5" /><path d="M 111 82 A 16 16 0 0 0 143 82 Z" fill="#ffffff" opacity="0.85" />
-            </g>
-            <path d="M 66 45 A 52 52 0 0 1 118 26" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="6" stroke-linecap="round" />
-            <circle cx="62" cy="58" r="4" fill="rgba(255,255,255,0.85)" />
-            <path d="M 72 22 Q 110 8 148 22 L 140 30 Q 110 20 80 30 Z" fill="#f472b6" stroke="#ec4899" stroke-width="1.5" />
-            <path d="M 54 118 L 166 118 L 158 232 Q 158 240 148 240 L 72 240 Q 62 240 62 232 Z" fill="#fbcfe8" stroke="#f472b6" stroke-width="3" />
-            <rect x="48" y="112" width="124" height="14" rx="7" fill="#f472b6" stroke="#db2777" stroke-width="1.5" />
-            <circle cx="110" cy="158" r="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="3" />
-            <circle cx="110" cy="158" r="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
-            <g id="gacha-handle-group"><rect x="88" y="152" width="44" height="12" rx="6" fill="#f472b6" stroke="#db2777" stroke-width="2" /><circle cx="110" cy="158" r="7" fill="#ffffff" stroke="#db2777" stroke-width="2" /></g>
-            <rect x="84" y="196" width="52" height="36" rx="10" fill="#be185d" stroke="#f472b6" stroke-width="2.5" /><rect x="88" y="200" width="44" height="16" rx="5" fill="#831843" opacity="0.6" />
-          </svg>
-        </div>
-        <div class="capsule-pop-overlay" id="capsule-pop-overlay">
-          <div class="pop-capsule-stage" id="pop-capsule-stage">
-            <div class="cap-half-top" id="cap-half-top"></div><div class="cap-half-bottom"></div>
-            <div class="pop-reward-item"><div class="pop-reward-icon" id="pop-reward-icon">🍎</div><div class="pop-reward-name" id="pop-reward-name">りんご ×1</div></div>
-          </div>
-          <div style="font-size:12px; font-weight:900; color:#64748b; margin-top:8px;" id="pop-status-msg"></div>
-        </div>
-      </div>
-      <div style="font-size:11px; color:#64748b; text-align:center;">🍎・🌳・🪨・🌿・🎁(宝箱) がランダムに出るよ！</div>
-      <div class="modal-footer-btns">
-        <button type="button" class="btn-gacha-start" id="btn-gacha-spin" onclick="spinGachaMachine()">スタート</button>
-        <button type="button" class="btn-modal-close" onclick="closeModal('gachaModal')">閉じる</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-cover" id="itemModal" style="display:none;">
-    <div class="modal-box">
-      <div class="modal-head">
-        <div class="modal-title">🎒 アイテム（5×5 もちもの袋）</div>
-        <div id="item-bag-summary" style="font-size:11px; font-weight:800; color:#3b82f6;">0 / 25マス</div>
-      </div>
-      <div style="font-size:12px; color:#64748b;">使いたいアイテムをタップして、島に置いてね（すべて通り抜けできるよ）。石や草は高さを1段積み上げるよ！</div>
-      <div class="grid-5x5" id="inventory-grid-5x5"></div>
-      <button type="button" class="btn-modal-close" style="width:100%;" onclick="closeModal('itemModal')">閉じる</button>
-    </div>
-  </div>
-
-  <div class="modal-cover" id="cleanModal" style="display:none;">
-    <div class="modal-box">
-      <div class="modal-head"><div class="modal-title">⛏️ 整地（中央大地の5×5マス目マップ）</div><div class="close-btn" onclick="closeModal('cleanModal')">✕</div></div>
-      <div class="grid-5x5" id="clean-grid-5x5"></div>
-      <div class="modal-footer-btns">
-        <button type="button" class="save-btn" style="background:#10b981;" onclick="cleanAllIslandFromModal()">✨ 大地を整地</button>
-        <button type="button" class="btn-modal-close" onclick="closeModal('cleanModal')">閉じる</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-cover" id="exitModal" style="display:none;">
-    <div class="modal-box" style="text-align:center; border-color:#f4a8b8; background:#fffafb;">
-      <div style="font-size:36px; margin-bottom:2px;">🌙</div><div style="font-size:16px; font-weight:900; color:#9f1239;">データを保存して終了しました</div>
-      <button type="button" class="save-btn" style="background:#f43f5e; margin-top:6px;" onclick="closeModal('exitModal')">もどる</button>
-    </div>
-  </div>
-
-  <div class="modal-cover" id="settingModal" style="display:none;">
-    <div class="modal-box">
-      <div class="modal-head"><div class="modal-title">⚙️ AIのせってい</div><div class="close-btn" onclick="closeModal('settingModal')">✕</div></div>
-      <div class="settings-card selected-google" id="grp-google-key" onclick="selectModelInModal('gemini-3.8-flash')">
-        <div style="font-size:13px; font-weight:900; color:#2563eb;">🟦 Google Gemini 3.8（じっくり派）</div>
-        <input type="password" id="input-google-key" class="input-box" placeholder="ここにGoogleキーを貼り付け" onclick="event.stopPropagation(); selectModelInModal('gemini-3.8-flash');" oninput="autoSaveKey('google', this.value)">
-      </div>
-      <div class="settings-card" id="grp-github-key" onclick="selectModelInModal('openai/gpt-oss-120b')">
-        <div style="font-size:13px; font-weight:900; color:#9333ea;">🟪 Groq 120B（ばくそく派）</div>
-        <input type="password" id="input-github-key" class="input-box" placeholder="ここにGroqキー (gsk_...) を貼り付け" onclick="event.stopPropagation(); selectModelInModal('openai/gpt-oss-120b');" oninput="autoSaveKey('github', this.value)">
-      </div>
-      <button type="button" class="save-btn" id="modal-save-btn" onclick="saveKeys()">決定してとじる</button>
-      <button type="button" class="reset-btn" onclick="resetGameDirectly()">🔄 データを消して最初からやり直す（初期化）</button>
-    </div>
-  </div>
-
-  <script>
-    class LifeCore {
-      #energy = 100; #stamina = 100; #mental = 100; #isAlive = true; #memory = {};
-      #lastStateKey = null; #lastAction = null; #lastWellbeing = 100; #lastDelta = 0;
-      constructor(savedData = null) { if (savedData) this.importSave(savedData); else this.#lastWellbeing = this.#calculateWellbeing(); Object.freeze(this); }
-      #calculateWellbeing() { if (!this.#isAlive) return 0; return (this.#energy * 0.5) + (this.#stamina * 0.3) + (this.#mental * 0.2); }
-      #determineCurrentDrive() {
-        if (this.#energy <= 0) return 'DEAD'; if (this.#stamina <= 0) return 'FAINT';
-        if (this.#energy <= 30) return 'STARVING'; if (this.#stamina <= 25) return 'EXHAUSTED';
-        if (this.#energy <= 60) return 'HUNGRY'; if (this.#mental <= 30) return 'BORED'; return 'PEACE';
-      }
-      tick(availableActions = []) {
-        if (!this.#isAlive) return 'NONE';
-        this.#energy = Math.max(0, this.#energy - 2); this.#stamina = Math.max(0, this.#stamina - 1); this.#mental = Math.max(0, this.#mental - 1);
-        if (this.#energy <= 0) { this.#isAlive = false; this.#lastAction = 'NONE'; return 'NONE'; }
-        const currentDrive = this.#determineCurrentDrive(); this.#lastWellbeing = this.#calculateWellbeing();
-        if (currentDrive === 'FAINT') { this.#lastStateKey = 'FAINT'; this.#lastAction = 'FORCE_SLEEP'; return 'FORCE_SLEEP'; }
-        if (!Array.isArray(availableActions) || availableActions.length === 0) return 'WAIT';
-        if (!this.#memory[currentDrive]) this.#memory[currentDrive] = {};
-        for (const act of availableActions) if (this.#memory[currentDrive][act] === undefined) this.#memory[currentDrive][act] = 0;
-        const curiosityRate = (currentDrive === 'BORED') ? 0.7 : 0.2;
-        let chosenAction;
-        if (Math.random() < curiosityRate) { chosenAction = availableActions[Math.floor(Math.random() * availableActions.length)]; }
-        else { chosenAction = availableActions.reduce((best, current) => this.#memory[currentDrive][current] > this.#memory[currentDrive][best] ? current : best, availableActions[0]); }
-        if (chosenAction === this.#lastAction) this.#mental = Math.max(0, this.#mental - 3);
-        this.#lastStateKey = currentDrive; this.#lastAction = chosenAction; return chosenAction;
-      }
-      feedback(dEnergy = 0, dStamina = 0, dMental = 0) {
-        if (!this.#isAlive) return;
-        if (this.#lastAction === 'FORCE_SLEEP') { this.#stamina = Math.min(100, Math.max(0, this.#stamina + 30)); this.#lastDelta = 0; return; }
-        this.#energy = Math.min(100, Math.max(0, this.#energy + dEnergy)); this.#stamina = Math.min(100, Math.max(0, this.#stamina + dStamina)); this.#mental = Math.min(100, Math.max(0, this.#mental + dMental));
-        if (this.#energy <= 0) this.#isAlive = false;
-        const newWellbeing = this.#calculateWellbeing(); const reward = newWellbeing - this.#lastWellbeing; this.#lastDelta = Number(reward.toFixed(2));
-        if (this.#lastStateKey && this.#lastAction && this.#memory[this.#lastStateKey]) {
-          const currentScore = this.#memory[this.#lastStateKey][this.#lastAction] || 0;
-          this.#memory[this.#lastStateKey][this.#lastAction] = Number((currentScore + reward).toFixed(2));
-        }
-      }
-      getState() { return Object.freeze({ isAlive: this.#isAlive, energy: this.#energy, stamina: this.#stamina, mental: this.#mental, drive: this.#determineCurrentDrive(), lastAction: this.#lastAction, feelingDelta: this.#lastDelta, memory: JSON.parse(JSON.stringify(this.#memory)) }); }
-      exportSave() { return JSON.stringify({ e: this.#energy, s: this.#stamina, m: this.#mental, a: this.#isAlive, mem: this.#memory }); }
-      importSave(jsonString) { try { const data = JSON.parse(jsonString); this.#energy = data.e ?? 100; this.#stamina = data.s ?? 100; this.#mental = data.m ?? 100; this.#isAlive = data.a ?? true; this.#memory = data.mem ?? {}; this.#lastWellbeing = this.#calculateWellbeing(); } catch (err) {} }
-    }
-    Object.freeze(LifeCore); Object.freeze(LifeCore.prototype);
-
-    const GeminiCore = Object.freeze({
-      DEFAULT_MODEL: 'gemini-3.8-flash',
-      async think(prompt, apiKey, customModel) {
-        let targetModel = customModel || this.DEFAULT_MODEL; if (targetModel.includes('2.5') || targetModel.includes('2.0') || targetModel.includes('1.5')) targetModel = this.DEFAULT_MODEL;
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey.trim()}`;
-        const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7, responseMimeType: 'application/json' } }) });
-        if (!res.ok) throw new Error(`Google エラー (${res.status})`);
-        const data = await res.json();
-        return this._parseJsonSafely(data?.candidates?.[0]?.content?.parts?.[0]?.text);
-      },
-      _parseJsonSafely(rawText) { const cleaned = rawText.replace(/\x60{3}json/gi, '').replace(/\x60{3}/g, '').trim(); return JSON.parse(cleaned.substring(cleaned.indexOf('{'), cleaned.lastIndexOf('}') + 1)); }
-    });
-    const GroqCore = Object.freeze({
-      DEFAULT_MODEL: 'openai/gpt-oss-120b',
-      async think(prompt, apiKey, modelName) {
-        const endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-        const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey.trim()}` }, body: JSON.stringify({ model: modelName || this.DEFAULT_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0.7, response_format: { type: 'json_object' } }) });
-        if (!res.ok) throw new Error(`Groq エラー (${res.status})`);
-        const data = await res.json(); return GeminiCore._parseJsonSafely(data?.choices?.[0]?.message?.content);
-      }
-    });
-
-    function buildFanMenuSVG() {
-      const svg = document.getElementById('fan-svg-root'); if (!svg) return;
-      const cx = 170, cy = 168, rIn = 30, rOut = 158, halfGap = 2.5;
-      const items = [{ id: 'gacha', icon: '🎰', label: 'ガチャ', startDeg: 180, endDeg: 135, isPink: false }, { id: 'item', icon: '🎒', label: 'アイテム', startDeg: 135, endDeg: 90, isPink: false }, { id: 'clean', icon: '⛏️', label: '整地', startDeg: 90, endDeg: 45, isPink: false }, { id: 'exit', icon: '🚪', label: '終了', startDeg: 45, endDeg: 0, isPink: true }];
-      const degToRad = d => (d * Math.PI) / 180, radToDeg = r => (r * 180) / Math.PI;
-      const offsetIn = radToDeg(Math.asin(halfGap / rIn)), offsetOut = radToDeg(Math.asin(halfGap / rOut));
-      let html = '';
-      for (const it of items) {
-        const a1Out = degToRad(it.startDeg - offsetOut), a2Out = degToRad(it.endDeg + offsetOut);
-        const a2In  = degToRad(it.endDeg + offsetIn), a1In  = degToRad(it.startDeg - offsetIn);
-        const x1Out = (cx + rOut * Math.cos(a1Out)).toFixed(2), y1Out = (cy - rOut * Math.sin(a1Out)).toFixed(2);
-        const x2Out = (cx + rOut * Math.cos(a2Out)).toFixed(2), y2Out = (cy - rOut * Math.sin(a2Out)).toFixed(2);
-        const x2In  = (cx + rIn * Math.cos(a2In)).toFixed(2), y2In  = (cy - rIn * Math.sin(a2In)).toFixed(2);
-        const x1In  = (cx + rIn * Math.cos(a1In)).toFixed(2), y1In  = (cy - rIn * Math.sin(a1In)).toFixed(2);
-        const dPath = `M ${x1Out} ${y1Out} A ${rOut} ${rOut} 0 0 1 ${x2Out} ${y2Out} L ${x2In} ${y2In} A ${rIn} ${rIn} 0 0 0 ${x1In} ${y1In} Z`;
-        const midRad = degToRad((it.startDeg + it.endDeg) / 2);
-        const centerX = cx + ((rIn + rOut) * 0.53) * Math.cos(midRad), centerY = cy - ((rIn + rOut) * 0.53) * Math.sin(midRad);
-        const sectorClass = it.isPink ? 'fan-sector fan-sector-pink' : 'fan-sector', labelClass = it.isPink ? 'fan-label fan-label-pink' : 'fan-label';
-        html += `<path class="${sectorClass}" d="${dPath}" onclick="triggerFanAction('${it.id}')"></path>
-                 <text x="${centerX.toFixed(1)}" y="${(centerY - 10).toFixed(1)}" class="fan-icon">${it.icon}</text>
-                 <text x="${centerX.toFixed(1)}" y="${(centerY + 12).toFixed(1)}" class="${labelClass}">${it.label}</text>`;
-      }
-      svg.innerHTML = html;
-    }
-
-    const TIME_PHASES = [
-      { name: '☀️ 朝', bg: 0x0f2b46, sun: 0xfffaed, hemi: 0xdbeafe, tagColor: '#0ea5e9', tagBg: '#e0f2fe' },
-      { name: '☀️ 昼', bg: 0x173e65, sun: 0xffffff, hemi: 0xe0f2fe, tagColor: '#0369a1', tagBg: '#ebf2f5' },
-      { name: '🌇 夕方', bg: 0x4a2432, sun: 0xfdba74, hemi: 0xfed7aa, tagColor: '#c2410c', tagBg: '#ffedd5' },
-      { name: '🌙 夜', bg: 0x1e1b4b, sun: 0x6366f1, hemi: 0x4338ca, tagColor: '#a5b4fc', tagBg: '#312e81' },
-      { name: '🌌 深淵', bg: 0x060913, sun: 0x312e81, hemi: 0x1e293b, tagColor: '#94a3b8', tagBg: '#0f172a' }
-    ];
-    function getCurrentTimePhaseIdx() { const cycle = ROBOT.stepCount % 20; if (cycle <= 3) return 0; if (cycle <= 7) return 1; if (cycle <= 11) return 2; if (cycle <= 15) return 3; return 4; }
-
-    const memStore = {};
-    const safeStorage = { getItem: k => memStore[k] ?? (() => { try { return localStorage.getItem(k); } catch(e){ return null; } })(), setItem: (k, v) => { memStore[k] = String(v); try { localStorage.setItem(k, String(v)); } catch(e){} }, removeItem: k => { delete memStore[k]; try { localStorage.removeItem(k); } catch(e){} } };
-    function showToast(msg) { const el = document.getElementById('toast-msg'); if (!el) return; el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2000); }
-
-    const DRIVE_JA = { PEACE: '😊 あんしん・まんぷく', BORED: '🥱 たい屈（あそびたい！）', HUNGRY: '🍙 おなかすいた…', EXHAUSTED: '💤 くたくた（ねむい）', STARVING: '🚨 はらぺこピンチ！！', FAINT: '💫 たおれて気絶中', DEAD: '💀 うごかなくなった' };
-
-    const GACHA_ITEMS = [
-      { type: 'apple', name: 'りんご', icon: '🍎', capColor: 'linear-gradient(135deg, #f9a8d4, #f472b6)', isTool: false },
-      { type: 'tree',  name: '木',     icon: '🌳', capColor: 'linear-gradient(135deg, #6ee7b7, #10b981)', isTool: false },
-      { type: 'stone', name: '石',     icon: '🪨', capColor: 'linear-gradient(135deg, #93c5fd, #60a5fa)', isTool: false },
-      { type: 'grass', name: '草',     icon: '🌿', capColor: 'linear-gradient(135deg, #fde047, #eab308)', isTool: false },
-      { type: 'chest', name: '宝箱',   icon: '🎁', capColor: 'linear-gradient(135deg, #fcd34d, #f59e0b)', isTool: true }
-    ];
-    const CHEST_TOOLS = [ { name: 'オノ', icon: '🪓' }, { name: 'ピッケル', icon: '⛏️' }, { name: '虫あみ', icon: '🕸️' }, { name: 'スコップ', icon: '🥄' } ];
-    
-    let inventorySlots = Array(25).fill(null);
-    let robotTools = Array(10).fill(null);
-    let placementMode = null;
-    let recentSounds = [];
-
-    const MAX_STEP_HEIGHT = 5;
-    const STEP_H = 0.35;
-    const SUB_DIV = 5;
-    const SUB_STEP = 1.0 / SUB_DIV;
-
-    const heightGrid = {};
-    for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) heightGrid[`${x},${z}`] = 0;
-
-    function isLand(gx, gz) { return (Math.abs(gx) <= 2 && Math.abs(gz) <= 2); }
-    function isSea(gx, gz) { return (Math.abs(gx) <= 3 && Math.abs(gz) <= 3) && !isLand(gx, gz); }
-    function isAbyss(gx, gz) { return (Math.abs(gx) > 3 || Math.abs(gz) > 3); }
-
-    function getTileHeight(gx, gz) {
-      if (isLand(gx, gz)) return heightGrid[`${gx},${gz}`] !== undefined ? heightGrid[`${gx},${gz}`] : 0;
-      if (isSea(gx, gz)) return -0.4;
-      return -99;
-    }
-    function setTileHeight(gx, gz, h) {
-      if (isLand(gx, gz)) heightGrid[`${gx},${gz}`] = Math.max(0, Math.min(MAX_STEP_HEIGHT, h));
-    }
-
-    function getAvailableGachaTypes() { const hasEmpty = inventorySlots.some(s => s === null); if (hasEmpty) return GACHA_ITEMS; return GACHA_ITEMS.filter(item => inventorySlots.some(s => s && s.type === item.type && s.count < 10)); }
-    function addItemToInventory(itemType) { for (let i = 0; i < 25; i++) if (inventorySlots[i] && inventorySlots[i].type === itemType && inventorySlots[i].count < 10) { inventorySlots[i].count++; return i; } for (let i = 0; i < 25; i++) if (inventorySlots[i] === null) { inventorySlots[i] = { type: itemType, count: 1 }; return i; } return -1; }
-    function removeInventoryItem(itemType) { for (let i = 0; i < 25; i++) { if (inventorySlots[i] && inventorySlots[i].type === itemType) { inventorySlots[i].count--; if (inventorySlots[i].count <= 0) inventorySlots[i] = null; return true; } } return false; }
-    
-    function addToolToRobot() {
-      const tool = CHEST_TOOLS[Math.floor(Math.random() * CHEST_TOOLS.length)];
-      for (let i = 0; i < 10; i++) { if (robotTools[i] === null) { robotTools[i] = tool; return tool; } }
-      return null;
-    }
-
-    let life = new LifeCore();
-    const ROBOT = {
-      gen: 1, stepCount: 0,
-      pos: { gx: 0, gz: 0, sx: 2, sz: 2 },
-      speed: 3,
-      rotY: 0, hasApple: false,
-      lastVoice: "四角い大地のまわりを丸い海が包み込んで、白波を立てているよ！",
-      lastActionNote: "待機中"
-    };
-
-    function calcWorldPos(gx, gz, sx = 2, sz = 2) {
-      const wx = gx + (sx - 2) * SUB_STEP;
-      const wz = gz + (sz - 2) * SUB_STEP;
-      return { x: wx, z: wz };
-    }
-
-    function getActiveModel() { const saved = safeStorage.getItem('ai_custom_model'); if (!saved) return GeminiCore.DEFAULT_MODEL; if (saved.includes('2.5') || saved.includes('2.0') || saved.includes('1.5')) return GeminiCore.DEFAULT_MODEL; return saved; }
-    function getKeyForCurrentModel() { return getActiveModel().startsWith('gemini') ? (safeStorage.getItem('key_google') || '') : (safeStorage.getItem('key_github') || ''); }
-
-    let fieldObjects = [];
-
-    function saveWorldState() {
-      try { safeStorage.setItem('island_game_save_v4', JSON.stringify({ lifeSave: life.exportSave(), robot: ROBOT, objs: fieldObjects.map(o => ({ gx: o.gx, gz: o.gz, type: o.type })), inventory: inventorySlots, tools: robotTools, heights: heightGrid })); } catch (e) {}
-    }
-    let pendingLoadedObjs = null;
-    function tryLoadWorldState() {
-      try {
-        const data = JSON.parse(safeStorage.getItem('island_game_save_v4')); if (!data || !data.lifeSave) return false;
-        life = new LifeCore(data.lifeSave); Object.assign(ROBOT, data.robot); pendingLoadedObjs = Array.isArray(data.objs) ? data.objs : null;
-        if (Array.isArray(data.inventory) && data.inventory.length === 25) inventorySlots = data.inventory;
-        if (Array.isArray(data.tools) && data.tools.length === 10) robotTools = data.tools;
-        if (data.heights && typeof data.heights === 'object') Object.assign(heightGrid, data.heights);
-        return true;
-      } catch (e) { return false; }
-    }
-    function resetGameDirectly() {
-      safeStorage.removeItem('island_game_save_v4');
-      showToast('🔄 初期化しました！');
-      setTimeout(() => location.reload(), 600);
-    }
-
-    let scene, camera, renderer, world, clickBlocks = [];
-    let allTerrainBlocks = [];
-    let stepMeshGroup = null, turtleGroup = null, cloudGroup = null, waterfallGroup = null;
-    let celestialGroup = null, starPoints = null, starDomeMesh = null, celestialRings = [];
-    let starOpacityTarget = 0;
-    let chara, bodyM, headM, rArm, lArm, rLeg, lLeg, handApple;
-    let hemiLight, sunLight;
-    let targetBgColor = new THREE.Color(0x0f2b46), targetHemiColor = new THREE.Color(0xdbeafe), targetSunColor = new THREE.Color(0xfffaed);
-
-    let camHeight = 8.5;
-    let camDist = 9.8;
-
-    function generateCelestialDomeTexture() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512; canvas.height = 256;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, 512, 256);
-
-      const grad = ctx.createLinearGradient(0, 0, 512, 256);
-      grad.addColorStop(0.0, 'rgba(30, 27, 75, 0.0)');
-      grad.addColorStop(0.35, 'rgba(99, 102, 241, 0.18)');
-      grad.addColorStop(0.5, 'rgba(244, 114, 182, 0.22)');
-      grad.addColorStop(0.65, 'rgba(56, 189, 248, 0.18)');
-      grad.addColorStop(1.0, 'rgba(30, 27, 75, 0.0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 512, 256);
-
-      for (let i = 0; i < 180; i++) {
-        const x = Math.random() * 512;
-        const y = Math.random() * 256;
-        const r = 0.6 + Math.random() * 1.4;
-        ctx.fillStyle = `rgba(255, 255, 255, ${(0.3 + Math.random() * 0.6).toFixed(2)})`;
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      return new THREE.CanvasTexture(canvas);
-    }
-
-    function buildCelestialSphere() {
-      celestialGroup = new THREE.Group();
-      world.add(celestialGroup);
-
-      const domeTex = generateCelestialDomeTexture();
-      const domeGeo = new THREE.SphereGeometry(24, 32, 24);
-      const domeMat = new THREE.MeshBasicMaterial({
-        map: domeTex,
-        transparent: true,
-        opacity: 0.0,
-        side: THREE.BackSide,
-        depthWrite: false
-      });
-      starDomeMesh = new THREE.Mesh(domeGeo, domeMat);
-      celestialGroup.add(starDomeMesh);
-
-      const starCount = 320;
-      const positions = new Float32Array(starCount * 3);
-      const colors = new Float32Array(starCount * 3);
-      const palette = [
-        new THREE.Color(0xffffff),
-        new THREE.Color(0xfef08a),
-        new THREE.Color(0xbae6fd),
-        new THREE.Color(0xfbcfe8),
-        new THREE.Color(0xfde047)
-      ];
-
-      for (let i = 0; i < starCount; i++) {
-        const rad = 17.5 + Math.random() * 5.0;
-        const theta = Math.random() * Math.PI * 2;
-        const phi = Math.acos(2 * Math.random() - 1);
-
-        positions[i * 3]     = rad * Math.sin(phi) * Math.cos(theta);
-        positions[i * 3 + 1] = rad * Math.cos(phi);
-        positions[i * 3 + 2] = rad * Math.sin(phi) * Math.sin(theta);
-
-        const c = palette[Math.floor(Math.random() * palette.length)];
-        colors[i * 3]     = c.r;
-        colors[i * 3 + 1] = c.g;
-        colors[i * 3 + 2] = c.b;
-      }
-
-      const starGeo = new THREE.BufferGeometry();
-      starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-      const starMat = new THREE.PointsMaterial({
-        size: 0.42,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.0,
-        depthWrite: false
-      });
-      starPoints = new THREE.Points(starGeo, starMat);
-      celestialGroup.add(starPoints);
-
-      celestialRings = [];
-      const ringMat1 = new THREE.MeshBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false });
-      const ring1 = new THREE.Mesh(new THREE.RingGeometry(16.8, 16.92, 64), ringMat1);
-      ring1.rotation.x = Math.PI / 2.3;
-      ring1.rotation.y = 0.3;
-      celestialGroup.add(ring1);
-      celestialRings.push(ring1);
-
-      const ringMat2 = new THREE.MeshBasicMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false });
-      const ring2 = new THREE.Mesh(new THREE.RingGeometry(18.2, 18.3, 64), ringMat2);
-      ring2.rotation.x = -Math.PI / 3.0;
-      ring2.rotation.z = 0.4;
-      celestialGroup.add(ring2);
-      celestialRings.push(ring2);
-    }
-
-    let turtleFlippers = [];
-
-    function buildWorldTurtle() {
-      turtleGroup = new THREE.Group();
-      turtleGroup.position.set(0, -6.2, 0);
-      world.add(turtleGroup);
-
-      const matShell = new THREE.MeshLambertMaterial({ color: 0x9b8370 });
-      const matSkin  = new THREE.MeshLambertMaterial({ color: 0xb5a08e });
-      const matRuin  = new THREE.MeshLambertMaterial({ color: 0xc8b6a6 });
-      const matEye   = new THREE.MeshBasicMaterial({ color: 0x4a3b32 });
-
-      const shell = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.5, 7.2), matShell);
-      shell.position.set(0, -0.6, 0);
-      turtleGroup.add(shell);
-
-      const ruinPlate = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.5, 5.8), matRuin);
-      ruinPlate.position.set(0, 0.2, 0);
-      turtleGroup.add(ruinPlate);
-
-      const ruinCenter = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.6, 3.4), matShell);
-      ruinCenter.position.set(0, 0.5, 0);
-      turtleGroup.add(ruinCenter);
-
-      const head = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.2, 2.2), matSkin);
-      head.position.set(0, -0.4, -4.4);
-      turtleGroup.add(head);
-
-      const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), matEye);
-      eyeL.position.set(-0.85, -0.2, -4.9);
-      turtleGroup.add(eyeL);
-      const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), matEye);
-      eyeR.position.set(0.85, -0.2, -4.9);
-      turtleGroup.add(eyeR);
-
-      const flipperGeo = new THREE.BoxGeometry(2.3, 0.4, 1.6);
-      turtleFlippers = [];
-
-      const flL = new THREE.Mesh(flipperGeo, matSkin);
-      flL.position.set(-4.2, -0.8, -2.2); flL.rotation.y = 0.4;
-      turtleGroup.add(flL); turtleFlippers.push(flL);
-
-      const flR = new THREE.Mesh(flipperGeo, matSkin);
-      flR.position.set(4.2, -0.8, -2.2); flR.rotation.y = -0.4;
-      turtleGroup.add(flR); turtleFlippers.push(flR);
-
-      const blL = new THREE.Mesh(flipperGeo, matSkin);
-      blL.position.set(-3.9, -0.8, 2.6); blL.rotation.y = -0.3;
-      turtleGroup.add(blL); turtleFlippers.push(blL);
-
-      const blR = new THREE.Mesh(flipperGeo, matSkin);
-      blR.position.set(3.9, -0.8, 2.6); blR.rotation.y = 0.3;
-      turtleGroup.add(blR); turtleFlippers.push(blR);
-
-      const tail = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 1.2), matSkin);
-      tail.position.set(0, -0.7, 4.0);
-      turtleGroup.add(tail);
-    }
-
-    let cloudPlates = [];
-    function buildCloudSea() {
-      cloudGroup = new THREE.Group();
-      cloudGroup.position.set(0, -4.5, 0);
-      world.add(cloudGroup);
-
-      const mistDiscGeo = new THREE.CircleGeometry(5.5, 48);
-      const mistDiscMat = new THREE.MeshBasicMaterial({
-        color: 0xf1f5f9, transparent: true, opacity: 0.92, side: THREE.DoubleSide
-      });
-      const mistDisc = new THREE.Mesh(mistDiscGeo, mistDiscMat);
-      mistDisc.rotation.x = -Math.PI / 2;
-      mistDisc.position.set(0, 0.05, 0);
-      cloudGroup.add(mistDisc);
-
-      const cloudMat = new THREE.MeshLambertMaterial({
-        color: 0xe2e8f0, transparent: true, opacity: 0.85
-      });
-
-      const cloudDefs = [
-        { x: -2.2, y: -0.2, z: -1.8, w: 4.2, h: 0.7, d: 3.8 },
-        { x: 2.0,  y: -0.3, z: 2.0,  w: 4.4, h: 0.6, d: 4.0 },
-        { x: -1.6, y: -0.4, z: 2.2,  w: 3.8, h: 0.7, d: 3.6 },
-        { x: 1.8,  y: -0.1, z: -2.0, w: 4.0, h: 0.6, d: 3.8 }
-      ];
-
-      cloudPlates = [];
-      cloudDefs.forEach((cd, i) => {
-        const cMesh = new THREE.Mesh(new THREE.BoxGeometry(cd.w, cd.h, cd.d), cloudMat);
-        cMesh.position.set(cd.x, cd.y, cd.z);
-        cMesh.userData = { origX: cd.x, speed: 0.003 + i * 0.001 };
-        cloudGroup.add(cMesh);
-        cloudPlates.push(cMesh);
-      });
-    }
-
-    let waterfallTexture = null;
-    let waterfallCylinder = null;
-    let seaSurfaceMesh = null;
-    let innerFoamDisc = null;
-
-    function generateWaterfallBaseTexture() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 64; canvas.height = 256;
-      const ctx = canvas.getContext('2d');
-      const grad = ctx.createLinearGradient(0, 0, 0, 256);
-      grad.addColorStop(0.0, 'rgba(56, 189, 248, 0.85)');
-      grad.addColorStop(0.45, 'rgba(125, 211, 252, 0.90)');
-      grad.addColorStop(0.80, 'rgba(224, 242, 254, 0.96)');
-      grad.addColorStop(1.0, 'rgba(255, 255, 255, 1.0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 64, 256);
-      return new THREE.CanvasTexture(canvas);
-    }
-
-    function generateWaterfallTexture() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 256; canvas.height = 256;
-      const ctx = canvas.getContext('2d');
-
-      ctx.clearRect(0, 0, 256, 256);
-
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
-      for (let i = 0; i < 36; i++) {
-        const x = Math.random() * 256;
-        const w = 1.5 + Math.random() * 4.5;
-        ctx.fillRect(x, 0, w, 256);
-      }
-
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
-      for (let i = 0; i < 90; i++) {
-        const px = Math.random() * 256;
-        const py = Math.random() * 256;
-        const len = 18 + Math.random() * 45;
-        const w = 1.5 + Math.random() * 2.5;
-        ctx.fillRect(px, py, w, len);
-        if (py + len > 256) {
-          ctx.fillRect(px, py - 256, w, len);
-        }
-      }
-
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-      for (let i = 0; i < 120; i++) {
-        const px = Math.random() * 256;
-        const py = Math.random() * 256;
-        const r = 1.5 + Math.random() * 3.0;
-        ctx.beginPath();
-        ctx.arc(px, py, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      const tex = new THREE.CanvasTexture(canvas);
-      tex.wrapS = THREE.RepeatWrapping;
-      tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(5, 2);
-      return tex;
-    }
-
-    function generateNaturalSeaTexture() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512; canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-
-      const cx = 256, cy = 256;
-      const maxR = 256;
-
-      const seaGrad = ctx.createRadialGradient(cx, cy, 110, cx, cy, maxR);
-      seaGrad.addColorStop(0.0, 'rgba(14, 165, 233, 0.95)');
-      seaGrad.addColorStop(0.55, 'rgba(56, 189, 248, 0.92)');
-      seaGrad.addColorStop(0.88, 'rgba(186, 230, 253, 0.95)');
-      seaGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0.98)');
-      ctx.fillStyle = seaGrad;
-      ctx.fillRect(0, 0, 512, 512);
-
-      const halfLand = 138;
-
-      for (let i = 24; i >= 2; i -= 3) {
-        ctx.strokeStyle = `rgba(255, 255, 255, ${(0.04 * (26 - i)).toFixed(3)})`;
-        ctx.lineWidth = i * 1.6;
-        ctx.lineJoin = 'round';
-        ctx.strokeRect(cx - halfLand, cy - halfLand, halfLand * 2, halfLand * 2);
-      }
-
-      const corners = [
-        [cx - halfLand, cy - halfLand, -1, -1],
-        [cx + halfLand, cy - halfLand,  1, -1],
-        [cx - halfLand, cy + halfLand, -1,  1],
-        [cx + halfLand, cy + halfLand,  1,  1]
-      ];
-      corners.forEach(([px, py, dx, dy]) => {
-        for (let step = 0; step < 5; step++) {
-          const ox = px + dx * (step * 10);
-          const oy = py + dy * (step * 10);
-          const r = 48 - step * 5;
-          const g = ctx.createRadialGradient(ox, oy, 2, ox, oy, r);
-          g.addColorStop(0.0, 'rgba(255, 255, 255, 0.55)');
-          g.addColorStop(0.5, 'rgba(240, 249, 255, 0.25)');
-          g.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
-          ctx.fillStyle = g;
-          ctx.beginPath();
-          ctx.arc(ox, oy, r, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      });
-
-      for (let i = 0; i < 420; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 135 + Math.random() * 118;
-        const sx = cx + Math.cos(angle) * dist;
-        const sy = cy + Math.sin(angle) * dist;
-        const sz = 1.0 + Math.random() * 3.0;
-        ctx.fillStyle = `rgba(255, 255, 255, ${(0.35 + Math.random() * 0.5).toFixed(2)})`;
-        ctx.beginPath();
-        ctx.arc(sx, sy, sz, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      const tex = new THREE.CanvasTexture(canvas);
-      return tex;
-    }
-
-    function buildWaterfalls() {
-      waterfallGroup = new THREE.Group();
-      world.add(waterfallGroup);
-
-      const baseTex = generateWaterfallBaseTexture();
-      const baseGeo = new THREE.CylinderGeometry(4.63, 5.12, 4.4, 64, 1, true);
-      const baseMat = new THREE.MeshLambertMaterial({
-        map: baseTex,
-        transparent: true,
-        opacity: 0.92,
-        side: THREE.DoubleSide
-      });
-      const baseCyl = new THREE.Mesh(baseGeo, baseMat);
-      baseCyl.position.set(0, -2.35, 0);
-      waterfallGroup.add(baseCyl);
-
-      waterfallTexture = generateWaterfallTexture();
-
-      const cylGeo = new THREE.CylinderGeometry(4.66, 5.16, 4.4, 64, 1, true);
-      const cylMat = new THREE.MeshLambertMaterial({
-        map: waterfallTexture,
-        transparent: true,
-        opacity: 0.85,
-        depthWrite: false,
-        side: THREE.DoubleSide
-      });
-      waterfallCylinder = new THREE.Mesh(cylGeo, cylMat);
-      waterfallCylinder.position.set(0, -2.35, 0);
-      waterfallGroup.add(waterfallCylinder);
-
-      const seaTex = generateNaturalSeaTexture();
-      const seaGeo = new THREE.CircleGeometry(4.65, 64);
-      const seaMat = new THREE.MeshLambertMaterial({
-        map: seaTex,
-        transparent: true,
-        opacity: 0.95,
-        side: THREE.DoubleSide
-      });
-      seaSurfaceMesh = new THREE.Mesh(seaGeo, seaMat);
-      seaSurfaceMesh.rotation.x = -Math.PI / 2;
-      seaSurfaceMesh.position.set(0, -0.15, 0);
-      waterfallGroup.add(seaSurfaceMesh);
-
-      const waveGeo = new THREE.RingGeometry(2.4, 4.62, 48);
-      const waveMat = new THREE.MeshBasicMaterial({
-        color: 0xe0f2fe,
-        transparent: true,
-        opacity: 0.35,
-        side: THREE.DoubleSide
-      });
-      innerFoamDisc = new THREE.Mesh(waveGeo, waveMat);
-      innerFoamDisc.rotation.x = -Math.PI / 2;
-      innerFoamDisc.position.set(0, -0.13, 0);
-      waterfallGroup.add(innerFoamDisc);
-    }
-
-    function buildChara() {
-      chara = new THREE.Group();
-
-      const bodyMat  = new THREE.MeshLambertMaterial({ color: 0x60a5fa });
-      const headMat  = new THREE.MeshLambertMaterial({ color: 0x93c5fd });
-      const jointMat = new THREE.MeshLambertMaterial({ color: 0x334155 });
-      const eyeMat   = new THREE.MeshBasicMaterial({ color: 0x1e293b });
-      const bulbMat  = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
-
-      bodyM = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.22), bodyMat);
-      bodyM.position.y = 0.32;
-      chara.add(bodyM);
-
-      headM = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.32, 0.3), headMat);
-      headM.position.y = 0.68;
-      chara.add(headM);
-
-      const eyeGeo = new THREE.BoxGeometry(0.06, 0.08, 0.04);
-      const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.1, 0.69, 0.16); chara.add(eyeL);
-      const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.1, 0.69, 0.16); chara.add(eyeR);
-
-      const bulb = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.08), bulbMat);
-      bulb.position.set(0, 0.88, 0); chara.add(bulb);
-
-      const armGeo = new THREE.BoxGeometry(0.1, 0.28, 0.1);
-      rArm = new THREE.Mesh(armGeo, jointMat); rArm.position.set(0.24, 0.32, 0); chara.add(rArm);
-      lArm = new THREE.Mesh(armGeo, jointMat); lArm.position.set(-0.24, 0.32, 0); chara.add(lArm);
-
-      const appleGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
-      const appleMat = new THREE.MeshLambertMaterial({ color: 0xef4444, visible: false });
-      handApple = new THREE.Mesh(appleGeo, appleMat);
-      handApple.position.set(0, -0.16, 0.06);
-      rArm.add(handApple);
-
-      const legGeo = new THREE.BoxGeometry(0.12, 0.2, 0.12);
-      rLeg = new THREE.Mesh(legGeo, jointMat); rLeg.position.set(0.09, 0.1, 0); chara.add(rLeg);
-      lLeg = new THREE.Mesh(legGeo, jointMat); lLeg.position.set(-0.09, 0.1, 0); chara.add(lLeg);
-
-      world.add(chara);
-    }
-
-    function init3D() {
-      if (typeof THREE === 'undefined') return;
-      const stage = document.getElementById('c3d');
-      if (!stage || renderer) return;
-      const w = Math.max(stage.clientWidth || window.innerWidth || 360, 240);
-      const h = Math.max(stage.clientHeight || 320, 240);
-
-      scene = new THREE.Scene();
-      const initialPhase = TIME_PHASES[getCurrentTimePhaseIdx()];
-      scene.background = new THREE.Color(initialPhase.bg);
-
-      camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
-      camera.position.set(0, camHeight, camDist);
-      camera.lookAt(0, 0.1, 0);
-
-      renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(w, h);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      stage.appendChild(renderer.domElement);
-
-      hemiLight = new THREE.HemisphereLight(initialPhase.hemi, 0x1e293b, 1.2);
-      scene.add(hemiLight);
-
-      sunLight = new THREE.DirectionalLight(initialPhase.sun, 0.9);
-      sunLight.position.set(6, 14, 7);
-      scene.add(sunLight);
-
-      world = new THREE.Group();
-      scene.add(world);
-
-      buildCelestialSphere();
-      buildCloudSea();
-      buildWaterfalls();
-      buildWorldTurtle();
-
-      stepMeshGroup = new THREE.Group();
-      world.add(stepMeshGroup);
-
-      buildTerrainVisuals();
-      buildChara();
-
-      const wp = calcWorldPos(ROBOT.pos.gx, ROBOT.pos.gz, ROBOT.pos.sx, ROBOT.pos.sz);
-      const curH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
-      chara.position.set(wp.x, 0.5 + (curH > 0 ? curH * STEP_H : 0), wp.z);
-      chara.rotation.y = ROBOT.rotY || 0;
-
-      if (pendingLoadedObjs && Array.isArray(pendingLoadedObjs)) {
-        for (const obj of pendingLoadedObjs) spawnObject(obj.gx, obj.gz, obj.type, false);
-        pendingLoadedObjs = null;
-      } else if (fieldObjects.length === 0) {
-        spawnObject(1, 0, 'apple', false);
-      }
-
-      setupTouchInteraction();
-      setTimeout(resizeRenderer, 100);
-      renderLoop();
-    }
-
-    function buildTerrainVisuals() {
-      if (!world || !stepMeshGroup) return;
-      while (stepMeshGroup.children.length > 0) stepMeshGroup.remove(stepMeshGroup.children[0]);
-      allTerrainBlocks = []; clickBlocks = [];
-
-      const baseGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
-      const stepGeo = new THREE.BoxGeometry(0.96, STEP_H - 0.02, 0.96);
-      const seaHitGeo = new THREE.BoxGeometry(0.98, 0.1, 0.98);
-
-      for (let x = -2; x <= 2; x++) {
-        for (let z = -2; z <= 2; z++) {
-          const h = getTileHeight(x, z);
-          const gMat = new THREE.MeshLambertMaterial({ color: 0x7ca982, transparent: true, opacity: 1.0 });
-          const topB = new THREE.Mesh(baseGeo, gMat);
-          topB.position.set(x, 0, z); topB.userData = { gx: x, gz: z };
-          stepMeshGroup.add(topB); clickBlocks.push(topB); allTerrainBlocks.push(topB);
-
-          const dMat = new THREE.MeshLambertMaterial({ color: 0x8a7058, transparent: true, opacity: 1.0 });
-          const underB = new THREE.Mesh(baseGeo, dMat);
-          underB.position.set(x, -1, z); underB.userData = { gx: x, gz: z };
-          stepMeshGroup.add(underB); allTerrainBlocks.push(underB);
-
-          for (let s = 1; s <= h; s++) {
-            const stepMat = new THREE.MeshLambertMaterial({
-              color: s % 2 === 1 ? 0x94a3b8 : 0x64748b,
-              transparent: true, opacity: 1.0
-            });
-            const stepB = new THREE.Mesh(stepGeo, stepMat);
-            stepB.position.set(x, 0.48 + (s - 0.5) * STEP_H, z);
-            stepB.userData = { gx: x, gz: z, stepLvl: s };
-            stepMeshGroup.add(stepB); clickBlocks.push(stepB); allTerrainBlocks.push(stepB);
-          }
-        }
-      }
-
-      const invisibleSeaMat = new THREE.MeshBasicMaterial({ visible: false });
-      for (let x = -3; x <= 3; x++) {
-        for (let z = -3; z <= 3; z++) {
-          if (isSea(x, z)) {
-            const seaB = new THREE.Mesh(seaHitGeo, invisibleSeaMat);
-            seaB.position.set(x, -0.15, z);
-            seaB.userData = { gx: x, gz: z, isSea: true };
-            stepMeshGroup.add(seaB); clickBlocks.push(seaB);
-          }
-        }
-      }
-
-      for (const obj of fieldObjects) {
-        const tileH = getTileHeight(obj.gx, obj.gz);
-        obj.mesh.position.y = 0.65 + (tileH > 0 ? tileH * STEP_H : 0);
-      }
-      if (chara && !isWalking) {
-        const wp = calcWorldPos(ROBOT.pos.gx, ROBOT.pos.gz, ROBOT.pos.sx, ROBOT.pos.sz);
-        const curH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
-        chara.position.set(wp.x, 0.5 + (curH > 0 ? curH * STEP_H : (isSea(ROBOT.pos.gx, ROBOT.pos.gz) ? -0.2 : 0)), wp.z);
-      }
-    }
-
-    function spawnObject(gx, gz, type, shouldSave = true) {
-      if (!world) return false;
-      const grp = new THREE.Group();
-      let color = 0xf87171;
-      if (type === 'tree') color = 0x10b981;
-      else if (type === 'stone') color = 0x94a3b8;
-      else if (type === 'grass') color = 0xa3e635;
-
-      const mainMesh = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.36), new THREE.MeshLambertMaterial({ color: color }));
-      grp.add(mainMesh);
-      if (type === 'apple') {
-        const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), new THREE.MeshLambertMaterial({ color: 0x86efac })); leaf.position.set(0, 0.22, 0); grp.add(leaf);
-      }
-      const tileH = getTileHeight(gx, gz);
-      grp.position.set(gx, 0.65 + (tileH > 0 ? tileH * STEP_H : 0), gz); world.add(grp);
-      
-      const meta = GACHA_ITEMS.find(it => it.type === type);
-      fieldObjects.push({ mesh: grp, gx: gx, gz: gz, type: type, meta: meta });
-      
-      if (shouldSave) saveWorldState();
-      return true;
-    }
-
-    function setupTouchInteraction() {
-      const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
-      let touchStartTime = 0, prevX = 0, prevY = 0; const topWindow = document.querySelector('.top-window');
-      topWindow.addEventListener('touchstart', e => {
-        if (e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
-        touchStartTime = performance.now();
-        if (e.touches.length === 1) {
-          prevX = e.touches[0].clientX;
-          prevY = e.touches[0].clientY;
-        }
-      }, { passive: true });
-      topWindow.addEventListener('touchmove', e => {
-        if (!world || e.touches.length !== 1 || e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
-        
-        const deltaX = e.touches[0].clientX - prevX;
-        world.rotation.y += deltaX * 0.008;
-        prevX = e.touches[0].clientX;
-
-        const deltaY = e.touches[0].clientY - prevY;
-        camHeight = Math.max(3.8, Math.min(13.5, camHeight + deltaY * 0.035));
-        camDist = Math.max(5.5, Math.min(13.0, camDist - deltaY * 0.012));
-        camera.position.set(0, camHeight, camDist);
-        camera.lookAt(0, 0.1, 0);
-        prevY = e.touches[0].clientY;
-      }, { passive: true });
-      topWindow.addEventListener('touchend', e => {
-        if (e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
-        if (performance.now() - touchStartTime < 250 && e.changedTouches.length === 1) {
-          if (!placementMode) return;
-          
-          const rect = topWindow.getBoundingClientRect(); const touch = e.changedTouches[0];
-          mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1; mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
-          raycaster.setFromCamera(mouse, camera);
-          const hits = raycaster.intersectObjects(clickBlocks);
-          if (hits.length > 0) {
-            const gx = hits[0].object.userData.gx, gz = hits[0].object.userData.gz;
-            
-            if (isSea(gx, gz) && (placementMode === 'stone' || placementMode === 'grass')) {
-              showToast("⚠️ 海の中にはブロックを積めないよ！");
-              return;
-            }
-
-            if (placementMode === 'stone' || placementMode === 'grass') {
-              const curH = getTileHeight(gx, gz);
-              if (curH >= MAX_STEP_HEIGHT) {
-                showToast(`⚠️ ここはもう${MAX_STEP_HEIGHT}段のてっぺんだよ！`);
-                return;
-              }
-              setTileHeight(gx, gz, curH + 1);
-              removeInventoryItem(placementMode);
-              buildTerrainVisuals();
-              showToast(`🧱 (${gx}, ${gz}) を ${curH + 1}段目 に積んだよ！`);
-              recentSounds.push({ x: gx, z: gz, text: "ドスン(ブロックを積んだ音)", age: 0 });
-              cancelPlacementMode();
-              saveWorldState();
-              return;
-            }
-
-            if (spawnObject(gx, gz, placementMode, true)) {
-              removeInventoryItem(placementMode);
-              const meta = GACHA_ITEMS.find(it => it.type === placementMode);
-              showToast(`✨ ${meta.icon} ${meta.name} を置いたよ！`);
-              recentSounds.push({ x: gx, z: gz, text: "トスン(何かを置いた音)", age: 0 });
-              cancelPlacementMode();
-            }
-          }
-        }
-      });
-    }
-
-    let isFanMenuOpen = false;
-    function toggleFanMenu() { isFanMenuOpen = !isFanMenuOpen; document.getElementById('fanRadialMenu').classList.toggle('open', isFanMenuOpen); document.getElementById('btn-circle-toggle').classList.toggle('active', isFanMenuOpen); }
-    function closeFanMenu() { if (isFanMenuOpen) toggleFanMenu(); }
-    function triggerFanAction(type) {
-      closeFanMenu();
-      if (type === 'gacha') { openGachaModal(); }
-      else if (type === 'item') { renderInventoryGrid(); openModal('itemModal'); }
-      else if (type === 'clean') { renderCleanGrid(); openModal('cleanModal'); }
-      else if (type === 'exit') { saveWorldState(); openModal('exitModal'); }
-    }
-    
-    function openDiaryModal() {
-      document.getElementById('diary-robot-name').textContent = `第${ROBOT.gen}世代 ロボット`;
-      const curArea = isSea(ROBOT.pos.gx, ROBOT.pos.gz) ? "🌊 海の中" : `大地 (${ROBOT.pos.gx}, ${ROBOT.pos.gz})`;
-      document.getElementById('diary-robot-pos-sub').textContent = `現在地: ${curArea} / サブマス [${ROBOT.pos.sx}, ${ROBOT.pos.sz}]`;
-      const grid = document.getElementById('robot-tools-grid');
-      grid.innerHTML = robotTools.map(t => {
-        if (!t) return `<div class="grid-cell" style="background:#f1f5f9;"></div>`;
-        return `<div class="grid-cell filled" onclick="showToast('${t.icon} ${t.name}')"><span class="cell-icon">${t.icon}</span></div>`;
-      }).join('');
-      openModal('diaryModal');
-    }
-
-    let isGachaSpinning = false;
-    function openGachaModal() { document.getElementById('capsule-pop-overlay').classList.remove('active'); document.getElementById('pop-capsule-stage').classList.remove('opened'); updateGachaModalStatus(); openModal('gachaModal'); }
-    function updateGachaModalStatus() {
-      const used = inventorySlots.filter(s => s !== null).length, avail = getAvailableGachaTypes();
-      document.getElementById('gacha-slot-status').textContent = avail.length === 0 ? '⚠️ 25マス満杯！' : `使用枠: ${used} / 25マス`;
-      document.getElementById('gacha-slot-status').style.color = avail.length === 0 ? '#ef4444' : '#64748b';
-      const btn = document.getElementById('btn-gacha-spin');
-      if (btn) { btn.disabled = avail.length === 0; btn.textContent = avail.length === 0 ? '満杯で回せません' : 'スタート'; }
-    }
-    async function spinGachaMachine() {
-      if (isGachaSpinning) return;
-      const avail = getAvailableGachaTypes(); if (avail.length === 0) return;
-      isGachaSpinning = true; document.getElementById('btn-gacha-spin').disabled = true;
-      const chosen = avail[Math.floor(Math.random() * avail.length)];
-
-      document.getElementById('gacha-handle-group').classList.add('turning'); document.getElementById('gacha-dome-capsules').classList.add('shaking');
-      await new Promise(r => setTimeout(r, 680));
-      document.getElementById('gacha-handle-group').classList.remove('turning'); document.getElementById('gacha-dome-capsules').classList.remove('shaking');
-
-      document.getElementById('cap-half-top').style.background = chosen.capColor;
-      document.getElementById('pop-reward-icon').textContent = chosen.icon;
-      document.getElementById('pop-reward-name').textContent = `${chosen.name} ×1個`;
-      document.getElementById('capsule-pop-overlay').classList.add('active');
-
-      await new Promise(r => setTimeout(r, 420));
-      document.getElementById('pop-capsule-stage').classList.add('opened');
-      
-      let msg = "";
-      if (chosen.type === 'chest') {
-        const tool = addToolToRobot();
-        if (tool) msg = `🎁 特賞！宝箱から「${tool.name}」が出た！手帳に入ったよ！`;
-        else msg = `🎁 宝箱を開けたけど、道具箱が満杯だったよ…`;
-      } else {
-        addItemToInventory(chosen.type);
-        msg = `✨ パカッ！「${chosen.name}」が入ったよ！`;
-        recentSounds.push({ x: 0, z: 0, text: "カチャッ(景品が出た音)", age: 0 });
-      }
-      
-      document.getElementById('pop-status-msg').textContent = msg;
-
-      life.feedback(0, -10, 30); updateHUD(); saveWorldState();
-      await new Promise(r => setTimeout(r, 500));
-      isGachaSpinning = false; updateGachaModalStatus();
-    }
-
-    function renderInventoryGrid() {
-      document.getElementById('inventory-grid-5x5').innerHTML = inventorySlots.map((s, i) => {
-        if (!s) return `<div class="grid-cell"></div>`;
-        const meta = GACHA_ITEMS.find(it => it.type === s.type);
-        return `<div class="grid-cell filled" onclick="startPlacementMode('${s.type}', '${meta.icon}', '${meta.name}')">
-          <span class="cell-icon">${meta.icon}</span><span class="cell-count">×${s.count}個</span>
-        </div>`;
-      }).join('');
-      document.getElementById('item-bag-summary').textContent = `${inventorySlots.filter(s=>s!==null).length} / 25マス`;
-    }
-    
-    function startPlacementMode(type, icon, name) {
-      if (type === 'chest') { showToast("宝箱は置けません"); return; }
-      placementMode = type;
-      closeModal('itemModal');
-      document.getElementById('placement-cancel-bar').classList.add('active');
-      showToast(`👇 好きなマスをタップして「${name}」を置いてね！`);
-    }
-    function cancelPlacementMode() {
-      placementMode = null;
-      document.getElementById('placement-cancel-bar').classList.remove('active');
-    }
-
-    function renderCleanGrid() {
-      let html = '';
-      for (let z = -2; z <= 2; z++) {
-        for (let x = -2; x <= 2; x++) {
-          const isRobo = (ROBOT.pos.gx === x && ROBOT.pos.gz === z);
-          const obj = fieldObjects.find(a => a.gx === x && a.gz === z);
-          const h = getTileHeight(x, z);
-          let icon = '🟩', cls = 'terrain-cell';
-          if (isRobo && obj) { icon = `🤖${obj.meta.icon}`; cls += ' has-obj'; }
-          else if (isRobo) { icon = '🤖'; }
-          else if (obj) { icon = obj.meta.icon; cls += ' has-obj'; }
-          else if (h > 0) { icon = '🧱'; }
-          
-          html += `<div class="grid-cell ${cls}" onclick="cleanSingleCell(${x}, ${z})">
-            <span class="cell-coord">${x},${z}</span>
-            <span class="cell-step-lvl">${h}段</span>
-            <span class="cell-icon" style="font-size:18px;">${icon}</span>
-          </div>`;
-        }
-      }
-      document.getElementById('clean-grid-5x5').innerHTML = html;
-    }
-    function cleanSingleCell(gx, gz) {
-      const idx = fieldObjects.findIndex(a => a.gx === gx && a.gz === gz);
-      if (idx !== -1) {
-        if (world) world.remove(fieldObjects[idx].mesh);
-        fieldObjects.splice(idx, 1);
-        saveWorldState(); renderCleanGrid(); showToast(`⛏️ (${gx}, ${gz}) の物を片づけたよ！`);
-        return;
-      }
-      const curH = getTileHeight(gx, gz);
-      if (curH > 0) {
-        setTileHeight(gx, gz, curH - 1);
-        buildTerrainVisuals();
-        saveWorldState(); renderCleanGrid();
-        showToast(`⛏️ (${gx}, ${gz}) を1段削ったよ (残り${curH - 1}段)`);
-      }
-    }
-    function cleanAllIslandFromModal() {
-      for (const a of fieldObjects) if (world) world.remove(a.mesh);
-      fieldObjects = [];
-      for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) heightGrid[`${x},${z}`] = 0;
-      buildTerrainVisuals();
-      saveWorldState(); renderCleanGrid(); showToast('✨ 大地をまっさらに整地したよ！');
-    }
-
-    function getDirection(cx, cz, tx, tz) {
-      if (tx===cx && tz===cz) return "足元";
-      let d = ""; if (tz < cz) d += "北"; if (tz > cz) d += "南"; if (tx > cx) d += "東"; if (tx < cx) d += "西"; return d;
-    }
-
-    function getEnvironmentInfo(cx, cz, timePhaseIdx) {
-      const isEvening = (timePhaseIdx === 2);
-      const isNight = (timePhaseIdx === 3 || timePhaseIdx === 4);
-      const curH = getTileHeight(cx, cz);
-      const hasHighVision = (!isSea(cx, cz) && curH >= 3);
-      
-      let vision = [];
-      if (fieldObjects.length === 0) vision.push("周りに何もない");
-      
-      fieldObjects.forEach(obj => {
-        const dist = Math.max(Math.abs(obj.gx - cx), Math.abs(obj.gz - cz));
-        let canSee = true;
-        if (!hasHighVision) {
-          if (isNight && dist > 0) canSee = false;
-          if (isEvening && dist > 1) canSee = false;
-        }
-        
-        if (canSee) {
-          const dir = getDirection(cx, cz, obj.gx, obj.gz);
-          const objH = getTileHeight(obj.gx, obj.gz);
-          vision.push(`[視界] ${dir}(距離${dist}歩・高さ${objH}段)に${obj.meta.icon}${obj.meta.name}が見える`);
-        }
-      });
-      
-      if (vision.length === 0) {
-        vision.push("暗くて足元しか見えない…（3段以上の高い段に登れば星の光で遠くまで見渡せるよ！）");
-      } else if (isNight && hasHighVision) {
-        vision.unshift(`🔭【高台の星見視界(${curH}段目)】天球の星の光で夜でも島全体がくっきり見渡せる！`);
-      }
-
-      let sounds = recentSounds.map(s => {
-        const dir = getDirection(cx, cz, s.x, s.z);
-        return `[耳] ${dir}の方から『${s.text}』と聞こえる！`;
-      });
-      
-      let locName = isSea(cx, cz) ? "🌊 島の外周の海の中" : `🟩 大地の上（高さ ${curH}段目）`;
-      if (!isSea(cx, cz) && curH === 5) {
-        locName += " 🌟【5段目・星の聖域（天球の星々に一番近い最高峰！）】";
-      } else if (!isSea(cx, cz) && curH >= 3) {
-        locName += " 🔭【星見の展望台（見晴らし最高！）】";
-      }
-      return `【現在の場所】 ${locName}\n【見えているもの】 ${vision.join(' / ')}\n【聞こえた音】 ${sounds.length > 0 ? sounds.join(' / ') : '静寂（波の音と星のきらめき）'}`;
-    }
-
-    function getPossibleActions(gx, gz) {
-      const list = [];
-      const curH = getTileHeight(gx, gz);
-
-      if (ROBOT.hasApple) list.push({ key: "EAT_HAND", speed: 1, txt: "右手の🍎リンゴを食べる" });
-      const objOnFeet = fieldObjects.find(a => a.gx === gx && a.gz === gz);
-      if (objOnFeet) {
-        if (objOnFeet.type === 'apple') {
-          list.push({ key: "EAT_FIELD", speed: 1, txt: "足元の🍎リンゴを食べる" });
-          if (!ROBOT.hasApple) list.push({ key: "PICK_APPLE", speed: 1, txt: "足元の🍎リンゴをひろう" });
-        } else {
-          list.push({ key: "OBSERVE_FEET", speed: 1, txt: `足元の${objOnFeet.meta.icon}をさわって観察する` });
-        }
-      }
-      
-      const dirs = [
-        { k: "MOVE_E", dx: 1, dz: 0, ry: Math.PI / 2, n: "東", edgeSx: 4, edgeSz: 2 },
-        { k: "MOVE_W", dx: -1, dz: 0, ry: -Math.PI / 2, n: "西", edgeSx: 0, edgeSz: 2 },
-        { k: "MOVE_S", dx: 0, dz: 1, ry: 0, n: "南", edgeSx: 2, edgeSz: 4 },
-        { k: "MOVE_N", dx: 0, dz: -1, ry: Math.PI, n: "北", edgeSx: 2, edgeSz: 0 }
-      ];
-
-      dirs.forEach(d => {
-        const tx = gx + d.dx, tz = gz + d.dz;
-        
-        if (!isAbyss(tx, tz)) {
-          const targetH = getTileHeight(tx, tz);
-          const diff = targetH - curH;
-          const targetArea = isSea(tx, tz) ? "海" : `大地(${targetH}段)`;
-          const starNote = (!isSea(tx, tz) && targetH === 5) ? "🌟星の聖域！" : ((!isSea(tx, tz) && targetH >= 3) ? "🔭見晴らし台" : "");
-
-          const curDistToCenter = Math.max(Math.abs(gx), Math.abs(gz));
-          const nextDistToCenter = Math.max(Math.abs(tx), Math.abs(tz));
-          const isMovingOutwardInSea = isSea(gx, gz) && (nextDistToCenter >= curDistToCenter);
-
-          if (!isMovingOutwardInSea) {
-            if (diff === 1) {
-              list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: `${d.n}の${targetArea}${starNote}へピョンと登る（速度3・安全移動）` });
-            } else if (diff === 0) {
-              list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: `${d.n}の${targetArea}${starNote}へ歩く（速度3・安全移動）` });
-            } else if (diff < 0 && diff >= -2) {
-              list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: `${d.n}の${targetArea}${starNote}へ降りる（速度3・安全移動）` });
-            } else if (diff <= -3) {
-              list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, isFall: true, txt: `${d.n}の崖から飛び降りる（高低差注意！）` });
-            }
-          }
-
-          const beyondGx = tx + d.dx, beyondGz = tz + d.dz;
-          const willFallAbyss = isAbyss(beyondGx, beyondGz);
-
-          if (diff <= 1) {
-            const waveText = isSea(gx, gz) ? '（白波を力づくで蹴散らす！）' : '';
-            list.push({
-              key: d.k + "_DASH5", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 5,
-              isOverrun: true, willFallOverrun: willFallAbyss,
-              edgeSub: [d.edgeSx, d.edgeSz],
-              beyond: [beyondGx, beyondGz],
-              txt: `⚡ ${d.n}へ猛ダッシュ！${waveText}（速度5・${willFallAbyss ? '⚠️滝の縁から奈落へダイブ' : '足場ありセーフ'}）`
-            });
-          }
-        }
-      });
-
-      if (isSea(gx, gz)) {
-        list.push({ key: "PUSH_BY_WAVE", speed: 1, txt: "白波に身をまかせて内陸側へ押し戻される（波に乗る）" });
-      } else if (curH === 5) {
-        list.push({ key: "REST_HERE", speed: 1, txt: "🌟 5段目のてっぺん（星の聖域）で星空を見上げてひとやすみする" });
-      } else if (curH >= 3) {
-        list.push({ key: "REST_HERE", speed: 1, txt: `🔭 ${curH}段目の展望台で景色を眺めながらひとやすみする` });
-      } else {
-        list.push({ key: "REST_HERE", speed: 1, txt: "その場の中央でひとやすみする（休む）" });
-      }
-      return list;
-    }
-
-    async function triggerThinkNow() {
-      closeFanMenu(); cancelPlacementMode();
-      const st = life.getState(); if (!st.isAlive) return;
-
-      const btn = document.getElementById('btn-think-now'), lamp = document.getElementById('comm-lamp');
-      const bubble = document.getElementById('voice-bubble'), voiceText = document.getElementById('voice-text');
-      const activeModel = getActiveModel(), currentKey = getKeyForCurrentModel();
-
-      if (currentKey.length <= 5) { openModal('settingModal'); return; }
-      btn.disabled = true; btn.innerHTML = '⚡ かんがえ中...';
-      lamp.className = 'comm-lamp lamp-busy'; lamp.textContent = '⚡ 通信中...';
-      bubble.className = 'voice-bubble bubble-active';
-
-      const gx = ROBOT.pos.gx, gz = ROBOT.pos.gz;
-      const curH = getTileHeight(gx, gz);
-      const actions = getPossibleActions(gx, gz);
-      const timeIdx = getCurrentTimePhaseIdx(); const phaseData = TIME_PHASES[timeIdx];
-
-      const prompt = `あなたは古代の神話にあるような、雲海の底に眠る古代の巨亀が支える平坦世界の島に立つロボットです。
+​<div class="app-container">
+<div class="top-window" id="sky-window">
+<div id="stage-3d"><div id="c3d"></div></div>
+​<div class="top-gauge-panel">
+<div class="gauge-grid">
+<div class="gauge-col"><div class="gauge-label">❤️ たいりょく <span id="v-energy" class="gauge-num">100</span></div><div class="bar-bg"><div id="b-energy" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #f87171, #ef4444);"></div></div></div>
+<div class="gauge-col"><div class="gauge-label">🍙 おなか <span id="v-stamina" class="gauge-num">100</span></div><div class="bar-bg"><div id="b-stamina" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #fde047, #eab308);"></div></div></div>
+<div class="gauge-col"><div class="gauge-label">🎵 ごきげん <span id="v-mental" class="gauge-num">100</span></div><div class="bar-bg"><div id="b-mental" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #6ee7b7, #10b981);"></div></div></div>
+</div>
+<div class="robot-status-row">
+<div class="status-left-group">
+<span id="ui-robot-id" class="robot-id-tag">🤖 ロボ1ごう</span>
+<span id="ui-day-count" class="day-badge">🌱 1日目</span>
+<span id="ui-time-phase" class="time-phase-badge">☀️ 朝</span>
+</div>
+<div class="status-right-group">
+<span id="ui-robot-drive" class="robot-drive-badge">😊 あんしん・まんぷく</span>
+<button type="button" class="btn-setting-gear-inline" onclick="openModal('settingModal')" title="せってい">⚙️</button>
+</div>
+</div>
+</div>
+​<div class="side-btn-col">
+<button type="button" class="btn-side-circle" onclick="openDiaryModal()" title="手帳（ステータス）">📖</button>
+</div>
+​<div id="placement-cancel-bar" class="placement-cancel-bar" onclick="cancelPlacementMode()">
+✕ 配置をやめる
+</div>
+​<div class="fan-menu-wrapper">
+<div class="fan-radial-container" id="fanRadialMenu">
+<svg class="fan-svg" id="fan-svg-root" viewBox="0 0 340 195"></svg>
+</div>
+<button type="button" class="btn-circle-main" id="btn-circle-toggle" onclick="toggleFanMenu()">
+<span class="circle-icon" id="circle-icon">＋</span>
+</button>
+</div>
+</div>
+​<div class="bottom-window">
+<div class="voice-header">
+<span class="voice-title">💭 ロボのきもち・心のさけび</span>
+<span id="comm-lamp" class="comm-lamp lamp-standby">💤 待機中</span>
+</div>
+<div class="voice-bubble" id="voice-bubble">
+<div class="voice-text" id="voice-text">
+ここは世界の果て。四角い大地のまわりを丸い海が包み込み、白い波しぶきを立てながら外の滝へと流れ落ちているよ。
+
+泡立つ滝のずっと下には、この世界を支える古代遺跡のカメさんが眠っているんだって！
+</div>
+</div>
+<div class="action-note-row">
+<div style="display:flex; align-items:center; gap:5px;">
+<span class="action-badge">👟 やった事</span>
+<span id="action-note-text">待機中（まだ動いていないよ）</span>
+</div>
+<span id="physics-note-text" style="font-size:10px; color:#3b82f6; font-weight:800;">中央静止中</span>
+</div>
+</div>
+​<div class="footer-bar">
+<button type="button" class="btn-think-now" id="btn-think-now" onclick="triggerThinkNow()">⚡ 今すぐ考える</button>
+<button type="button" class="btn-think-now btn-respawn" id="btn-respawn" onclick="respawnRobot()">🔄 つぎの世代へ引き継ぐ</button>
+</div>
+</div>
+​<div id="toast-msg">💾 データを保存したよ</div>
+​<div class="modal-cover" id="diaryModal" style="display:none;">
+<div class="modal-box">
+<div class="modal-head">
+<div class="modal-title">📖 ロボット手帳（ステータス）</div>
+<div class="close-btn" onclick="closeModal('diaryModal')">✕</div>
+</div>
+<div class="diary-robot-preview">
+<div class="diary-robot-emoji">🤖</div>
+<div style="font-size:14px; font-weight:900; color:#0f172a;" id="diary-robot-name">第1世代 ロボット</div>
+<div style="font-size:11px; color:#475569; margin-top:2px;" id="diary-robot-day-sub">生存: 🌱 1日目</div>
+</div>
+<div class="diary-tool-title">🎒 宝箱から見つけた「どうぐ」(5×2マス)</div>
+<div class="grid-5x2" id="robot-tools-grid"></div>
+​<button type="button" class="btn-log-view" onclick="showToast('📝 1日の記録は準備中だよ！')">📝 1日のきろくを見る</button>
+</div>
+</div>
+​<div class="modal-cover" id="gachaModal" style="display:none;">
+<div class="modal-box" style="border-color:#fbcfe8;">
+<div class="modal-head"><div class="modal-title" style="color:#be185d;">🎰 パステル・ガチャガチャ</div><div id="gacha-slot-status" style="font-size:11px; font-weight:800; color:#64748b;">空き枠あり</div></div>
+<div class="gacha-stage-box">
+<div class="gacha-svg-wrap">
+<svg viewBox="0 0 220 250" width="100%" height="100%">
+<ellipse cx="110" cy="240" rx="68" ry="8" fill="rgba(15,23,42,0.1)" />
+<circle cx="110" cy="76" r="62" fill="rgba(240, 249, 255, 0.55)" stroke="#f9a8d4" stroke-width="3" />
+<g id="gacha-dome-capsules">
+<circle cx="80" cy="105" r="16" fill="#f9a8d4" stroke="#ec4899" stroke-width="1.5" /><path d="M 64 105 A 16 16 0 0 0 96 105 Z" fill="#ffffff" opacity="0.85" />
+<circle cx="112" cy="112" r="16" fill="#93c5fd" stroke="#60a5fa" stroke-width="1.5" /><path d="M 96 112 A 16 16 0 0 0 128 112 Z" fill="#ffffff" opacity="0.85" />
+<circle cx="140" cy="103" r="16" fill="#6ee7b7" stroke="#34d399" stroke-width="1.5" /><path d="M 124 103 A 16 16 0 0 0 156 103 Z" fill="#ffffff" opacity="0.85" />
+<circle cx="95" cy="84" r="16" fill="#fde047" stroke="#eab308" stroke-width="1.5" /><path d="M 79 84 A 16 16 0 0 0 111 84 Z" fill="#ffffff" opacity="0.85" />
+<circle cx="127" cy="82" r="16" fill="#d8b4fe" stroke="#a855f7" stroke-width="1.5" /><path d="M 111 82 A 16 16 0 0 0 143 82 Z" fill="#ffffff" opacity="0.85" />
+</g>
+<path d="M 66 45 A 52 52 0 0 1 118 26" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="6" stroke-linecap="round" />
+<circle cx="62" cy="58" r="4" fill="rgba(255,255,255,0.85)" />
+<path d="M 72 22 Q 110 8 148 22 L 140 30 Q 110 20 80 30 Z" fill="#f472b6" stroke="#ec4899" stroke-width="1.5" />
+<path d="M 54 118 L 166 118 L 158 232 Q 158 240 148 240 L 72 240 Q 62 240 62 232 Z" fill="#fbcfe8" stroke="#f472b6" stroke-width="3" />
+<rect x="48" y="112" width="124" height="14" rx="7" fill="#f472b6" stroke="#db2777" stroke-width="1.5" />
+<circle cx="110" cy="158" r="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="3" />
+<circle cx="110" cy="158" r="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+<g id="gacha-handle-group"><rect x="88" y="152" width="44" height="12" rx="6" fill="#f472b6" stroke="#db2777" stroke-width="2" /><circle cx="110" cy="158" r="7" fill="#ffffff" stroke="#db2777" stroke-width="2" /></g>
+<rect x="84" y="196" width="52" height="36" rx="10" fill="#be185d" stroke="#f472b6" stroke-width="2.5" /><rect x="88" y="200" width="44" height="16" rx="5" fill="#831843" opacity="0.6" />
+</svg>
+</div>
+<div class="capsule-pop-overlay" id="capsule-pop-overlay">
+<div class="pop-capsule-stage" id="pop-capsule-stage">
+<div class="cap-half-top" id="cap-half-top"></div><div class="cap-half-bottom"></div>
+<div class="pop-reward-item"><div class="pop-reward-icon" id="pop-reward-icon">🍎</div><div class="pop-reward-name" id="pop-reward-name">りんご ×1</div></div>
+</div>
+<div style="font-size:12px; font-weight:900; color:#64748b; margin-top:8px;" id="pop-status-msg"></div>
+</div>
+</div>
+<div style="font-size:11px; color:#64748b; text-align:center;">🍎・🌳・🪨・🌿・🎁(宝箱) がランダムに出るよ！</div>
+<div class="modal-footer-btns">
+<button type="button" class="btn-gacha-start" id="btn-gacha-spin" onclick="spinGachaMachine()">スタート</button>
+<button type="button" class="btn-modal-close" onclick="closeModal('gachaModal')">閉じる</button>
+</div>
+</div>
+</div>
+​<div class="modal-cover" id="itemModal" style="display:none;">
+<div class="modal-box">
+<div class="modal-head">
+<div class="modal-title">🎒 アイテム（5×5 もちもの袋）</div>
+<div id="item-bag-summary" style="font-size:11px; font-weight:800; color:#3b82f6;">0 / 25マス</div>
+</div>
+<div style="font-size:12px; color:#64748b;">使いたいアイテムをタップして、島に置いてね（すべて通り抜けできるよ）。石や草は高さを1段積み上げるよ！</div>
+<div class="grid-5x5" id="inventory-grid-5x5"></div>
+<button type="button" class="btn-modal-close" style="width:100%;" onclick="closeModal('itemModal')">閉じる</button>
+</div>
+</div>
+​<div class="modal-cover" id="cleanModal" style="display:none;">
+<div class="modal-box">
+<div class="modal-head"><div class="modal-title">⛏️ 整地（中央大地の5×5マス目マップ）</div><div class="close-btn" onclick="closeModal('cleanModal')">✕</div></div>
+<div class="grid-5x5" id="clean-grid-5x5"></div>
+<div class="modal-footer-btns">
+<button type="button" class="save-btn" style="background:#10b981;" onclick="cleanAllIslandFromModal()">✨ 大地を整地</button>
+<button type="button" class="btn-modal-close" onclick="closeModal('cleanModal')">閉じる</button>
+</div>
+</div>
+</div>
+​<div class="modal-cover" id="exitModal" style="display:none;">
+<div class="modal-box" style="text-align:center; border-color:#f4a8b8; background:#fffafb;">
+<div style="font-size:36px; margin-bottom:2px;">🌙</div><div style="font-size:16px; font-weight:900; color:#9f1239;">データを保存して終了しました</div>
+<button type="button" class="save-btn" style="background:#f43f5e; margin-top:6px;" onclick="closeModal('exitModal')">もどる</button>
+</div>
+</div>
+​<div class="modal-cover" id="settingModal" style="display:none;">
+<div class="modal-box">
+<div class="modal-head"><div class="modal-title">⚙️ AIのせってい</div><div class="close-btn" onclick="closeModal('settingModal')">✕</div></div>
+<div class="settings-card selected-google" id="grp-google-key" onclick="selectModelInModal('gemini-3.8-flash')">
+<div style="font-size:13px; font-weight:900; color:#2563eb;">🟦 Google Gemini 3.8（じっくり派）</div>
+<input type="password" id="input-google-key" class="input-box" placeholder="ここにGoogleキーを貼り付け" onclick="event.stopPropagation(); selectModelInModal('gemini-3.8-flash');" oninput="autoSaveKey('google', this.value)">
+</div>
+<div class="settings-card" id="grp-github-key" onclick="selectModelInModal('openai/gpt-oss-120b')">
+<div style="font-size:13px; font-weight:900; color:#9333ea;">🟪 Groq 120B（ばくそく派）</div>
+<input type="password" id="input-github-key" class="input-box" placeholder="ここにGroqキー (gsk_...) を貼り付け" onclick="event.stopPropagation(); selectModelInModal('openai/gpt-oss-120b');" oninput="autoSaveKey('github', this.value)">
+</div>
+<button type="button" class="save-btn" id="modal-save-btn" onclick="saveKeys()">決定してとじる</button>
+<button type="button" class="reset-btn" onclick="resetGameDirectly()">🔄 データを消して最初からやり直す（初期化）</button>
+</div>
+</div>
+​<script>
+class LifeCore {
+#energy = 100; #stamina = 100; #mental = 100; #isAlive = true; #memory = {};
+#lastStateKey = null; #lastAction = null; #lastWellbeing = 100; #lastDelta = 0;
+constructor(savedData = null) { if (savedData) this.importSave(savedData); else this.#lastWellbeing = this.#calculateWellbeing(); Object.freeze(this); }
+#calculateWellbeing() { if (!this.#isAlive) return 0; return (this.#energy * 0.5) + (this.#stamina * 0.3) + (this.#mental * 0.2); }
+#determineCurrentDrive() {
+if (this.#energy <= 0) return 'DEAD'; if (this.#stamina <= 0) return 'FAINT';
+if (this.#energy <= 30) return 'STARVING'; if (this.#stamina <= 25) return 'EXHAUSTED';
+if (this.#energy <= 60) return 'HUNGRY'; if (this.#mental <= 30) return 'BORED'; return 'PEACE';
+}
+tick(availableActions = []) {
+if (!this.#isAlive) return 'NONE';
+this.#energy = Math.max(0, this.#energy - 2); this.#stamina = Math.max(0, this.#stamina - 1); this.#mental = Math.max(0, this.#mental - 1);
+if (this.#energy <= 0) { this.#isAlive = false; this.#lastAction = 'NONE'; return 'NONE'; }
+const currentDrive = this.#determineCurrentDrive(); this.#lastWellbeing = this.#calculateWellbeing();
+if (currentDrive === 'FAINT') { this.#lastStateKey = 'FAINT'; this.#lastAction = 'FORCE_SLEEP'; return 'FORCE_SLEEP'; }
+if (!Array.isArray(availableActions) || availableActions.length === 0) return 'WAIT';
+if (!this.#memory[currentDrive]) this.#memory[currentDrive] = {};
+for (const act of availableActions) if (this.#memory[currentDrive][act] === undefined) this.#memory[currentDrive][act] = 0;
+const curiosityRate = (currentDrive === 'BORED') ? 0.7 : 0.2;
+let chosenAction;
+if (Math.random() < curiosityRate) { chosenAction = availableActions[Math.floor(Math.random() * availableActions.length)]; }
+else { chosenAction = availableActions.reduce((best, current) => this.#memory[currentDrive][current] > this.#memory[currentDrive][best] ? current : best, availableActions[0]); }
+if (chosenAction === this.#lastAction) this.#mental = Math.max(0, this.#mental - 3);
+this.#lastStateKey = currentDrive; this.#lastAction = chosenAction; return chosenAction;
+}
+feedback(dEnergy = 0, dStamina = 0, dMental = 0) {
+if (!this.#isAlive) return;
+if (this.#lastAction === 'FORCE_SLEEP') { this.#stamina = Math.min(100, Math.max(0, this.#stamina + 30)); this.#lastDelta = 0; return; }
+this.#energy = Math.min(100, Math.max(0, this.#energy + dEnergy)); this.#stamina = Math.min(100, Math.max(0, this.#stamina + dStamina)); this.#mental = Math.min(100, Math.max(0, this.#mental + dMental));
+if (this.#energy <= 0) this.#isAlive = false;
+const newWellbeing = this.#calculateWellbeing(); const reward = newWellbeing - this.#lastWellbeing; this.#lastDelta = Number(reward.toFixed(2));
+if (this.#lastStateKey && this.#lastAction && this.#memory[this.#lastStateKey]) {
+const currentScore = this.#memory[this.#lastStateKey][this.#lastAction] || 0;
+this.#memory[this.#lastStateKey][this.#lastAction] = Number((currentScore + reward).toFixed(2));
+}
+}
+getState() { return Object.freeze({ isAlive: this.#isAlive, energy: this.#energy, stamina: this.#stamina, mental: this.#mental, drive: this.#determineCurrentDrive(), lastAction: this.#lastAction, feelingDelta: this.#lastDelta, memory: JSON.parse(JSON.stringify(this.#memory)) }); }
+exportSave() { return JSON.stringify({ e: this.#energy, s: this.#stamina, m: this.#mental, a: this.#isAlive, mem: this.#memory }); }
+importSave(jsonString) { try { const data = JSON.parse(jsonString); this.#energy = data.e ?? 100; this.#stamina = data.s ?? 100; this.#mental = data.m ?? 100; this.#isAlive = data.a ?? true; this.#memory = data.mem ?? {}; this.#lastWellbeing = this.#calculateWellbeing(); } catch (err) {} }
+}
+Object.freeze(LifeCore); Object.freeze(LifeCore.prototype);
+​const GeminiCore = Object.freeze({
+DEFAULT_MODEL: 'gemini-3.8-flash',
+async think(prompt, apiKey, customModel) {
+let targetModel = customModel || this.DEFAULT_MODEL; if (targetModel.includes('2.5') || targetModel.includes('2.0') || targetModel.includes('1.5')) targetModel = this.DEFAULT_MODEL;
+const endpoint = https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey.trim()};
+const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7, responseMimeType: 'application/json' } }) });
+if (!res.ok) throw new Error(Google エラー (${res.status}));
+const data = await res.json();
+return this._parseJsonSafely(data?.candidates?.[0]?.content?.parts?.[0]?.text);
+},
+_parseJsonSafely(rawText) { const cleaned = rawText.replace(/\x60{3}json/gi, '').replace(/\x60{3}/g, '').trim(); return JSON.parse(cleaned.substring(cleaned.indexOf('{'), cleaned.lastIndexOf('}') + 1)); }
+});
+const GroqCore = Object.freeze({
+DEFAULT_MODEL: 'openai/gpt-oss-120b',
+async think(prompt, apiKey, modelName) {
+const endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': Bearer ${apiKey.trim()} }, body: JSON.stringify({ model: modelName || this.DEFAULT_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0.7, response_format: { type: 'json_object' } }) });
+if (!res.ok) throw new Error(Groq エラー (${res.status}));
+const data = await res.json(); return GeminiCore._parseJsonSafely(data?.choices?.[0]?.message?.content);
+}
+});
+​function buildFanMenuSVG() {
+const svg = document.getElementById('fan-svg-root'); if (!svg) return;
+const cx = 170, cy = 168, rIn = 30, rOut = 158, halfGap = 2.5;
+const items = [{ id: 'gacha', icon: '🎰', label: 'ガチャ', startDeg: 180, endDeg: 135, isPink: false }, { id: 'item', icon: '🎒', label: 'アイテム', startDeg: 135, endDeg: 90, isPink: false }, { id: 'clean', icon: '⛏️', label: '整地', startDeg: 90, endDeg: 45, isPink: false }, { id: 'exit', icon: '🚪', label: '終了', startDeg: 45, endDeg: 0, isPink: true }];
+const degToRad = d => (d * Math.PI) / 180, radToDeg = r => (r * 180) / Math.PI;
+const offsetIn = radToDeg(Math.asin(halfGap / rIn)), offsetOut = radToDeg(Math.asin(halfGap / rOut));
+let html = '';
+for (const it of items) {
+const a1Out = degToRad(it.startDeg - offsetOut), a2Out = degToRad(it.endDeg + offsetOut);
+const a2In  = degToRad(it.endDeg + offsetIn), a1In  = degToRad(it.startDeg - offsetIn);
+const x1Out = (cx + rOut * Math.cos(a1Out)).toFixed(2), y1Out = (cy - rOut * Math.sin(a1Out)).toFixed(2);
+const x2Out = (cx + rOut * Math.cos(a2Out)).toFixed(2), y2Out = (cy - rOut * Math.sin(a2Out)).toFixed(2);
+const x2In  = (cx + rIn * Math.cos(a2In)).toFixed(2), y2In  = (cy - rIn * Math.sin(a2In)).toFixed(2);
+const x1In  = (cx + rIn * Math.cos(a1In)).toFixed(2), y1In  = (cy - rIn * Math.sin(a1In)).toFixed(2);
+const dPath = M ${x1Out} ${y1Out} A ${rOut} ${rOut} 0 0 1 ${x2Out} ${y2Out} L ${x2In} ${y2In} A ${rIn} ${rIn} 0 0 0 ${x1In} ${y1In} Z;
+const midRad = degToRad((it.startDeg + it.endDeg) / 2);
+const centerX = cx + ((rIn + rOut) * 0.53) * Math.cos(midRad), centerY = cy - ((rIn + rOut) * 0.53) * Math.sin(midRad);
+const sectorClass = it.isPink ? 'fan-sector fan-sector-pink' : 'fan-sector', labelClass = it.isPink ? 'fan-label fan-label-pink' : 'fan-label';
+html += <path class="${sectorClass}" d="${dPath}" onclick="triggerFanAction('${it.id}')"></path> <text x="${centerX.toFixed(1)}" y="${(centerY - 10).toFixed(1)}" class="fan-icon">${it.icon}</text> <text x="${centerX.toFixed(1)}" y="${(centerY + 12).toFixed(1)}" class="${labelClass}">${it.label}</text>;
+}
+svg.innerHTML = html;
+}
+​const TIME_PHASES = [
+{ name: '☀️ 朝', bg: 0x0f2b46, sun: 0xfffaed, hemi: 0xdbeafe, tagColor: '#0ea5e9', tagBg: '#e0f2fe' },
+{ name: '☀️ 昼', bg: 0x173e65, sun: 0xffffff, hemi: 0xe0f2fe, tagColor: '#0369a1', tagBg: '#ebf2f5' },
+{ name: '🌇 夕方', bg: 0x4a2432, sun: 0xfdba74, hemi: 0xfed7aa, tagColor: '#c2410c', tagBg: '#ffedd5' },
+{ name: '🌙 夜', bg: 0x1e1b4b, sun: 0x6366f1, hemi: 0x4338ca, tagColor: '#a5b4fc', tagBg: '#312e81' },
+{ name: '🌌 深淵', bg: 0x060913, sun: 0x312e81, hemi: 0x1e293b, tagColor: '#94a3b8', tagBg: '#0f172a' }
+];
+function getCurrentTimePhaseIdx() { const cycle = ROBOT.stepCount % 20; if (cycle <= 3) return 0; if (cycle <= 7) return 1; if (cycle <= 11) return 2; if (cycle <= 15) return 3; return 4; }
+​const memStore = {};
+const safeStorage = { getItem: k => memStore[k] ?? (() => { try { return localStorage.getItem(k); } catch(e){ return null; } })(), setItem: (k, v) => { memStore[k] = String(v); try { localStorage.setItem(k, String(v)); } catch(e){} }, removeItem: k => { delete memStore[k]; try { localStorage.removeItem(k); } catch(e){} } };
+function showToast(msg) { const el = document.getElementById('toast-msg'); if (!el) return; el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2000); }
+​const DRIVE_JA = { PEACE: '😊 あんしん・まんぷく', BORED: '🥱 たい屈（あそびたい！）', HUNGRY: '🍙 おなかすいた…', EXHAUSTED: '💤 くたくた（ねむい）', STARVING: '🚨 はらぺこピンチ！！', FAINT: '💫 たおれて気絶中', DEAD: '💀 うごかなくなった' };
+​const GACHA_ITEMS = [
+{ type: 'apple', name: 'りんご', icon: '🍎', capColor: 'linear-gradient(135deg, #f9a8d4, #f472b6)', isTool: false },
+{ type: 'tree',  name: '木',     icon: '🌳', capColor: 'linear-gradient(135deg, #6ee7b7, #10b981)', isTool: false },
+{ type: 'stone', name: '石',     icon: '🪨', capColor: 'linear-gradient(135deg, #93c5fd, #60a5fa)', isTool: false },
+{ type: 'grass', name: '草',     icon: '🌿', capColor: 'linear-gradient(135deg, #fde047, #eab308)', isTool: false },
+{ type: 'chest', name: '宝箱',   icon: '🎁', capColor: 'linear-gradient(135deg, #fcd34d, #f59e0b)', isTool: true }
+];
+const CHEST_TOOLS = [ { name: 'オノ', icon: '🪓' }, { name: 'ピッケル', icon: '⛏️' }, { name: '虫あみ', icon: '🕸️' }, { name: 'スコップ', icon: '🥄' } ];
+​let inventorySlots = Array(25).fill(null);
+let robotTools = Array(10).fill(null);
+let placementMode = null;
+let recentSounds = [];
+​const MAX_STEP_HEIGHT = 5;
+const STEP_H = 0.35;
+const SUB_DIV = 5;
+const SUB_STEP = 1.0 / SUB_DIV;
+​const heightGrid = {};
+for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) heightGrid[${x},${z}] = 0;
+​function isLand(gx, gz) { return (Math.abs(gx) <= 2 && Math.abs(gz) <= 2); }
+function isSea(gx, gz) { return (Math.abs(gx) <= 3 && Math.abs(gz) <= 3) && !isLand(gx, gz); }
+function isAbyss(gx, gz) { return (Math.abs(gx) > 3 || Math.abs(gz) > 3); }
+​function getTileHeight(gx, gz) {
+if (isLand(gx, gz)) return heightGrid[${gx},${gz}] !== undefined ? heightGrid[${gx},${gz}] : 0;
+if (isSea(gx, gz)) return -0.4;
+return -99;
+}
+function setTileHeight(gx, gz, h) {
+if (isLand(gx, gz)) heightGrid[${gx},${gz}] = Math.max(0, Math.min(MAX_STEP_HEIGHT, h));
+}
+​function getAvailableGachaTypes() { const hasEmpty = inventorySlots.some(s => s === null); if (hasEmpty) return GACHA_ITEMS; return GACHA_ITEMS.filter(item => inventorySlots.some(s => s && s.type === item.type && s.count < 10)); }
+function addItemToInventory(itemType) { for (let i = 0; i < 25; i++) if (inventorySlots[i] && inventorySlots[i].type === itemType && inventorySlots[i].count < 10) { inventorySlots[i].count++; return i; } for (let i = 0; i < 25; i++) if (inventorySlots[i] === null) { inventorySlots[i] = { type: itemType, count: 1 }; return i; } return -1; }
+function removeInventoryItem(itemType) { for (let i = 0; i < 25; i++) { if (inventorySlots[i] && inventorySlots[i].type === itemType) { inventorySlots[i].count--; if (inventorySlots[i].count <= 0) inventorySlots[i] = null; return true; } } return false; }
+​function addToolToRobot() {
+const tool = CHEST_TOOLS[Math.floor(Math.random() * CHEST_TOOLS.length)];
+for (let i = 0; i < 10; i++) { if (robotTools[i] === null) { robotTools[i] = tool; return tool; } }
+return null;
+}
+​let life = new LifeCore();
+const ROBOT = {
+gen: 1, stepCount: 0,
+pos: { gx: 0, gz: 0, sx: 2, sz: 2 },
+speed: 3,
+rotY: 0, hasApple: false,
+lastVoice: "四角い大地のまわりを丸い海が包み込んで、白波を立てているよ！",
+lastActionNote: "待機中"
+};
+​function calcWorldPos(gx, gz, sx = 2, sz = 2) {
+const wx = gx + (sx - 2) * SUB_STEP;
+const wz = gz + (sz - 2) * SUB_STEP;
+return { x: wx, z: wz };
+}
+​function getActiveModel() { const saved = safeStorage.getItem('ai_custom_model'); if (!saved) return GeminiCore.DEFAULT_MODEL; if (saved.includes('2.5') || saved.includes('2.0') || saved.includes('1.5')) return GeminiCore.DEFAULT_MODEL; return saved; }
+function getKeyForCurrentModel() { return getActiveModel().startsWith('gemini') ? (safeStorage.getItem('key_google') || '') : (safeStorage.getItem('key_github') || ''); }
+​let fieldObjects = [];
+​function saveWorldState() {
+try { safeStorage.setItem('island_game_save_v4', JSON.stringify({ lifeSave: life.exportSave(), robot: ROBOT, objs: fieldObjects.map(o => ({ gx: o.gx, gz: o.gz, type: o.type })), inventory: inventorySlots, tools: robotTools, heights: heightGrid })); } catch (e) {}
+}
+let pendingLoadedObjs = null;
+function tryLoadWorldState() {
+try {
+const data = JSON.parse(safeStorage.getItem('island_game_save_v4')); if (!data || !data.lifeSave) return false;
+life = new LifeCore(data.lifeSave); Object.assign(ROBOT, data.robot); pendingLoadedObjs = Array.isArray(data.objs) ? data.objs : null;
+if (Array.isArray(data.inventory) && data.inventory.length === 25) inventorySlots = data.inventory;
+if (Array.isArray(data.tools) && data.tools.length === 10) robotTools = data.tools;
+if (data.heights && typeof data.heights === 'object') Object.assign(heightGrid, data.heights);
+return true;
+} catch (e) { return false; }
+}
+function resetGameDirectly() {
+safeStorage.removeItem('island_game_save_v4');
+showToast('🔄 初期化しました！');
+setTimeout(() => location.reload(), 600);
+}
+​let scene, camera, renderer, world, clickBlocks = [];
+let allTerrainBlocks = [];
+let stepMeshGroup = null, turtleGroup = null, cloudGroup = null, waterfallGroup = null;
+let celestialGroup = null, starPoints = null, starDomeMesh = null, celestialRings = [];
+let starOpacityTarget = 0;
+let chara, bodyM, headM, rArm, lArm, rLeg, lLeg, handApple;
+let hemiLight, sunLight;
+let targetBgColor = new THREE.Color(0x0f2b46), targetHemiColor = new THREE.Color(0xdbeafe), targetSunColor = new THREE.Color(0xfffaed);
+​let camHeight = 8.5;
+let camDist = 9.8;
+let camPitchAngle = 0;
+​function generateCelestialDomeTexture() {
+const canvas = document.createElement('canvas');
+canvas.width = 512; canvas.height = 256;
+const ctx = canvas.getContext('2d');
+ctx.clearRect(0, 0, 512, 256);
+​const grad = ctx.createLinearGradient(0, 0, 512, 256);
+grad.addColorStop(0.0, 'rgba(30, 27, 75, 0.0)');
+grad.addColorStop(0.35, 'rgba(99, 102, 241, 0.18)');
+grad.addColorStop(0.5, 'rgba(244, 114, 182, 0.22)');
+grad.addColorStop(0.65, 'rgba(56, 189, 248, 0.18)');
+grad.addColorStop(1.0, 'rgba(30, 27, 75, 0.0)');
+ctx.fillStyle = grad;
+ctx.fillRect(0, 0, 512, 256);
+​for (let i = 0; i < 180; i++) {
+const x = Math.random() * 512;
+const y = Math.random() * 256;
+const r = 0.6 + Math.random() * 1.4;
+ctx.fillStyle = rgba(255, 255, 255, ${(0.3 + Math.random() * 0.6).toFixed(2)});
+ctx.beginPath();
+ctx.arc(x, y, r, 0, Math.PI * 2);
+ctx.fill();
+}
+return new THREE.CanvasTexture(canvas);
+}
+​function buildCelestialSphere() {
+celestialGroup = new THREE.Group();
+world.add(celestialGroup);
+​const domeTex = generateCelestialDomeTexture();
+const domeGeo = new THREE.SphereGeometry(24, 32, 24);
+const domeMat = new THREE.MeshBasicMaterial({
+map: domeTex,
+transparent: true,
+opacity: 0.0,
+side: THREE.BackSide,
+depthWrite: false
+});
+starDomeMesh = new THREE.Mesh(domeGeo, domeMat);
+celestialGroup.add(starDomeMesh);
+​const starCount = 320;
+const positions = new Float32Array(starCount * 3);
+const colors = new Float32Array(starCount * 3);
+const palette = [
+new THREE.Color(0xffffff),
+new THREE.Color(0xfef08a),
+new THREE.Color(0xbae6fd),
+new THREE.Color(0xfbcfe8),
+new THREE.Color(0xfde047)
+];
+​for (let i = 0; i < starCount; i++) {
+const rad = 17.5 + Math.random() * 5.0;
+const theta = Math.random() * Math.PI * 2;
+const phi = Math.acos(2 * Math.random() - 1);
+​positions[i * 3]     = rad * Math.sin(phi) * Math.cos(theta);
+positions[i * 3 + 1] = rad * Math.cos(phi);
+positions[i * 3 + 2] = rad * Math.sin(phi) * Math.sin(theta);
+​const c = palette[Math.floor(Math.random() * palette.length)];
+colors[i * 3]     = c.r;
+colors[i * 3 + 1] = c.g;
+colors[i * 3 + 2] = c.b;
+}
+​const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+​const starMat = new THREE.PointsMaterial({
+size: 0.42,
+vertexColors: true,
+transparent: true,
+opacity: 0.0,
+depthWrite: false
+});
+starPoints = new THREE.Points(starGeo, starMat);
+celestialGroup.add(starPoints);
+​celestialRings = [];
+const ringMat1 = new THREE.MeshBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false });
+const ring1 = new THREE.Mesh(new THREE.RingGeometry(16.8, 16.92, 64), ringMat1);
+ring1.rotation.x = Math.PI / 2.3;
+ring1.rotation.y = 0.3;
+celestialGroup.add(ring1);
+celestialRings.push(ring1);
+​const ringMat2 = new THREE.MeshBasicMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false });
+const ring2 = new THREE.Mesh(new THREE.RingGeometry(18.2, 18.3, 64), ringMat2);
+ring2.rotation.x = -Math.PI / 3.0;
+ring2.rotation.z = 0.4;
+celestialGroup.add(ring2);
+celestialRings.push(ring2);
+}
+​let turtleFlippers = [];
+​/* === [デザイン完全固定：古代亀] === */
+function buildWorldTurtle() {
+turtleGroup = new THREE.Group();
+turtleGroup.position.set(0, -6.2, 0);
+world.add(turtleGroup);
+​const matShell = new THREE.MeshLambertMaterial({ color: 0x9b8370 });
+const matSkin  = new THREE.MeshLambertMaterial({ color: 0xb5a08e });
+const matRuin  = new THREE.MeshLambertMaterial({ color: 0xc8b6a6 });
+const matEye   = new THREE.MeshBasicMaterial({ color: 0x4a3b32 });
+​const shell = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.5, 7.2), matShell);
+shell.position.set(0, -0.6, 0);
+turtleGroup.add(shell);
+​const ruinPlate = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.5, 5.8), matRuin);
+ruinPlate.position.set(0, 0.2, 0);
+turtleGroup.add(ruinPlate);
+​const ruinCenter = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.6, 3.4), matShell);
+ruinCenter.position.set(0, 0.5, 0);
+turtleGroup.add(ruinCenter);
+​const head = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.2, 2.2), matSkin);
+head.position.set(0, -0.4, -4.4);
+turtleGroup.add(head);
+​const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), matEye);
+eyeL.position.set(-0.85, -0.2, -4.9);
+turtleGroup.add(eyeL);
+const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), matEye);
+eyeR.position.set(0.85, -0.2, -4.9);
+turtleGroup.add(eyeR);
+​const flipperGeo = new THREE.BoxGeometry(2.3, 0.4, 1.6);
+turtleFlippers = [];
+​const flL = new THREE.Mesh(flipperGeo, matSkin);
+flL.position.set(-4.2, -0.8, -2.2); flL.rotation.y = 0.4;
+turtleGroup.add(flL); turtleFlippers.push(flL);
+​const flR = new THREE.Mesh(flipperGeo, matSkin);
+flR.position.set(4.2, -0.8, -2.2); flR.rotation.y = -0.4;
+turtleGroup.add(flR); turtleFlippers.push(flR);
+​const blL = new THREE.Mesh(flipperGeo, matSkin);
+blL.position.set(-3.9, -0.8, 2.6); blL.rotation.y = -0.3;
+turtleGroup.add(blL); turtleFlippers.push(blL);
+​const blR = new THREE.Mesh(flipperGeo, matSkin);
+blR.position.set(3.9, -0.8, 2.6); blR.rotation.y = 0.3;
+turtleGroup.add(blR); turtleFlippers.push(blR);
+​const tail = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 1.2), matSkin);
+tail.position.set(0, -0.7, 4.0);
+turtleGroup.add(tail);
+}
+​let cloudPlates = [];
+/* === [デザイン完全固定：雲海] === */
+function buildCloudSea() {
+cloudGroup = new THREE.Group();
+cloudGroup.position.set(0, -4.5, 0);
+world.add(cloudGroup);
+​const mistDiscGeo = new THREE.CircleGeometry(5.5, 48);
+const mistDiscMat = new THREE.MeshBasicMaterial({
+color: 0xf1f5f9, transparent: true, opacity: 0.92, side: THREE.DoubleSide
+});
+const mistDisc = new THREE.Mesh(mistDiscGeo, mistDiscMat);
+mistDisc.rotation.x = -Math.PI / 2;
+mistDisc.position.set(0, 0.05, 0);
+cloudGroup.add(mistDisc);
+​const cloudMat = new THREE.MeshLambertMaterial({
+color: 0xe2e8f0, transparent: true, opacity: 0.85
+});
+​const cloudDefs = [
+{ x: -2.2, y: -0.2, z: -1.8, w: 4.2, h: 0.7, d: 3.8 },
+{ x: 2.0,  y: -0.3, z: 2.0,  w: 4.4, h: 0.6, d: 4.0 },
+{ x: -1.6, y: -0.4, z: 2.2,  w: 3.8, h: 0.7, d: 3.6 },
+{ x: 1.8,  y: -0.1, z: -2.0, w: 4.0, h: 0.6, d: 3.8 }
+];
+​cloudPlates = [];
+cloudDefs.forEach((cd, i) => {
+const cMesh = new THREE.Mesh(new THREE.BoxGeometry(cd.w, cd.h, cd.d), cloudMat);
+cMesh.position.set(cd.x, cd.y, cd.z);
+cMesh.userData = { origX: cd.x, speed: 0.003 + i * 0.001 };
+cloudGroup.add(cMesh);
+cloudPlates.push(cMesh);
+});
+}
+​let waterfallTexture = null;
+let waterfallCylinder = null;
+let seaSurfaceMesh = null;
+let innerFoamDisc = null;
+​/* === [デザイン完全固定：滝テクスチャ] === */
+function generateWaterfallBaseTexture() {
+const canvas = document.createElement('canvas');
+canvas.width = 64; canvas.height = 256;
+const ctx = canvas.getContext('2d');
+const grad = ctx.createLinearGradient(0, 0, 0, 256);
+grad.addColorStop(0.0, 'rgba(56, 189, 248, 0.85)');
+grad.addColorStop(0.45, 'rgba(125, 211, 252, 0.90)');
+grad.addColorStop(0.80, 'rgba(224, 242, 254, 0.96)');
+grad.addColorStop(1.0, 'rgba(255, 255, 255, 1.0)');
+ctx.fillStyle = grad;
+ctx.fillRect(0, 0, 64, 256);
+return new THREE.CanvasTexture(canvas);
+}
+​function generateWaterfallTexture() {
+const canvas = document.createElement('canvas');
+canvas.width = 256; canvas.height = 256;
+const ctx = canvas.getContext('2d');
+​ctx.clearRect(0, 0, 256, 256);
+​ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
+for (let i = 0; i < 36; i++) {
+const x = Math.random() * 256;
+const w = 1.5 + Math.random() * 4.5;
+ctx.fillRect(x, 0, w, 256);
+}
+​ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+for (let i = 0; i < 90; i++) {
+const px = Math.random() * 256;
+const py = Math.random() * 256;
+const len = 18 + Math.random() * 45;
+const w = 1.5 + Math.random() * 2.5;
+ctx.fillRect(px, py, w, len);
+if (py + len > 256) {
+ctx.fillRect(px, py - 256, w, len);
+}
+}
+​ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+for (let i = 0; i < 120; i++) {
+const px = Math.random() * 256;
+const py = Math.random() * 256;
+const r = 1.5 + Math.random() * 3.0;
+ctx.beginPath();
+ctx.arc(px, py, r, 0, Math.PI * 2);
+ctx.fill();
+}
+​const tex = new THREE.CanvasTexture(canvas);
+tex.wrapS = THREE.RepeatWrapping;
+tex.wrapT = THREE.RepeatWrapping;
+tex.repeat.set(5, 2);
+return tex;
+}
+​/* === [デザイン完全固定：円形海と白波テクスチャ] === */
+function generateNaturalSeaTexture() {
+const canvas = document.createElement('canvas');
+canvas.width = 512; canvas.height = 512;
+const ctx = canvas.getContext('2d');
+​const cx = 256, cy = 256;
+const maxR = 256;
+​const seaGrad = ctx.createRadialGradient(cx, cy, 110, cx, cy, maxR);
+seaGrad.addColorStop(0.0, 'rgba(14, 165, 233, 0.95)');
+seaGrad.addColorStop(0.55, 'rgba(56, 189, 248, 0.92)');
+seaGrad.addColorStop(0.88, 'rgba(186, 230, 253, 0.95)');
+seaGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0.98)');
+ctx.fillStyle = seaGrad;
+ctx.fillRect(0, 0, 512, 512);
+​const halfLand = 138;
+​for (let i = 24; i >= 2; i -= 3) {
+ctx.strokeStyle = rgba(255, 255, 255, ${(0.04 * (26 - i)).toFixed(3)});
+ctx.lineWidth = i * 1.6;
+ctx.lineJoin = 'round';
+ctx.strokeRect(cx - halfLand, cy - halfLand, halfLand * 2, halfLand * 2);
+}
+​const corners = [
+[cx - halfLand, cy - halfLand, -1, -1],
+[cx + halfLand, cy - halfLand,  1, -1],
+[cx - halfLand, cy + halfLand, -1,  1],
+[cx + halfLand, cy + halfLand,  1,  1]
+];
+corners.forEach(([px, py, dx, dy]) => {
+for (let step = 0; step < 5; step++) {
+const ox = px + dx * (step * 10);
+const oy = py + dy * (step * 10);
+const r = 48 - step * 5;
+const g = ctx.createRadialGradient(ox, oy, 2, ox, oy, r);
+g.addColorStop(0.0, 'rgba(255, 255, 255, 0.55)');
+g.addColorStop(0.5, 'rgba(240, 249, 255, 0.25)');
+g.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+ctx.fillStyle = g;
+ctx.beginPath();
+ctx.arc(ox, oy, r, 0, Math.PI * 2);
+ctx.fill();
+}
+});
+​for (let i = 0; i < 420; i++) {
+const angle = Math.random() * Math.PI * 2;
+const dist = 135 + Math.random() * 118;
+const sx = cx + Math.cos(angle) * dist;
+const sy = cy + Math.sin(angle) * dist;
+const sz = 1.0 + Math.random() * 3.0;
+ctx.fillStyle = rgba(255, 255, 255, ${(0.35 + Math.random() * 0.5).toFixed(2)});
+ctx.beginPath();
+ctx.arc(sx, sy, sz, 0, Math.PI * 2);
+ctx.fill();
+}
+​const tex = new THREE.CanvasTexture(canvas);
+return tex;
+}
+​/* === [デザイン完全固定：滝と海の組み立て] === */
+function buildWaterfalls() {
+waterfallGroup = new THREE.Group();
+world.add(waterfallGroup);
+​const baseTex = generateWaterfallBaseTexture();
+const baseGeo = new THREE.CylinderGeometry(4.63, 5.12, 4.4, 64, 1, true);
+const baseMat = new THREE.MeshLambertMaterial({
+map: baseTex,
+transparent: true,
+opacity: 0.92,
+side: THREE.DoubleSide
+});
+const baseCyl = new THREE.Mesh(baseGeo, baseMat);
+baseCyl.position.set(0, -2.35, 0);
+waterfallGroup.add(baseCyl);
+​waterfallTexture = generateWaterfallTexture();
+​const cylGeo = new THREE.CylinderGeometry(4.66, 5.16, 4.4, 64, 1, true);
+const cylMat = new THREE.MeshLambertMaterial({
+map: waterfallTexture,
+transparent: true,
+opacity: 0.85,
+depthWrite: false,
+side: THREE.DoubleSide
+});
+waterfallCylinder = new THREE.Mesh(cylGeo, cylMat);
+waterfallCylinder.position.set(0, -2.35, 0);
+waterfallGroup.add(waterfallCylinder);
+​const seaTex = generateNaturalSeaTexture();
+const seaGeo = new THREE.CircleGeometry(4.65, 64);
+const seaMat = new THREE.MeshLambertMaterial({
+map: seaTex,
+transparent: true,
+opacity: 0.95,
+side: THREE.DoubleSide
+});
+seaSurfaceMesh = new THREE.Mesh(seaGeo, seaMat);
+seaSurfaceMesh.rotation.x = -Math.PI / 2;
+seaSurfaceMesh.position.set(0, -0.15, 0);
+waterfallGroup.add(seaSurfaceMesh);
+​const waveGeo = new THREE.RingGeometry(2.4, 4.62, 48);
+const waveMat = new THREE.MeshBasicMaterial({
+color: 0xe0f2fe,
+transparent: true,
+opacity: 0.35,
+side: THREE.DoubleSide
+});
+innerFoamDisc = new THREE.Mesh(waveGeo, waveMat);
+innerFoamDisc.rotation.x = -Math.PI / 2;
+innerFoamDisc.position.set(0, -0.13, 0);
+waterfallGroup.add(innerFoamDisc);
+}
+​function buildChara() {
+chara = new THREE.Group();
+​const bodyMat  = new THREE.MeshLambertMaterial({ color: 0x60a5fa });
+const headMat  = new THREE.MeshLambertMaterial({ color: 0x93c5fd });
+const jointMat = new THREE.MeshLambertMaterial({ color: 0x334155 });
+const eyeMat   = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+const bulbMat  = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+​bodyM = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.22), bodyMat);
+bodyM.position.y = 0.32;
+chara.add(bodyM);
+​headM = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.32, 0.3), headMat);
+headM.position.y = 0.68;
+chara.add(headM);
+​const eyeGeo = new THREE.BoxGeometry(0.06, 0.08, 0.04);
+const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.1, 0.69, 0.16); chara.add(eyeL);
+const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.1, 0.69, 0.16); chara.add(eyeR);
+​const bulb = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.08), bulbMat);
+bulb.position.set(0, 0.88, 0); chara.add(bulb);
+​const armGeo = new THREE.BoxGeometry(0.1, 0.28, 0.1);
+rArm = new THREE.Mesh(armGeo, jointMat); rArm.position.set(0.24, 0.32, 0); chara.add(rArm);
+lArm = new THREE.Mesh(armGeo, jointMat); lArm.position.set(-0.24, 0.32, 0); chara.add(lArm);
+​const appleGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+const appleMat = new THREE.MeshLambertMaterial({ color: 0xef4444, visible: false });
+handApple = new THREE.Mesh(appleGeo, appleMat);
+handApple.position.set(0, -0.16, 0.06);
+rArm.add(handApple);
+​const legGeo = new THREE.BoxGeometry(0.12, 0.2, 0.12);
+rLeg = new THREE.Mesh(legGeo, jointMat); rLeg.position.set(0.09, 0.1, 0); chara.add(rLeg);
+lLeg = new THREE.Mesh(legGeo, jointMat); lLeg.position.set(-0.09, 0.1, 0); chara.add(lLeg);
+​world.add(chara);
+}
+​function init3D() {
+if (typeof THREE === 'undefined') return;
+const stage = document.getElementById('c3d');
+if (!stage || renderer) return;
+const w = Math.max(stage.clientWidth || window.innerWidth || 360, 240);
+const h = Math.max(stage.clientHeight || 320, 240);
+​scene = new THREE.Scene();
+const initialPhase = TIME_PHASES[getCurrentTimePhaseIdx()];
+scene.background = new THREE.Color(initialPhase.bg);
+​camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
+updateCameraOrientation();
+​renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(w, h);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+stage.appendChild(renderer.domElement);
+​hemiLight = new THREE.HemisphereLight(initialPhase.hemi, 0x1e293b, 1.2);
+scene.add(hemiLight);
+​sunLight = new THREE.DirectionalLight(initialPhase.sun, 0.9);
+sunLight.position.set(6, 14, 7);
+scene.add(sunLight);
+​world = new THREE.Group();
+scene.add(world);
+​buildCelestialSphere();
+buildCloudSea();
+buildWaterfalls();
+buildWorldTurtle();
+​stepMeshGroup = new THREE.Group();
+world.add(stepMeshGroup);
+​buildTerrainVisuals();
+buildChara();
+​const wp = calcWorldPos(ROBOT.pos.gx, ROBOT.pos.gz, ROBOT.pos.sx, ROBOT.pos.sz);
+const curH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
+chara.position.set(wp.x, 0.5 + (curH > 0 ? curH * STEP_H : 0), wp.z);
+chara.rotation.y = ROBOT.rotY || 0;
+​if (pendingLoadedObjs && Array.isArray(pendingLoadedObjs)) {
+for (const obj of pendingLoadedObjs) spawnObject(obj.gx, obj.gz, obj.type, false);
+pendingLoadedObjs = null;
+} else if (fieldObjects.length === 0) {
+spawnObject(1, 0, 'apple', false);
+}
+​setupTouchInteraction();
+setTimeout(resizeRenderer, 100);
+renderLoop();
+}
+​/* === [星空見上げ＆ゲージ自動フェードアウト制御] === */
+function updateCameraOrientation() {
+if (!camera) return;
+const effectiveCamY = Math.max(0.4, camHeight);
+let lookY = 0.1;
+let isLookingUpSky = false;
+​if (camHeight < 3.0) {
+const lift = (3.0 - camHeight) / 4.8;
+lookY = 0.1 + lift * 15.5;
+if (lift > 0.28) {
+isLookingUpSky = true;
+}
+}
+​camera.position.set(0, effectiveCamY, camDist);
+camera.lookAt(0, lookY, 0);
+​const gaugePanel = document.querySelector('.top-gauge-panel');
+if (gaugePanel) {
+if (isLookingUpSky) {
+gaugePanel.classList.add('gauge-hidden');
+} else {
+gaugePanel.classList.remove('gauge-hidden');
+}
+}
+}
+​function buildTerrainVisuals() {
+if (!world || !stepMeshGroup) return;
+while (stepMeshGroup.children.length > 0) stepMeshGroup.remove(stepMeshGroup.children[0]);
+allTerrainBlocks = []; clickBlocks = [];
+​const baseGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+const stepGeo = new THREE.BoxGeometry(0.96, STEP_H - 0.02, 0.96);
+const seaHitGeo = new THREE.BoxGeometry(0.98, 0.1, 0.98);
+​for (let x = -2; x <= 2; x++) {
+for (let z = -2; z <= 2; z++) {
+const h = getTileHeight(x, z);
+const gMat = new THREE.MeshLambertMaterial({ color: 0x7ca982, transparent: true, opacity: 1.0 });
+const topB = new THREE.Mesh(baseGeo, gMat);
+topB.position.set(x, 0, z); topB.userData = { gx: x, gz: z };
+stepMeshGroup.add(topB); clickBlocks.push(topB); allTerrainBlocks.push(topB);
+​const dMat = new THREE.MeshLambertMaterial({ color: 0x8a7058, transparent: true, opacity: 1.0 });
+const underB = new THREE.Mesh(baseGeo, dMat);
+underB.position.set(x, -1, z); underB.userData = { gx: x, gz: z };
+stepMeshGroup.add(underB); allTerrainBlocks.push(underB);
+​for (let s = 1; s <= h; s++) {
+const stepMat = new THREE.MeshLambertMaterial({
+color: s % 2 === 1 ? 0x94a3b8 : 0x64748b,
+transparent: true, opacity: 1.0
+});
+const stepB = new THREE.Mesh(stepGeo, stepMat);
+stepB.position.set(x, 0.48 + (s - 0.5) * STEP_H, z);
+stepB.userData = { gx: x, gz: z, stepLvl: s };
+stepMeshGroup.add(stepB); clickBlocks.push(stepB); allTerrainBlocks.push(stepB);
+}
+}
+}
+​const invisibleSeaMat = new THREE.MeshBasicMaterial({ visible: false });
+for (let x = -3; x <= 3; x++) {
+for (let z = -3; z <= 3; z++) {
+if (isSea(x, z)) {
+const seaB = new THREE.Mesh(seaHitGeo, invisibleSeaMat);
+seaB.position.set(x, -0.15, z);
+seaB.userData = { gx: x, gz: z, isSea: true };
+stepMeshGroup.add(seaB); clickBlocks.push(seaB);
+}
+}
+}
+​for (const obj of fieldObjects) {
+const tileH = getTileHeight(obj.gx, obj.gz);
+obj.mesh.position.y = 0.65 + (tileH > 0 ? tileH * STEP_H : 0);
+}
+if (chara && !isWalking) {
+const wp = calcWorldPos(ROBOT.pos.gx, ROBOT.pos.gz, ROBOT.pos.sx, ROBOT.pos.sz);
+const curH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
+chara.position.set(wp.x, 0.5 + (curH > 0 ? curH * STEP_H : (isSea(ROBOT.pos.gx, ROBOT.pos.gz) ? -0.2 : 0)), wp.z);
+}
+}
+​function spawnObject(gx, gz, type, shouldSave = true) {
+if (!world) return false;
+const grp = new THREE.Group();
+let color = 0xf87171;
+if (type === 'tree') color = 0x10b981;
+else if (type === 'stone') color = 0x94a3b8;
+else if (type === 'grass') color = 0xa3e635;
+​const mainMesh = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.36), new THREE.MeshLambertMaterial({ color: color }));
+grp.add(mainMesh);
+if (type === 'apple') {
+const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), new THREE.MeshLambertMaterial({ color: 0x86efac })); leaf.position.set(0, 0.22, 0); grp.add(leaf);
+}
+const tileH = getTileHeight(gx, gz);
+grp.position.set(gx, 0.65 + (tileH > 0 ? tileH * STEP_H : 0), gz); world.add(grp);
+​const meta = GACHA_ITEMS.find(it => it.type === type);
+fieldObjects.push({ mesh: grp, gx: gx, gz: gz, type: type, meta: meta });
+​if (shouldSave) saveWorldState();
+return true;
+}
+​function setupTouchInteraction() {
+const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+let touchStartTime = 0, prevX = 0, prevY = 0; const topWindow = document.querySelector('.top-window');
+topWindow.addEventListener('touchstart', e => {
+if (e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
+touchStartTime = performance.now();
+if (e.touches.length === 1) {
+prevX = e.touches[0].clientX;
+prevY = e.touches[0].clientY;
+}
+}, { passive: true });
+topWindow.addEventListener('touchmove', e => {
+if (!world || e.touches.length !== 1 || e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
+​const deltaX = e.touches[0].clientX - prevX;
+world.rotation.y += deltaX * 0.008;
+prevX = e.touches[0].clientX;
+​const deltaY = e.touches[0].clientY - prevY;
+camHeight = Math.max(-1.8, Math.min(13.5, camHeight + deltaY * 0.04));
+camDist = Math.max(5.5, Math.min(13.0, camDist - deltaY * 0.012));
+updateCameraOrientation();
+prevY = e.touches[0].clientY;
+}, { passive: true });
+topWindow.addEventListener('touchend', e => {
+if (e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
+if (performance.now() - touchStartTime < 250 && e.changedTouches.length === 1) {
+if (!placementMode) return;
+​const rect = topWindow.getBoundingClientRect(); const touch = e.changedTouches[0];
+mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1; mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+raycaster.setFromCamera(mouse, camera);
+const hits = raycaster.intersectObjects(clickBlocks);
+if (hits.length > 0) {
+const gx = hits[0].object.userData.gx, gz = hits[0].object.userData.gz;
+​if (isSea(gx, gz) && (placementMode === 'stone' || placementMode === 'grass')) {
+showToast("⚠️ 海の中にはブロックを積めないよ！");
+return;
+}
+​if (placementMode === 'stone' || placementMode === 'grass') {
+const curH = getTileHeight(gx, gz);
+if (curH >= MAX_STEP_HEIGHT) {
+showToast(⚠️ ここはもう${MAX_STEP_HEIGHT}段のてっぺんだよ！);
+return;
+}
+setTileHeight(gx, gz, curH + 1);
+removeInventoryItem(placementMode);
+buildTerrainVisuals();
+showToast(🧱 (${gx}, ${gz}) を ${curH + 1}段目 に積んだよ！);
+recentSounds.push({ x: gx, z: gz, text: "ドスン(ブロックを積んだ音)", age: 0 });
+cancelPlacementMode();
+saveWorldState();
+return;
+}
+​if (spawnObject(gx, gz, placementMode, true)) {
+removeInventoryItem(placementMode);
+const meta = GACHA_ITEMS.find(it => it.type === placementMode);
+showToast(✨ ${meta.icon} ${meta.name} を置いたよ！);
+recentSounds.push({ x: gx, z: gz, text: "トスン(何かを置いた音)", age: 0 });
+cancelPlacementMode();
+}
+}
+}
+});
+}
+​let isFanMenuOpen = false;
+function toggleFanMenu() { isFanMenuOpen = !isFanMenuOpen; document.getElementById('fanRadialMenu').classList.toggle('open', isFanMenuOpen); document.getElementById('btn-circle-toggle').classList.toggle('active', isFanMenuOpen); }
+function closeFanMenu() { if (isFanMenuOpen) toggleFanMenu(); }
+function triggerFanAction(type) {
+closeFanMenu();
+if (type === 'gacha') { openGachaModal(); }
+else if (type === 'item') { renderInventoryGrid(); openModal('itemModal'); }
+else if (type === 'clean') { renderCleanGrid(); openModal('cleanModal'); }
+else if (type === 'exit') { saveWorldState(); openModal('exitModal'); }
+}
+​function openDiaryModal() {
+document.getElementById('diary-robot-name').textContent = 第${ROBOT.gen}世代 ロボット;
+const curDay = Math.floor(ROBOT.stepCount / 20) + 1;
+document.getElementById('diary-robot-day-sub').textContent = 生存日数: 🌱 ${curDay}日目;
+const grid = document.getElementById('robot-tools-grid');
+grid.innerHTML = robotTools.map(t => {
+if (!t) return <div class="grid-cell" style="background:#f1f5f9;"></div>;
+return <div class="grid-cell filled" onclick="showToast('${t.icon} ${t.name}')"><span class="cell-icon">${t.icon}</span></div>;
+}).join('');
+openModal('diaryModal');
+}
+​let isGachaSpinning = false;
+function openGachaModal() { document.getElementById('capsule-pop-overlay').classList.remove('active'); document.getElementById('pop-capsule-stage').classList.remove('opened'); updateGachaModalStatus(); openModal('gachaModal'); }
+function updateGachaModalStatus() {
+const used = inventorySlots.filter(s => s !== null).length, avail = getAvailableGachaTypes();
+document.getElementById('gacha-slot-status').textContent = avail.length === 0 ? '⚠️ 25マス満杯！' : 使用枠: ${used} / 25マス;
+document.getElementById('gacha-slot-status').style.color = avail.length === 0 ? '#ef4444' : '#64748b';
+const btn = document.getElementById('btn-gacha-spin');
+if (btn) { btn.disabled = avail.length === 0; btn.textContent = avail.length === 0 ? '満杯で回せません' : 'スタート'; }
+}
+async function spinGachaMachine() {
+if (isGachaSpinning) return;
+const avail = getAvailableGachaTypes(); if (avail.length === 0) return;
+isGachaSpinning = true; document.getElementById('btn-gacha-spin').disabled = true;
+const chosen = avail[Math.floor(Math.random() * avail.length)];
+​document.getElementById('gacha-handle-group').classList.add('turning'); document.getElementById('gacha-dome-capsules').classList.add('shaking');
+await new Promise(r => setTimeout(r, 680));
+document.getElementById('gacha-handle-group').classList.remove('turning'); document.getElementById('gacha-dome-capsules').classList.remove('shaking');
+​document.getElementById('cap-half-top').style.background = chosen.capColor;
+document.getElementById('pop-reward-icon').textContent = chosen.icon;
+document.getElementById('pop-reward-name').textContent = ${chosen.name} ×1個;
+document.getElementById('capsule-pop-overlay').classList.add('active');
+​await new Promise(r => setTimeout(r, 420));
+document.getElementById('pop-capsule-stage').classList.add('opened');
+​let msg = "";
+if (chosen.type === 'chest') {
+const tool = addToolToRobot();
+if (tool) msg = 🎁 特賞！宝箱から「${tool.name}」が出た！手帳に入ったよ！;
+else msg = 🎁 宝箱を開けたけど、道具箱が満杯だったよ…;
+} else {
+addItemToInventory(chosen.type);
+msg = ✨ パカッ！「${chosen.name}」が入ったよ！;
+recentSounds.push({ x: 0, z: 0, text: "カチャッ(景品が出た音)", age: 0 });
+}
+​document.getElementById('pop-status-msg').textContent = msg;
+​life.feedback(0, -10, 30); updateHUD(); saveWorldState();
+await new Promise(r => setTimeout(r, 500));
+isGachaSpinning = false; updateGachaModalStatus();
+}
+​function renderInventoryGrid() {
+document.getElementById('inventory-grid-5x5').innerHTML = inventorySlots.map((s, i) => {
+if (!s) return <div class="grid-cell"></div>;
+const meta = GACHA_ITEMS.find(it => it.type === s.type);
+return <div class="grid-cell filled" onclick="startPlacementMode('${s.type}', '${meta.icon}', '${meta.name}')"> <span class="cell-icon">${meta.icon}</span><span class="cell-count">×${s.count}個</span> </div>;
+}).join('');
+document.getElementById('item-bag-summary').textContent = ${inventorySlots.filter(s=>s!==null).length} / 25マス;
+}
+​function startPlacementMode(type, icon, name) {
+if (type === 'chest') { showToast("宝箱は置けません"); return; }
+placementMode = type;
+closeModal('itemModal');
+document.getElementById('placement-cancel-bar').classList.add('active');
+showToast(👇 好きなマスをタップして「${name}」を置いてね！);
+}
+function cancelPlacementMode() {
+placementMode = null;
+document.getElementById('placement-cancel-bar').classList.remove('active');
+}
+​function renderCleanGrid() {
+let html = '';
+for (let z = -2; z <= 2; z++) {
+for (let x = -2; x <= 2; x++) {
+const isRobo = (ROBOT.pos.gx === x && ROBOT.pos.gz === z);
+const obj = fieldObjects.find(a => a.gx === x && a.gz === z);
+const h = getTileHeight(x, z);
+let icon = '🟩', cls = 'terrain-cell';
+if (isRobo && obj) { icon = 🤖${obj.meta.icon}; cls += ' has-obj'; }
+else if (isRobo) { icon = '🤖'; }
+else if (obj) { icon = obj.meta.icon; cls += ' has-obj'; }
+else if (h > 0) { icon = '🧱'; }
+​html += <div class="grid-cell ${cls}" onclick="cleanSingleCell(${x}, ${z})"> <span class="cell-coord">${x},${z}</span> <span class="cell-step-lvl">${h}段</span> <span class="cell-icon" style="font-size:18px;">${icon}</span> </div>;
+}
+}
+document.getElementById('clean-grid-5x5').innerHTML = html;
+}
+function cleanSingleCell(gx, gz) {
+const idx = fieldObjects.findIndex(a => a.gx === gx && a.gz === gz);
+if (idx !== -1) {
+if (world) world.remove(fieldObjects[idx].mesh);
+fieldObjects.splice(idx, 1);
+saveWorldState(); renderCleanGrid(); showToast(⛏️ (${gx}, ${gz}) の物を片づけたよ！);
+return;
+}
+const curH = getTileHeight(gx, gz);
+if (curH > 0) {
+setTileHeight(gx, gz, curH - 1);
+buildTerrainVisuals();
+saveWorldState(); renderCleanGrid();
+showToast(⛏️ (${gx}, ${gz}) を1段削ったよ (残り${curH - 1}段));
+}
+}
+function cleanAllIslandFromModal() {
+for (const a of fieldObjects) if (world) world.remove(a.mesh);
+fieldObjects = [];
+for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) heightGrid[${x},${z}] = 0;
+buildTerrainVisuals();
+saveWorldState(); renderCleanGrid(); showToast('✨ 大地をまっさらに整地したよ！');
+}
+​function getDirection(cx, cz, tx, tz) {
+if (tx=cx && tz=cz) return "足元";
+let d = ""; if (tz < cz) d += "北"; if (tz > cz) d += "南"; if (tx > cx) d += "東"; if (tx < cx) d += "西"; return d;
+}
+​function getEnvironmentInfo(cx, cz, timePhaseIdx) {
+const isEvening = (timePhaseIdx === 2);
+const isNight = (timePhaseIdx === 3 || timePhaseIdx === 4);
+const curH = getTileHeight(cx, cz);
+const hasHighVision = (!isSea(cx, cz) && curH >= 3);
+​let vision = [];
+if (fieldObjects.length === 0) vision.push("周りに何もない");
+​fieldObjects.forEach(obj => {
+const dist = Math.max(Math.abs(obj.gx - cx), Math.abs(obj.gz - cz));
+let canSee = true;
+if (!hasHighVision) {
+if (isNight && dist > 0) canSee = false;
+if (isEvening && dist > 1) canSee = false;
+}
+​if (canSee) {
+const dir = getDirection(cx, cz, obj.gx, obj.gz);
+const objH = getTileHeight(obj.gx, obj.gz);
+vision.push([視界] ${dir}(距離${dist}歩・高さ${objH}段)に${obj.meta.icon}${obj.meta.name}が見える);
+}
+});
+​if (vision.length === 0) {
+vision.push("暗くて足元しか見えない…（3段以上の高い段に登れば星の光で遠くまで見渡せるよ！）");
+} else if (isNight && hasHighVision) {
+vision.unshift(🔭【高台の星見視界(${curH}段目)】天球の星の光で夜でも島全体がくっきり見渡せる！);
+}
+​let sounds = recentSounds.map(s => {
+const dir = getDirection(cx, cz, s.x, s.z);
+return [耳] ${dir}の方から『${s.text}』と聞こえる！;
+});
+​let locName = isSea(cx, cz) ? "🌊 島の外周の海の中" : 🟩 大地の上（高さ ${curH}段目）;
+if (!isSea(cx, cz) && curH === 5) {
+locName += " 🌟【5段目・星の聖域（天球の星々に一番近い最高峰！）】";
+} else if (!isSea(cx, cz) && curH >= 3) {
+locName += " 🔭【星見の展望台（見晴らし最高！）】";
+}
+return 【現在の場所】 ${locName}\n【見えているもの】 ${vision.join(' / ')}\n【聞こえた音】 ${sounds.length > 0 ? sounds.join(' / ') : '静寂（波の音と星のきらめき）'};
+}
+​function getPossibleActions(gx, gz) {
+const list = [];
+const curH = getTileHeight(gx, gz);
+​if (ROBOT.hasApple) list.push({ key: "EAT_HAND", speed: 1, txt: "右手の🍎リンゴを食べる" });
+const objOnFeet = fieldObjects.find(a => a.gx === gx && a.gz === gz);
+if (objOnFeet) {
+if (objOnFeet.type === 'apple') {
+list.push({ key: "EAT_FIELD", speed: 1, txt: "足元の🍎リンゴを食べる" });
+if (!ROBOT.hasApple) list.push({ key: "PICK_APPLE", speed: 1, txt: "足元の🍎リンゴをひろう" });
+} else {
+list.push({ key: "OBSERVE_FEET", speed: 1, txt: 足元の${objOnFeet.meta.icon}をさわって観察する });
+}
+}
+​const dirs = [
+{ k: "MOVE_E", dx: 1, dz: 0, ry: Math.PI / 2, n: "東", edgeSx: 4, edgeSz: 2 },
+{ k: "MOVE_W", dx: -1, dz: 0, ry: -Math.PI / 2, n: "西", edgeSx: 0, edgeSz: 2 },
+{ k: "MOVE_S", dx: 0, dz: 1, ry: 0, n: "南", edgeSx: 2, edgeSz: 4 },
+{ k: "MOVE_N", dx: 0, dz: -1, ry: Math.PI, n: "北", edgeSx: 2, edgeSz: 0 }
+];
+​dirs.forEach(d => {
+const tx = gx + d.dx, tz = gz + d.dz;
+​if (!isAbyss(tx, tz)) {
+const targetH = getTileHeight(tx, tz);
+const diff = targetH - curH;
+const targetArea = isSea(tx, tz) ? "海" : 大地(${targetH}段);
+const starNote = (!isSea(tx, tz) && targetH === 5) ? "🌟星の聖域！" : ((!isSea(tx, tz) && targetH >= 3) ? "🔭見晴らし台" : "");
+​const curDistToCenter = Math.max(Math.abs(gx), Math.abs(gz));
+const nextDistToCenter = Math.max(Math.abs(tx), Math.abs(tz));
+const isMovingOutwardInSea = isSea(gx, gz) && (nextDistToCenter >= curDistToCenter);
+​if (!isMovingOutwardInSea) {
+if (diff === 1) {
+list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: ${d.n}の${targetArea}${starNote}へピョンと登る（速度3・安全移動） });
+} else if (diff === 0) {
+list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: ${d.n}の${targetArea}${starNote}へ歩く（速度3・安全移動） });
+} else if (diff < 0 && diff >= -2) {
+list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: ${d.n}の${targetArea}${starNote}へ降りる（速度3・安全移動） });
+} else if (diff <= -3) {
+list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, isFall: true, txt: ${d.n}の崖から飛び降りる（高低差注意！） });
+}
+}
+​const beyondGx = tx + d.dx, beyondGz = tz + d.dz;
+const willFallAbyss = isAbyss(beyondGx, beyondGz);
+​if (diff <= 1) {
+const waveText = isSea(gx, gz) ? '（白波を力づくで蹴散らす！）' : '';
+list.push({
+key: d.k + "_DASH5", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 5,
+isOverrun: true, willFallOverrun: willFallAbyss,
+edgeSub: [d.edgeSx, d.edgeSz],
+beyond: [beyondGx, beyondGz],
+txt: ⚡ ${d.n}へ猛ダッシュ！${waveText}（速度5・${willFallAbyss ? '⚠️滝の縁から奈落へダイブ' : '足場ありセーフ'}）
+});
+}
+}
+});
+​if (isSea(gx, gz)) {
+list.push({ key: "PUSH_BY_WAVE", speed: 1, txt: "白波に身をまかせて内陸側へ押し戻される（波に乗る）" });
+} else if (curH === 5) {
+list.push({ key: "REST_HERE", speed: 1, txt: "🌟 5段目のてっぺん（星の聖域）で星空を見上げてひとやすみする" });
+} else if (curH >= 3) {
+list.push({ key: "REST_HERE", speed: 1, txt: 🔭 ${curH}段目の展望台で景色を眺めながらひとやすみする });
+} else {
+list.push({ key: "REST_HERE", speed: 1, txt: "その場の中央でひとやすみする（休む）" });
+}
+return list;
+}
+​async function triggerThinkNow() {
+closeFanMenu(); cancelPlacementMode();
+const st = life.getState(); if (!st.isAlive) return;
+​const btn = document.getElementById('btn-think-now'), lamp = document.getElementById('comm-lamp');
+const bubble = document.getElementById('voice-bubble'), voiceText = document.getElementById('voice-text');
+const activeModel = getActiveModel(), currentKey = getKeyForCurrentModel();
+​if (currentKey.length <= 5) { openModal('settingModal'); return; }
+btn.disabled = true; btn.innerHTML = '⚡ かんがえ中...';
+lamp.className = 'comm-lamp lamp-busy'; lamp.textContent = '⚡ 通信中...';
+bubble.className = 'voice-bubble bubble-active';
+​const gx = ROBOT.pos.gx, gz = ROBOT.pos.gz;
+const curH = getTileHeight(gx, gz);
+const actions = getPossibleActions(gx, gz);
+const timeIdx = getCurrentTimePhaseIdx(); const phaseData = TIME_PHASES[timeIdx];
+​const prompt = `あなたは古代の神話にあるような、雲海の底に眠る古代の巨亀が支える平坦世界の島に立つロボットです。
 世界の外側は巨大な球体の天球（星空の大枠）に包まれており、夜や深淵になると満天の星々と天球の軌道が輝き出します。
 大地は0段〜5段までの高さがあり、高く登るほど星空に近づきます。
-
-【高さ×星空の特別ルール】
+​【高さ×星空の特別ルール】
 ・0〜2段目: 夜は暗くて足元しか見えず、夜歩きすると寒さと怖さでたいりょくが減る。
 ・3〜4段目(展望台): 星の光が届くため、夜や深淵でも島全体がくっきり見渡せる！夜のダメージも大幅に減る。
 ・5段目(星の聖域・てっぺん): 星々に手が届きそうな最高峰！夜でもダメージを一切受けず、星の加護でごきげんとたいりょくが回復する特別な場所。
-
-【ロボットのいま】
+​【ロボットのいま】
 ・❤️ たいりょく(HP): ${st.energy}/100 （ゼロで倒れます！）
 ・🍙 おなか: ${st.stamina}/100
 ・🎵 ごきげん: ${st.mental}/100
-・時間帯: ${phaseData.name}
-・位置: (${gx}, ${gz}) / 足元の高さ: ${isSea(gx, gz) ? '海' : curH + '段目'}
-・${getEnvironmentInfo(gx, gz, timeIdx)}
-
-【選べる行動リスト】
+・時間帯: {phaseData.name}
+・位置: ({gx}, ${gz}) / 足元の高さ: {isSea(gx, gz) ? '海' : curH + '段目'}
+・{getEnvironmentInfo(gx, gz, timeIdx)}
+​【選べる行動リスト】
 ${JSON.stringify(actions.map(a => ({ key: a.key, 速度: a.speed, 行動: a.txt })))}
-
-以下のJSON形式で答えてください：
+​以下のJSON形式で答えてください：
 {
-  "feeling": "ロボットの素直な気持ちや叫び（例: 夜になって天球の星がキラキラ輝き出したよ！3段以上の高い場所に登れば星の光で遠くまで見渡せるぞ！）（65字以内）",
-  "actionKey": "選んだ行動のkey",
-  "actionName": "やったことの説明（例: 星を見ようと1段上のブロックへピョンと登った！）"
+"feeling": "ロボットの素直な気持ちや叫び（例: 夜になって天球の星がキラキラ輝き出したよ！3段以上の高い場所に登れば星の光で遠くまで見渡せるぞ！）（65字以内）",
+"actionKey": "選んだ行動のkey",
+"actionName": "やったことの説明（例: 星を見ようと1段上のブロックへピョンと登った！）"
 }`;
-
-      try {
-        let decision;
-        if (activeModel.startsWith('gemini')) decision = await GeminiCore.think(prompt, currentKey, activeModel);
-        else decision = await GroqCore.think(prompt, currentKey, activeModel);
-
-        lamp.className = 'comm-lamp lamp-ok'; lamp.textContent = '🟢 通信OK!';
-        const actionKey = decision.actionKey || actions[0].key;
-        voiceText.innerHTML = decision.feeling || 'まわりをキョロキョロ見わたしたよ！';
-        document.getElementById('action-note-text').textContent = decision.actionName || '1手動いたよ';
-        bubble.className = 'voice-bubble';
-
-        ROBOT.lastVoice = voiceText.innerHTML; ROBOT.lastActionNote = document.getElementById('action-note-text').textContent;
-        ROBOT.stepCount++;
-        
-        recentSounds.forEach(s => s.age++);
-        recentSounds = recentSounds.filter(s => s.age < 3);
-
-        life.tick([actionKey]); 
-        const resultAct = await executeWorldAction(actionKey, actions);
-        const afterH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
-        const onLandAfter = !isSea(ROBOT.pos.gx, ROBOT.pos.gz);
-
-        let dEnergy = 0, dStamina = 0, dMental = 0;
-        if (resultAct && resultAct.speed) {
-          ROBOT.speed = resultAct.speed;
-          dStamina = -(resultAct.speed * 3);
-          if (st.stamina <= 0) dEnergy -= 15;
-
-          if (onLandAfter && afterH === 5) {
-            dEnergy += 10; dMental += 15;
-            showToast("🌟 5段目・星の聖域！星の光で元気とごきげん回復！");
-          } else if (onLandAfter && afterH >= 3) {
-            dMental += 5;
-            if (timeIdx === 4) dEnergy -= 8;
-          } else {
-            if (timeIdx === 3) dEnergy -= 10;
-            if (timeIdx === 4) { dEnergy -= 20; dMental -= 20; }
-          }
-          
-          if (resultAct.overrunFell) {
-            dEnergy -= 15;
-            showToast("🐢 カメさんの横を落下！たいりょく -15！");
-          } else if (resultAct.isFall) {
-            dEnergy -= 10;
-            showToast("💥 崖から落ちてたいりょく -10！");
-          }
-        } 
-        else if (actionKey === 'REST_HERE') {
-          ROBOT.speed = 1;
-          dStamina = -3;
-          if (onLandAfter && afterH === 5) {
-            dEnergy += 100; dMental += 35;
-            showToast("🌟 てっぺんで星見休憩！たいりょく全回復＆ごきげん大アップ！");
-          } else if (timeIdx === 3 || timeIdx === 4) {
-            dEnergy += 100; dMental += 20;
-          } else if (onLandAfter && afterH >= 3) {
-            dEnergy += 25; dMental += 15;
-          }
-        }
-        else if (actionKey === 'PUSH_BY_WAVE') {
-          ROBOT.speed = 1;
-          dStamina = -1; dMental += 5;
-          showToast("🌊 ざっぱーん！白波に押されて少し内陸へ寄ったよ");
-        }
-        else if (actionKey === 'EAT_HAND' || actionKey === 'EAT_FIELD') {
-          ROBOT.speed = 1;
-          dStamina = +50; dMental += 10;
-        }
-        else if (actionKey === 'PICK_APPLE' || actionKey === 'OBSERVE_FEET') {
-          ROBOT.speed = 1;
-          dStamina = -4; dMental += 5;
-        }
-
-        life.feedback(dEnergy, dStamina, dMental);
-        const afterState = life.getState();
-        if (!afterState.isAlive) triggerRobotDown("「たいりょく」が0になって、動けなくなっちゃった…");
-
-      } catch (err) {
-        lamp.className = 'comm-lamp lamp-err'; lamp.textContent = '❌ 通信エラー';
-        bubble.className = 'voice-bubble bubble-error';
-        voiceText.innerHTML = `<div class="voice-error-text">❌ 【通信できませんでした】<br>${err.message}</div>`;
-      } finally {
-        btn.disabled = false; btn.innerHTML = '⚡ 今すぐ考える';
-        updateHUD(); saveWorldState();
-      }
-    }
-
-    async function executeWorldAction(chosenKey, actions) {
-      const act = actions.find(a => a.key === chosenKey) || actions[0];
-      const gx = ROBOT.pos.gx, gz = ROBOT.pos.gz;
-      const objIdx = fieldObjects.findIndex(a => a.gx === gx && a.gz === gz);
-      
-      if (act.key === 'EAT_HAND') {
-        ROBOT.hasApple = false; if (handApple) handApple.material.visible = false;
-        if (rArm) rArm.rotation.x = -0.9; await new Promise(r => setTimeout(r, 450)); if (rArm) rArm.rotation.x = 0;
-      } else if (act.key === 'EAT_FIELD') {
-        if (objIdx !== -1) { if (world) world.remove(fieldObjects[objIdx].mesh); fieldObjects.splice(objIdx, 1); }
-        if (rArm) rArm.rotation.x = -0.9; await new Promise(r => setTimeout(r, 450)); if (rArm) rArm.rotation.x = 0;
-      } else if (act.key === 'PICK_APPLE') {
-        if (objIdx !== -1) { if (world) world.remove(fieldObjects[objIdx].mesh); fieldObjects.splice(objIdx, 1); }
-        ROBOT.hasApple = true; if (handApple) handApple.material.visible = true;
-      } else if (act.pos) {
-        const tx = act.pos[0], tz = act.pos[1];
-        const targetH = getTileHeight(tx, tz);
-        const targetY = 0.5 + (targetH > 0 ? targetH * STEP_H : (isSea(tx, tz) ? -0.2 : 0));
-
-        if (act.speed === 5) {
-          const edgeSx = act.edgeSub[0], edgeSz = act.edgeSub[1];
-          const edgeW = calcWorldPos(tx, tz, edgeSx, edgeSz);
-          document.getElementById('physics-note-text').textContent = '⚡ 猛ダッシュ中！';
-          
-          await walkCharaTo(edgeW.x, targetY, edgeW.z, act.rotY, 400, act.diff || 0, true);
-
-          if (act.willFallOverrun) {
-            document.getElementById('physics-note-text').textContent = '🐢 雲海を突き抜け古代亀の横をダイブ！';
-            await fallPastTurtle(edgeW.x, edgeW.z);
-            act.overrunFell = true;
-            ROBOT.pos = { gx: 0, gz: 0, sx: 2, sz: 2 };
-            chara.position.set(0, 0.5 + getTileHeight(0,0)*STEP_H, 0);
-          } else {
-            document.getElementById('physics-note-text').textContent = '⚠️ 滝の手前でギリギリセーフ！';
-            await charaStumble();
-            ROBOT.pos = { gx: tx, gz: tz, sx: edgeSx, sz: edgeSz };
-          }
-        } else {
-          const centerW = calcWorldPos(tx, tz, 2, 2);
-          document.getElementById('physics-note-text').textContent = isSea(tx, tz) ? '🌊 荒波の海を歩く' : '🚶 大地を安全移動';
-          await walkCharaTo(centerW.x, targetY, centerW.z, act.rotY, 480, act.diff || 0, false);
-          ROBOT.pos = { gx: tx, gz: tz, sx: 2, sz: 2 };
-        }
-
-        ROBOT.rotY = act.rotY !== undefined ? act.rotY : ROBOT.rotY;
-        if (act.isFall) {
-          recentSounds.push({ x: tx, z: tz, text: "ドスン！(高い所から落ちた音)", age: 0 });
-        }
-      } else if (act.key === 'PUSH_BY_WAVE') {
-        const signX = gx > 0 ? -1 : (gx < 0 ? 1 : 0);
-        const signZ = gz > 0 ? -1 : (gz < 0 ? 1 : 0);
-        const targetGx = gx + signX, targetGz = gz + signZ;
-        const targetW = calcWorldPos(targetGx, targetGz, 2, 2);
-        const targetY = 0.5 + (isSea(targetGx, targetGz) ? -0.2 : getTileHeight(targetGx, targetGz) * STEP_H);
-        await walkCharaTo(targetW.x, targetY, targetW.z, ROBOT.rotY, 400, 0, false);
-        ROBOT.pos = { gx: targetGx, gz: targetGz, sx: 2, sz: 2 };
-      } else if (act.key === 'OBSERVE_FEET') {
-        if (rArm) rArm.rotation.z = -0.5; await new Promise(r => setTimeout(r, 450)); if (rArm) rArm.rotation.z = 0;
-      }
-      return act;
-    }
-
-    function walkCharaTo(tx, ty, tz, targetRotY, dur, diff = 0, isDash = false) {
-      return new Promise(resolve => {
-        if (!chara) { resolve(); return; }
-        isWalking = true;
-        const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z, sRotY = chara.rotation.y;
-        let diffRot = (targetRotY - sRotY) % (Math.PI * 2);
-        if (diffRot > Math.PI) diffRot -= Math.PI * 2; if (diffRot < -Math.PI) diffRot += Math.PI * 2;
-        const start = performance.now();
-        function s(now) {
-          const p = Math.min((now - start) / dur, 1);
-          const jumpArc = (diff === 1) ? Math.sin(p * Math.PI) * 0.28 : 0;
-          chara.position.set(sx + (tx - sx) * p, sy + (ty - sy) * p + jumpArc, sz + (tz - sz) * p);
-          chara.rotation.y = sRotY + diffRot * Math.min(p * 2, 1);
-          if (rLeg && lLeg) {
-            const legSpeed = isDash ? 0.08 : 0.04;
-            rLeg.rotation.x = Math.sin(now * legSpeed) * 0.6;
-            lLeg.rotation.x = -Math.sin(now * legSpeed) * 0.6;
-          }
-          if (p < 1) requestAnimationFrame(s);
-          else {
-            chara.position.set(tx, ty, tz);
-            chara.rotation.y = targetRotY;
-            if (rLeg && lLeg) { rLeg.rotation.x = 0; lLeg.rotation.x = 0; }
-            isWalking = false;
-            resolve();
-          }
-        }
-        requestAnimationFrame(s);
-      });
-    }
-
-    function charaStumble() {
-      return new Promise(resolve => {
-        if (!chara) { resolve(); return; }
-        let f = 0;
-        function wobble() {
-          f++;
-          chara.rotation.z = Math.sin(f * 0.5) * 0.2;
-          if (f < 16) requestAnimationFrame(wobble);
-          else { chara.rotation.z = 0; resolve(); }
-        }
-        wobble();
-      });
-    }
-
-    function fallPastTurtle(x, z) {
-      return new Promise(resolve => {
-        if (!chara) { resolve(); return; }
-        const startY = chara.position.y;
-        const fallTargetY = -9.5;
-        const start = performance.now();
-        function fall(now) {
-          const p = Math.min((now - start) / 850, 1);
-          chara.position.y = startY + (fallTargetY - startY) * p * p;
-          chara.rotation.x += 0.14;
-          chara.rotation.y += 0.09;
-          if (p < 1) requestAnimationFrame(fall);
-          else {
-            chara.rotation.x = 0;
-            chara.rotation.y = 0;
-            resolve();
-          }
-        }
-        requestAnimationFrame(fall);
-      });
-    }
-
-    function triggerRobotDown(msg) {
-      if (chara) {
-        chara.rotation.z = Math.PI / 2;
-        chara.position.y = 0.25 + (getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz) > 0 ? getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz) * STEP_H : 0);
-      }
-      document.getElementById('voice-text').innerHTML = `<span style="color:#ef4444;">🚨 【ロボがたおれました】</span><br>${msg}`;
-      document.getElementById('btn-think-now').style.display = 'none'; document.getElementById('btn-respawn').style.display = 'flex';
-      updateHUD(); saveWorldState();
-    }
-
-    function respawnRobot() {
-      const savedMem = JSON.parse(life.exportSave()).mem || {};
-      life = new LifeCore(JSON.stringify({ e: 100, s: 100, m: 100, a: true, mem: savedMem }));
-      ROBOT.gen++; ROBOT.stepCount = 0; ROBOT.pos = { gx: 0, gz: 0, sx: 2, sz: 2 }; ROBOT.speed = 3; ROBOT.rotY = 0; ROBOT.hasApple = false;
-      ROBOT.lastVoice = `前の世代のきおくを引き継いで、第${ROBOT.gen}世代のロボがめざめたよ！`; ROBOT.lastActionNote = "新しいロボが目覚めた！";
-
-      if (handApple) handApple.material.visible = false;
-      const startY = 0.5 + getTileHeight(0, 0) * STEP_H;
-      if (chara) { chara.rotation.z = 0; chara.rotation.y = 0; chara.position.set(0, startY, 0); }
-      if (fieldObjects.length === 0) spawnObject(1, 0, 'apple', false);
-
-      document.getElementById('btn-think-now').style.display = 'flex'; document.getElementById('btn-respawn').style.display = 'none';
-      document.getElementById('voice-text').textContent = ROBOT.lastVoice; document.getElementById('action-note-text').textContent = ROBOT.lastActionNote;
-      updateHUD(); saveWorldState(); showToast('✨ 新しい世代がめざめたよ！');
-    }
-
-    function updateHUD() {
-      const st = life.getState();
-      document.getElementById('v-energy').textContent = st.energy; document.getElementById('b-energy').style.width = st.energy + '%';
-      document.getElementById('v-stamina').textContent = st.stamina; document.getElementById('b-stamina').style.width = st.stamina + '%';
-      document.getElementById('v-mental').textContent = st.mental; document.getElementById('b-mental').style.width = st.mental + '%';
-      const curH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
-      const locLabel = isSea(ROBOT.pos.gx, ROBOT.pos.gz) ? '海' : `${ROBOT.pos.gx},${ROBOT.pos.gz}・${curH}段`;
-      document.getElementById('ui-robot-id').textContent = `🤖 ロボ${ROBOT.gen} (${locLabel})`;
-      document.getElementById('ui-speed-tag').textContent = `⚡ 速度 ${ROBOT.speed}`;
-      document.getElementById('ui-robot-drive').textContent = DRIVE_JA[st.drive] || st.drive;
-      document.getElementById('ui-step-count').textContent = `⭐ ${ROBOT.stepCount}手目`;
-
-      const timeIdx = getCurrentTimePhaseIdx();
-      const phase = TIME_PHASES[timeIdx];
-      const badge = document.getElementById('ui-time-phase');
-      badge.textContent = phase.name; badge.style.color = phase.tagColor; badge.style.background = phase.tagBg; badge.style.borderColor = phase.tagColor;
-
-      if (timeIdx === 0 || timeIdx === 1) starOpacityTarget = 0.0;
-      else if (timeIdx === 2) starOpacityTarget = 0.32;
-      else if (timeIdx === 3) starOpacityTarget = 0.88;
-      else starOpacityTarget = 1.0;
-
-      if (!isSea(ROBOT.pos.gx, ROBOT.pos.gz)) {
-        const physEl = document.getElementById('physics-note-text');
-        if (curH === 5) physEl.textContent = '🌟 5段目: 星の聖域 (視界＆加護MAX)';
-        else if (curH >= 3) physEl.textContent = `🔭 ${curH}段目: 星見の展望台 (夜間視界◎)`;
-      }
-
-      targetBgColor.setHex(phase.bg); targetHemiColor.setHex(phase.hemi); targetSunColor.setHex(phase.sun);
-      document.getElementById('sky-window').style.backgroundColor = '#' + phase.bg.toString(16).padStart(6, '0');
-    }
-
-    function selectModelInModal(m) {
-      safeStorage.setItem('ai_custom_model', m); const isGem = m.startsWith('gemini');
-      document.getElementById('grp-google-key').className = 'settings-card ' + (isGem ? 'selected-google' : '');
-      document.getElementById('grp-github-key').className = 'settings-card ' + (!isGem ? 'selected-github' : '');
-      const b = document.getElementById('modal-save-btn');
-      b.style.background = isGem ? '#3b82f6' : '#9333ea'; b.textContent = isGem ? '🟦 Google 3.8 に決定して閉じる' : '🟪 Groq 120B に決定して閉じる';
-    }
-    function autoSaveKey(type, val) { const t = val.trim(); if (type === 'google') { safeStorage.setItem('key_google', t); selectModelInModal('gemini-3.8-flash'); } else { safeStorage.setItem('key_github', t); selectModelInModal('openai/gpt-oss-120b'); } }
-    function saveKeys() {
-      const g = document.getElementById('input-google-key').value.trim(), gh = document.getElementById('input-github-key').value.trim();
-      if (g.length > 5) safeStorage.setItem('key_google', g); if (gh.length > 5) safeStorage.setItem('key_github', gh);
-      closeModal('settingModal'); showToast('💾 設定をほぞんしたよ！');
-    }
-    function openModal(id) {
-      if (id === 'settingModal') {
-        document.getElementById('input-google-key').value = safeStorage.getItem('key_google') || ''; document.getElementById('input-github-key').value = safeStorage.getItem('key_github') || '';
-        selectModelInModal(getActiveModel());
-      }
-      document.getElementById(id).style.display = 'flex';
-    }
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
-    let clock = 0, isWalking = false;
-    const occludeRaycaster = new THREE.Raycaster();
-    const camWorldPos = new THREE.Vector3();
-    const roboWorldPos = new THREE.Vector3();
-
-    function updateOccludedBlocks() {
-      if (!chara || !camera || allTerrainBlocks.length === 0) return;
-      camera.getWorldPosition(camWorldPos);
-      chara.getWorldPosition(roboWorldPos);
-      roboWorldPos.y += 0.55;
-
-      const dir = new THREE.Vector3().subVectors(roboWorldPos, camWorldPos);
-      const distToRobo = dir.length();
-      dir.normalize();
-
-      occludeRaycaster.set(camWorldPos, dir);
-      occludeRaycaster.far = Math.max(0.1, distToRobo - 0.2);
-
-      const hits = occludeRaycaster.intersectObjects(allTerrainBlocks, false);
-      const occludedSet = new Set(hits.map(h => h.object));
-
-      for (const block of allTerrainBlocks) {
-        const isBlocking = occludedSet.has(block);
-        const targetOp = isBlocking ? 0.22 : 1.0;
-        block.material.opacity = THREE.MathUtils.lerp(block.material.opacity, targetOp, 0.18);
-      }
-    }
-
-    function renderLoop() {
-      requestAnimationFrame(renderLoop); clock += 0.04;
-      for (const a of fieldObjects) a.mesh.rotation.y += 0.03;
-      if (scene && scene.background) scene.background.lerp(targetBgColor, 0.02);
-      if (hemiLight) hemiLight.color.lerp(targetHemiColor, 0.02);
-      if (sunLight) sunLight.color.lerp(targetSunColor, 0.02);
-
-      if (celestialGroup) {
-        celestialGroup.rotation.y += 0.0008;
-        celestialGroup.rotation.x = Math.sin(clock * 0.15) * 0.08;
-        const curH = (!isSea(ROBOT.pos.gx, ROBOT.pos.gz)) ? getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz) : 0;
-        const heightBoost = curH >= 3 ? (curH - 2) * 0.12 : 0;
-        const finalStarOp = Math.min(1.0, starOpacityTarget + (starOpacityTarget > 0 ? heightBoost : 0));
-
-        if (starPoints) {
-          starPoints.material.opacity = THREE.MathUtils.lerp(starPoints.material.opacity, finalStarOp, 0.03);
-          starPoints.material.size = (0.38 + (curH >= 3 ? curH * 0.04 : 0)) + Math.sin(clock * 2.0) * 0.04;
-        }
-        if (starDomeMesh) {
-          starDomeMesh.material.opacity = THREE.MathUtils.lerp(starDomeMesh.material.opacity, finalStarOp * 0.75, 0.03);
-        }
-        if (celestialRings.length > 0) {
-          celestialRings.forEach((r, idx) => {
-            r.rotation.z += (idx === 0 ? 0.0012 : -0.0009);
-            r.material.opacity = THREE.MathUtils.lerp(r.material.opacity, finalStarOp * 0.35, 0.03);
-          });
-        }
-      }
-
-      if (cloudPlates.length > 0) {
-        cloudPlates.forEach((cp, idx) => {
-          cp.position.x = cp.userData.origX + Math.sin(clock * 0.4 + idx) * 0.35;
-        });
-      }
-
-      if (waterfallTexture) {
-        waterfallTexture.offset.y += 0.006;
-      }
-      if (waterfallCylinder) {
-        waterfallCylinder.rotation.y += 0.0004;
-      }
-
-      if (innerFoamDisc) {
-        const waveScale = 1.0 + Math.sin(clock * 2.2) * 0.025;
-        innerFoamDisc.scale.set(waveScale, waveScale, 1);
-        innerFoamDisc.material.opacity = 0.28 + Math.sin(clock * 3.0) * 0.1;
-      }
-
-      if (turtleGroup) {
-        turtleGroup.position.y = -6.2 + Math.sin(clock * 0.5) * 0.18;
-        turtleFlippers.forEach((fl, idx) => {
-          fl.rotation.z = Math.sin(clock * 0.8 + idx) * 0.15;
-        });
-      }
-      
-      updateOccludedBlocks();
-
-      if (life.getState().isAlive && chara && !isWalking) {
-        const curH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
-        const baseY = 0.5 + (curH > 0 ? curH * STEP_H : (isSea(ROBOT.pos.gx, ROBOT.pos.gz) ? -0.2 : 0));
-        chara.position.y = baseY + Math.sin(clock * 2.5) * 0.025;
-      }
-      if (renderer && scene && camera) renderer.render(scene, camera);
-    }
-
-    function resizeRenderer() {
-      if (!camera || !renderer) return; const stage = document.querySelector('.top-window');
-      const w = Math.max(stage?.clientWidth || window.innerWidth || 360, 240), h = Math.max(stage?.clientHeight || 280, 200);
-      camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h, false);
-    }
-    window.addEventListener('resize', resizeRenderer);
-
-    function startApp() {
-      buildFanMenuSVG(); const isLoaded = tryLoadWorldState(); init3D();
-      if (ROBOT.lastVoice) document.getElementById('voice-text').innerHTML = ROBOT.lastVoice;
-      if (ROBOT.lastActionNote) document.getElementById('action-note-text').textContent = ROBOT.lastActionNote;
-      updateHUD(); if (isLoaded) showToast('💾 つづきから再開したよ！');
-    }
-    if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', startApp); else startApp();
-  </script>
+​try {
+let decision;
+if (activeModel.startsWith('gemini')) decision = await GeminiCore.think(prompt, currentKey, activeModel);
+else decision = await GroqCore.think(prompt, currentKey, activeModel);
+​lamp.className = 'comm-lamp lamp-ok'; lamp.textContent = '🟢 通信OK!';
+const actionKey = decision.actionKey || actions[0].key;
+voiceText.innerHTML = decision.feeling || 'まわりをキョロキョロ見わたしたよ！';
+document.getElementById('action-note-text').textContent = decision.actionName || '1手動いたよ';
+bubble.className = 'voice-bubble';
+​ROBOT.lastVoice = voiceText.innerHTML; ROBOT.lastActionNote = document.getElementById('action-note-text').textContent;
+ROBOT.stepCount++;
+​recentSounds.forEach(s => s.age++);
+recentSounds = recentSounds.filter(s => s.age < 3);
+​life.tick([actionKey]);
+const resultAct = await executeWorldAction(actionKey, actions);
+const afterH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
+const onLandAfter = !isSea(ROBOT.pos.gx, ROBOT.pos.gz);
+​let dEnergy = 0, dStamina = 0, dMental = 0;
+if (resultAct && resultAct.speed) {
+ROBOT.speed = resultAct.speed;
+dStamina = -(resultAct.speed * 3);
+if (st.stamina <= 0) dEnergy -= 15;
+​if (onLandAfter && afterH === 5) {
+dEnergy += 10; dMental += 15;
+showToast("🌟 5段目・星の聖域！星の光で元気とごきげん回復！");
+} else if (onLandAfter && afterH >= 3) {
+dMental += 5;
+if (timeIdx === 4) dEnergy -= 8;
+} else {
+if (timeIdx === 3) dEnergy -= 10;
+if (timeIdx === 4) { dEnergy -= 20; dMental -= 20; }
+}
+​if (resultAct.overrunFell) {
+dEnergy -= 15;
+showToast("🐢 カメさんの横を落下！たいりょく -15！");
+} else if (resultAct.isFall) {
+dEnergy -= 10;
+showToast("💥 崖から落ちてたいりょく -10！");
+}
+}
+else if (actionKey === 'REST_HERE') {
+ROBOT.speed = 1;
+dStamina = -3;
+if (onLandAfter && afterH === 5) {
+dEnergy += 100; dMental += 35;
+showToast("🌟 てっぺんで星見休憩！たいりょく全回復＆ごきげん大アップ！");
+} else if (timeIdx === 3 || timeIdx === 4) {
+dEnergy += 100; dMental += 20;
+} else if (onLandAfter && afterH >= 3) {
+dEnergy += 25; dMental += 15;
+}
+}
+else if (actionKey === 'PUSH_BY_WAVE') {
+ROBOT.speed = 1;
+dStamina = -1; dMental += 5;
+showToast("🌊 ざっぱーん！白波に押されて少し内陸へ寄ったよ");
+}
+else if (actionKey === 'EAT_HAND' || actionKey === 'EAT_FIELD') {
+ROBOT.speed = 1;
+dStamina = +50; dMental += 10;
+}
+else if (actionKey === 'PICK_APPLE' || actionKey === 'OBSERVE_FEET') {
+ROBOT.speed = 1;
+dStamina = -4; dMental += 5;
+}
+​life.feedback(dEnergy, dStamina, dMental);
+const afterState = life.getState();
+if (!afterState.isAlive) triggerRobotDown("「たいりょく」が0になって、動けなくなっちゃった…");
+​} catch (err) {
+lamp.className = 'comm-lamp lamp-err'; lamp.textContent = '❌ 通信エラー';
+bubble.className = 'voice-bubble bubble-error';
+voiceText.innerHTML = <div class="voice-error-text">❌ 【通信できませんでした】<br>${err.message}</div>;
+} finally {
+btn.disabled = false; btn.innerHTML = '⚡ 今すぐ考える';
+updateHUD(); saveWorldState();
+}
+}
+​async function executeWorldAction(chosenKey, actions) {
+const act = actions.find(a => a.key === chosenKey) || actions[0];
+const gx = ROBOT.pos.gx, gz = ROBOT.pos.gz;
+const objIdx = fieldObjects.findIndex(a => a.gx === gx && a.gz === gz);
+​if (act.key === 'EAT_HAND') {
+ROBOT.hasApple = false; if (handApple) handApple.material.visible = false;
+if (rArm) rArm.rotation.x = -0.9; await new Promise(r => setTimeout(r, 450)); if (rArm) rArm.rotation.x = 0;
+} else if (act.key === 'EAT_FIELD') {
+if (objIdx !== -1) { if (world) world.remove(fieldObjects[objIdx].mesh); fieldObjects.splice(objIdx, 1); }
+if (rArm) rArm.rotation.x = -0.9; await new Promise(r => setTimeout(r, 450)); if (rArm) rArm.rotation.x = 0;
+} else if (act.key === 'PICK_APPLE') {
+if (objIdx !== -1) { if (world) world.remove(fieldObjects[objIdx].mesh); fieldObjects.splice(objIdx, 1); }
+ROBOT.hasApple = true; if (handApple) handApple.material.visible = true;
+} else if (act.pos) {
+const tx = act.pos[0], tz = act.pos[1];
+const targetH = getTileHeight(tx, tz);
+const targetY = 0.5 + (targetH > 0 ? targetH * STEP_H : (isSea(tx, tz) ? -0.2 : 0));
+​if (act.speed === 5) {
+const edgeSx = act.edgeSub[0], edgeSz = act.edgeSub[1];
+const edgeW = calcWorldPos(tx, tz, edgeSx, edgeSz);
+document.getElementById('physics-note-text').textContent = '⚡ 猛ダッシュ中！';
+​await walkCharaTo(edgeW.x, targetY, edgeW.z, act.rotY, 400, act.diff || 0, true);
+​if (act.willFallOverrun) {
+document.getElementById('physics-note-text').textContent = '🐢 雲海を突き抜け古代亀の横をダイブ！';
+await fallPastTurtle(edgeW.x, edgeW.z);
+act.overrunFell = true;
+ROBOT.pos = { gx: 0, gz: 0, sx: 2, sz: 2 };
+chara.position.set(0, 0.5 + getTileHeight(0,0)*STEP_H, 0);
+} else {
+document.getElementById('physics-note-text').textContent = '⚠️ 滝の手前でギリギリセーフ！';
+await charaStumble();
+ROBOT.pos = { gx: tx, gz: tz, sx: edgeSx, sz: edgeSz };
+}
+} else {
+const centerW = calcWorldPos(tx, tz, 2, 2);
+document.getElementById('physics-note-text').textContent = isSea(tx, tz) ? '🌊 荒波の海を歩く' : '🚶 大地を安全移動';
+await walkCharaTo(centerW.x, targetY, centerW.z, act.rotY, 480, act.diff || 0, false);
+ROBOT.pos = { gx: tx, gz: tz, sx: 2, sz: 2 };
+}
+​ROBOT.rotY = act.rotY !== undefined ? act.rotY : ROBOT.rotY;
+if (act.isFall) {
+recentSounds.push({ x: tx, z: tz, text: "ドスン！(高い所から落ちた音)", age: 0 });
+}
+} else if (act.key === 'PUSH_BY_WAVE') {
+const signX = gx > 0 ? -1 : (gx < 0 ? 1 : 0);
+const signZ = gz > 0 ? -1 : (gz < 0 ? 1 : 0);
+const targetGx = gx + signX, targetGz = gz + signZ;
+const targetW = calcWorldPos(targetGx, targetGz, 2, 2);
+const targetY = 0.5 + (isSea(targetGx, targetGz) ? -0.2 : getTileHeight(targetGx, targetGz) * STEP_H);
+await walkCharaTo(targetW.x, targetY, targetW.z, ROBOT.rotY, 400, 0, false);
+ROBOT.pos = { gx: targetGx, gz: targetGz, sx: 2, sz: 2 };
+} else if (act.key === 'OBSERVE_FEET') {
+if (rArm) rArm.rotation.z = -0.5; await new Promise(r => setTimeout(r, 450)); if (rArm) rArm.rotation.z = 0;
+}
+return act;
+}
+​function walkCharaTo(tx, ty, tz, targetRotY, dur, diff = 0, isDash = false) {
+return new Promise(resolve => {
+if (!chara) { resolve(); return; }
+isWalking = true;
+const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z, sRotY = chara.rotation.y;
+let diffRot = (targetRotY - sRotY) % (Math.PI * 2);
+if (diffRot > Math.PI) diffRot -= Math.PI * 2; if (diffRot < -Math.PI) diffRot += Math.PI * 2;
+const start = performance.now();
+function s(now) {
+const p = Math.min((now - start) / dur, 1);
+const jumpArc = (diff === 1) ? Math.sin(p * Math.PI) * 0.28 : 0;
+chara.position.set(sx + (tx - sx) * p, sy + (ty - sy) * p + jumpArc, sz + (tz - sz) * p);
+chara.rotation.y = sRotY + diffRot * Math.min(p * 2, 1);
+if (rLeg && lLeg) {
+const legSpeed = isDash ? 0.08 : 0.04;
+rLeg.rotation.x = Math.sin(now * legSpeed) * 0.6;
+lLeg.rotation.x = -Math.sin(now * legSpeed) * 0.6;
+}
+if (p < 1) requestAnimationFrame(s);
+else {
+chara.position.set(tx, ty, tz);
+chara.rotation.y = targetRotY;
+if (rLeg && lLeg) { rLeg.rotation.x = 0; lLeg.rotation.x = 0; }
+isWalking = false;
+resolve();
+}
+}
+requestAnimationFrame(s);
+});
+}
+​function charaStumble() {
+return new Promise(resolve => {
+if (!chara) { resolve(); return; }
+let f = 0;
+function wobble() {
+f++;
+chara.rotation.z = Math.sin(f * 0.5) * 0.2;
+if (f < 16) requestAnimationFrame(wobble);
+else { chara.rotation.z = 0; resolve(); }
+}
+wobble();
+});
+}
+​function fallPastTurtle(x, z) {
+return new Promise(resolve => {
+if (!chara) { resolve(); return; }
+const startY = chara.position.y;
+const fallTargetY = -9.5;
+const start = performance.now();
+function fall(now) {
+const p = Math.min((now - start) / 850, 1);
+chara.position.y = startY + (fallTargetY - startY) * p * p;
+chara.rotation.x += 0.14;
+chara.rotation.y += 0.09;
+if (p < 1) requestAnimationFrame(fall);
+else {
+chara.rotation.x = 0;
+chara.rotation.y = 0;
+resolve();
+}
+}
+requestAnimationFrame(fall);
+});
+}
+​function triggerRobotDown(msg) {
+if (chara) {
+chara.rotation.z = Math.PI / 2;
+chara.position.y = 0.25 + (getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz) > 0 ? getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz) * STEP_H : 0);
+}
+document.getElementById('voice-text').innerHTML = <span style="color:#ef4444;">🚨 【ロボがたおれました】</span><br>${msg};
+document.getElementById('btn-think-now').style.display = 'none'; document.getElementById('btn-respawn').style.display = 'flex';
+updateHUD(); saveWorldState();
+}
+​function respawnRobot() {
+const savedMem = JSON.parse(life.exportSave()).mem || {};
+life = new LifeCore(JSON.stringify({ e: 100, s: 100, m: 100, a: true, mem: savedMem }));
+ROBOT.gen++;
+ROBOT.stepCount = 0; /* 生存日数をクリア（🌱 1日目へリセット） */
+ROBOT.pos = { gx: 0, gz: 0, sx: 2, sz: 2 };
+ROBOT.speed = 3; ROBOT.rotY = 0; ROBOT.hasApple = false;
+ROBOT.lastVoice = 前の世代のきおくを引き継いで、第${ROBOT.gen}世代のロボがめざめたよ！; ROBOT.lastActionNote = "新しいロボが目覚めた！";
+​if (handApple) handApple.material.visible = false;
+const startY = 0.5 + getTileHeight(0, 0) * STEP_H;
+if (chara) { chara.rotation.z = 0; chara.rotation.y = 0; chara.position.set(0, startY, 0); }
+if (fieldObjects.length === 0) spawnObject(1, 0, 'apple', false);
+​document.getElementById('btn-think-now').style.display = 'flex'; document.getElementById('btn-respawn').style.display = 'none';
+document.getElementById('voice-text').textContent = ROBOT.lastVoice; document.getElementById('action-note-text').textContent = ROBOT.lastActionNote;
+updateHUD(); saveWorldState(); showToast('✨ 新しい世代がめざめたよ！');
+}
+​function updateHUD() {
+const st = life.getState();
+document.getElementById('v-energy').textContent = st.energy; document.getElementById('b-energy').style.width = st.energy + '%';
+document.getElementById('v-stamina').textContent = st.stamina; document.getElementById('b-stamina').style.width = st.stamina + '%';
+document.getElementById('v-mental').textContent = st.mental; document.getElementById('b-mental').style.width = st.mental + '%';
+​const curDay = Math.floor(ROBOT.stepCount / 20) + 1;
+document.getElementById('ui-robot-id').textContent = 🤖 ロボ${ROBOT.gen}ごう;
+document.getElementById('ui-day-count').textContent = 🌱 ${curDay}日目;
+document.getElementById('ui-robot-drive').textContent = DRIVE_JA[st.drive] || st.drive;
+​const timeIdx = getCurrentTimePhaseIdx();
+const phase = TIME_PHASES[timeIdx];
+const badge = document.getElementById('ui-time-phase');
+badge.textContent = phase.name; badge.style.color = phase.tagColor; badge.style.background = phase.tagBg; badge.style.borderColor = phase.tagColor;
+​if (timeIdx === 0 || timeIdx === 1) starOpacityTarget = 0.0;
+else if (timeIdx === 2) starOpacityTarget = 0.32;
+else if (timeIdx === 3) starOpacityTarget = 0.88;
+else starOpacityTarget = 1.0;
+​const curH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
+if (!isSea(ROBOT.pos.gx, ROBOT.pos.gz)) {
+const physEl = document.getElementById('physics-note-text');
+if (curH === 5) physEl.textContent = '🌟 5段目: 星の聖域 (視界＆加護MAX)';
+else if (curH >= 3) physEl.textContent = 🔭 ${curH}段目: 星見の展望台 (夜間視界◎);
+}
+​targetBgColor.setHex(phase.bg); targetHemiColor.setHex(phase.hemi); targetSunColor.setHex(phase.sun);
+document.getElementById('sky-window').style.backgroundColor = '#' + phase.bg.toString(16).padStart(6, '0');
+}
+​function selectModelInModal(m) {
+safeStorage.setItem('ai_custom_model', m); const isGem = m.startsWith('gemini');
+document.getElementById('grp-google-key').className = 'settings-card ' + (isGem ? 'selected-google' : '');
+document.getElementById('grp-github-key').className = 'settings-card ' + (!isGem ? 'selected-github' : '');
+const b = document.getElementById('modal-save-btn');
+b.style.background = isGem ? '#3b82f6' : '#9333ea'; b.textContent = isGem ? '🟦 Google 3.8 に決定して閉じる' : '🟪 Groq 120B に決定して閉じる';
+}
+function autoSaveKey(type, val) { const t = val.trim(); if (type === 'google') { safeStorage.setItem('key_google', t); selectModelInModal('gemini-3.8-flash'); } else { safeStorage.setItem('key_github', t); selectModelInModal('openai/gpt-oss-120b'); } }
+function saveKeys() {
+const g = document.getElementById('input-google-key').value.trim(), gh = document.getElementById('input-github-key').value.trim();
+if (g.length > 5) safeStorage.setItem('key_google', g); if (gh.length > 5) safeStorage.setItem('key_github', gh);
+closeModal('settingModal'); showToast('💾 設定をほぞんしたよ！');
+}
+function openModal(id) {
+if (id === 'settingModal') {
+document.getElementById('input-google-key').value = safeStorage.getItem('key_google') || ''; document.getElementById('input-github-key').value = safeStorage.getItem('key_github') || '';
+selectModelInModal(getActiveModel());
+}
+document.getElementById(id).style.display = 'flex';
+}
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+​let clock = 0, isWalking = false;
+const occludeRaycaster = new THREE.Raycaster();
+const camWorldPos = new THREE.Vector3();
+const roboWorldPos = new THREE.Vector3();
+​function updateOccludedBlocks() {
+if (!chara || !camera || allTerrainBlocks.length === 0) return;
+camera.getWorldPosition(camWorldPos);
+chara.getWorldPosition(roboWorldPos);
+roboWorldPos.y += 0.55;
+​const dir = new THREE.Vector3().subVectors(roboWorldPos, camWorldPos);
+const distToRobo = dir.length();
+dir.normalize();
+​occludeRaycaster.set(camWorldPos, dir);
+occludeRaycaster.far = Math.max(0.1, distToRobo - 0.2);
+​const hits = occludeRaycaster.intersectObjects(allTerrainBlocks, false);
+const occludedSet = new Set(hits.map(h => h.object));
+​for (const block of allTerrainBlocks) {
+const isBlocking = occludedSet.has(block);
+const targetOp = isBlocking ? 0.22 : 1.0;
+block.material.opacity = THREE.MathUtils.lerp(block.material.opacity, targetOp, 0.18);
+}
+}
+​function renderLoop() {
+requestAnimationFrame(renderLoop); clock += 0.04;
+for (const a of fieldObjects) a.mesh.rotation.y += 0.03;
+if (scene && scene.background) scene.background.lerp(targetBgColor, 0.02);
+if (hemiLight) hemiLight.color.lerp(targetHemiColor, 0.02);
+if (sunLight) sunLight.color.lerp(targetSunColor, 0.02);
+​if (celestialGroup) {
+celestialGroup.rotation.y += 0.0008;
+celestialGroup.rotation.x = Math.sin(clock * 0.15) * 0.08;
+const curH = (!isSea(ROBOT.pos.gx, ROBOT.pos.gz)) ? getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz) : 0;
+const heightBoost = curH >= 3 ? (curH - 2) * 0.12 : 0;
+const finalStarOp = Math.min(1.0, starOpacityTarget + (starOpacityTarget > 0 ? heightBoost : 0));
+​if (starPoints) {
+starPoints.material.opacity = THREE.MathUtils.lerp(starPoints.material.opacity, finalStarOp, 0.03);
+starPoints.material.size = (0.38 + (curH >= 3 ? curH * 0.04 : 0)) + Math.sin(clock * 2.0) * 0.04;
+}
+if (starDomeMesh) {
+starDomeMesh.material.opacity = THREE.MathUtils.lerp(starDomeMesh.material.opacity, finalStarOp * 0.75, 0.03);
+}
+if (celestialRings.length > 0) {
+celestialRings.forEach((r, idx) => {
+r.rotation.z += (idx === 0 ? 0.0012 : -0.0009);
+r.material.opacity = THREE.MathUtils.lerp(r.material.opacity, finalStarOp * 0.35, 0.03);
+});
+}
+}
+​/* === [デザイン完全固定：雲海・滝・白波・古代亀のアニメーション] === */
+if (cloudPlates.length > 0) {
+cloudPlates.forEach((cp, idx) => {
+cp.position.x = cp.userData.origX + Math.sin(clock * 0.4 + idx) * 0.35;
+});
+}
+​if (waterfallTexture) {
+waterfallTexture.offset.y += 0.006; /* 速度0.006固定（上から下へ） */
+}
+if (waterfallCylinder) {
+waterfallCylinder.rotation.y += 0.0004;
+}
+​if (innerFoamDisc) {
+const waveScale = 1.0 + Math.sin(clock * 2.2) * 0.025;
+innerFoamDisc.scale.set(waveScale, waveScale, 1);
+innerFoamDisc.material.opacity = 0.28 + Math.sin(clock * 3.0) * 0.1;
+}
+​if (turtleGroup) {
+turtleGroup.position.y = -6.2 + Math.sin(clock * 0.5) * 0.18;
+turtleFlippers.forEach((fl, idx) => {
+fl.rotation.z = Math.sin(clock * 0.8 + idx) * 0.15;
+});
+}
+​updateOccludedBlocks();
+​if (life.getState().isAlive && chara && !isWalking) {
+const curH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
+const baseY = 0.5 + (curH > 0 ? curH * STEP_H : (isSea(ROBOT.pos.gx, ROBOT.pos.gz) ? -0.2 : 0));
+chara.position.y = baseY + Math.sin(clock * 2.5) * 0.025;
+}
+if (renderer && scene && camera) renderer.render(scene, camera);
+}
+​function resizeRenderer() {
+if (!camera || !renderer) return; const stage = document.querySelector('.top-window');
+const w = Math.max(stage?.clientWidth || window.innerWidth || 360, 240), h = Math.max(stage?.clientHeight || 280, 200);
+camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h, false);
+updateCameraOrientation();
+}
+window.addEventListener('resize', resizeRenderer);
+​function startApp() {
+buildFanMenuSVG(); const isLoaded = tryLoadWorldState(); init3D();
+if (ROBOT.lastVoice) document.getElementById('voice-text').innerHTML = ROBOT.lastVoice;
+if (ROBOT.lastActionNote) document.getElementById('action-note-text').textContent = ROBOT.lastActionNote;
+updateHUD(); if (isLoaded) showToast('💾 つづきから再開したよ！');
+}
+if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', startApp); else startApp();
+</script>
 </body>
 </html>
-```
