@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -741,38 +742,60 @@
     let seaSurfaceMesh = null;
     let innerFoamDisc = null;
 
+    function generateWaterfallBaseTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64; canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0.0, 'rgba(56, 189, 248, 0.85)');
+      grad.addColorStop(0.45, 'rgba(125, 211, 252, 0.90)');
+      grad.addColorStop(0.80, 'rgba(224, 242, 254, 0.96)');
+      grad.addColorStop(1.0, 'rgba(255, 255, 255, 1.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 256);
+      return new THREE.CanvasTexture(canvas);
+    }
+
     function generateWaterfallTexture() {
       const canvas = document.createElement('canvas');
       canvas.width = 256; canvas.height = 256;
       const ctx = canvas.getContext('2d');
 
-      const grad = ctx.createLinearGradient(0, 0, 0, 256);
-      grad.addColorStop(0.0, 'rgba(56, 189, 248, 0.88)');
-      grad.addColorStop(0.35, 'rgba(125, 211, 252, 0.92)');
-      grad.addColorStop(0.75, 'rgba(240, 249, 255, 0.96)');
-      grad.addColorStop(1.0, 'rgba(255, 255, 255, 1.0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 256, 256);
+      ctx.clearRect(0, 0, 256, 256);
 
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-      for (let i = 0; i < 42; i++) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
+      for (let i = 0; i < 36; i++) {
         const x = Math.random() * 256;
-        const w = 2 + Math.random() * 6;
+        const w = 1.5 + Math.random() * 4.5;
         ctx.fillRect(x, 0, w, 256);
       }
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-      for (let i = 0; i < 220; i++) {
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+      for (let i = 0; i < 90; i++) {
         const px = Math.random() * 256;
-        const py = 100 + Math.random() * 156;
+        const py = Math.random() * 256;
+        const len = 18 + Math.random() * 45;
+        const w = 1.5 + Math.random() * 2.5;
+        ctx.fillRect(px, py, w, len);
+        if (py + len > 256) {
+          ctx.fillRect(px, py - 256, w, len);
+        }
+      }
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+      for (let i = 0; i < 120; i++) {
+        const px = Math.random() * 256;
+        const py = Math.random() * 256;
+        const r = 1.5 + Math.random() * 3.0;
         ctx.beginPath();
-        ctx.arc(px, py, 2 + Math.random() * 3.5, 0, Math.PI * 2);
+        ctx.arc(px, py, r, 0, Math.PI * 2);
         ctx.fill();
       }
 
       const tex = new THREE.CanvasTexture(canvas);
       tex.wrapS = THREE.RepeatWrapping;
       tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(5, 1);
+      tex.repeat.set(5, 2);
       return tex;
     }
 
@@ -843,13 +866,26 @@
       waterfallGroup = new THREE.Group();
       world.add(waterfallGroup);
 
+      const baseTex = generateWaterfallBaseTexture();
+      const baseGeo = new THREE.CylinderGeometry(4.63, 5.12, 4.4, 64, 1, true);
+      const baseMat = new THREE.MeshLambertMaterial({
+        map: baseTex,
+        transparent: true,
+        opacity: 0.92,
+        side: THREE.DoubleSide
+      });
+      const baseCyl = new THREE.Mesh(baseGeo, baseMat);
+      baseCyl.position.set(0, -2.35, 0);
+      waterfallGroup.add(baseCyl);
+
       waterfallTexture = generateWaterfallTexture();
 
-      const cylGeo = new THREE.CylinderGeometry(4.65, 5.15, 4.4, 64, 1, true);
+      const cylGeo = new THREE.CylinderGeometry(4.66, 5.16, 4.4, 64, 1, true);
       const cylMat = new THREE.MeshLambertMaterial({
         map: waterfallTexture,
         transparent: true,
-        opacity: 0.94,
+        opacity: 0.85,
+        depthWrite: false,
         side: THREE.DoubleSide
       });
       waterfallCylinder = new THREE.Mesh(cylGeo, cylMat);
@@ -1725,10 +1761,10 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 速度: a.speed, 行動: a.txt 
       }
 
       if (waterfallTexture) {
-        waterfallTexture.offset.y -= 0.035;
+        waterfallTexture.offset.y += 0.006;
       }
       if (waterfallCylinder) {
-        waterfallCylinder.rotation.y += 0.002;
+        waterfallCylinder.rotation.y += 0.0004;
       }
 
       if (innerFoamDisc) {
@@ -1771,3 +1807,4 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 速度: a.speed, 行動: a.txt 
   </script>
 </body>
 </html>
+```
