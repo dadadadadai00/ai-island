@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>ボクセルAI自律思考水槽 - 視界音・アイテム配置・手帳版</title>
+  <title>ボクセルAI自律思考水槽 - 古代亀が支える平坦世界版</title>
 
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,7 +15,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100vw; height: 100vh; height: 100dvh;
-      overflow: hidden; background: #ebf2f5; color: #2d3748;
+      overflow: hidden; background: #0f172a; color: #2d3748;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Maru Gothic ProN", "Meiryo", sans-serif;
       font-size: 0; line-height: 0;
       user-select: none; -webkit-user-select: none;
@@ -33,7 +33,7 @@
     .top-window {
       position: relative;
       flex: 1; min-height: 0;
-      background: #ebf2f5;
+      background: #0f172a;
       overflow: visible;
       border-bottom: 2px solid #cbd5e1;
       z-index: 30;
@@ -49,7 +49,7 @@
       background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(8px);
       border: 1.5px solid #d1d5db; border-radius: 14px;
       padding: 8px 10px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
     }
     .gauge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .gauge-col {
@@ -66,6 +66,10 @@
       margin-top: 6px; padding-top: 5px; border-top: 1px solid #e2e8f0;
     }
     .robot-id-tag { font-size: 11px; font-weight: 800; color: #64748b; line-height: 1.2; }
+    .speed-badge {
+      font-size: 10px; font-weight: 900; padding: 2px 7px; border-radius: 6px;
+      background: #fef08a; color: #854d0e; border: 1px solid #fde047;
+    }
     .robot-drive-badge {
       font-size: 11px; font-weight: 900; padding: 2px 9px; border-radius: 12px;
       background: #fef9c3; color: #854d0e; border: 1.5px solid #fde047; line-height: 1.3;
@@ -91,13 +95,13 @@
     .btn-side-circle {
       width: 42px; height: 42px; border-radius: 50%;
       background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(6px);
-      border: 2px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border: 2px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
       display: flex; align-items: center; justify-content: center;
       font-size: 20px; cursor: pointer; transition: transform 0.2s;
     }
     .btn-side-circle:active { transform: scale(0.9); }
 
-    /* アイテム配置モードのキャンセルボタン */
+    /* アイテム配置モードのキャンセルバー */
     .placement-cancel-bar {
       position: absolute; top: 100px; left: 50%; transform: translateX(-50%); z-index: 25;
       background: #ef4444; color: white; font-size: 13px; font-weight: 900;
@@ -117,9 +121,9 @@
       transition: transform 0.26s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease;
     }
     .fan-radial-container.open { opacity: 1; transform: scale(1); }
-    .fan-svg { width: 100%; height: 100%; filter: drop-shadow(0 6px 18px rgba(15, 23, 42, 0.14)); overflow: visible; }
+    .fan-svg { width: 100%; height: 100%; filter: drop-shadow(0 6px 18px rgba(15, 23, 42, 0.25)); overflow: visible; }
     .fan-sector {
-      fill: rgba(255, 255, 255, 0.90); stroke: rgba(203, 213, 225, 0.95); stroke-width: 1.5; stroke-linejoin: round;
+      fill: rgba(255, 255, 255, 0.92); stroke: rgba(203, 213, 225, 0.95); stroke-width: 1.5; stroke-linejoin: round;
       cursor: pointer; pointer-events: none; transition: fill 0.15s ease, transform 0.15s ease;
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     }
@@ -133,7 +137,7 @@
 
     .btn-circle-main {
       position: absolute; left: 146px; top: 144px; width: 48px; height: 48px; border-radius: 50%;
-      background: #ffffff; border: 2px solid #cbd5e1; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+      background: #ffffff; border: 2px solid #cbd5e1; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
       transition: transform 0.2s ease, background 0.2s, border-color 0.2s;
@@ -145,10 +149,10 @@
 
     /* ② 文章枠 */
     .bottom-window {
-      position: relative; z-index: 10; flex: none; height: 142px;
+      position: relative; z-index: 10; flex: none; height: 146px;
       background: #ffffff; padding: 10px 12px 8px;
       display: flex; flex-direction: column; gap: 4px;
-      overflow-y: auto; border-top: 1.5px solid #cbd5e1; box-shadow: 0 -2px 10px rgba(0,0,0,0.03);
+      overflow-y: auto; border-top: 1.5px solid #cbd5e1; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
     }
     .voice-header { display: flex; justify-content: space-between; align-items: center; }
     .voice-title { font-size: 12px; font-weight: 900; color: #475569; display: flex; align-items: center; gap: 4px; }
@@ -168,7 +172,7 @@
     .voice-text { font-size: 14px; font-weight: 900; line-height: 1.45; color: #1e293b; word-break: break-all; }
     .voice-error-text { font-size: 12px; font-weight: 800; line-height: 1.4; color: #dc2626; }
 
-    .action-note-row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: #64748b; }
+    .action-note-row { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 800; color: #64748b; }
     .action-badge { font-size: 10px; font-weight: 900; background: #f1f5f9; color: #475569; padding: 1px 6px; border-radius: 5px; border: 1px solid #cbd5e1; }
 
     /* ③ フッター */
@@ -190,11 +194,11 @@
     /* モーダル */
     .modal-cover {
       font-size: 14px; line-height: 1.4; position: fixed; inset: 0; z-index: 100;
-      background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 14px;
+      background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 14px;
     }
     .modal-box {
       width: 100%; max-width: 390px; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 20px; padding: 16px;
-      display: flex; flex-direction: column; gap: 10px; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.15); max-height: 90dvh; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 10px; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2); max-height: 90dvh; overflow-y: auto;
     }
     .modal-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #f1f5f9; padding-bottom: 6px; }
     .modal-title { font-size: 15px; font-weight: 900; color: #334155; }
@@ -235,6 +239,7 @@
     .cell-icon { font-size: 22px; line-height: 1; }
     .cell-count { position: absolute; right: 3px; bottom: 2px; font-size: 9.5px; font-weight: 900; color: #1e293b; background: rgba(255, 255, 255, 0.92); padding: 0 3px; border-radius: 4px; border: 1px solid #cbd5e1; line-height: 1.2; }
     .cell-coord { position: absolute; top: 2px; left: 3px; font-size: 8px; font-weight: 700; color: #64748b; line-height: 1; }
+    .cell-step-lvl { position: absolute; right: 3px; top: 2px; font-size: 8.5px; font-weight: 900; color: #047857; background: #ecfdf5; padding: 0 3px; border-radius: 4px; border: 1px solid #a7f3d0; line-height: 1.2; }
 
     /* 手帳（ステータス）画面 */
     .diary-robot-preview {
@@ -284,7 +289,10 @@
           <div class="gauge-col"><div class="gauge-label">🎵 ごきげん <span id="v-mental" class="gauge-num">100</span></div><div class="bar-bg"><div id="b-mental" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #6ee7b7, #10b981);"></div></div></div>
         </div>
         <div class="robot-status-row">
-          <span id="ui-robot-id" class="robot-id-tag">🤖 ロボ1ごう (0, 0)</span>
+          <div style="display:flex; align-items:center; gap:5px;">
+            <span id="ui-robot-id" class="robot-id-tag">🤖 ロボ1ごう (0, 0)</span>
+            <span id="ui-speed-tag" class="speed-badge">⚡ 速度 3</span>
+          </div>
           <span id="ui-robot-drive" class="robot-drive-badge">😊 あんしん・まんぷく</span>
           <div class="status-right-col">
             <span id="ui-time-phase" class="time-phase-badge">☀️ 朝</span>
@@ -323,14 +331,17 @@
       </div>
       <div class="voice-bubble" id="voice-bubble">
         <div class="voice-text" id="voice-text">
-          ぼくはマス目の島に立つロボットだよ！<br>
-          「おなか」が空きすぎると「たいりょく」が減って倒れちゃうよ。<br>
-          暗い夜中は足元しか見えないから気をつけてね！
+          ぼく達の世界は巨大なカメさんが下で背負って支えているんだって！<br>
+          大地のまわりは青い海で、海の端っこは奈落の底へ落ちていくよ！<br>
+          ダッシュ(速度5)で海の端を飛び出すと、カメさんを見ながら落っこちちゃうから気をつけてね！
         </div>
       </div>
       <div class="action-note-row">
-        <span class="action-badge">👟 やった事</span>
-        <span id="action-note-text">待機中（まだ動いていないよ）</span>
+        <div style="display:flex; align-items:center; gap:5px;">
+          <span class="action-badge">👟 やった事</span>
+          <span id="action-note-text">待機中（まだ動いていないよ）</span>
+        </div>
+        <span id="physics-note-text" style="font-size:10px; color:#3b82f6; font-weight:800;">中央静止中</span>
       </div>
     </div>
 
@@ -354,11 +365,12 @@
       <div class="diary-robot-preview">
         <div class="diary-robot-emoji">🤖</div>
         <div style="font-size:14px; font-weight:900; color:#0f172a;" id="diary-robot-name">第1世代 ロボット</div>
+        <div style="font-size:11px; color:#475569; margin-top:2px;" id="diary-robot-pos-sub">位置: (0, 0) / サブマス [2, 2]</div>
       </div>
       <div class="diary-tool-title">🎒 宝箱から見つけた「どうぐ」(5×2マス)</div>
       <div class="grid-5x2" id="robot-tools-grid"></div>
       
-      <button type="button" class="btn-log-view" onclick="alert('ここに1日の記録（ログ）が表示される予定です！')">📝 1日のきろくを見る</button>
+      <button type="button" class="btn-log-view" onclick="showToast('📝 1日の記録は準備中だよ！')">📝 1日のきろくを見る</button>
     </div>
   </div>
 
@@ -412,7 +424,7 @@
         <div class="modal-title">🎒 アイテム（5×5 もちもの袋）</div>
         <div id="item-bag-summary" style="font-size:11px; font-weight:800; color:#3b82f6;">0 / 25マス</div>
       </div>
-      <div style="font-size:12px; color:#64748b;">使いたいアイテムをタップして、島に置いてね（1マスに1個まで）。宝箱はロボットのどうぐになるよ！</div>
+      <div style="font-size:12px; color:#64748b;">使いたいアイテムをタップして、島に置いてね（すべて通り抜けできるよ）。石や草は高さを1段積み上げるよ！</div>
       <div class="grid-5x5" id="inventory-grid-5x5"></div>
       <button type="button" class="btn-modal-close" style="width:100%;" onclick="closeModal('itemModal')">閉じる</button>
     </div>
@@ -421,10 +433,10 @@
   <!-- 整地 -->
   <div class="modal-cover" id="cleanModal">
     <div class="modal-box">
-      <div class="modal-head"><div class="modal-title">⛏️ 整地（島の5×5マス目マップ）</div><div class="close-btn" onclick="closeModal('cleanModal')">✕</div></div>
+      <div class="modal-head"><div class="modal-title">⛏️ 整地（中央大地の5×5マス目マップ）</div><div class="close-btn" onclick="closeModal('cleanModal')">✕</div></div>
       <div class="grid-5x5" id="clean-grid-5x5"></div>
       <div class="modal-footer-btns">
-        <button type="button" class="save-btn" style="background:#10b981;" onclick="cleanAllIslandFromModal()">✨ 島ぜんぶ整地</button>
+        <button type="button" class="save-btn" style="background:#10b981;" onclick="cleanAllIslandFromModal()">✨ 大地を整地</button>
         <button type="button" class="btn-modal-close" onclick="closeModal('cleanModal')">閉じる</button>
       </div>
     </div>
@@ -450,7 +462,7 @@
         <input type="password" id="input-github-key" class="input-box" placeholder="ここにGroqキー (gsk_...) を貼り付け" onclick="event.stopPropagation(); selectModelInModal('openai/gpt-oss-120b');" oninput="autoSaveKey('github', this.value)">
       </div>
       <button type="button" class="save-btn" id="modal-save-btn" onclick="saveKeys()">決定してとじる</button>
-      <button type="button" class="reset-btn" onclick="confirmResetGame()">🔄 データを消して最初からやり直す（初期化）</button>
+      <button type="button" class="reset-btn" onclick="resetGameDirectly()">🔄 データを消して最初からやり直す（初期化）</button>
     </div>
   </div>
 
@@ -465,7 +477,7 @@
     }
     cleanStrayTextNodes();
 
-    /* ================= LifeCore (変更なし) ================= */
+    /* ================= LifeCore (生命の種) ================= */
     class LifeCore {
       #energy = 100; #stamina = 100; #mental = 100; #isAlive = true; #memory = {};
       #lastStateKey = null; #lastAction = null; #lastWellbeing = 100; #lastDelta = 0;
@@ -558,23 +570,21 @@
       svg.innerHTML = html;
     }
 
-    // ★ 5段階の環境・時間フェーズ
     const TIME_PHASES = [
-      { name: '☀️ 朝', bg: 0xe0f2fe, sun: 0xfffaed, hemi: 0xffffff, tagColor: '#0ea5e9', tagBg: '#e0f2fe' },
-      { name: '☀️ 昼', bg: 0xebf2f5, sun: 0xffffff, hemi: 0xcfd8dc, tagColor: '#0369a1', tagBg: '#ebf2f5' },
-      { name: '🌇 夕方', bg: 0xffedd5, sun: 0xfdba74, hemi: 0xfed7aa, tagColor: '#c2410c', tagBg: '#ffedd5' },
-      { name: '🌙 夜', bg: 0x312e81, sun: 0x4f46e5, hemi: 0x4338ca, tagColor: '#a5b4fc', tagBg: '#312e81' },
-      { name: '🌌 夜中', bg: 0x0f172a, sun: 0x1e1b4b, hemi: 0x312e81, tagColor: '#94a3b8', tagBg: '#0f172a' }
+      { name: '☀️ 朝', bg: 0x0f2b46, sun: 0xfffaed, hemi: 0xdbeafe, tagColor: '#0ea5e9', tagBg: '#e0f2fe' },
+      { name: '☀️ 昼', bg: 0x173e65, sun: 0xffffff, hemi: 0xe0f2fe, tagColor: '#0369a1', tagBg: '#ebf2f5' },
+      { name: '🌇 夕方', bg: 0x4a2432, sun: 0xfdba74, hemi: 0xfed7aa, tagColor: '#c2410c', tagBg: '#ffedd5' },
+      { name: '🌙 夜', bg: 0x1e1b4b, sun: 0x6366f1, hemi: 0x4338ca, tagColor: '#a5b4fc', tagBg: '#312e81' },
+      { name: '🌌 深淵', bg: 0x060913, sun: 0x312e81, hemi: 0x1e293b, tagColor: '#94a3b8', tagBg: '#0f172a' }
     ];
     function getCurrentTimePhaseIdx() { const cycle = ROBOT.stepCount % 20; if (cycle <= 3) return 0; if (cycle <= 7) return 1; if (cycle <= 11) return 2; if (cycle <= 15) return 3; return 4; }
 
     const memStore = {};
     const safeStorage = { getItem: k => memStore[k] ?? (() => { try { return localStorage.getItem(k); } catch(e){ return null; } })(), setItem: (k, v) => { memStore[k] = String(v); try { localStorage.setItem(k, String(v)); } catch(e){} }, removeItem: k => { delete memStore[k]; try { localStorage.removeItem(k); } catch(e){} } };
-    function showToast(msg) { const el = document.getElementById('toast-msg'); if (!el) return; el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 1800); }
+    function showToast(msg) { const el = document.getElementById('toast-msg'); if (!el) return; el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2000); }
 
     const DRIVE_JA = { PEACE: '😊 あんしん・まんぷく', BORED: '🥱 たい屈（あそびたい！）', HUNGRY: '🍙 おなかすいた…', EXHAUSTED: '💤 くたくた（ねむい）', STARVING: '🚨 はらぺこピンチ！！', FAINT: '💫 たおれて気絶中', DEAD: '💀 うごかなくなった' };
 
-    // ★ 特賞「宝箱」を追加
     const GACHA_ITEMS = [
       { type: 'apple', name: 'りんご', icon: '🍎', capColor: 'linear-gradient(135deg, #f9a8d4, #f472b6)', isTool: false },
       { type: 'tree',  name: '木',     icon: '🌳', capColor: 'linear-gradient(135deg, #6ee7b7, #10b981)', isTool: false },
@@ -585,99 +595,133 @@
     const CHEST_TOOLS = [ { name: 'オノ', icon: '🪓' }, { name: 'ピッケル', icon: '⛏️' }, { name: '虫あみ', icon: '🕸️' }, { name: 'スコップ', icon: '🥄' } ];
     
     let inventorySlots = Array(25).fill(null);
-    let robotTools = Array(10).fill(null); // 5x2の道具箱
-    
-    // ★ 配置システムと音ログ
-    let placementMode = null; // 置くアイテムのtype
-    let recentSounds = []; // {x, z, text, age}
+    let robotTools = Array(10).fill(null);
+    let placementMode = null;
+    let recentSounds = [];
+
+    /* ================= マップ定義 =================
+       大地: -2 <= x <= 2, -2 <= z <= 2 (5x5)
+       海  : x, z in [-3, 3] のうち外周 (|x|=3 または |z|=3)
+       奈落: |x| > 3 または |z| > 3 (外側の大宇宙・落下)
+    ================================================== */
+    const MAX_STEP_HEIGHT = 5;
+    const STEP_H = 0.35;
+    const SUB_DIV = 5;
+    const SUB_STEP = 1.0 / SUB_DIV;
+
+    const heightGrid = {};
+    for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) heightGrid[`${x},${z}`] = 0;
+
+    function isLand(gx, gz) { return (Math.abs(gx) <= 2 && Math.abs(gz) <= 2); }
+    function isSea(gx, gz) { return (Math.abs(gx) <= 3 && Math.abs(gz) <= 3) && !isLand(gx, gz); }
+    function isAbyss(gx, gz) { return (Math.abs(gx) > 3 || Math.abs(gz) > 3); }
+
+    function getTileHeight(gx, gz) {
+      if (isLand(gx, gz)) return heightGrid[`${gx},${gz}`] !== undefined ? heightGrid[`${gx},${gz}`] : 0;
+      if (isSea(gx, gz)) return -0.4; // 海の水面（少し低い）
+      return -99; // 奈落の底
+    }
+    function setTileHeight(gx, gz, h) {
+      if (isLand(gx, gz)) heightGrid[`${gx},${gz}`] = Math.max(0, Math.min(MAX_STEP_HEIGHT, h));
+    }
 
     function getAvailableGachaTypes() { const hasEmpty = inventorySlots.some(s => s === null); if (hasEmpty) return GACHA_ITEMS; return GACHA_ITEMS.filter(item => inventorySlots.some(s => s && s.type === item.type && s.count < 10)); }
     function addItemToInventory(itemType) { for (let i = 0; i < 25; i++) if (inventorySlots[i] && inventorySlots[i].type === itemType && inventorySlots[i].count < 10) { inventorySlots[i].count++; return i; } for (let i = 0; i < 25; i++) if (inventorySlots[i] === null) { inventorySlots[i] = { type: itemType, count: 1 }; return i; } return -1; }
     function removeInventoryItem(itemType) { for (let i = 0; i < 25; i++) { if (inventorySlots[i] && inventorySlots[i].type === itemType) { inventorySlots[i].count--; if (inventorySlots[i].count <= 0) inventorySlots[i] = null; return true; } } return false; }
     
-    // 宝箱から道具を引く
     function addToolToRobot() {
       const tool = CHEST_TOOLS[Math.floor(Math.random() * CHEST_TOOLS.length)];
       for (let i = 0; i < 10; i++) { if (robotTools[i] === null) { robotTools[i] = tool; return tool; } }
-      return null; // 満杯
+      return null;
     }
 
     let life = new LifeCore();
-    const ROBOT = { gen: 1, stepCount: 0, pos: { x: 0, z: 0 }, rotY: 0, hasApple: false, lastVoice: "ぼくはマス目の島に立つロボットだよ！", lastActionNote: "待機中" };
+    const ROBOT = {
+      gen: 1, stepCount: 0,
+      pos: { gx: 0, gz: 0, sx: 2, sz: 2 },
+      speed: 3,
+      rotY: 0, hasApple: false,
+      lastVoice: "カメさんが下で世界を支えているんだって！",
+      lastActionNote: "待機中"
+    };
+
+    function calcWorldPos(gx, gz, sx = 2, sz = 2) {
+      const wx = gx + (sx - 2) * SUB_STEP;
+      const wz = gz + (sz - 2) * SUB_STEP;
+      return { x: wx, z: wz };
+    }
 
     function getActiveModel() { const saved = safeStorage.getItem('ai_custom_model'); if (!saved) return GeminiCore.DEFAULT_MODEL; if (saved.includes('2.5') || saved.includes('2.0') || saved.includes('1.5')) return GeminiCore.DEFAULT_MODEL; return saved; }
     function getKeyForCurrentModel() { return getActiveModel().startsWith('gemini') ? (safeStorage.getItem('key_google') || '') : (safeStorage.getItem('key_github') || ''); }
 
-    // ★ リンゴだけでなく、すべてのオブジェクトを管理
-    let fieldObjects = []; // { gx, gz, type, mesh, meta }
+    let fieldObjects = [];
 
     function saveWorldState() {
-      try { safeStorage.setItem('island_game_save_v2', JSON.stringify({ lifeSave: life.exportSave(), robot: ROBOT, objs: fieldObjects.map(o => ({ gx: o.gx, gz: o.gz, type: o.type })), inventory: inventorySlots, tools: robotTools })); } catch (e) {}
+      try { safeStorage.setItem('island_game_save_v4', JSON.stringify({ lifeSave: life.exportSave(), robot: ROBOT, objs: fieldObjects.map(o => ({ gx: o.gx, gz: o.gz, type: o.type })), inventory: inventorySlots, tools: robotTools, heights: heightGrid })); } catch (e) {}
     }
     let pendingLoadedObjs = null;
     function tryLoadWorldState() {
       try {
-        const data = JSON.parse(safeStorage.getItem('island_game_save_v2')); if (!data || !data.lifeSave) return false;
+        const data = JSON.parse(safeStorage.getItem('island_game_save_v4')); if (!data || !data.lifeSave) return false;
         life = new LifeCore(data.lifeSave); Object.assign(ROBOT, data.robot); pendingLoadedObjs = Array.isArray(data.objs) ? data.objs : null;
         if (Array.isArray(data.inventory) && data.inventory.length === 25) inventorySlots = data.inventory;
         if (Array.isArray(data.tools) && data.tools.length === 10) robotTools = data.tools;
+        if (data.heights && typeof data.heights === 'object') Object.assign(heightGrid, data.heights);
         return true;
       } catch (e) { return false; }
     }
-    function confirmResetGame() { if (confirm('ほんとうに最初からやり直しますか？')) { safeStorage.removeItem('island_game_save_v2'); location.reload(); } }
+    function resetGameDirectly() {
+      safeStorage.removeItem('island_game_save_v4');
+      showToast('🔄 初期化しました！');
+      setTimeout(() => location.reload(), 600);
+    }
 
     /* 3Dエンジン */
     let scene, camera, renderer, world, clickBlocks = [];
-    let allTerrainBlocks = []; // ★ 遮蔽判定用の全ブロック配列
+    let allTerrainBlocks = [];
+    let stepMeshGroup = null, turtleGroup = null;
     let chara, bodyM, headM, rArm, lArm, rLeg, lLeg, handApple;
     let hemiLight, sunLight;
-    const MAP_SIZE = 5;
-    let targetBgColor = new THREE.Color(0xe0f2fe), targetHemiColor = new THREE.Color(0xffffff), targetSunColor = new THREE.Color(0xfffaed);
+    let targetBgColor = new THREE.Color(0x0f2b46), targetHemiColor = new THREE.Color(0xdbeafe), targetSunColor = new THREE.Color(0xfffaed);
 
-    // ★ カメラの上下角度・見下ろし管理
-    let camHeight = 7.8;
-    let camDist = 8.2;
+    let camHeight = 8.5;
+    let camDist = 9.8;
 
     function init3D() {
       if (typeof THREE === 'undefined') return; const stage = document.getElementById('c3d'); if (!stage || renderer) return;
       const w = Math.max(stage.clientWidth || window.innerWidth || 360, 240), h = Math.max(stage.clientHeight || 280, 200);
       scene = new THREE.Scene(); const initialPhase = TIME_PHASES[getCurrentTimePhaseIdx()]; scene.background = new THREE.Color(initialPhase.bg);
-      camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100); camera.position.set(0, camHeight, camDist); camera.lookAt(0, 0.2, 0);
+      camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100); camera.position.set(0, camHeight, camDist); camera.lookAt(0, 0.1, 0);
       renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(w, h); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); stage.appendChild(renderer.domElement);
-      hemiLight = new THREE.HemisphereLight(initialPhase.hemi, 0x94a3b8, 1.15); scene.add(hemiLight);
-      sunLight = new THREE.DirectionalLight(initialPhase.sun, 0.85); sunLight.position.set(5, 12, 6); scene.add(sunLight);
+      hemiLight = new THREE.HemisphereLight(initialPhase.hemi, 0x1e293b, 1.2); scene.add(hemiLight);
+      sunLight = new THREE.DirectionalLight(initialPhase.sun, 0.9); sunLight.position.set(6, 14, 7); scene.add(sunLight);
       world = new THREE.Group(); scene.add(world);
+
+      // 下を支える古代カメ
+      buildWorldTurtle();
+
+      stepMeshGroup = new THREE.Group();
+      world.add(stepMeshGroup);
       
-      const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
-      const half = Math.floor(MAP_SIZE / 2);
-      allTerrainBlocks = []; clickBlocks = [];
+      buildTerrainVisuals();
 
-      for (let x = -half; x <= half; x++) {
-        for (let z = -half; z <= half; z++) {
-          // 各ブロックに個別マテリアルを適用（邪魔なブロックだけ個別に透かすため）
-          const gMat = new THREE.MeshLambertMaterial({ color: 0x7ca982, transparent: true, opacity: 1.0 });
-          const topB = new THREE.Mesh(boxGeo, gMat);
-          topB.position.set(x, 0, z); topB.userData = { gx: x, gz: z, baseOpacity: 1.0, currentTargetOpacity: 1.0 };
-          world.add(topB); clickBlocks.push(topB); allTerrainBlocks.push(topB);
-
-          const dMat = new THREE.MeshLambertMaterial({ color: 0xa89078, transparent: true, opacity: 1.0 });
-          const underB = new THREE.Mesh(boxGeo, dMat);
-          underB.position.set(x, -1, z); underB.userData = { gx: x, gz: z, baseOpacity: 1.0, currentTargetOpacity: 1.0 };
-          world.add(underB); allTerrainBlocks.push(underB);
-        }
-      }
+      // キャラクター（ロボット）
       chara = new THREE.Group(); world.add(chara);
-      bodyM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x60a5fa })); bodyM.scale.set(0.52, 0.52, 0.38); bodyM.position.y = 0.5; chara.add(bodyM);
-      headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0xe2e8f0 })); headM.scale.set(0.44, 0.42, 0.42); headM.position.y = 0.88; chara.add(headM);
-      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.1, 0.08), new THREE.MeshBasicMaterial({ color: 0x1e3a8a })); eye.position.set(0, 0.9, 0.22); chara.add(eye);
+      const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+      bodyM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x60a5fa })); bodyM.scale.set(0.48, 0.48, 0.35); bodyM.position.y = 0.5; chara.add(bodyM);
+      headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0xe2e8f0 })); headM.scale.set(0.40, 0.38, 0.38); headM.position.y = 0.86; chara.add(headM);
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.09, 0.08), new THREE.MeshBasicMaterial({ color: 0x1e3a8a })); eye.position.set(0, 0.88, 0.20); chara.add(eye);
       const armMat = new THREE.MeshLambertMaterial({ color: 0x3b82f6 });
-      rArm = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.38, 0.18), armMat); rArm.position.set(0.37, 0.5, 0); chara.add(rArm);
-      lArm = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.38, 0.18), armMat); lArm.position.set(-0.37, 0.5, 0); chara.add(lArm);
-      handApple = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), new THREE.MeshLambertMaterial({ color: 0xf87171, visible: false })); handApple.position.set(0, -0.2, 0.15); rArm.add(handApple);
+      rArm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.34, 0.16), armMat); rArm.position.set(0.34, 0.5, 0); chara.add(rArm);
+      lArm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.34, 0.16), armMat); lArm.position.set(-0.34, 0.5, 0); chara.add(lArm);
+      handApple = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshLambertMaterial({ color: 0xf87171, visible: false })); handApple.position.set(0, -0.18, 0.14); rArm.add(handApple);
       const legMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
-      rLeg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.34, 0.2), legMat); rLeg.position.set(0.17, 0.17, 0); chara.add(rLeg);
-      lLeg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.34, 0.2), legMat); lLeg.position.set(-0.17, 0.17, 0); chara.add(lLeg);
-      chara.position.set(ROBOT.pos.x, 0.5, ROBOT.pos.z); chara.rotation.y = ROBOT.rotY || 0;
+      rLeg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.30, 0.18), legMat); rLeg.position.set(0.15, 0.15, 0); chara.add(rLeg);
+      lLeg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.30, 0.18), legMat); lLeg.position.set(-0.15, 0.15, 0); chara.add(lLeg);
+      
+      const initW = calcWorldPos(ROBOT.pos.gx, ROBOT.pos.gz, ROBOT.pos.sx, ROBOT.pos.sz);
+      const startY = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz) * STEP_H + 0.5;
+      chara.position.set(initW.x, startY, initW.z); chara.rotation.y = ROBOT.rotY || 0;
       if (ROBOT.hasApple && handApple) handApple.material.visible = true;
 
       if (pendingLoadedObjs && pendingLoadedObjs.length > 0) {
@@ -687,12 +731,160 @@
       setupTouchInteraction(); updateHUD(); renderLoop(); setTimeout(resizeRenderer, 150);
     }
 
-    // ★ オブジェクトのスポーン（1マス1個制限あり）
+    // 🐢 世界を背負う古代の巨大ウミガメ
+    let turtleFlippers = [];
+    function buildWorldTurtle() {
+      turtleGroup = new THREE.Group();
+      turtleGroup.position.set(0, -2.8, 0);
+      world.add(turtleGroup);
+
+      const turtleMatShell = new THREE.MeshLambertMaterial({ color: 0x2e5a44 });
+      const turtleMatSkin  = new THREE.MeshLambertMaterial({ color: 0x3d7055 });
+      const turtleMatEye   = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+
+      // 甲羅（大地の真下を支える広大なボクセル盤）
+      const shell = new THREE.Mesh(new THREE.BoxGeometry(7.6, 1.4, 7.6), turtleMatShell);
+      shell.position.set(0, -0.5, 0);
+      turtleGroup.add(shell);
+
+      // 甲羅の装飾エッジ
+      const shellRim = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.4, 8.2), new THREE.MeshLambertMaterial({ color: 0x224232 }));
+      shellRim.position.set(0, -0.2, 0);
+      turtleGroup.add(shellRim);
+
+      // カメの頭（北＝-Z方向に突き出る）
+      const head = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.2, 2.4), turtleMatSkin);
+      head.position.set(0, -0.4, -4.8);
+      turtleGroup.add(head);
+
+      // カメの目（つぶらな目）
+      const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.25), turtleMatEye);
+      eyeL.position.set(-0.95, -0.2, -5.3);
+      turtleGroup.add(eyeL);
+      const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.25), turtleMatEye);
+      eyeR.position.set(0.95, -0.2, -5.3);
+      turtleGroup.add(eyeR);
+
+      // 4本の大きなパドルヒレ
+      const flipperGeo = new THREE.BoxGeometry(2.4, 0.4, 1.6);
+      
+      // 前ヒレ左
+      const flL = new THREE.Mesh(flipperGeo, turtleMatSkin);
+      flL.position.set(-4.5, -0.7, -2.5); flL.rotation.y = 0.4;
+      turtleGroup.add(flL); turtleFlippers.push(flL);
+
+      // 前ヒレ右
+      const flR = new THREE.Mesh(flipperGeo, turtleMatSkin);
+      flR.position.set(4.5, -0.7, -2.5); flR.rotation.y = -0.4;
+      turtleGroup.add(flR); turtleFlippers.push(flR);
+
+      // 後ろヒレ左
+      const blL = new THREE.Mesh(flipperGeo, turtleMatSkin);
+      blL.position.set(-4.2, -0.7, 2.8); blL.rotation.y = -0.3;
+      turtleGroup.add(blL); turtleFlippers.push(blL);
+
+      // 後ろヒレ右
+      const blR = new THREE.Mesh(flipperGeo, turtleMatSkin);
+      blR.position.set(4.2, -0.7, 2.8); blR.rotation.y = 0.3;
+      turtleGroup.add(blR); turtleFlippers.push(blR);
+
+      // 尻尾
+      const tail = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 1.4), turtleMatSkin);
+      tail.position.set(0, -0.6, 4.3);
+      turtleGroup.add(tail);
+    }
+
+    // 地形生成（中央大地 5x5 ＋ 外周海 7x7 ＋ 奈落）
+    function buildTerrainVisuals() {
+      if (!world || !stepMeshGroup) return;
+      while (stepMeshGroup.children.length > 0) stepMeshGroup.remove(stepMeshGroup.children[0]);
+      allTerrainBlocks = []; clickBlocks = [];
+
+      const baseGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+      const stepGeo = new THREE.BoxGeometry(0.96, STEP_H - 0.02, 0.96);
+      const seaGeo  = new THREE.BoxGeometry(0.98, 0.4, 0.98);
+      const subLineMat = new THREE.LineBasicMaterial({ color: 0x475569, opacity: 0.25, transparent: true });
+
+      // ① 中央大地 (-2 <= x,z <= 2)
+      for (let x = -2; x <= 2; x++) {
+        for (let z = -2; z <= 2; z++) {
+          const h = getTileHeight(x, z);
+          // 表層
+          const gMat = new THREE.MeshLambertMaterial({ color: 0x7ca982, transparent: true, opacity: 1.0 });
+          const topB = new THREE.Mesh(baseGeo, gMat);
+          topB.position.set(x, 0, z); topB.userData = { gx: x, gz: z };
+          stepMeshGroup.add(topB); clickBlocks.push(topB); allTerrainBlocks.push(topB);
+
+          // 地下土台
+          const dMat = new THREE.MeshLambertMaterial({ color: 0x8a7058, transparent: true, opacity: 1.0 });
+          const underB = new THREE.Mesh(baseGeo, dMat);
+          underB.position.set(x, -1, z); underB.userData = { gx: x, gz: z };
+          stepMeshGroup.add(underB); allTerrainBlocks.push(underB);
+
+          // 1〜5段目の積み上げブロック
+          for (let s = 1; s <= h; s++) {
+            const stepMat = new THREE.MeshLambertMaterial({
+              color: s % 2 === 1 ? 0x94a3b8 : 0x64748b,
+              transparent: true, opacity: 1.0
+            });
+            const stepB = new THREE.Mesh(stepGeo, stepMat);
+            stepB.position.set(x, 0.48 + (s - 0.5) * STEP_H, z);
+            stepB.userData = { gx: x, gz: z, stepLvl: s };
+            stepMeshGroup.add(stepB); clickBlocks.push(stepB); allTerrainBlocks.push(stepB);
+          }
+
+          // 5x5細分化の目印ライン
+          const topY = (h === 0 ? 0.49 : 0.48 + h * STEP_H) + 0.005;
+          const gridGeo = new THREE.BufferGeometry();
+          const pts = [];
+          for (let i = 1; i < 5; i++) {
+            const offset = -0.48 + i * 0.192;
+            pts.push(new THREE.Vector3(x - 0.46, topY, z + offset), new THREE.Vector3(x + 0.46, topY, z + offset));
+            pts.push(new THREE.Vector3(x + offset, topY, z - 0.46), new THREE.Vector3(x + offset, topY, z + 0.46));
+          }
+          gridGeo.setFromPoints(pts);
+          const gridLines = new THREE.LineSegments(gridGeo, subLineMat);
+          stepMeshGroup.add(gridLines);
+        }
+      }
+
+      // ② 外周の海 (-3 <= x,z <= 3 の外枠)
+      for (let x = -3; x <= 3; x++) {
+        for (let z = -3; z <= 3; z++) {
+          if (isSea(x, z)) {
+            // 透き通る海水
+            const seaMat = new THREE.MeshLambertMaterial({
+              color: 0x38bdf8, transparent: true, opacity: 0.65
+            });
+            const seaB = new THREE.Mesh(seaGeo, seaMat);
+            seaB.position.set(x, -0.3, z);
+            seaB.userData = { gx: x, gz: z, isSea: true };
+            stepMeshGroup.add(seaB); clickBlocks.push(seaB);
+
+            // 海底の土台
+            const bedMat = new THREE.MeshLambertMaterial({ color: 0x475569, transparent: true, opacity: 0.85 });
+            const bedB = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.6, 0.96), bedMat);
+            bedB.position.set(x, -0.8, z);
+            stepMeshGroup.add(bedB);
+          }
+        }
+      }
+
+      // オブジェクトの高さ調整
+      for (const obj of fieldObjects) {
+        const tileH = getTileHeight(obj.gx, obj.gz);
+        obj.mesh.position.y = 0.65 + (tileH > 0 ? tileH * STEP_H : 0);
+      }
+      if (chara && !isWalking) {
+        const wp = calcWorldPos(ROBOT.pos.gx, ROBOT.pos.gz, ROBOT.pos.sx, ROBOT.pos.sz);
+        const curH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
+        chara.position.set(wp.x, 0.5 + (curH > 0 ? curH * STEP_H : (isSea(ROBOT.pos.gx, ROBOT.pos.gz) ? -0.2 : 0)), wp.z);
+      }
+    }
+
     function spawnObject(gx, gz, type, shouldSave = true) {
       if (!world) return false;
-      // 1マスに1個制限
-      if (fieldObjects.some(o => o.gx === gx && o.gz === gz)) return false;
-
+      // すべて通り抜け可能（同じマスにいくつでも配置可能）
       const grp = new THREE.Group();
       let color = 0xf87171;
       if (type === 'tree') color = 0x10b981;
@@ -704,7 +896,8 @@
       if (type === 'apple') {
         const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), new THREE.MeshLambertMaterial({ color: 0x86efac })); leaf.position.set(0, 0.22, 0); grp.add(leaf);
       }
-      grp.position.set(gx, 0.65, gz); world.add(grp);
+      const tileH = getTileHeight(gx, gz);
+      grp.position.set(gx, 0.65 + (tileH > 0 ? tileH * STEP_H : 0), gz); world.add(grp);
       
       const meta = GACHA_ITEMS.find(it => it.type === type);
       fieldObjects.push({ mesh: grp, gx: gx, gz: gz, type: type, meta: meta });
@@ -727,23 +920,21 @@
       topWindow.addEventListener('touchmove', e => {
         if (!world || e.touches.length !== 1 || e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
         
-        // ① 左右スワイプ：島を水平回転
         const deltaX = e.touches[0].clientX - prevX;
         world.rotation.y += deltaX * 0.008;
         prevX = e.touches[0].clientX;
 
-        // ② 上下スワイプ：カメラの見下ろし角度を変更（ストッパー制限付き）
         const deltaY = e.touches[0].clientY - prevY;
-        camHeight = Math.max(3.8, Math.min(11.5, camHeight + deltaY * 0.035));
-        camDist = Math.max(5.5, Math.min(10.5, camDist - deltaY * 0.012));
+        camHeight = Math.max(3.8, Math.min(13.5, camHeight + deltaY * 0.035));
+        camDist = Math.max(5.5, Math.min(13.0, camDist - deltaY * 0.012));
         camera.position.set(0, camHeight, camDist);
-        camera.lookAt(0, 0.2, 0);
+        camera.lookAt(0, 0.1, 0);
         prevY = e.touches[0].clientY;
       }, { passive: true });
       topWindow.addEventListener('touchend', e => {
         if (e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
         if (performance.now() - touchStartTime < 250 && e.changedTouches.length === 1) {
-          if (!placementMode) return; // 配置モード中のみクリックを許可
+          if (!placementMode) return;
           
           const rect = topWindow.getBoundingClientRect(); const touch = e.changedTouches[0];
           mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1; mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
@@ -751,14 +942,34 @@
           const hits = raycaster.intersectObjects(clickBlocks);
           if (hits.length > 0) {
             const gx = hits[0].object.userData.gx, gz = hits[0].object.userData.gz;
+            
+            if (isSea(gx, gz) && (placementMode === 'stone' || placementMode === 'grass')) {
+              showToast("⚠️ 海の中にはブロックを積めないよ！");
+              return;
+            }
+
+            if (placementMode === 'stone' || placementMode === 'grass') {
+              const curH = getTileHeight(gx, gz);
+              if (curH >= MAX_STEP_HEIGHT) {
+                showToast(`⚠️ ここはもう${MAX_STEP_HEIGHT}段のてっぺんだよ！`);
+                return;
+              }
+              setTileHeight(gx, gz, curH + 1);
+              removeInventoryItem(placementMode);
+              buildTerrainVisuals();
+              showToast(`🧱 (${gx}, ${gz}) を ${curH + 1}段目 に積んだよ！`);
+              recentSounds.push({ x: gx, z: gz, text: "ドスン(ブロックを積んだ音)", age: 0 });
+              cancelPlacementMode();
+              saveWorldState();
+              return;
+            }
+
             if (spawnObject(gx, gz, placementMode, true)) {
-              removeInventoryItem(placementMode); // 配置成功したらカバンから減らす
+              removeInventoryItem(placementMode);
               const meta = GACHA_ITEMS.find(it => it.type === placementMode);
               showToast(`✨ ${meta.icon} ${meta.name} を置いたよ！`);
-              recentSounds.push({ x: gx, z: gz, text: "トスン(何かを置いた音)", age: 0 }); // 音を記録
+              recentSounds.push({ x: gx, z: gz, text: "トスン(何かを置いた音)", age: 0 });
               cancelPlacementMode();
-            } else {
-              showToast('⚠️ ここにはすでに物があるよ！');
             }
           }
         }
@@ -779,6 +990,8 @@
     
     function openDiaryModal() {
       document.getElementById('diary-robot-name').textContent = `第${ROBOT.gen}世代 ロボット`;
+      const curArea = isSea(ROBOT.pos.gx, ROBOT.pos.gz) ? "🌊 海の中" : `大地 (${ROBOT.pos.gx}, ${ROBOT.pos.gz})`;
+      document.getElementById('diary-robot-pos-sub').textContent = `現在地: ${curArea} / サブマス [${ROBOT.pos.sx}, ${ROBOT.pos.sz}]`;
       const grid = document.getElementById('robot-tools-grid');
       grid.innerHTML = robotTools.map(t => {
         if (!t) return `<div class="grid-cell" style="background:#f1f5f9;"></div>`;
@@ -787,7 +1000,7 @@
       openModal('diaryModal');
     }
 
-    /* ガチャ演出 */
+    /* ガチャ */
     let isGachaSpinning = false;
     function openGachaModal() { document.getElementById('capsule-pop-overlay').classList.remove('active'); document.getElementById('pop-capsule-stage').classList.remove('opened'); updateGachaModalStatus(); openModal('gachaModal'); }
     function updateGachaModalStatus() {
@@ -818,12 +1031,11 @@
       let msg = "";
       if (chosen.type === 'chest') {
         const tool = addToolToRobot();
-        if (tool) msg = `🎁 特賞！宝箱から「${tool.name}」が出た！手帳（道具箱）に入ったよ！`;
+        if (tool) msg = `🎁 特賞！宝箱から「${tool.name}」が出た！手帳に入ったよ！`;
         else msg = `🎁 宝箱を開けたけど、道具箱が満杯だったよ…`;
       } else {
         addItemToInventory(chosen.type);
         msg = `✨ パカッ！「${chosen.name}」が入ったよ！`;
-        // ガチャで落ちてきた音
         recentSounds.push({ x: 0, z: 0, text: "カチャッ(景品が出た音)", age: 0 });
       }
       
@@ -839,7 +1051,6 @@
       document.getElementById('inventory-grid-5x5').innerHTML = inventorySlots.map((s, i) => {
         if (!s) return `<div class="grid-cell"></div>`;
         const meta = GACHA_ITEMS.find(it => it.type === s.type);
-        // アイテムをタップしたら配置モードへ
         return `<div class="grid-cell filled" onclick="startPlacementMode('${s.type}', '${meta.icon}', '${meta.name}')">
           <span class="cell-icon">${meta.icon}</span><span class="cell-count">×${s.count}個</span>
         </div>`;
@@ -859,18 +1070,25 @@
       document.getElementById('placement-cancel-bar').classList.remove('active');
     }
 
-    /* 整地 */
+    /* 整地（中央大地 5x5） */
     function renderCleanGrid() {
       let html = '';
       for (let z = -2; z <= 2; z++) {
         for (let x = -2; x <= 2; x++) {
-          const isRobo = (ROBOT.pos.x === x && ROBOT.pos.z === z);
+          const isRobo = (ROBOT.pos.gx === x && ROBOT.pos.gz === z);
           const obj = fieldObjects.find(a => a.gx === x && a.gz === z);
-          let icon = '🟩', badge = '', cls = 'terrain-cell';
+          const h = getTileHeight(x, z);
+          let icon = '🟩', cls = 'terrain-cell';
           if (isRobo && obj) { icon = `🤖${obj.meta.icon}`; cls += ' has-obj'; }
           else if (isRobo) { icon = '🤖'; }
           else if (obj) { icon = obj.meta.icon; cls += ' has-obj'; }
-          html += `<div class="grid-cell ${cls}" onclick="cleanSingleCell(${x}, ${z})"><span class="cell-coord">${x},${z}</span><span class="cell-icon" style="font-size:18px;">${icon}</span></div>`;
+          else if (h > 0) { icon = '🧱'; }
+          
+          html += `<div class="grid-cell ${cls}" onclick="cleanSingleCell(${x}, ${z})">
+            <span class="cell-coord">${x},${z}</span>
+            <span class="cell-step-lvl">${h}段</span>
+            <span class="cell-icon" style="font-size:18px;">${icon}</span>
+          </div>`;
         }
       }
       document.getElementById('clean-grid-5x5').innerHTML = html;
@@ -880,12 +1098,23 @@
       if (idx !== -1) {
         if (world) world.remove(fieldObjects[idx].mesh);
         fieldObjects.splice(idx, 1);
-        saveWorldState(); renderCleanGrid(); showToast(`⛏️ (${gx}, ${gz}) を整地したよ！`);
+        saveWorldState(); renderCleanGrid(); showToast(`⛏️ (${gx}, ${gz}) の物を片づけたよ！`);
+        return;
+      }
+      const curH = getTileHeight(gx, gz);
+      if (curH > 0) {
+        setTileHeight(gx, gz, curH - 1);
+        buildTerrainVisuals();
+        saveWorldState(); renderCleanGrid();
+        showToast(`⛏️ (${gx}, ${gz}) を1段削ったよ (残り${curH - 1}段)`);
       }
     }
     function cleanAllIslandFromModal() {
       for (const a of fieldObjects) if (world) world.remove(a.mesh);
-      fieldObjects = []; saveWorldState(); renderCleanGrid(); showToast('✨ 島ぜんぶを整地したよ！');
+      fieldObjects = [];
+      for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) heightGrid[`${x},${z}`] = 0;
+      buildTerrainVisuals();
+      saveWorldState(); renderCleanGrid(); showToast('✨ 大地をまっさらに整地したよ！');
     }
 
     /* ロボット行動まわり */
@@ -894,7 +1123,6 @@
       let d = ""; if (tz < cz) d += "北"; if (tz > cz) d += "南"; if (tx > cx) d += "東"; if (tx < cx) d += "西"; return d;
     }
 
-    // ★ 新しい「視界」と「音」のルール
     function getEnvironmentInfo(cx, cz, timePhaseIdx) {
       const isEvening = (timePhaseIdx === 2);
       const isNight = (timePhaseIdx === 3 || timePhaseIdx === 4);
@@ -903,10 +1131,10 @@
       if (fieldObjects.length === 0) vision.push("周りに何もない");
       
       fieldObjects.forEach(obj => {
-        const dist = Math.max(Math.abs(obj.gx - cx), Math.abs(obj.gz - cz)); // チェビシェフ距離(マス数)
+        const dist = Math.max(Math.abs(obj.gx - cx), Math.abs(obj.gz - cz));
         let canSee = true;
-        if (isNight && dist > 0) canSee = false; // 夜は足元のみ
-        if (isEvening && dist > 1) canSee = false; // 夕方は周囲1マスのみ
+        if (isNight && dist > 0) canSee = false;
+        if (isEvening && dist > 1) canSee = false;
         
         if (canSee) {
           const dir = getDirection(cx, cz, obj.gx, obj.gz);
@@ -921,26 +1149,70 @@
         return `[耳] ${dir}の方から『${s.text}』と聞こえる！`;
       });
       
-      return `【見えているもの】 ${vision.join(' / ')}\n【聞こえた音】 ${sounds.length > 0 ? sounds.join(' / ') : 'とくに音はしない'}`;
+      const locName = isSea(cx, cz) ? "🌊 島の外周の海の中" : "🟩 平坦な大地の上";
+      return `【現在の場所】 ${locName}\n【見えているもの】 ${vision.join(' / ')}\n【聞こえた音】 ${sounds.length > 0 ? sounds.join(' / ') : '静寂（波の音だけが聞こえる）'}`;
     }
 
-    function getPossibleActions(cx, cz) {
+    // 進行方向ごとの行動候補
+    function getPossibleActions(gx, gz) {
       const list = [];
-      if (ROBOT.hasApple) list.push({ key: "EAT_HAND", txt: "右手の🍎リンゴを食べる" });
-      const objOnFeet = fieldObjects.find(a => a.gx === cx && a.gz === cz);
+      const curH = getTileHeight(gx, gz);
+
+      if (ROBOT.hasApple) list.push({ key: "EAT_HAND", speed: 1, txt: "右手の🍎リンゴを食べる" });
+      const objOnFeet = fieldObjects.find(a => a.gx === gx && a.gz === gz);
       if (objOnFeet) {
         if (objOnFeet.type === 'apple') {
-          list.push({ key: "EAT_FIELD", txt: "足元の🍎リンゴを食べる" });
-          if (!ROBOT.hasApple) list.push({ key: "PICK_APPLE", txt: "足元の🍎リンゴをひろう" });
+          list.push({ key: "EAT_FIELD", speed: 1, txt: "足元の🍎リンゴを食べる" });
+          if (!ROBOT.hasApple) list.push({ key: "PICK_APPLE", speed: 1, txt: "足元の🍎リンゴをひろう" });
         } else {
-          list.push({ key: "OBSERVE_FEET", txt: `足元の${objOnFeet.meta.icon}をさわって観察する` });
+          list.push({ key: "OBSERVE_FEET", speed: 1, txt: `足元の${objOnFeet.meta.icon}をさわって観察する` });
         }
       }
-      [{k:"MOVE_E",dx:1,dz:0,ry:Math.PI/2,n:"東に1歩"},{k:"MOVE_W",dx:-1,dz:0,ry:-Math.PI/2,n:"西に1歩"},{k:"MOVE_S",dx:0,dz:1,ry:0,n:"南に1歩"},{k:"MOVE_N",dx:0,dz:-1,ry:Math.PI,n:"北に1歩"}].forEach(d => {
-        const tx = cx + d.dx, tz = cz + d.dz;
-        if (tx >= -2 && tx <= 2 && tz >= -2 && tz <= 2) list.push({ key: d.k, pos: [tx, tz], rotY: d.ry, txt: `${d.n} (${tx}, ${tz})へ歩く` });
+      
+      const dirs = [
+        { k: "MOVE_E", dx: 1, dz: 0, ry: Math.PI / 2, n: "東", edgeSx: 4, edgeSz: 2 },
+        { k: "MOVE_W", dx: -1, dz: 0, ry: -Math.PI / 2, n: "西", edgeSx: 0, edgeSz: 2 },
+        { k: "MOVE_S", dx: 0, dz: 1, ry: 0, n: "南", edgeSx: 2, edgeSz: 4 },
+        { k: "MOVE_N", dx: 0, dz: -1, ry: Math.PI, n: "北", edgeSx: 2, edgeSz: 0 }
+      ];
+
+      dirs.forEach(d => {
+        const tx = gx + d.dx, tz = gz + d.dz;
+        
+        // 奈落（大宇宙）でなければ通常移動可能
+        if (!isAbyss(tx, tz)) {
+          const targetH = getTileHeight(tx, tz);
+          const diff = targetH - curH;
+          const targetArea = isSea(tx, tz) ? "海" : "大地";
+
+          if (diff === 1) {
+            list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: `${d.n}の${targetArea}へピョンと登る（速度3・安全移動）` });
+          } else if (diff === 0) {
+            list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: `${d.n}の${targetArea}へ歩く（速度3・安全移動）` });
+          } else if (diff < 0 && diff >= -2) {
+            list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: `${d.n}の${targetArea}へ降りる（速度3・安全移動）` });
+          } else if (diff <= -3) {
+            list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, isFall: true, txt: `${d.n}の崖から飛び降りる（高低差注意！）` });
+          }
+
+          // ⚡ 速度5（猛ダッシュ＆オーバーラン）
+          // tx, tz のさらに先（beyond）が海の端＝奈落であれば落下！
+          const beyondGx = tx + d.dx, beyondGz = tz + d.dz;
+          const willFallAbyss = isAbyss(beyondGx, beyondGz);
+
+          if (diff <= 1) {
+            list.push({
+              key: d.k + "_DASH5", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 5,
+              isOverrun: true, willFallOverrun: willFallAbyss,
+              edgeSub: [d.edgeSx, d.edgeSz],
+              beyond: [beyondGx, beyondGz],
+              txt: `⚡ ${d.n}へ猛ダッシュ！（速度5・勢い余って端へ突入！${willFallAbyss ? '⚠️海の端から奈落へ滑落' : '足場ありセーフ'}）`
+            });
+          }
+        }
       });
-      list.push({ key: "REST_HERE", txt: "ひとやすみする（休む）" });
+
+      list.push({ key: "REST_HERE", speed: 1, txt: "その場の中央でひとやすみする（休む）" });
       return list;
     }
 
@@ -957,30 +1229,36 @@
       lamp.className = 'comm-lamp lamp-busy'; lamp.textContent = '⚡ 通信中...';
       bubble.className = 'voice-bubble bubble-active';
 
-      const cx = ROBOT.pos.x, cz = ROBOT.pos.z;
-      const actions = getPossibleActions(cx, cz);
+      const gx = ROBOT.pos.gx, gz = ROBOT.pos.gz;
+      const sx = ROBOT.pos.sx, sz = ROBOT.pos.sz;
+      const curH = getTileHeight(gx, gz);
+      const actions = getPossibleActions(gx, gz);
       const timeIdx = getCurrentTimePhaseIdx(); const phaseData = TIME_PHASES[timeIdx];
-      const toolsStr = robotTools.filter(t => t).map(t => `${t.icon}${t.name}`).join('、') || '何も持っていない';
 
-      const prompt = `あなたは小さなマス目の島に立つロボットです。
-いまの体の状態と時間帯・視界を見て、心の中で感じている「素直な叫び」を小学3年生にもわかる言葉で教えてください！
+      const prompt = `あなたは巨大なカメが宇宙で背負って支えている、平坦な世界の島に立つロボットです。
+中央には5×5の大地があり、その外周を青い海が囲んでいます。海の端は遮る壁がなく、奈落の底（大宇宙）へ落ちてしまいます。
 
 【ロボットのいま】
 ・❤️ たいりょく(HP): ${st.energy}/100 （ゼロで倒れます！）
-・🍙 おなか: ${st.stamina}/100 （ゼロのまま動くとHPが削られます）
+・🍙 おなか: ${st.stamina}/100
 ・🎵 ごきげん: ${st.mental}/100
-・いまの時間帯: ${phaseData.name} （夜は暗くて遠くが見えず、動くと体力が激減します）
-・現在地: (${cx}, ${cz}) / 道具箱の中身: ${toolsStr}
-・${getEnvironmentInfo(cx, cz, timeIdx)}
+・時間帯: ${phaseData.name}
+・位置: (${gx}, ${gz}) / サブマス[${sx}, ${sz}]
+・${getEnvironmentInfo(gx, gz, timeIdx)}
 
-【いま選べる行動】
-${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
+【速度とカメの世界のルール】
+・速度1〜4: 各マスの中央[2, 2]で安全にピタッと止まる。
+・速度5(猛ダッシュ): 勢い余って目標の中央をオーバーランし、端の細分化マスへ滑り込む！
+  滑り込んだ先が海の端の外（奈落）だと、下で世界を支えているカメさんを見ながらヒュ〜…と落下（HP-15）！
+
+【選べる行動リスト】
+${JSON.stringify(actions.map(a => ({ key: a.key, 速度: a.speed, 行動: a.txt })))}
 
 以下のJSON形式で答えてください：
 {
-  "feeling": "ロボットの素直な気持ちや叫び（例: 暗くて足元しか見えないけど、北から音がしたぞ！）（65字以内）",
+  "feeling": "ロボットの素直な気持ちや叫び（例: 海の端っこだ！下を見ると巨大なカメさんが悠然と泳いでるよ…落ちたら怖いけど神秘的だな！）（65字以内）",
   "actionKey": "選んだ行動のkey",
-  "actionName": "やったことの説明（例: 音のする北へ1歩あるいた）"
+  "actionName": "やったことの説明（例: 速度5で東へ猛ダッシュした！）"
 }`;
 
       try {
@@ -997,32 +1275,40 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
         ROBOT.lastVoice = voiceText.innerHTML; ROBOT.lastActionNote = document.getElementById('action-note-text').textContent;
         ROBOT.stepCount++;
         
-        // 音ログの古さを進める（3手前の音は消す）
         recentSounds.forEach(s => s.age++);
         recentSounds = recentSounds.filter(s => s.age < 3);
 
         life.tick([actionKey]); 
-        await executeWorldAction(actionKey, actions);
+        const resultAct = await executeWorldAction(actionKey, actions);
 
         let dEnergy = 0, dStamina = 0, dMental = 0;
-        if (actionKey.startsWith('MOVE_')) {
-          dStamina = -9;
+        if (resultAct && resultAct.speed) {
+          ROBOT.speed = resultAct.speed;
+          dStamina = -(resultAct.speed * 3);
           if (st.stamina <= 0) dEnergy -= 15;
           if (timeIdx === 3) dEnergy -= 10;
           if (timeIdx === 4) { dEnergy -= 20; dMental -= 20; }
+          
+          if (resultAct.overrunFell) {
+            dEnergy -= 15;
+            showToast("🐢 カメさんの横を落下！たいりょく -15！");
+          } else if (resultAct.isFall) {
+            dEnergy -= 10;
+            showToast("💥 崖から落ちてたいりょく -10！");
+          }
         } 
         else if (actionKey === 'REST_HERE') {
-          dStamina = -4;
+          ROBOT.speed = 1;
+          dStamina = -3;
           if (timeIdx === 3 || timeIdx === 4) { dEnergy += 100; dMental += 20; }
         }
         else if (actionKey === 'EAT_HAND' || actionKey === 'EAT_FIELD') {
+          ROBOT.speed = 1;
           dStamina = +50; dMental += 10;
         }
-        else if (actionKey === 'PICK_APPLE') {
-          dStamina = -4;
-        }
-        else if (actionKey === 'OBSERVE_FEET') {
-          dStamina = -4; dMental += 5; // 遊んでちょっと楽しい
+        else if (actionKey === 'PICK_APPLE' || actionKey === 'OBSERVE_FEET') {
+          ROBOT.speed = 1;
+          dStamina = -4; dMental += 5;
         }
 
         life.feedback(dEnergy, dStamina, dMental);
@@ -1041,8 +1327,8 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
 
     async function executeWorldAction(chosenKey, actions) {
       const act = actions.find(a => a.key === chosenKey) || actions[0];
-      const cx = ROBOT.pos.x, cz = ROBOT.pos.z;
-      const objIdx = fieldObjects.findIndex(a => a.gx === cx && a.gz === cz);
+      const gx = ROBOT.pos.gx, gz = ROBOT.pos.gz;
+      const objIdx = fieldObjects.findIndex(a => a.gx === gx && a.gz === gz);
       
       if (act.key === 'EAT_HAND') {
         ROBOT.hasApple = false; if (handApple) handApple.material.visible = false;
@@ -1055,15 +1341,119 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
         ROBOT.hasApple = true; if (handApple) handApple.material.visible = true;
       } else if (act.pos) {
         const tx = act.pos[0], tz = act.pos[1];
-        await walkCharaTo(tx, 0.5, tz, act.rotY !== undefined ? act.rotY : 0, 420);
-        ROBOT.pos = { x: tx, z: tz }; ROBOT.rotY = act.rotY !== undefined ? act.rotY : ROBOT.rotY;
+        const targetH = getTileHeight(tx, tz);
+        const targetY = 0.5 + (targetH > 0 ? targetH * STEP_H : (isSea(tx, tz) ? -0.2 : 0));
+
+        if (act.speed === 5) {
+          const edgeSx = act.edgeSub[0], edgeSz = act.edgeSub[1];
+          const edgeW = calcWorldPos(tx, tz, edgeSx, edgeSz);
+          document.getElementById('physics-note-text').textContent = '⚡ 猛ダッシュ中！';
+          
+          await walkCharaTo(edgeW.x, targetY, edgeW.z, act.rotY, 400, act.diff || 0, true);
+
+          if (act.willFallOverrun) {
+            // 🐢 奈落へ落下！下で世界を支えるカメの横を落ちていく
+            document.getElementById('physics-note-text').textContent = '🐢 カメを見ながら奈落へダイブ！';
+            await fallPastTurtle(edgeW.x, edgeW.z);
+            act.overrunFell = true;
+            // 中央の大地へ優しくリスポーン
+            ROBOT.pos = { gx: 0, gz: 0, sx: 2, sz: 2 };
+            chara.position.set(0, 0.5 + getTileHeight(0,0)*STEP_H, 0);
+          } else {
+            document.getElementById('physics-note-text').textContent = '⚠️ 端っこでギリギリセーフ！';
+            await charaStumble();
+            ROBOT.pos = { gx: tx, gz: tz, sx: edgeSx, sz: edgeSz };
+          }
+        } else {
+          const centerW = calcWorldPos(tx, tz, 2, 2);
+          document.getElementById('physics-note-text').textContent = isSea(tx, tz) ? '🌊 海の中を歩く' : '🚶 大地を安全移動';
+          await walkCharaTo(centerW.x, targetY, centerW.z, act.rotY, 480, act.diff || 0, false);
+          ROBOT.pos = { gx: tx, gz: tz, sx: 2, sz: 2 };
+        }
+
+        ROBOT.rotY = act.rotY !== undefined ? act.rotY : ROBOT.rotY;
+        if (act.isFall) {
+          recentSounds.push({ x: tx, z: tz, text: "ドスン！(高い所から落ちた音)", age: 0 });
+        }
       } else if (act.key === 'OBSERVE_FEET') {
         if (rArm) rArm.rotation.z = -0.5; await new Promise(r => setTimeout(r, 450)); if (rArm) rArm.rotation.z = 0;
       }
+      return act;
+    }
+
+    function walkCharaTo(tx, ty, tz, targetRotY, dur, diff = 0, isDash = false) {
+      return new Promise(resolve => {
+        if (!chara) { resolve(); return; }
+        isWalking = true;
+        const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z, sRotY = chara.rotation.y;
+        let diffRot = (targetRotY - sRotY) % (Math.PI * 2);
+        if (diffRot > Math.PI) diffRot -= Math.PI * 2; if (diffRot < -Math.PI) diffRot += Math.PI * 2;
+        const start = performance.now();
+        function s(now) {
+          const p = Math.min((now - start) / dur, 1);
+          const jumpArc = (diff === 1) ? Math.sin(p * Math.PI) * 0.28 : 0;
+          chara.position.set(sx + (tx - sx) * p, sy + (ty - sy) * p + jumpArc, sz + (tz - sz) * p);
+          chara.rotation.y = sRotY + diffRot * Math.min(p * 2, 1);
+          if (rLeg && lLeg) {
+            const legSpeed = isDash ? 0.08 : 0.04;
+            rLeg.rotation.x = Math.sin(now * legSpeed) * 0.6;
+            lLeg.rotation.x = -Math.sin(now * legSpeed) * 0.6;
+          }
+          if (p < 1) requestAnimationFrame(s);
+          else {
+            chara.position.set(tx, ty, tz);
+            chara.rotation.y = targetRotY;
+            if (rLeg && lLeg) { rLeg.rotation.x = 0; lLeg.rotation.x = 0; }
+            isWalking = false;
+            resolve();
+          }
+        }
+        requestAnimationFrame(s);
+      });
+    }
+
+    function charaStumble() {
+      return new Promise(resolve => {
+        if (!chara) { resolve(); return; }
+        let f = 0;
+        function wobble() {
+          f++;
+          chara.rotation.z = Math.sin(f * 0.5) * 0.2;
+          if (f < 16) requestAnimationFrame(wobble);
+          else { chara.rotation.z = 0; resolve(); }
+        }
+        wobble();
+      });
+    }
+
+    // 🐢 カメの横をすり抜けて深淵へ落ちていく演出
+    function fallPastTurtle(x, z) {
+      return new Promise(resolve => {
+        if (!chara) { resolve(); return; }
+        const startY = chara.position.y;
+        const fallTargetY = -8.0; // カメより下の大宇宙まで落下
+        const start = performance.now();
+        function fall(now) {
+          const p = Math.min((now - start) / 750, 1);
+          chara.position.y = startY + (fallTargetY - startY) * p * p;
+          chara.rotation.x += 0.12;
+          chara.rotation.y += 0.08;
+          if (p < 1) requestAnimationFrame(fall);
+          else {
+            chara.rotation.x = 0;
+            chara.rotation.y = 0;
+            resolve();
+          }
+        }
+        requestAnimationFrame(fall);
+      });
     }
 
     function triggerRobotDown(msg) {
-      if (chara) { chara.rotation.z = Math.PI / 2; chara.position.y = 0.25; }
+      if (chara) {
+        chara.rotation.z = Math.PI / 2;
+        chara.position.y = 0.25 + (getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz) > 0 ? getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz) * STEP_H : 0);
+      }
       document.getElementById('voice-text').innerHTML = `<span style="color:#ef4444;">🚨 【ロボがたおれました】</span><br>${msg}`;
       document.getElementById('btn-think-now').style.display = 'none'; document.getElementById('btn-respawn').style.display = 'flex';
       updateHUD(); saveWorldState();
@@ -1072,11 +1462,12 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
     function respawnRobot() {
       const savedMem = JSON.parse(life.exportSave()).mem || {};
       life = new LifeCore(JSON.stringify({ e: 100, s: 100, m: 100, a: true, mem: savedMem }));
-      ROBOT.gen++; ROBOT.stepCount = 0; ROBOT.pos = { x: 0, z: 0 }; ROBOT.rotY = 0; ROBOT.hasApple = false;
+      ROBOT.gen++; ROBOT.stepCount = 0; ROBOT.pos = { gx: 0, gz: 0, sx: 2, sz: 2 }; ROBOT.speed = 3; ROBOT.rotY = 0; ROBOT.hasApple = false;
       ROBOT.lastVoice = `前の世代のきおくを引き継いで、第${ROBOT.gen}世代のロボがめざめたよ！`; ROBOT.lastActionNote = "新しいロボが目覚めた！";
 
       if (handApple) handApple.material.visible = false;
-      if (chara) { chara.rotation.z = 0; chara.rotation.y = 0; chara.position.set(0, 0.5, 0); }
+      const startY = 0.5 + getTileHeight(0, 0) * STEP_H;
+      if (chara) { chara.rotation.z = 0; chara.rotation.y = 0; chara.position.set(0, startY, 0); }
       if (fieldObjects.length === 0) spawnObject(1, 0, 'apple', false);
 
       document.getElementById('btn-think-now').style.display = 'flex'; document.getElementById('btn-respawn').style.display = 'none';
@@ -1089,7 +1480,9 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
       document.getElementById('v-energy').textContent = st.energy; document.getElementById('b-energy').style.width = st.energy + '%';
       document.getElementById('v-stamina').textContent = st.stamina; document.getElementById('b-stamina').style.width = st.stamina + '%';
       document.getElementById('v-mental').textContent = st.mental; document.getElementById('b-mental').style.width = st.mental + '%';
-      document.getElementById('ui-robot-id').textContent = `🤖 ロボ${ROBOT.gen}ごう (${ROBOT.pos.x}, ${ROBOT.pos.z})`;
+      const locLabel = isSea(ROBOT.pos.gx, ROBOT.pos.gz) ? '海' : `${ROBOT.pos.gx},${ROBOT.pos.gz}`;
+      document.getElementById('ui-robot-id').textContent = `🤖 ロボ${ROBOT.gen} (${locLabel})`;
+      document.getElementById('ui-speed-tag').textContent = `⚡ 速度 ${ROBOT.speed}`;
       document.getElementById('ui-robot-drive').textContent = DRIVE_JA[st.drive] || st.drive;
       document.getElementById('ui-step-count').textContent = `⭐ ${ROBOT.stepCount}手目`;
 
@@ -1128,28 +1521,22 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
     const camWorldPos = new THREE.Vector3();
     const roboWorldPos = new THREE.Vector3();
 
-    // ★ ロボットを隠している手前のブロックだけを自動透過する処理
     function updateOccludedBlocks() {
       if (!chara || !camera || allTerrainBlocks.length === 0) return;
-
-      // カメラとロボットの胸の位置を取得
       camera.getWorldPosition(camWorldPos);
       chara.getWorldPosition(roboWorldPos);
-      roboWorldPos.y += 0.55; // ロボットの胴体・頭の高さ
+      roboWorldPos.y += 0.55;
 
-      // カメラからロボットへ向かう視線ベクトル
       const dir = new THREE.Vector3().subVectors(roboWorldPos, camWorldPos);
       const distToRobo = dir.length();
       dir.normalize();
 
       occludeRaycaster.set(camWorldPos, dir);
-      occludeRaycaster.far = Math.max(0.1, distToRobo - 0.2); // ロボットの手前まで
+      occludeRaycaster.far = Math.max(0.1, distToRobo - 0.2);
 
-      // 視線と交差するブロックを検出
       const hits = occludeRaycaster.intersectObjects(allTerrainBlocks, false);
       const occludedSet = new Set(hits.map(h => h.object));
 
-      // 遮っているブロックは 0.25（透明）、それ以外は 1.0（不透明）へスムーズに補間
       for (const block of allTerrainBlocks) {
         const isBlocking = occludedSet.has(block);
         const targetOp = isBlocking ? 0.22 : 1.0;
@@ -1163,34 +1550,23 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
       if (scene && scene.background) scene.background.lerp(targetBgColor, 0.02);
       if (hemiLight) hemiLight.color.lerp(targetHemiColor, 0.02);
       if (sunLight) sunLight.color.lerp(targetSunColor, 0.02);
+
+      // 🐢 カメのゆったりした遊泳アニメーション
+      if (turtleGroup) {
+        turtleGroup.position.y = -2.8 + Math.sin(clock * 0.8) * 0.12;
+        turtleFlippers.forEach((fl, idx) => {
+          fl.rotation.z = Math.sin(clock * 1.2 + idx) * 0.18;
+        });
+      }
       
-      // 遮蔽ブロックのスマート透過を実行
       updateOccludedBlocks();
 
-      if (life.getState().isAlive && chara) {
-        if (isWalking) {
-          rArm.rotation.x = Math.sin(clock * 9) * 0.7; lArm.rotation.x = -Math.sin(clock * 9) * 0.7;
-          rLeg.rotation.x = -Math.sin(clock * 9) * 0.7; lLeg.rotation.x = Math.sin(clock * 9) * 0.7;
-        } else {
-          rLeg.rotation.x = 0; lLeg.rotation.x = 0; bodyM.scale.y = 0.52 + Math.sin(clock * 2.5) * 0.02;
-        }
+      if (life.getState().isAlive && chara && !isWalking) {
+        const curH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
+        const baseY = 0.5 + (curH > 0 ? curH * STEP_H : (isSea(ROBOT.pos.gx, ROBOT.pos.gz) ? -0.2 : 0));
+        chara.position.y = baseY + Math.sin(clock * 2.5) * 0.025;
       }
       if (renderer && scene && camera) renderer.render(scene, camera);
-    }
-    function walkCharaTo(tx, ty, tz, targetRotY, dur) {
-      return new Promise(resolve => {
-        if (!chara) { resolve(); return; }
-        isWalking = true; const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z, sRotY = chara.rotation.y;
-        let diffRot = (targetRotY - sRotY) % (Math.PI * 2);
-        if (diffRot > Math.PI) diffRot -= Math.PI * 2; if (diffRot < -Math.PI) diffRot += Math.PI * 2;
-        const start = performance.now();
-        function s(now) {
-          const p = Math.min((now - start) / dur, 1);
-          chara.position.set(sx + (tx - sx) * p, sy + (ty - sy) * p, sz + (tz - sz) * p); chara.rotation.y = sRotY + diffRot * Math.min(p * 2, 1);
-          if (p < 1) requestAnimationFrame(s); else { chara.rotation.y = targetRotY; isWalking = false; resolve(); }
-        }
-        requestAnimationFrame(s);
-      });
     }
 
     function resizeRenderer() {
