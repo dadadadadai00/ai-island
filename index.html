@@ -37,10 +37,12 @@
     .top-window {
       position: relative;
       flex: 1; min-height: 0;
-      background: #ebf2f5; overflow: hidden;
+      background: #ebf2f5;
+      overflow: visible; /* ◯ボタンの下半分を下部パネルへ乗せるためvisible */
       border-bottom: 2px solid #cbd5e1;
+      z-index: 30; /* 下部パネル・フッターより上の階層に配置 */
     }
-    #stage-3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+    #stage-3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; overflow: hidden; }
     #c3d { width: 100%; height: 100%; display: block; }
     canvas { display: block; width: 100% !important; height: 100% !important; }
 
@@ -85,10 +87,11 @@
 
     /* ========================================================
      * ★ 180°展開・4分割・均等余白の扇状メニュー ＆ シンプル◯ボタン
+     * 中心の◯ボタンが下部境界（フッター側領域）に上下半分乗る位置に配置
      * ======================================================== */
     .fan-menu-wrapper {
-      position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
-      z-index: 25; width: 340px; height: 195px;
+      position: absolute; bottom: -27px; left: 50%; transform: translateX(-50%);
+      z-index: 40; width: 340px; height: 195px;
       pointer-events: none;
     }
 
@@ -180,8 +183,9 @@
      * ② 文章枠（ロボットのお気持ち）：3行分のゆったりサイズ
      * ======================================================== */
     .bottom-window {
+      position: relative; z-index: 10;
       flex: none; height: 142px;
-      background: #ffffff; padding: 8px 12px;
+      background: #ffffff; padding: 10px 12px 8px;
       display: flex; flex-direction: column; gap: 4px;
       overflow-y: auto; border-top: 1.5px solid #cbd5e1;
       box-shadow: 0 -2px 10px rgba(0,0,0,0.03);
@@ -292,6 +296,143 @@
       cursor: pointer; font-size: 12px; margin-top: 4px;
     }
 
+    /* ========================================================
+     * ★ ガチャガチャ専用スタイル ＆ カプセルアニメーション
+     * ======================================================== */
+    .gacha-stage-box {
+      background: linear-gradient(180deg, #fff5f7 0%, #ffffff 100%);
+      border: 1.5px solid #fbcfe8; border-radius: 16px;
+      padding: 10px; display: flex; flex-direction: column; align-items: center;
+      position: relative; overflow: hidden;
+    }
+    .gacha-svg-wrap {
+      width: 220px; height: 250px; position: relative;
+    }
+    /* ハンドル回転アニメーション */
+    #gacha-handle-group {
+      transform-origin: 110px 158px;
+      transition: transform 0.65s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+    }
+    #gacha-handle-group.turning {
+      transform: rotate(360deg);
+    }
+    /* ドーム内のカプセル揺れアニメーション */
+    @keyframes domeJostle {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      25% { transform: translate(-4px, -6px) rotate(-8deg); }
+      50% { transform: translate(5px, -3px) rotate(8deg); }
+      75% { transform: translate(-3px, -5px) rotate(-5deg); }
+    }
+    #gacha-dome-capsules.shaking {
+      animation: domeJostle 0.3s ease-in-out 2;
+      transform-origin: 110px 78px;
+    }
+
+    /* 出てきたカプセルがパカッと開く演出エリア */
+    .capsule-pop-overlay {
+      position: absolute; inset: 0;
+      background: rgba(255, 255, 255, 0.88); backdrop-filter: blur(3px);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 10;
+    }
+    .capsule-pop-overlay.active { display: flex; }
+
+    .pop-capsule-stage {
+      position: relative; width: 140px; height: 140px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cap-half-top {
+      position: absolute; width: 76px; height: 38px;
+      top: 32px; left: 32px;
+      border-radius: 38px 38px 0 0;
+      background: linear-gradient(135deg, #f9a8d4, #f472b6);
+      border: 2.5px solid #ec4899;
+      transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s;
+      z-index: 3;
+    }
+    .cap-half-bottom {
+      position: absolute; width: 76px; height: 38px;
+      top: 70px; left: 32px;
+      border-radius: 0 0 38px 38px;
+      background: linear-gradient(135deg, #ffffff, #f1f5f9);
+      border: 2.5px solid #cbd5e1;
+      transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s;
+      z-index: 3;
+    }
+    .pop-capsule-stage.opened .cap-half-top {
+      transform: translate(-28px, -34px) rotate(-32deg);
+    }
+    .pop-capsule-stage.opened .cap-half-bottom {
+      transform: translate(28px, 30px) rotate(28deg);
+    }
+    .pop-reward-item {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transform: scale(0); opacity: 0;
+      transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+      z-index: 4;
+    }
+    .pop-capsule-stage.opened .pop-reward-item {
+      transform: scale(1.15); opacity: 1;
+    }
+    .pop-reward-icon { font-size: 44px; line-height: 1.1; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.12)); }
+    .pop-reward-name {
+      margin-top: 6px; font-size: 14px; font-weight: 900; color: #be185d;
+      background: #fdf2f8; padding: 3px 12px; border-radius: 12px; border: 1.5px solid #fbcfe8;
+    }
+
+    /* モーダル下部ボタン2列（スタート・閉じる） */
+    .modal-footer-btns {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;
+    }
+    .btn-gacha-start {
+      padding: 11px; border-radius: 12px; border: 1.5px solid #f472b6;
+      background: linear-gradient(135deg, #f472b6, #ec4899);
+      color: #ffffff; font-size: 14px; font-weight: 900; cursor: pointer;
+      box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+    }
+    .btn-gacha-start:active { transform: scale(0.96); }
+    .btn-gacha-start:disabled {
+      background: #cbd5e1 !important; border-color: #94a3b8 !important;
+      color: #64748b !important; box-shadow: none; cursor: not-allowed;
+    }
+    .btn-modal-close {
+      padding: 11px; border-radius: 12px; border: 1.5px solid #cbd5e1;
+      background: #f1f5f9; color: #475569; font-size: 14px; font-weight: 900; cursor: pointer;
+    }
+    .btn-modal-close:active { transform: scale(0.96); background: #e2e8f0; }
+
+    /* ========================================================
+     * ★ 5×5 グリッドウィンドウ（アイテム ＆ 整地 共通）
+     * ======================================================== */
+    .grid-5x5 {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+      background: #f8fafc; padding: 8px; border-radius: 14px;
+      border: 1.5px solid #e2e8f0;
+    }
+    .grid-cell {
+      aspect-ratio: 1 / 1; background: #ffffff;
+      border: 1.5px solid #cbd5e1; border-radius: 10px;
+      position: relative; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.15s ease;
+      overflow: hidden;
+    }
+    .grid-cell:active { transform: scale(0.93); }
+    .grid-cell.filled { background: #f0f9ff; border-color: #93c5fd; }
+    .grid-cell.terrain-cell { background: #edf7ed; border-color: #86efac; }
+    .grid-cell.terrain-cell.has-obj { background: #fef9c3; border-color: #fde047; }
+    .cell-icon { font-size: 22px; line-height: 1; }
+    .cell-count {
+      position: absolute; right: 3px; bottom: 2px;
+      font-size: 9.5px; font-weight: 900; color: #1e293b;
+      background: rgba(255, 255, 255, 0.92); padding: 0 3px;
+      border-radius: 4px; border: 1px solid #cbd5e1; line-height: 1.2;
+    }
+    .cell-coord {
+      position: absolute; top: 2px; left: 3px;
+      font-size: 8px; font-weight: 700; color: #64748b; line-height: 1;
+    }
+
     #toast-msg {
       font-size: 13px; line-height: 1.4;
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
@@ -392,6 +533,142 @@
 
   <!-- 一時通知トースト -->
   <div id="toast-msg">💾 データを保存したよ</div>
+
+  <!-- 🎰 ガチャガチャ ウィンドウ -->
+  <div class="modal-cover" id="gachaModal">
+    <div class="modal-box" style="border-color:#fbcfe8;">
+      <div class="modal-head">
+        <div class="modal-title" style="color:#be185d;">🎰 パステル・ガチャガチャ</div>
+        <div id="gacha-slot-status" style="font-size:11px; font-weight:800; color:#64748b;">空き枠あり</div>
+      </div>
+
+      <!-- ガチャガチャ本体とカプセル演出エリア -->
+      <div class="gacha-stage-box">
+        <div class="gacha-svg-wrap">
+          <svg viewBox="0 0 220 250" width="100%" height="100%">
+            <!-- 台座の影 -->
+            <ellipse cx="110" cy="240" rx="68" ry="8" fill="rgba(15,23,42,0.1)" />
+
+            <!-- 透明プラスチックのドーム窓（背景） -->
+            <circle cx="110" cy="76" r="62" fill="rgba(240, 249, 255, 0.55)" stroke="#f9a8d4" stroke-width="3" />
+
+            <!-- ドーム内の丸いカプセルたち（アイテムは見えない丸カプセル） -->
+            <g id="gacha-dome-capsules">
+              <!-- カプセル1: ピンク -->
+              <circle cx="80" cy="105" r="16" fill="#f9a8d4" stroke="#ec4899" stroke-width="1.5" />
+              <path d="M 64 105 A 16 16 0 0 0 96 105 Z" fill="#ffffff" opacity="0.85" />
+              <!-- カプセル2: 水色 -->
+              <circle cx="112" cy="112" r="16" fill="#93c5fd" stroke="#60a5fa" stroke-width="1.5" />
+              <path d="M 96 112 A 16 16 0 0 0 128 112 Z" fill="#ffffff" opacity="0.85" />
+              <!-- カプセル3: ミント -->
+              <circle cx="140" cy="103" r="16" fill="#6ee7b7" stroke="#34d399" stroke-width="1.5" />
+              <path d="M 124 103 A 16 16 0 0 0 156 103 Z" fill="#ffffff" opacity="0.85" />
+              <!-- カプセル4: レモン -->
+              <circle cx="95" cy="84" r="16" fill="#fde047" stroke="#eab308" stroke-width="1.5" />
+              <path d="M 79 84 A 16 16 0 0 0 111 84 Z" fill="#ffffff" opacity="0.85" />
+              <!-- カプセル5: ラベンダー -->
+              <circle cx="127" cy="82" r="16" fill="#d8b4fe" stroke="#a855f7" stroke-width="1.5" />
+              <path d="M 111 82 A 16 16 0 0 0 143 82 Z" fill="#ffffff" opacity="0.85" />
+              <!-- カプセル6: ピーチ -->
+              <circle cx="70" cy="78" r="15" fill="#fda4af" stroke="#fb7185" stroke-width="1.5" />
+              <path d="M 55 78 A 15 15 0 0 0 85 78 Z" fill="#ffffff" opacity="0.85" />
+              <!-- カプセル7: スカイ -->
+              <circle cx="110" cy="60" r="15" fill="#7dd3fc" stroke="#38bdf8" stroke-width="1.5" />
+              <path d="M 95 60 A 15 15 0 0 0 125 60 Z" fill="#ffffff" opacity="0.85" />
+            </g>
+
+            <!-- 透明プラスチック窓のツヤ（ハイライト反射） -->
+            <path d="M 66 45 A 52 52 0 0 1 118 26" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="6" stroke-linecap="round" />
+            <circle cx="62" cy="58" r="4" fill="rgba(255,255,255,0.85)" />
+
+            <!-- ガチャガチャ上部キャップ（パステルピンク） -->
+            <path d="M 72 22 Q 110 8 148 22 L 140 30 Q 110 20 80 30 Z" fill="#f472b6" stroke="#ec4899" stroke-width="1.5" />
+
+            <!-- ガチャガチャ本体ボディ（パステルカラーピンク） -->
+            <path d="M 54 118 L 166 118 L 158 232 Q 158 240 148 240 L 72 240 Q 62 240 62 232 Z" fill="#fbcfe8" stroke="#f472b6" stroke-width="3" />
+            <!-- 本体リング装飾 -->
+            <rect x="48" y="112" width="124" height="14" rx="7" fill="#f472b6" stroke="#db2777" stroke-width="1.5" />
+
+            <!-- ハンドル台座プレート -->
+            <circle cx="110" cy="158" r="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="3" />
+            <circle cx="110" cy="158" r="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+
+            <!-- 回転するハンドル本体 -->
+            <g id="gacha-handle-group">
+              <rect x="88" y="152" width="44" height="12" rx="6" fill="#f472b6" stroke="#db2777" stroke-width="2" />
+              <circle cx="110" cy="158" r="7" fill="#ffffff" stroke="#db2777" stroke-width="2" />
+            </g>
+
+            <!-- カプセル取り出し口（ガチャガチャの口） -->
+            <rect x="84" y="196" width="52" height="36" rx="10" fill="#be185d" stroke="#f472b6" stroke-width="2.5" />
+            <rect x="88" y="200" width="44" height="16" rx="5" fill="#831843" opacity="0.6" />
+          </svg>
+        </div>
+
+        <!-- カプセルが出てパカッと開く演出オーバーレイ -->
+        <div class="capsule-pop-overlay" id="capsule-pop-overlay">
+          <div class="pop-capsule-stage" id="pop-capsule-stage">
+            <div class="cap-half-top" id="cap-half-top"></div>
+            <div class="cap-half-bottom"></div>
+            <div class="pop-reward-item">
+              <div class="pop-reward-icon" id="pop-reward-icon">🍎</div>
+              <div class="pop-reward-name" id="pop-reward-name">りんご ×1</div>
+            </div>
+          </div>
+          <div style="font-size:12px; font-weight:900; color:#64748b; margin-top:8px;" id="pop-status-msg">カプセルがパカッと開いたよ！</div>
+        </div>
+      </div>
+
+      <div style="font-size:11px; color:#64748b; text-align:center;">
+        🍎りんご・🌳木・🪨石・🌿草・🟫土 の5種類からランダムに1個でるよ！
+      </div>
+
+      <!-- 下部：スタートボタン ＆ 閉じるボタン -->
+      <div class="modal-footer-btns">
+        <button type="button" class="btn-gacha-start" id="btn-gacha-spin" onclick="spinGachaMachine()">スタート</button>
+        <button type="button" class="btn-modal-close" onclick="closeModal('gachaModal')">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🎒 アイテム 5×5 ウィンドウ -->
+  <div class="modal-cover" id="itemModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-title">🎒 アイテム（5×5 もちもの袋）</div>
+        <div id="item-bag-summary" style="font-size:11px; font-weight:800; color:#3b82f6;">0 / 25マス</div>
+      </div>
+      <div style="font-size:11px; color:#64748b;">
+        1マスに10個まで入るよ！10個を超えると隣の空いているマスへ自動で入るよ（最大25マス）。
+      </div>
+
+      <!-- 5×5（25マス）グリッド -->
+      <div class="grid-5x5" id="inventory-grid-5x5"></div>
+
+      <button type="button" class="btn-modal-close" style="width:100%;" onclick="closeModal('itemModal')">閉じる</button>
+    </div>
+  </div>
+
+  <!-- ⛏️ 整地 5×5 ウィンドウ -->
+  <div class="modal-cover" id="cleanModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-title">⛏️ 整地（島の5×5マス目マップ）</div>
+        <div class="close-btn" onclick="closeModal('cleanModal')">✕</div>
+      </div>
+      <div style="font-size:11px; color:#64748b;">
+        島の5×5マス目の状態だよ。マスをタップすると、そのマスの上にある物を片付けて整地できるよ！
+      </div>
+
+      <!-- 5×5（25マス）整地グリッド -->
+      <div class="grid-5x5" id="clean-grid-5x5"></div>
+
+      <div class="modal-footer-btns">
+        <button type="button" class="save-btn" style="background:#10b981;" onclick="cleanAllIslandFromModal()">✨ 島ぜんぶ整地</button>
+        <button type="button" class="btn-modal-close" onclick="closeModal('cleanModal')">閉じる</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ゲーム終了（おやすみ）モーダル -->
   <div class="modal-cover" id="exitModal">
@@ -789,6 +1066,51 @@
       DEAD: '💀 うごかなくなった'
     };
 
+    // =====================================================================
+    // ★ ガチャの5種類アイテム定義 ＆ 5×5（最大25マス・各10個まで）インベントリ
+    // =====================================================================
+    const GACHA_ITEMS = [
+      { type: 'apple', name: 'りんご', icon: '🍎', capColor: 'linear-gradient(135deg, #f9a8d4, #f472b6)' },
+      { type: 'tree',  name: '木',     icon: '🌳', capColor: 'linear-gradient(135deg, #6ee7b7, #10b981)' },
+      { type: 'stone', name: '石',     icon: '🪨', capColor: 'linear-gradient(135deg, #93c5fd, #60a5fa)' },
+      { type: 'grass', name: '草',     icon: '🌿', capColor: 'linear-gradient(135deg, #fde047, #eab308)' },
+      { type: 'dirt',  name: '土',     icon: '🟫', capColor: 'linear-gradient(135deg, #d8b4fe, #a855f7)' }
+    ];
+
+    const MAX_SLOTS = 25;
+    const MAX_STACK = 10;
+    // 25マスの配列（空は null、入っている時は { type, count }）
+    let inventorySlots = Array(MAX_SLOTS).fill(null);
+
+    // 獲得可能なアイテム種類（10個未満の同種スロットがあるか、空きスロットがある種類）を取得
+    function getAvailableGachaTypes() {
+      const hasEmptySlot = inventorySlots.some(s => s === null);
+      if (hasEmptySlot) return GACHA_ITEMS;
+      // 全25マスが埋まっている場合は、まだcount < 10のマスが存在する種類のみ入る
+      return GACHA_ITEMS.filter(item =>
+        inventorySlots.some(s => s && s.type === item.type && s.count < MAX_STACK)
+      );
+    }
+
+    // アイテム1個を5×5インベントリに登録（10個まで・溢れたら空きマスへ移動）
+    function addItemToInventory(itemType) {
+      // 1. すでに同じアイテムがあり、10個未満のマスを探す
+      for (let i = 0; i < MAX_SLOTS; i++) {
+        if (inventorySlots[i] && inventorySlots[i].type === itemType && inventorySlots[i].count < MAX_STACK) {
+          inventorySlots[i].count += 1;
+          return i;
+        }
+      }
+      // 2. なければ空いている最初のマスに登録する
+      for (let i = 0; i < MAX_SLOTS; i++) {
+        if (inventorySlots[i] === null) {
+          inventorySlots[i] = { type: itemType, count: 1 };
+          return i;
+        }
+      }
+      return -1; // 満杯
+    }
+
     let life = new LifeCore();
 
     const ROBOT = {
@@ -827,7 +1149,8 @@
             lastVoice: ROBOT.lastVoice,
             lastActionNote: ROBOT.lastActionNote
           },
-          apples: applesData
+          apples: applesData,
+          inventory: inventorySlots
         };
         safeStorage.setItem('island_game_save_clean', JSON.stringify(saveData));
       } catch (e) {
@@ -852,6 +1175,9 @@
         ROBOT.lastVoice = data.robot.lastVoice || ROBOT.lastVoice;
         ROBOT.lastActionNote = data.robot.lastActionNote || ROBOT.lastActionNote;
         pendingLoadedApples = Array.isArray(data.apples) ? data.apples : null;
+        if (Array.isArray(data.inventory) && data.inventory.length === MAX_SLOTS) {
+          inventorySlots = data.inventory;
+        }
         return true;
       } catch (e) {
         console.error('Load error:', e);
@@ -1047,35 +1373,221 @@
     function triggerFanAction(type) {
       closeFanMenu();
       if (type === 'gacha') {
-        const half = Math.floor(MAP_SIZE / 2);
-        for (let i = 0; i < 2; i++) {
-          const rx = Math.floor(Math.random() * MAP_SIZE) - half;
-          const rz = Math.floor(Math.random() * MAP_SIZE) - half;
-          spawnApple(rx, rz, false);
-        }
-        saveWorldState();
-        showToast('🎰 ガチャガチャ！リンゴが降ってきた！');
+        openGachaModal();
       } else if (type === 'item') {
-        const half = Math.floor(MAP_SIZE / 2);
-        const rx = Math.floor(Math.random() * MAP_SIZE) - half;
-        const rz = Math.floor(Math.random() * MAP_SIZE) - half;
-        spawnApple(rx, rz, true);
-        showToast('🎒 アイテム：リンゴを1こ出したよ！');
+        renderInventoryGrid();
+        openModal('itemModal');
       } else if (type === 'clean') {
-        if (fieldApples.length === 0) {
-          showToast('⛏️ 整地：すでに綺麗だよ！');
-          return;
-        }
-        for (const a of fieldApples) {
-          if (world) world.remove(a.mesh);
-        }
-        fieldApples = [];
-        saveWorldState();
-        showToast('⛏️ 整地：島をきれいに掃除したよ！');
+        renderCleanGrid();
+        openModal('cleanModal');
       } else if (type === 'exit') {
         saveWorldState();
         openModal('exitModal');
       }
+    }
+
+    // =====================================================================
+    // ★ ガチャガチャ演出（ハンドル回転 ➔ カプセル排出 ➔ パカッと開く）
+    // =====================================================================
+    let isGachaSpinning = false;
+
+    function openGachaModal() {
+      const overlay = document.getElementById('capsule-pop-overlay');
+      const stage = document.getElementById('pop-capsule-stage');
+      if (overlay) overlay.classList.remove('active');
+      if (stage) stage.classList.remove('opened');
+      updateGachaModalStatus();
+      openModal('gachaModal');
+    }
+
+    function updateGachaModalStatus() {
+      const usedSlots = inventorySlots.filter(s => s !== null).length;
+      const availTypes = getAvailableGachaTypes();
+      const statusEl = document.getElementById('gacha-slot-status');
+      const spinBtn = document.getElementById('btn-gacha-spin');
+
+      if (availTypes.length === 0) {
+        if (statusEl) {
+          statusEl.textContent = '⚠️ 25マス満杯！';
+          statusEl.style.color = '#ef4444';
+        }
+        if (spinBtn) {
+          spinBtn.disabled = true;
+          spinBtn.textContent = '満杯で回せません';
+        }
+      } else {
+        if (statusEl) {
+          statusEl.textContent = `使用枠: ${usedSlots} / 25マス`;
+          statusEl.style.color = '#64748b';
+        }
+        if (spinBtn && !isGachaSpinning) {
+          spinBtn.disabled = false;
+          spinBtn.textContent = 'スタート';
+        }
+      }
+    }
+
+    async function spinGachaMachine() {
+      if (isGachaSpinning) return;
+      const availTypes = getAvailableGachaTypes();
+      if (availTypes.length === 0) {
+        showToast('🎒 もちものが25マスいっぱいで回せないよ！');
+        updateGachaModalStatus();
+        return;
+      }
+
+      isGachaSpinning = true;
+      const spinBtn = document.getElementById('btn-gacha-spin');
+      const handle = document.getElementById('gacha-handle-group');
+      const domeCaps = document.getElementById('gacha-dome-capsules');
+      const overlay = document.getElementById('capsule-pop-overlay');
+      const stage = document.getElementById('pop-capsule-stage');
+      const capTop = document.getElementById('cap-half-top');
+
+      if (spinBtn) spinBtn.disabled = true;
+      if (overlay) overlay.classList.remove('active');
+      if (stage) stage.classList.remove('opened');
+
+      // 1. ランダムに1個抽選（りんご、木、石、草、土）
+      const chosen = availTypes[Math.floor(Math.random() * availTypes.length)];
+
+      // 2. ハンドルをくるっと回し、ドーム内のカプセルが揺れる
+      if (handle) handle.classList.add('turning');
+      if (domeCaps) domeCaps.classList.add('shaking');
+
+      await new Promise(r => setTimeout(r, 680));
+
+      if (handle) handle.classList.remove('turning');
+      if (domeCaps) domeCaps.classList.remove('shaking');
+
+      // 3. カプセルがガチャガチャの口から出て登場
+      if (capTop) capTop.style.background = chosen.capColor;
+      document.getElementById('pop-reward-icon').textContent = chosen.icon;
+      document.getElementById('pop-reward-name').textContent = `${chosen.name} ×1個`;
+      document.getElementById('pop-status-msg').textContent = 'コロン！カプセルが出てきたよ…';
+      if (overlay) overlay.classList.add('active');
+
+      await new Promise(r => setTimeout(r, 420));
+
+      // 4. パカッと開くアニメーション！
+      if (stage) stage.classList.add('opened');
+      const slotIdx = addItemToInventory(chosen.type);
+      saveWorldState();
+      document.getElementById('pop-status-msg').textContent = `✨ パカッ！「${chosen.name}」がアイテム枠#${slotIdx + 1}に入ったよ！`;
+
+      // りんごが出た場合は島にも1個プレゼント配置すると観察がさらに楽しくなる
+      if (chosen.type === 'apple') {
+        const half = Math.floor(MAP_SIZE / 2);
+        const rx = Math.floor(Math.random() * MAP_SIZE) - half;
+        const rz = Math.floor(Math.random() * MAP_SIZE) - half;
+        spawnApple(rx, rz, true);
+      }
+
+      await new Promise(r => setTimeout(r, 500));
+      isGachaSpinning = false;
+      updateGachaModalStatus();
+    }
+
+    // =====================================================================
+    // ★ 5×5 アイテムウィンドウ ＆ 5×5 整地ウィンドウの描画
+    // =====================================================================
+    function renderInventoryGrid() {
+      const grid = document.getElementById('inventory-grid-5x5');
+      const summary = document.getElementById('item-bag-summary');
+      if (!grid) return;
+
+      let usedCount = 0;
+      let html = '';
+      for (let i = 0; i < MAX_SLOTS; i++) {
+        const slot = inventorySlots[i];
+        if (slot) {
+          usedCount++;
+          const meta = GACHA_ITEMS.find(it => it.type === slot.type) || GACHA_ITEMS[0];
+          html += `
+            <div class="grid-cell filled" onclick="onTapInventorySlot(${i})" title="${meta.name} ×${slot.count}個">
+              <span class="cell-icon">${meta.icon}</span>
+              <span class="cell-count">×${slot.count}個</span>
+            </div>
+          `;
+        } else {
+          html += `<div class="grid-cell"></div>`;
+        }
+      }
+      grid.innerHTML = html;
+      if (summary) summary.textContent = `${usedCount} / 25マス`;
+    }
+
+    function onTapInventorySlot(idx) {
+      const slot = inventorySlots[idx];
+      if (!slot) return;
+      const meta = GACHA_ITEMS.find(it => it.type === slot.type) || GACHA_ITEMS[0];
+      showToast(`${meta.icon} ${meta.name}（このマスに ×${slot.count}個）`);
+    }
+
+    function renderCleanGrid() {
+      const grid = document.getElementById('clean-grid-5x5');
+      if (!grid) return;
+
+      const half = Math.floor(MAP_SIZE / 2);
+      let html = '';
+      for (let z = -half; z <= half; z++) {
+        for (let x = -half; x <= half; x++) {
+          const isRobotHere = (ROBOT.pos.x === x && ROBOT.pos.z === z);
+          const appleCount = fieldApples.filter(a => a.gx === x && a.gz === z).length;
+
+          let icon = '🟩';
+          let badge = '';
+          let extraClass = 'terrain-cell';
+
+          if (isRobotHere && appleCount > 0) {
+            icon = '🤖🍎';
+            extraClass += ' has-obj';
+          } else if (isRobotHere) {
+            icon = '🤖';
+          } else if (appleCount > 0) {
+            icon = '🍎';
+            badge = `<span class="cell-count">×${appleCount}個</span>`;
+            extraClass += ' has-obj';
+          }
+
+          html += `
+            <div class="grid-cell ${extraClass}" onclick="cleanSingleCell(${x}, ${z})">
+              <span class="cell-coord">${x},${z}</span>
+              <span class="cell-icon" style="font-size:18px;">${icon}</span>
+              ${badge}
+            </div>
+          `;
+        }
+      }
+      grid.innerHTML = html;
+    }
+
+    function cleanSingleCell(gx, gz) {
+      const targets = fieldApples.filter(a => a.gx === gx && a.gz === gz);
+      if (targets.length === 0) {
+        showToast(`⛏️ (${gx}, ${gz}) はすでに綺麗だよ！`);
+        return;
+      }
+      fieldApples = fieldApples.filter(a => {
+        if (a.gx === gx && a.gz === gz) {
+          if (world) world.remove(a.mesh);
+          return false;
+        }
+        return true;
+      });
+      saveWorldState();
+      renderCleanGrid();
+      showToast(`⛏️ (${gx}, ${gz}) のマスを整地したよ！`);
+    }
+
+    function cleanAllIslandFromModal() {
+      for (const a of fieldApples) {
+        if (world) world.remove(a.mesh);
+      }
+      fieldApples = [];
+      saveWorldState();
+      renderCleanGrid();
+      showToast('✨ 島ぜんぶを綺麗に整地したよ！');
     }
 
     function getSurroundings(cx, cz) {
