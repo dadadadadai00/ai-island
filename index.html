@@ -9,37 +9,38 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#0b1329">
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100vw; height: 100vh; height: 100dvh; min-height: 540px;
       margin: 0; padding: 0;
-      overflow: hidden; background: #0f172a; color: #f8fafc;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden; background: #0b1329; color: #f8fafc;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Maru Gothic ProN", "Meiryo", sans-serif;
       position: relative; user-select: none; -webkit-user-select: none;
     }
     input, select, textarea, button { user-select: auto; -webkit-user-select: auto; }
 
-    #stage { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; overflow: hidden; background: #0f172a; }
+    #stage { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; overflow: hidden; background: #0b1329; }
     #c3d { width: 100%; height: 100%; display: block; }
     canvas { display: block; width: 100% !important; height: 100% !important; }
 
+    /* ひらめき電球ポップアップ */
     #bulb-popup {
       position: absolute; z-index: 15; pointer-events: none;
       transform: translate(-50%, -100%);
       display: none; align-items: center; justify-content: center;
       flex-direction: column;
-      filter: drop-shadow(0 0 14px #fde047) drop-shadow(0 0 28px #f59e0b);
+      filter: drop-shadow(0 0 16px #fde047) drop-shadow(0 0 28px #f59e0b);
       animation: bulbPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     }
-    .bulb-icon { font-size: 32px; line-height: 1; }
+    .bulb-icon { font-size: 34px; line-height: 1; }
     .bulb-tag {
-      background: #facc15; color: #0f172a;
-      font-size: 10px; font-weight: 900; padding: 2px 7px;
-      border-radius: 8px; margin-top: 3px; white-space: nowrap;
-      box-shadow: 0 0 12px rgba(250, 204, 21, 0.8);
+      background: #facc15; color: #0b1329;
+      font-size: 11px; font-weight: 900; padding: 3px 8px;
+      border-radius: 10px; margin-top: 3px; white-space: nowrap;
+      box-shadow: 0 2px 10px rgba(250, 204, 21, 0.8);
     }
     @keyframes bulbPop {
       0% { transform: translate(-50%, -60%) scale(0.2); opacity: 0; }
@@ -47,259 +48,344 @@
       100% { transform: translate(-50%, -100%) scale(1); opacity: 1; }
     }
 
-    /* 上部HUD：LifeCoreの3本ゲージ（命・体・心） */
+    /* 上部HUD：小学生にも直感でわかる3本メーター（いのち・げんき・こころ） */
     .top-hud {
       position: absolute; top: 10px; left: 10px; right: 10px; z-index: 20;
-      background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px;
-      padding: 8px 12px; pointer-events: none;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      background: rgba(11, 19, 41, 0.94); backdrop-filter: blur(10px);
+      border: 2px solid rgba(56, 189, 248, 0.3); border-radius: 16px;
+      padding: 9px 12px; pointer-events: none;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
     }
-    .status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; font-size: 11px; font-weight: bold; }
-    .bar-box { background: rgba(255, 255, 255, 0.15); height: 7px; border-radius: 4px; margin-top: 4px; overflow: hidden; }
-    .bar-val { height: 100%; transition: width 0.3s ease; }
+    .status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+    .status-col {
+      background: rgba(255, 255, 255, 0.05); padding: 5px 6px; border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .status-label { font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 3px; }
+    .status-num { font-size: 13px; font-weight: 900; color: #fff; margin-left: 2px; }
+    .bar-box { background: rgba(0, 0, 0, 0.5); height: 9px; border-radius: 6px; margin-top: 4px; overflow: hidden; padding: 1px; }
+    .bar-val { height: 100%; border-radius: 5px; transition: width 0.3s ease; }
+
     .hud-sub {
       display: flex; justify-content: space-between; align-items: center;
-      margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.1);
-      font-size: 10px; color: #cbd5e1;
+      margin-top: 7px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.1);
+      font-size: 11px; font-weight: bold; color: #cbd5e1;
     }
     .drive-badge {
-      padding: 2px 8px; border-radius: 6px; font-weight: bold;
-      background: #1e293b; color: #fde047; border: 1px solid #475569;
+      padding: 3px 10px; border-radius: 12px; font-weight: 900; font-size: 11px;
+      background: #1e293b; color: #fde047; border: 1.5px solid #eab308;
+      box-shadow: 0 0 10px rgba(234, 179, 8, 0.25);
     }
 
-    /* 思考・観察パネル */
+    /* 思考・観察パネル（まんがの吹き出し風デザイン） */
     .thought-card {
-      position: absolute; top: 78px; left: 10px; right: 58px; z-index: 20;
-      background: rgba(15, 23, 42, 0.94); border: 1px solid #38bdf8; border-radius: 12px;
-      padding: 8px 11px; backdrop-filter: blur(6px); pointer-events: none;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      position: absolute; top: 92px; left: 10px; right: 58px; z-index: 20;
+      background: rgba(11, 19, 41, 0.96); border: 2px solid #38bdf8; border-radius: 16px;
+      padding: 10px 12px; backdrop-filter: blur(8px); pointer-events: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
       transition: border-color 0.3s ease, box-shadow 0.3s ease;
     }
     .thought-card.flash-success {
       border-color: #fde047;
-      box-shadow: 0 0 22px rgba(250, 204, 21, 0.6);
+      box-shadow: 0 0 25px rgba(250, 204, 21, 0.7);
     }
-    .thought-title { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: bold; color: #38bdf8; margin-bottom: 5px; gap: 4px; }
-    .server-status { font-size: 10px; padding: 2px 7px; border-radius: 10px; white-space: nowrap; font-weight: bold; }
-    .status-green { background: #065f46; color: #34d399; }
-    .status-yellow { background: #854d0e; color: #fde047; }
-    .status-red { background: #7f1d1d; color: #fca5a5; }
+    .thought-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 7px; gap: 4px;
+    }
+    .thought-header-left {
+      display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 900; color: #38bdf8;
+    }
+    .server-status {
+      font-size: 10px; padding: 2px 8px; border-radius: 10px; white-space: nowrap; font-weight: 900;
+    }
+    .status-green { background: #065f46; color: #34d399; border: 1px solid #10b981; }
+    .status-yellow { background: #854d0e; color: #fde047; border: 1px solid #eab308; }
+    .status-red { background: #7f1d1d; color: #fca5a5; border: 1px solid #ef4444; }
 
     .quick-switch-group { display: flex; gap: 4px; pointer-events: auto; }
     .q-btn {
-      padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: bold;
-      border: 1px solid #334155; background: #0f172a; color: #94a3b8; cursor: pointer;
+      padding: 3px 8px; border-radius: 8px; font-size: 10px; font-weight: 900;
+      border: 1.5px solid #334155; background: #0f172a; color: #94a3b8; cursor: pointer;
     }
-    .q-btn.active-google { background: #0284c7; color: #fff; border-color: #38bdf8; }
-    .q-btn.active-github { background: #6d28d9; color: #fff; border-color: #a78bfa; }
+    .q-btn.active-google { background: #0284c7; color: #fff; border-color: #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
+    .q-btn.active-github { background: #6d28d9; color: #fff; border-color: #a78bfa; box-shadow: 0 0 8px rgba(167, 139, 250, 0.4); }
 
-    .brain-4rows {
-      display: grid; grid-template-columns: 1fr; gap: 3px;
-      background: rgba(2, 6, 23, 0.8); border: 1px solid rgba(56, 189, 248, 0.3);
-      border-radius: 8px; padding: 6px 8px; margin-bottom: 5px; font-size: 10px;
+    .balloon-box {
+      background: rgba(2, 6, 23, 0.85); border: 1.5px solid rgba(56, 189, 248, 0.35);
+      border-radius: 12px; padding: 8px 10px; margin-bottom: 6px;
     }
-    .brain-row { display: flex; gap: 6px; line-height: 1.35; }
-    .brain-lbl { color: #7dd3fc; font-weight: bold; min-width: 80px; flex-shrink: 0; }
-    .brain-val { color: #f8fafc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .balloon-row { display: flex; align-items: flex-start; gap: 6px; font-size: 11px; line-height: 1.4; margin-bottom: 4px; }
+    .balloon-row:last-child { margin-bottom: 0; }
+    .balloon-tag {
+      font-weight: 900; min-width: 68px; flex-shrink: 0; border-radius: 6px; padding: 1px 5px; font-size: 10px; text-align: center;
+    }
+    .tag-see { background: rgba(56, 189, 248, 0.2); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.4); }
+    .tag-act { background: rgba(234, 179, 8, 0.2); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.4); }
+    .balloon-text { color: #f8fafc; font-weight: 600; word-break: break-all; }
 
-    .thought-body { font-size: 11px; line-height: 1.4; color: #f8fafc; }
+    .thought-voice-area {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));
+      border: 1.5px dashed rgba(250, 204, 21, 0.45);
+      border-radius: 12px; padding: 8px 10px;
+    }
+    .thought-voice-title { font-size: 10px; font-weight: 900; color: #fde047; margin-bottom: 3px; display: flex; align-items: center; gap: 4px; }
+    .thought-voice-text { font-size: 12px; font-weight: bold; line-height: 1.45; color: #ffffff; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
 
     /* サイドボタン */
     .side-btns {
-      position: absolute; top: 78px; right: 10px; z-index: 20;
+      position: absolute; top: 92px; right: 10px; z-index: 20;
       display: flex; flex-direction: column; gap: 8px;
     }
     .circle-btn {
-      width: 40px; height: 40px; border-radius: 50%;
-      background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.25);
-      color: #fff; font-size: 16px; display: flex; align-items: center; justify-content: center;
-      cursor: pointer; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      pointer-events: auto;
+      width: 42px; height: 42px; border-radius: 50%;
+      background: rgba(11, 19, 41, 0.95); border: 2px solid rgba(255, 255, 255, 0.25);
+      color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; backdrop-filter: blur(4px); box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+      pointer-events: auto; touch-action: manipulation;
     }
-    .circle-btn.active { border-color: #38bdf8; background: #1d4ed8; }
+    .circle-btn:active { transform: scale(0.92); }
+    .circle-btn.active { border-color: #38bdf8; background: #0284c7; box-shadow: 0 0 12px rgba(56, 189, 248, 0.6); }
 
-    /* 下部操作HUD */
+    /* 下部HUD */
     .bottom-hud {
       position: absolute; bottom: max(12px, env(safe-area-inset-bottom)); left: 10px; right: 10px; z-index: 20;
-      display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+      display: flex; flex-direction: column; gap: 7px; pointer-events: none;
     }
     .tap-guide {
-      align-self: center; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 20px; padding: 4px 14px; font-size: 11px; color: #e2e8f0; pointer-events: auto;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      align-self: center; background: rgba(11, 19, 41, 0.96); border: 1.5px solid rgba(255, 255, 255, 0.3);
+      border-radius: 20px; padding: 5px 16px; font-size: 11px; font-weight: 800; color: #fde047;
+      pointer-events: auto; box-shadow: 0 4px 14px rgba(0,0,0,0.5);
     }
     .action-row {
-      display: flex; gap: 6px; width: 100%; max-width: 440px; margin: 0 auto; pointer-events: auto;
+      display: flex; gap: 8px; width: 100%; max-width: 460px; margin: 0 auto; pointer-events: auto;
     }
     .main-btn {
-      flex: 1; padding: 13px 10px; border-radius: 12px; font-weight: bold; font-size: 13px;
-      color: #fff; border: none; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.5);
-      background: linear-gradient(135deg, #0284c7, #2563eb); border: 1px solid #38bdf8;
-      display: flex; align-items: center; justify-content: center; gap: 5px;
+      flex: 1; padding: 14px 10px; border-radius: 14px; font-weight: 900; font-size: 14px;
+      color: #fff; border: none; cursor: pointer; box-shadow: 0 5px 16px rgba(0,0,0,0.6);
+      background: linear-gradient(135deg, #0284c7, #2563eb); border: 2px solid #38bdf8;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     }
-    .main-btn:active { transform: scale(0.98); }
+    .main-btn:active { transform: scale(0.97); }
     .main-btn.btn-github {
-      background: linear-gradient(135deg, #6d28d9, #7c3aed); border: 1px solid #c4b5fd;
+      background: linear-gradient(135deg, #6d28d9, #7c3aed); border: 2px solid #c4b5fd;
     }
     .sub-instinct-btn {
-      padding: 13px 12px; border-radius: 12px; font-weight: bold; font-size: 11px;
-      color: #fde047; background: rgba(15, 23, 42, 0.95); border: 1px solid #eab308;
-      cursor: pointer; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      padding: 14px 14px; border-radius: 14px; font-weight: 900; font-size: 12px;
+      color: #fde047; background: rgba(15, 23, 42, 0.96); border: 2px solid #eab308;
+      cursor: pointer; white-space: nowrap; box-shadow: 0 5px 16px rgba(0,0,0,0.6);
+      touch-action: manipulation;
     }
+    .sub-instinct-btn:active { transform: scale(0.97); }
     .main-btn:disabled, .sub-instinct-btn:disabled {
       background: #334155 !important; border-color: #475569 !important; color: #94a3b8 !important; cursor: not-allowed;
     }
-    .btn-respawn { background: linear-gradient(135deg, #dc2626, #991b1b); border: 1px solid #f87171; display: none; }
+    .btn-respawn {
+      background: linear-gradient(135deg, #dc2626, #b91c1c); border: 2px solid #f87171; display: none; width: 100%;
+    }
 
-    /* モーダル */
+    /* トースト通知（セーブ完了など） */
+    #toast-msg {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
+      background: rgba(15, 23, 42, 0.96); border: 2px solid #38bdf8; border-radius: 14px;
+      padding: 10px 20px; font-size: 13px; font-weight: 900; color: #f8fafc; z-index: 50;
+      opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    }
+    #toast-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+    /* モーダル共通 */
     .modal-cover {
       position: fixed; inset: 0; z-index: 100;
-      background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(6px);
-      display: none; align-items: center; justify-content: center; padding: 16px;
+      background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px);
+      display: none; align-items: center; justify-content: center; padding: 14px;
     }
     .modal-box {
-      width: 100%; max-width: 400px; background: #0f172a; border: 1px solid #334155;
-      border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
-      box-shadow: 0 12px 35px rgba(0,0,0,0.9); max-height: 88dvh; overflow-y: auto;
+      width: 100%; max-width: 410px; background: #0f172a; border: 2px solid #334155;
+      border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 12px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.9); max-height: 90dvh; overflow-y: auto;
     }
-    .modal-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
-    .modal-title { font-size: 14px; font-weight: bold; color: #38bdf8; }
-    .close-btn { font-size: 20px; color: #94a3b8; cursor: pointer; padding: 0 4px; }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e293b; padding-bottom: 10px; }
+    .modal-title { font-size: 15px; font-weight: 900; color: #38bdf8; }
+    .close-btn { font-size: 22px; color: #94a3b8; cursor: pointer; padding: 2px 6px; font-weight: bold; }
     .diary-content {
-      background: #020617; border: 1px solid #1e293b; border-radius: 8px; padding: 10px;
-      font-size: 11px; line-height: 1.6; color: #cbd5e1; max-height: 200px; overflow-y: auto; white-space: pre-wrap;
+      background: #020617; border: 1.5px solid #1e293b; border-radius: 12px; padding: 12px;
+      font-size: 11px; line-height: 1.6; color: #cbd5e1; max-height: 180px; overflow-y: auto; white-space: pre-wrap;
     }
     .input-box {
-      width: 100%; padding: 10px; background: #020617; border: 1px solid #334155;
-      color: #fff; border-radius: 8px; font-size: 12px; margin-top: 4px;
+      width: 100%; padding: 11px 12px; background: #020617; border: 1.5px solid #334155;
+      color: #fff; border-radius: 10px; font-size: 12px; margin-top: 6px;
     }
-    .save-btn { padding: 12px; background: #0284c7; color: #fff; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 13px; }
-    .msg-line { font-size: 11px; color: #fde047; min-height: 16px; line-height: 1.4; }
-    
-    .settings-group {
-      background: rgba(255,255,255,0.03); border: 2px solid #1e293b;
-      padding: 12px; border-radius: 12px; cursor: pointer;
+    .input-box:focus { border-color: #38bdf8; outline: none; }
+    .save-btn {
+      padding: 14px; background: #0284c7; color: #fff; border: none; border-radius: 12px;
+      font-weight: 900; cursor: pointer; font-size: 14px; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
     }
-    .settings-group.selected-google { border-color: #38bdf8; background: rgba(2, 132, 199, 0.15); }
-    .settings-group.selected-github { border-color: #a78bfa; background: rgba(109, 40, 217, 0.18); }
-    .settings-group-title {
-      font-size: 12px; color: #f8fafc; font-weight: bold; margin-bottom: 6px;
-      display: flex; justify-content: space-between; align-items: center;
+    .reset-btn {
+      padding: 10px; background: transparent; color: #f87171; border: 1.5px dashed #dc2626;
+      border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 11px; margin-top: 4px;
     }
-    .key-status-tag { font-size: 10px; padding: 2px 7px; border-radius: 6px; }
-    .tag-saved { background: #065f46; color: #34d399; }
-    .tag-empty { background: #334155; color: #94a3b8; }
+
+    /* 設定カード（小学生にも押しやすい大きな2択カード） */
+    .settings-card {
+      background: rgba(255,255,255,0.03); border: 2.5px solid #1e293b;
+      padding: 13px; border-radius: 14px; cursor: pointer; transition: all 0.2s ease;
+    }
+    .settings-card.selected-google {
+      border-color: #38bdf8; background: rgba(2, 132, 199, 0.16); box-shadow: 0 0 14px rgba(56, 189, 248, 0.3);
+    }
+    .settings-card.selected-github {
+      border-color: #a78bfa; background: rgba(109, 40, 217, 0.2); box-shadow: 0 0 14px rgba(167, 139, 250, 0.3);
+    }
+    .settings-card-head {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
+    }
+    .settings-card-title { font-size: 13px; font-weight: 900; color: #fff; }
+    .key-status-tag { font-size: 10px; padding: 3px 8px; border-radius: 8px; font-weight: 900; }
+    .tag-saved { background: #065f46; color: #34d399; border: 1px solid #10b981; }
+    .tag-empty { background: #334155; color: #94a3b8; border: 1px solid #475569; }
+    .settings-help { font-size: 11px; color: #94a3b8; line-height: 1.4; margin-bottom: 6px; }
   </style>
 
-  <!-- Three.js (CDN) -->
+  <!-- Three.js (3D空間の描画ライブラリ) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
   <div id="stage"><div id="c3d"></div></div>
 
+  <!-- ひらめきポップアップ -->
   <div id="bulb-popup">
     <div class="bulb-icon">💡</div>
-    <div class="bulb-tag" id="bulb-tag-txt">通過!</div>
+    <div class="bulb-tag" id="bulb-tag-txt">ひらめいた!</div>
   </div>
 
-  <!-- 上部HUD：LifeCoreの3要素（エネルギー・スタミナ・メンタル） -->
+  <!-- 一時通知トースト -->
+  <div id="toast-msg">💾 データをほぞんしたよ</div>
+
+  <!-- 上部ステータスメーター（小学生向け・3要素直感表示） -->
   <div class="top-hud">
     <div class="status-grid">
-      <div>🍎エネルギー <span id="v-energy">100</span><div class="bar-box"><div id="b-energy" class="bar-val" style="width:100%; background:#ef4444;"></div></div></div>
-      <div>⚡スタミナ <span id="v-stamina">100</span><div class="bar-box"><div id="b-stamina" class="bar-val" style="width:100%; background:#eab308;"></div></div></div>
-      <div>🎵メンタル <span id="v-mental">100</span><div class="bar-box"><div id="b-mental" class="bar-val" style="width:100%; background:#10b981;"></div></div></div>
+      <div class="status-col">
+        <div class="status-label">🍎 いのち <span id="v-energy" class="status-num">100</span></div>
+        <div class="bar-box"><div id="b-energy" class="bar-val" style="width:100%; background:linear-gradient(90deg, #f87171, #ef4444);"></div></div>
+      </div>
+      <div class="status-col">
+        <div class="status-label">⚡ げんき <span id="v-stamina" class="status-num">100</span></div>
+        <div class="bar-box"><div id="b-stamina" class="bar-val" style="width:100%; background:linear-gradient(90deg, #fde047, #eab308);"></div></div>
+      </div>
+      <div class="status-col">
+        <div class="status-label">🎵 こころ <span id="v-mental" class="status-num">100</span></div>
+        <div class="bar-box"><div id="b-mental" class="bar-val" style="width:100%; background:linear-gradient(90deg, #6ee7b7, #10b981);"></div></div>
+      </div>
     </div>
     <div class="hud-sub">
-      <span id="ui-id">🤖 村人#1 (0, 0, -1)</span>
-      <span id="ui-drive" class="drive-badge">本能: PEACE (±0)</span>
-      <span id="ui-timer">⏸️ 0手目</span>
+      <span id="ui-id">🤖 ロボ1ごう (0, 0, -1)</span>
+      <span id="ui-drive" class="drive-badge">😊 あんしん・まんぷく</span>
+      <span id="ui-timer">⭐ 0手目</span>
     </div>
   </div>
 
-  <!-- 観察パネル（生命・通信・空間の連携表示） -->
+  <!-- 思考・観察パネル（ロボの気持ちと行動がひと目でわかる吹き出し） -->
   <div class="thought-card" id="thought-card">
-    <div class="thought-title">
-      <div style="display:flex; align-items:center; gap:6px;">
-        <span>🧠 頭脳:</span>
+    <div class="thought-header">
+      <div class="thought-header-left">
+        <span>🧠 つかう頭脳:</span>
         <div class="quick-switch-group">
           <button type="button" id="q-btn-google" class="q-btn active-google" onclick="selectModelAndRefresh('gemini-3.8-flash')">🟦 Google 3.8</button>
           <button type="button" id="q-btn-github" class="q-btn" onclick="selectModelAndRefresh('openai/gpt-oss-120b')">🟪 Groq 120B</button>
         </div>
       </div>
-      <span id="server-lamp" class="server-status status-yellow">⚙️ キー未設定</span>
+      <span id="server-lamp" class="server-status status-yellow">⚙️ キー未せってい</span>
     </div>
-    <div class="brain-4rows">
-      <div class="brain-row"><span class="brain-lbl">👁️空間の知覚:</span><span class="brain-val" id="br-see">東にリンゴ / 西に仲間村人B</span></div>
-      <div class="brain-row"><span class="brain-lbl">💓本能の欲求:</span><span class="brain-val" id="br-drive">PEACE（満たされている）</span></div>
-      <div class="brain-row"><span class="brain-lbl">🧬身体の学習:</span><span class="brain-val" id="br-mem">まだ学習データなし（白紙）</span></div>
-      <div class="brain-row"><span class="brain-lbl">⚡直前の行動:</span><span class="brain-val" id="br-act">待機中</span></div>
+
+    <!-- まんがの吹き出し枠：ロボが見ているもの・行動 -->
+    <div class="balloon-box">
+      <div class="balloon-row">
+        <span class="balloon-tag tag-see">👀 見えてる</span>
+        <span class="balloon-text" id="br-see">東に🍎リンゴ / 西に村人B</span>
+      </div>
+      <div class="balloon-row">
+        <span class="balloon-tag tag-act">👟 やった事</span>
+        <span class="balloon-text" id="br-act">ボタンを押して1歩動かしてみてね</span>
+      </div>
     </div>
-    <div class="thought-body" id="thought-txt">
-      下のボタンで時間を1コマ進め、本能（LifeCore）と理性（AI通信）の行動を観察します。
+
+    <!-- ロボのこころのこえ（一番大きく見やすい） -->
+    <div class="thought-voice-area">
+      <div class="thought-voice-title">💭 ロボのこころのこえ</div>
+      <div class="thought-voice-text" id="thought-txt">
+        下のボタンを押すと、AIが自分で考えて島をトコトコ歩き回るよ！
+      </div>
     </div>
   </div>
 
+  <!-- 右サイドの切り替えボタン -->
   <div class="side-btns">
-    <button class="circle-btn active" id="btn-sur" onclick="changeCam('surface')" title="地上視点">🌲</button>
-    <button class="circle-btn" id="btn-ant" onclick="changeCam('antfarm')" title="地下断面視点">⛏️</button>
-    <button class="circle-btn" onclick="openModal('diaryModal')" title="記憶と学習ログ">📖</button>
-    <button class="circle-btn" onclick="openModal('settingModal')" title="API設定">⚙️</button>
+    <button class="circle-btn active" id="btn-sur" onclick="changeCam('surface')" title="じじょう（島の上）を見る">🌲</button>
+    <button class="circle-btn" id="btn-ant" onclick="changeCam('antfarm')" title="ちか（断面）を見る">⛏️</button>
+    <button class="circle-btn" onclick="openModal('diaryModal')" title="手帳ときおく">📖</button>
+    <button class="circle-btn" onclick="openModal('settingModal')" title="せってい">⚙️</button>
   </div>
 
+  <!-- 下部操作HUD -->
   <div class="bottom-hud">
-    <div class="tap-guide" id="guide-txt">👆 ブロックタップで🍎投下 / ドラッグで回転</div>
+    <div class="tap-guide" id="guide-txt">👆 地面をタップすると🍎リンゴが落ちるよ！</div>
     <div class="action-row">
-      <button class="main-btn" id="think-btn" onclick="stepAiLife(true)">🟦 ⚡ gemini-3.8-flash で1手思考</button>
-      <button class="sub-instinct-btn" id="instinct-btn" onclick="stepAiLife(false)" title="通信せずLifeCoreの本能だけで1コマ動きます">🌱 本能のみ</button>
-      <button class="main-btn btn-respawn" id="respawn-btn" onclick="respawnRobot()">🔄 記憶を引き継いで次の世代へ</button>
+      <button class="main-btn" id="think-btn" onclick="stepAiLife(true)">🟦 ⚡ Google 3.8 で1手かんがえさせる</button>
+      <button class="sub-instinct-btn" id="instinct-btn" onclick="stepAiLife(false)" title="通信しないでロボの自分のほんのうだけで動きます">🌱 ほんのう</button>
+      <button class="main-btn btn-respawn" id="respawn-btn" onclick="respawnRobot()">🔄 つぎの世代へ引き継ぐ</button>
     </div>
   </div>
 
+  <!-- 手帳・学習スコアモーダル -->
   <div class="modal-cover" id="diaryModal">
     <div class="modal-box">
       <div class="modal-head">
-        <div class="modal-title">📖 身体記憶（LifeCore）と手帳の記録</div>
+        <div class="modal-title">📖 ロボの手帳ときおく</div>
         <div class="close-btn" onclick="closeModal('diaryModal')">✕</div>
       </div>
-      <div style="font-size:11px; color:#fde047; font-weight:bold;">🧬 LifeCoreが学習した快・不快スコア:</div>
-      <div class="diary-content" id="lifecore-mem-box" style="max-height:110px; color:#86efac;"></div>
-      <div style="font-size:11px; color:#38bdf8; font-weight:bold;">📝 村人の手帳ログ:</div>
+      <div style="font-size:12px; color:#fde047; font-weight:900;">🧬 体で覚えた「すき・きらい」スコア:</div>
+      <div class="diary-content" id="lifecore-mem-box" style="max-height:100px; color:#86efac;"></div>
+      <div style="font-size:12px; color:#38bdf8; font-weight:900;">📝 ロボが書いた日記:</div>
       <div class="diary-content" id="diary-text"></div>
+      <button class="reset-btn" onclick="confirmResetGame()">🔄 データを消して最初からやり直す</button>
       <button class="save-btn" onclick="closeModal('diaryModal')">とじる</button>
     </div>
   </div>
 
+  <!-- 設定モーダル（小学生にもわかりやすい2大選択カード） -->
   <div class="modal-cover" id="settingModal">
     <div class="modal-box">
       <div class="modal-head">
-        <div class="modal-title">⚙️ 使いたい頭脳をタップして選択</div>
+        <div class="modal-title">⚙️ どっちのあたま（AI）をつかう？</div>
         <div class="close-btn" onclick="closeModal('settingModal')">✕</div>
       </div>
 
-      <div class="settings-group selected-google" id="grp-google-key" onclick="selectModelInModal('gemini-3.8-flash')">
-        <div class="settings-group-title">
-          <span>🟦 Google Gemini 3.8 を使う</span>
+      <!-- Google Gemini カード -->
+      <div class="settings-card selected-google" id="grp-google-key" onclick="selectModelInModal('gemini-3.8-flash')">
+        <div class="settings-card-head">
+          <span class="settings-card-title">🟦 Google Gemini 3.8（じっくり派）</span>
           <span id="tag-google-status" class="key-status-tag tag-empty">キー未保存</span>
         </div>
-        <div style="font-size:10px; color:#94a3b8; margin-bottom:6px;">Google AI Studio の無料キー（AIza...）</div>
+        <div class="settings-help">Google AI Studio の無料キー（AIza...）をいれてね。</div>
         <input type="password" id="input-google-key" class="input-box" placeholder="ここにGoogleキーを貼り付け" onclick="event.stopPropagation(); selectModelInModal('gemini-3.8-flash');" oninput="autoSaveKey('google', this.value)">
       </div>
 
-      <div class="settings-group" id="grp-github-key" onclick="selectModelInModal('openai/gpt-oss-120b')">
-        <div class="settings-group-title">
-          <span>🟪 Groq (GPT-OSS-120B) を使う</span>
+      <!-- Groq 120B カード -->
+      <div class="settings-card" id="grp-github-key" onclick="selectModelInModal('openai/gpt-oss-120b')">
+        <div class="settings-card-head">
+          <span class="settings-card-title">🟪 Groq 120B（ばくそく派）</span>
           <span id="tag-github-status" class="key-status-tag tag-empty">キー未保存</span>
         </div>
-        <div style="font-size:10px; color:#94a3b8; margin-bottom:6px;">Groq の無料キー（gsk_... / 1日1,000回・有効期限なし）</div>
+        <div class="settings-help">Groq の無料キー（gsk_...）をいれてね。1日1000回まで無料！</div>
         <input type="password" id="input-github-key" class="input-box" placeholder="ここにGroqキー (gsk_...) を貼り付け" onclick="event.stopPropagation(); selectModelInModal('openai/gpt-oss-120b');" oninput="autoSaveKey('github', this.value)">
       </div>
 
-      <div class="msg-line" id="setting-msg">枠をタップすると使う頭脳が切り替わります。</div>
+      <div style="font-size:11px; color:#fde047; font-weight:800; text-align:center;" id="setting-msg">枠をタップすると使う頭脳が切り替わるよ！</div>
 
-      <button class="save-btn" id="modal-save-btn" onclick="saveKeys()">🟦 Google Gemini 3.8 に決定して閉じる</button>
+      <button class="save-btn" id="modal-save-btn" onclick="saveKeys()">決定してとじる</button>
     </div>
   </div>
 
@@ -513,12 +599,11 @@
       }
     }
 
-    // クラス自体も凍結して改造不能にする
     Object.freeze(LifeCore);
     Object.freeze(LifeCore.prototype);
 
     /* =====================================================================
-     * 通信コア：GeminiCore (gemini-3.8-flash) & GroqCore
+     * 通信コア：GeminiCore & GroqCore
      * ===================================================================== */
     const GeminiCore = Object.freeze({
       DEFAULT_MODEL: 'gemini-3.8-flash',
@@ -541,19 +626,18 @@
         });
 
         if (!res.ok) {
-          if (res.status === 429) throw new Error('Google無料枠の混雑（429）です。少し待ってお試しください。');
+          if (res.status === 429) throw new Error('Googleの無料枠が混雑中です。少し待って押してね！');
           const errTxt = await res.text();
-          throw new Error(`Google HTTP ${res.status}: ${errTxt.slice(0, 80)}`);
+          throw new Error(`Google エラー ${res.status}: ${errTxt.slice(0, 80)}`);
         }
 
         const data = await res.json();
         const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!rawText) throw new Error('AIから空の返答が返されました。');
+        if (!rawText) throw new Error('AIから返答がありませんでした。');
         return this._parseJsonSafely(rawText);
       },
       
       _parseJsonSafely(rawText) {
-        // プレビュー切断を防ぐため16進エスケープ(\x60)でバッククォートを除去
         const cleaned = rawText.replace(/\x60{3}json/gi, '').replace(/\x60{3}/g, '').trim();
         const firstBrace = cleaned.indexOf('{');
         const lastBrace = cleaned.lastIndexOf('}');
@@ -604,21 +688,21 @@
         }
 
         if (!res.ok) {
-          if (res.status === 401) throw new Error('Groqキーが無効です（gsk_から始まるキーか確認してください）。');
-          if (res.status === 429) throw new Error('Groqの混雑（429）です。数秒待ってお試しください。');
+          if (res.status === 401) throw new Error('Groqキーが無効です（gsk_から始まるか確認してね）。');
+          if (res.status === 429) throw new Error('Groqが混雑中です。数秒待って押してね！');
           const errTxt = await res.text();
           throw new Error(`Groq エラー ${res.status}: ${errTxt.slice(0, 80)}`);
         }
 
         const data = await res.json();
         const rawText = data?.choices?.[0]?.message?.content;
-        if (!rawText) throw new Error('AIから空の返答が返されました。');
+        if (!rawText) throw new Error('AIから返答がありませんでした。');
         return GeminiCore._parseJsonSafely(rawText);
       }
     });
 
     // =====================================================================
-    // 設定・ストレージ管理
+    // 安全ストレージ＆自動セーブ（閉じても続きから再開できる仕組み）
     // =====================================================================
     const memStore = {};
     const safeStorage = {
@@ -629,8 +713,20 @@
       setItem: (k, v) => {
         memStore[k] = String(v);
         try { localStorage.setItem(k, String(v)); } catch(e) {}
+      },
+      removeItem: (k) => {
+        delete memStore[k];
+        try { localStorage.removeItem(k); } catch(e) {}
       }
     };
+
+    function showToast(msg) {
+      const el = document.getElementById('toast-msg');
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2000);
+    }
 
     function isGeminiModel(modelName) {
       return String(modelName).startsWith('gemini');
@@ -656,13 +752,13 @@
     // 村人状態 & LifeCore
     // =====================================================================
     const DRIVE_JA = {
-      PEACE: 'PEACE（平和・満足）',
-      BORED: 'BORED（退屈・刺激が欲しい）',
-      HUNGRY: 'HUNGRY（小腹が減った）',
-      EXHAUSTED: 'EXHAUSTED（体力限界・眠い）',
-      STARVING: 'STARVING（命の危機・飢餓）',
-      FAINT: 'FAINT（限界気絶・強制睡眠）',
-      DEAD: 'DEAD（生命停止）'
+      PEACE: '😊 あんしん・まんぷく',
+      BORED: '🥱 たいくつ（あそびたい！）',
+      HUNGRY: '🍙 おなかすいた…',
+      EXHAUSTED: '💤 くたくた（ねむい）',
+      STARVING: '🚨 はらぺこピンチ！！',
+      FAINT: '💫 たおれてきぜつ中',
+      DEAD: '💀 うごかなくなった'
     };
 
     let life = new LifeCore();
@@ -673,8 +769,61 @@
       pos: { x: 0, y: 0, z: -1 },
       hasApple: false,
       known: {},
-      diary: ["【第1世代の覚醒】\n生命コア（LifeCore）が起動した。空間を探索し、快・不快を学習して生き延びよう。"]
+      diary: ["【第1世代の目覚め】\n生命コア（LifeCore）が起動した。島のマス目を歩いて、すき・きらいを学習しよう！"]
     };
+
+    // 自動セーブとロードの処理
+    function saveWorldState() {
+      try {
+        const applesData = fieldApples.map(a => ({ gx: a.gx, gy: a.gy, gz: a.gz }));
+        const saveData = {
+          lifeSave: life.exportSave(),
+          robot: {
+            gen: ROBOT.gen,
+            stepCount: ROBOT.stepCount,
+            pos: ROBOT.pos,
+            hasApple: ROBOT.hasApple,
+            known: ROBOT.known,
+            diary: ROBOT.diary
+          },
+          apples: applesData,
+          savedAt: Date.now()
+        };
+        safeStorage.setItem('island_game_save_v2', JSON.stringify(saveData));
+      } catch (err) {
+        console.error('Save error:', err);
+      }
+    }
+
+    let pendingLoadedApples = null;
+    function tryLoadWorldState() {
+      try {
+        const raw = safeStorage.getItem('island_game_save_v2');
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (!data || !data.lifeSave || !data.robot) return false;
+
+        life = new LifeCore(data.lifeSave);
+        ROBOT.gen = data.robot.gen || 1;
+        ROBOT.stepCount = data.robot.stepCount || 0;
+        ROBOT.pos = data.robot.pos || { x: 0, y: 0, z: -1 };
+        ROBOT.hasApple = Boolean(data.robot.hasApple);
+        ROBOT.known = data.robot.known || {};
+        ROBOT.diary = Array.isArray(data.robot.diary) ? data.robot.diary : [];
+        pendingLoadedApples = Array.isArray(data.apples) ? data.apples : null;
+        return true;
+      } catch (err) {
+        console.error('Load error:', err);
+        return false;
+      }
+    }
+
+    function confirmResetGame() {
+      if (confirm('ほんとうに最初からやり直しますか？（きおくや手帳のデータが消えます）')) {
+        safeStorage.removeItem('island_game_save_v2');
+        location.reload();
+      }
+    }
 
     function markVision(cx, cy, cz) {
       for (let ox = -1; ox <= 1; ox++) {
@@ -683,7 +832,6 @@
         }
       }
     }
-    markVision(0, 0, -1);
 
     // =====================================================================
     // 空間コア（明るく立体的なライティングと美しいボクセル島）
@@ -713,24 +861,24 @@
       const h = Math.max(stage.clientHeight || window.innerHeight || 640, 420);
 
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0f172a);
+      scene.background = new THREE.Color(0x0b1329);
 
       camera = new THREE.PerspectiveCamera(42, w / h, 0.1, 100);
       renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
       renderer.setSize(w, h);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setClearColor(0x0f172a, 1.0);
+      renderer.setClearColor(0x0b1329, 1.0);
       stage.innerHTML = '';
       stage.appendChild(renderer.domElement);
 
-      const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x1e293b, 1.15);
+      const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x1e293b, 1.2);
       scene.add(hemiLight);
 
-      const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+      const sun = new THREE.DirectionalLight(0xffffff, 0.9);
       sun.position.set(8, 16, 10);
       scene.add(sun);
 
-      const fillSun = new THREE.DirectionalLight(0x38bdf8, 0.35);
+      const fillSun = new THREE.DirectionalLight(0x38bdf8, 0.4);
       fillSun.position.set(-8, 10, -8);
       scene.add(fillSun);
 
@@ -823,7 +971,9 @@
       bulbLight = new THREE.PointLight(0xfde047, 0, 5);
       bulbLight.position.set(0, 0.2, 0); bulbGroup.add(bulbLight);
 
-      chara.position.set(0, 0.5, -1);
+      // ロボットの初期位置（ロードされた座標または初期値）
+      chara.position.set(ROBOT.pos.x, ROBOT.pos.y + 0.5, ROBOT.pos.z);
+      if (ROBOT.hasApple && handApple) handApple.material.visible = true;
 
       targetCamPos = new THREE.Vector3(...CAM_COORDS.surface.pos);
       targetCamLook = new THREE.Vector3(...CAM_COORDS.surface.look);
@@ -831,8 +981,15 @@
       camera.position.copy(targetCamPos);
       camera.lookAt(curCamLook);
 
+      // 保存されたリンゴの復元、または初期リンゴの生成
+      if (pendingLoadedApples && pendingLoadedApples.length > 0) {
+        for (const ap of pendingLoadedApples) spawnApple(ap.gx, ap.gy, ap.gz, false);
+      } else {
+        spawnApple(2, 0, -1, false);
+      }
+
+      markVision(ROBOT.pos.x, ROBOT.pos.y, ROBOT.pos.z);
       refreshFog();
-      spawnApple(2, 0, -1);
       setupTouch();
       updateHUD();
       renderLoop();
@@ -883,7 +1040,7 @@
       document.getElementById('btn-ant').classList.toggle('active', type === 'antfarm');
     }
 
-    function spawnApple(gx, gy, gz) {
+    function spawnApple(gx, gy, gz, shouldSave = true) {
       if (!world) return;
       const grp = new THREE.Group();
       const apple = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.34), new THREE.MeshLambertMaterial({ color: 0xef4444 }));
@@ -893,6 +1050,7 @@
       world.add(grp);
       fieldApples.push({ mesh: grp, gx: gx, gy: gy, gz: gz });
       updateHUD();
+      if (shouldSave) saveWorldState();
     }
 
     function setupTouch() {
@@ -931,8 +1089,8 @@
         if (hits.length === 0) return;
         let gx = hits[0].object.userData.gx, gy = hits[0].object.userData.gy, gz = hits[0].object.userData.gz;
         while (gy > -4 && !voxelMap[gx + ',' + gy + ',' + gz]) gy--;
-        spawnApple(gx, gy, gz);
-        document.getElementById('guide-txt').textContent = '🍎投下! (島に' + fieldApples.length + '個)';
+        spawnApple(gx, gy, gz, true);
+        document.getElementById('guide-txt').textContent = '🍎 リンゴを落としたよ！ (島に' + fieldApples.length + 'こ)';
       }
     }
 
@@ -966,7 +1124,7 @@
           if (a.gx > cx) dirs.push("東"); if (a.gx < cx) dirs.push("西");
           if (a.gz > cz) dirs.push("南"); if (a.gz < cz) dirs.push("北");
           if (a.gy > cy) dirs.push("上"); if (a.gy < cy) dirs.push("下");
-          return 'リンゴ#' + (i + 1) + ':' + (dirs.length > 0 ? dirs.join("") : "足元") + '(' + dist + 'マス)';
+          return '🍎リンゴ#' + (i + 1) + ':' + (dirs.length > 0 ? dirs.join("") : "足元") + '(' + dist + 'マス)';
         }).join(' / ');
       }
       return str + ' ｜ 西(-2,0,-1)に仲間村人B';
@@ -975,23 +1133,23 @@
     function getPossibleActions(cx, cy, cz) {
       const list = [];
       if (ROBOT.hasApple) {
-        list.push({ key: "EAT_HAND", txt: "右手のリンゴを食べる" });
+        list.push({ key: "EAT_HAND", txt: "右手の🍎リンゴを食べる" });
       }
       const nearIdx = fieldApples.findIndex(a => Math.abs(a.gx - cx) + Math.abs(a.gy - cy) + Math.abs(a.gz - cz) <= 1);
       if (nearIdx !== -1) {
-        list.push({ key: "EAT_FIELD", appleIdx: nearIdx, txt: "目の前のリンゴを食べる" });
+        list.push({ key: "EAT_FIELD", appleIdx: nearIdx, txt: "目の前の🍎リンゴを食べる" });
         if (!ROBOT.hasApple) {
-          list.push({ key: "PICK_APPLE", appleIdx: nearIdx, txt: "目の前のリンゴを拾って持つ" });
+          list.push({ key: "PICK_APPLE", appleIdx: nearIdx, txt: "目の前の🍎リンゴをひろう" });
         }
       }
 
       const dirs = [
-        { key: "MOVE_E", dx: 1, dy: 0, dz: 0, name: "東へ1歩歩く" },
-        { key: "MOVE_W", dx: -1, dy: 0, dz: 0, name: "西へ1歩歩く" },
-        { key: "MOVE_S", dx: 0, dy: 0, dz: 1, name: "南へ1歩歩く" },
-        { key: "MOVE_N", dx: 0, dy: 0, dz: -1, name: "北へ1歩歩く" },
-        { key: "CLIMB_UP", dx: 0, dy: 1, dz: 0, name: "ハシゴを1段のぼる" },
-        { key: "CLIMB_DOWN", dx: 0, dy: -1, dz: 0, name: "ハシゴを1段おりる" }
+        { key: "MOVE_E", dx: 1, dy: 0, dz: 0, name: "東へ1歩あるく" },
+        { key: "MOVE_W", dx: -1, dy: 0, dz: 0, name: "西へ1歩あるく" },
+        { key: "MOVE_S", dx: 0, dy: 0, dz: 1, name: "南へ1歩あるく" },
+        { key: "MOVE_N", dx: 0, dy: 0, dz: -1, name: "北へ1歩あるく" },
+        { key: "CLIMB_UP", dx: 0, dy: 1, dz: 0, name: "ハシゴをのぼる" },
+        { key: "CLIMB_DOWN", dx: 0, dy: -1, dz: 0, name: "ハシゴをおりる" }
       ];
       for (const d of dirs) {
         const tx = cx + d.dx, ty = cy + d.dy, tz = cz + d.dz;
@@ -1001,7 +1159,7 @@
         }
       }
 
-      list.push({ key: "SLEEP_REST", txt: "その場で休息・仮眠をとる" });
+      list.push({ key: "SLEEP_REST", txt: "その場でひとやすみ（仮眠）" });
       return list;
     }
 
@@ -1050,7 +1208,7 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
 
       if (useLLM && currentKey.length <= 5) {
         const keyLabel = isGeminiModel(activeModel) ? 'Googleキー' : 'Groqキー (gsk_...)';
-        document.getElementById('thought-txt').innerHTML = '<span style="color:#fde047; font-weight:bold;">⚠️ ' + activeModel + ' 用の' + keyLabel + 'が未設定です。</span><br>設定画面から入力するか、右の「🌱本能のみ」を押してください。';
+        document.getElementById('thought-txt').innerHTML = '<span style="color:#fde047; font-weight:900;">⚠️ ' + keyLabel + 'がまだ入っていないよ！</span><br>右上の⚙️からキーを入れるか、となりの「🌱ほんのう」ボタンを押してみてね。';
         openModal('settingModal');
         return;
       }
@@ -1068,9 +1226,9 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
 
       try {
         if (useLLM) {
-          thinkBtn.innerHTML = "⚡ " + activeModel + " 思考中...";
+          thinkBtn.innerHTML = "⚡ かんがえ中...";
           lamp.className = "server-status status-yellow";
-          lamp.textContent = "⚡ 通信中...";
+          lamp.textContent = "⚡ つうしん中...";
 
           const memForDrive = preState.memory[preState.drive] || {};
           const instinctSuggestion = actionKeys.reduce((best, cur) => (memForDrive[cur] || 0) > (memForDrive[best] || 0) ? cur : best, actionKeys[0]);
@@ -1087,21 +1245,21 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
           if (decision.actionKey && actionKeys.includes(decision.actionKey)) {
             chosenKey = decision.actionKey;
           }
-          reasonText = decision.reason || '本能と空間の状況から判断した。';
+          reasonText = decision.reason || 'まわりのようすを見てきめたよ。';
           noteText = decision.note || '';
 
           const actualTickAction = life.tick([chosenKey]);
           chosenKey = actualTickAction;
 
           lamp.className = "server-status status-green";
-          lamp.textContent = "💡 通過成功!";
-          triggerIdeaBulb('⚡ ' + activeModel);
+          lamp.textContent = "🟢 通信OK!";
+          triggerIdeaBulb(isGeminiModel(activeModel) ? '💡 Google 3.8' : '💡 Groq 120B');
         } else {
           chosenKey = life.tick(actionKeys);
           const afterTick = life.getState();
-          reasonText = '【LifeCore本能行動】欲求「' + afterTick.drive + '」と身体記憶・好奇心に従い行動。';
-          noteText = '本能（' + afterTick.drive + '）に従って「' + chosenKey + '」を実行。';
-          triggerIdeaBulb('🌱 LifeCore本能');
+          reasonText = '頭を使わず、体のほんのう（' + (DRIVE_JA[afterTick.drive] || afterTick.drive) + '）に従って動いたよ！';
+          noteText = 'ほんのうに従って「' + chosenKey + '」を実行。';
+          triggerIdeaBulb('🌱 ほんのう');
         }
 
         ROBOT.stepCount++;
@@ -1109,18 +1267,19 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
 
       } catch (err) {
         lamp.className = "server-status status-red";
-        lamp.textContent = "❌ 通信停止";
-        document.getElementById('thought-txt').innerHTML = '<div style="color:#ef4444; font-weight:bold;">❌ 【通信エラー】</div><div style="font-size:10px; color:#fde047;">' + err.message + '</div>';
+        lamp.textContent = "❌ つうしんストップ";
+        document.getElementById('thought-txt').innerHTML = '<div style="color:#f87171; font-weight:900;">❌ 【通信エラー】</div><div style="font-size:11px; color:#fde047; margin-top:2px;">' + err.message + '</div>';
       } finally {
         thinkBtn.disabled = false;
         instinctBtn.disabled = false;
         updateHUD();
+        saveWorldState();
       }
     }
 
     async function executeWorldActionAndFeedback(chosenKey, actions, reasonText, noteText) {
       if (chosenKey === 'NONE' || !life.getState().isAlive) {
-        triggerShutdown("エネルギー（命）が0になり、生命活動が停止した。");
+        triggerShutdown("いのち（エネルギー）が0になって、たおれてしまいました。");
         return;
       }
 
@@ -1129,9 +1288,9 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
         await new Promise(r => setTimeout(r, 550));
         if (chara) chara.rotation.z = 0;
         life.feedback(0, 0, 0);
-        document.getElementById('br-act').textContent = '💫 限界気絶（強制睡眠でスタミナ+30）';
-        document.getElementById('thought-txt').innerHTML = '<div style="color:#f97316; font-weight:bold;">💫 スタミナが0になり強制気絶しました（スタミナ+30回復）</div>';
-        ROBOT.diary.push('・[手番' + ROBOT.stepCount + '] スタミナ切れで気絶し、強制睡眠をとった。');
+        document.getElementById('br-act').textContent = '💫 きぜつ中（強制すいみんでスタミナ回復）';
+        document.getElementById('thought-txt').textContent = 'げんきが限界になってバッタリきぜつしてしまいました…（スタミナ+30回復）';
+        ROBOT.diary.push('・[第' + ROBOT.stepCount + '手] げんきが切れてきぜつし、強制睡眠をとった。');
         return;
       }
 
@@ -1182,18 +1341,17 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
       life.feedback(dEnergy, dStamina, dMental);
       const afterState = life.getState();
 
-      const deltaStr = (afterState.feelingDelta >= 0 ? '+' : '') + afterState.feelingDelta;
-      const deltaColor = afterState.feelingDelta >= 0 ? '#34d399' : '#f87171';
+      const deltaVal = afterState.feelingDelta;
+      const deltaStr = deltaVal > 0 ? `うれしい！ (+${deltaVal})` : (deltaVal < 0 ? `つかれた… (${deltaVal})` : `ふつう (±0)`);
+      const deltaColor = deltaVal > 0 ? '#34d399' : (deltaVal < 0 ? '#f87171' : '#cbd5e1');
 
-      document.getElementById('br-act').textContent = act.txt + ' (快不快 ' + deltaStr + ')';
-      document.getElementById('thought-txt').innerHTML =
-        '<div style="color:#fefcbf; font-weight:bold;">💭 「' + reasonText + '」</div>' +
-        '<div style="font-size:10px; margin-top:2px;">⚡ 行動: <b>' + act.txt + '</b> ｜ <span style="color:' + deltaColor + '; font-weight:bold;">快・不快変化: ' + deltaStr + '</span></div>';
+      document.getElementById('br-act').textContent = act.txt + ' ｜ きぶん: ' + deltaStr;
+      document.getElementById('thought-txt').textContent = '「' + reasonText + '」';
 
-      ROBOT.diary.push('・[手番' + ROBOT.stepCount + '] ' + (noteText || act.txt) + ' (快不快:' + deltaStr + ')');
+      ROBOT.diary.push('・[第' + ROBOT.stepCount + '手] ' + (noteText || act.txt) + ' (' + deltaStr + ')');
 
       if (!afterState.isAlive) {
-        triggerShutdown("エネルギー（命）が尽き、地面に倒れ込んだ。");
+        triggerShutdown("エネルギーが尽きて倒れてしまいました。");
       }
     }
 
@@ -1202,12 +1360,13 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
         chara.rotation.z = Math.PI / 2;
         chara.position.y = ROBOT.pos.y + 0.25;
       }
-      ROBOT.diary.push('【第' + ROBOT.gen + '世代の絶筆】\n座標(' + ROBOT.pos.x + ',' + ROBOT.pos.y + ',' + ROBOT.pos.z + ')にて。' + reason);
-      document.getElementById('thought-txt').innerHTML = '<div style="color:#ef4444; font-weight:bold;">🚨 生命停止：' + reason + '</div>';
+      ROBOT.diary.push('【第' + ROBOT.gen + '世代のおわり】\n' + reason + '（手帳を次の世代へ残す）');
+      document.getElementById('thought-txt').textContent = '🚨 【生命停止】' + reason;
       document.getElementById('think-btn').style.display = 'none';
       document.getElementById('instinct-btn').style.display = 'none';
       document.getElementById('respawn-btn').style.display = 'flex';
       updateHUD();
+      saveWorldState();
     }
 
     function respawnRobot() {
@@ -1230,31 +1389,22 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
       }
       changeCam('surface');
 
-      if (fieldApples.length === 0) spawnApple(2, 0, -1);
+      if (fieldApples.length === 0) spawnApple(2, 0, -1, false);
 
-      ROBOT.diary.push('【第' + ROBOT.gen + '世代の誕生】\n先代の身体記憶（LifeCoreメモリ）と手帳を引き継いで目覚めた。');
+      ROBOT.diary.push('【第' + ROBOT.gen + '世代の誕生】\n前の世代が覚えた体の記憶（すき・きらい）と手帳を引き継いで目覚めたよ！');
       document.getElementById('think-btn').style.display = 'flex';
       document.getElementById('instinct-btn').style.display = 'block';
       document.getElementById('respawn-btn').style.display = 'none';
-      document.getElementById('br-act').textContent = '先代の記憶を引き継いで覚醒';
+      document.getElementById('br-act').textContent = '前の世代の記憶を引き継いで目覚めた！';
+      document.getElementById('thought-txt').textContent = '前の世代の経験を胸に、新しいロボとして目覚めました！';
       updateHUD();
+      saveWorldState();
       openModal('diaryModal');
     }
 
     // =====================================================================
     // UI更新 & モーダル
     // =====================================================================
-    function formatMemorySummary(memObj, currentDrive) {
-      const driveMem = memObj[currentDrive];
-      if (!driveMem || Object.keys(driveMem).length === 0) {
-        return '（' + currentDrive + '時の学習データはまだ白紙）';
-      }
-      return Object.entries(driveMem)
-        .sort((a, b) => b[1] - a[1])
-        .map(([k, v]) => k + ':' + (v >= 0 ? '+' : '') + v)
-        .join(' / ');
-    }
-
     function updateHUD() {
       const st = life.getState();
 
@@ -1265,20 +1415,17 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
       document.getElementById('v-mental').textContent = st.mental;
       document.getElementById('b-mental').style.width = st.mental + '%';
 
-      const deltaStr = (st.feelingDelta >= 0 ? '+' : '') + st.feelingDelta;
-      document.getElementById('ui-id').textContent = '🤖 村人#' + ROBOT.gen + ' (' + ROBOT.pos.x + ',' + ROBOT.pos.y + ',' + ROBOT.pos.z + ')';
-      document.getElementById('ui-drive').textContent = '本能: ' + st.drive + ' (' + deltaStr + ')';
-      document.getElementById('ui-timer').textContent = '⏸️ ' + ROBOT.stepCount + '手目';
+      document.getElementById('ui-id').textContent = '🤖 ロボ' + ROBOT.gen + 'ごう (' + ROBOT.pos.x + ',' + ROBOT.pos.y + ',' + ROBOT.pos.z + ')';
+      document.getElementById('ui-drive').textContent = DRIVE_JA[st.drive] || st.drive;
+      document.getElementById('ui-timer').textContent = '⭐ ' + ROBOT.stepCount + '手目';
 
-      document.getElementById('br-see').textContent = scanSmell(ROBOT.pos.x, ROBOT.pos.y, ROBOT.pos.z) + ' ｜ ' + inspectSurroundings(ROBOT.pos.x, ROBOT.pos.y, ROBOT.pos.z);
-      document.getElementById('br-drive').textContent = DRIVE_JA[st.drive] || st.drive;
-      document.getElementById('br-mem').textContent = formatMemorySummary(st.memory, st.drive);
+      document.getElementById('br-see').textContent = scanSmell(ROBOT.pos.x, ROBOT.pos.y, ROBOT.pos.z);
 
       const memBox = document.getElementById('lifecore-mem-box');
       if (memBox) {
         const memKeys = Object.keys(st.memory);
         memBox.textContent = memKeys.length === 0
-          ? 'まだ学習データはありません。行動すると快・不快スコアが刻まれます。'
+          ? 'まだ学習データはありません。動くと「この行動をすると気持ちよかった！」が記録されるよ。'
           : JSON.stringify(st.memory, null, 2);
       }
       const dtEl = document.getElementById('diary-text');
@@ -1295,7 +1442,7 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
       const thinkBtn = document.getElementById('think-btn');
       if (thinkBtn && !thinkBtn.disabled) {
         thinkBtn.className = 'main-btn ' + (isGem ? '' : 'btn-github');
-        thinkBtn.innerHTML = (isGem ? '🟦 ⚡ ' : '🟪 ⚡ ') + activeModel + ' で1手思考';
+        thinkBtn.innerHTML = isGem ? '🟦 ⚡ Google 3.8 で1手かんがえさせる' : '🟪 ⚡ Groq 120B で1手かんがえさせる';
       }
 
       const curKey = getKeyForCurrentModel();
@@ -1303,10 +1450,10 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
       if (lamp) {
         if (curKey.length > 5) {
           lamp.className = "server-status status-green";
-          lamp.textContent = "🟢 準備OK";
+          lamp.textContent = "🟢 じゅんびOK";
         } else {
           lamp.className = "server-status status-yellow";
-          lamp.textContent = "⚙️ キー未設定";
+          lamp.textContent = "⚙️ キー未せってい";
         }
       }
     }
@@ -1314,6 +1461,7 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
     function selectModelAndRefresh(modelName) {
       safeStorage.setItem('ai_custom_model', modelName);
       updateHUD();
+      saveWorldState();
     }
 
     function selectModelInModal(modelName) {
@@ -1324,15 +1472,15 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
       const saveBtn = document.getElementById('modal-save-btn');
       const msg = document.getElementById('setting-msg');
 
-      if (grpG) grpG.className = 'settings-group ' + (isGem ? 'selected-google' : '');
-      if (grpGh) grpGh.className = 'settings-group ' + (!isGem ? 'selected-github' : '');
+      if (grpG) grpG.className = 'settings-card ' + (isGem ? 'selected-google' : '');
+      if (grpGh) grpGh.className = 'settings-card ' + (!isGem ? 'selected-github' : '');
       if (saveBtn) {
         saveBtn.style.background = isGem ? '#0284c7' : '#6d28d9';
-        saveBtn.textContent = isGem ? '🟦 Google Gemini 3.8 に決定して閉じる' : '🟪 Groq 120B に決定して閉じる';
+        saveBtn.textContent = isGem ? '🟦 Google 3.8 に決定して閉じる' : '🟪 Groq 120B に決定して閉じる';
       }
       if (msg) {
         msg.style.color = isGem ? '#38bdf8' : '#c4b5fd';
-        msg.textContent = isGem ? '✓ Google Gemini 3.8 を選択中' : '✓ Groq (openai/gpt-oss-120b) を選択中';
+        msg.textContent = isGem ? '✓ Google Gemini 3.8 を選択中だよ' : '✓ Groq (openai/gpt-oss-120b) を選択中だよ';
       }
       updateHUD();
     }
@@ -1373,6 +1521,7 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
       if (ghInput && ghInput.value.trim().length > 5) safeStorage.setItem('key_github', ghInput.value.trim());
       updateHUD();
       closeModal('settingModal');
+      showToast('💾 設定をほぞんしたよ！');
     }
 
     function openModal(id) {
@@ -1452,6 +1601,8 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
     window.addEventListener('resize', resizeRenderer);
 
     function startApp() {
+      const isLoaded = tryLoadWorldState();
+
       if (typeof THREE === 'undefined') {
         let count = 0;
         const timer = setInterval(() => {
@@ -1460,17 +1611,19 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
             clearInterval(timer);
             init3D();
             updateHUD();
+            if (isLoaded) showToast('💾 つづきから再開したよ！');
           } else if (count > 30) {
             clearInterval(timer);
             const s = document.createElement('script');
             s.src = 'https://unpkg.com/three@0.128.0/build/three.min.js';
-            s.onload = () => { init3D(); updateHUD(); };
+            s.onload = () => { init3D(); updateHUD(); if (isLoaded) showToast('💾 つづきから再開したよ！'); };
             document.head.appendChild(s);
           }
         }, 100);
       } else {
         init3D();
         updateHUD();
+        if (isLoaded) showToast('💾 つづきから再開したよ！');
       }
     }
 
