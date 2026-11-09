@@ -628,26 +628,42 @@
 
     /* 3Dエンジン */
     let scene, camera, renderer, world, clickBlocks = [];
+    let allTerrainBlocks = []; // ★ 遮蔽判定用の全ブロック配列
     let chara, bodyM, headM, rArm, lArm, rLeg, lLeg, handApple;
     let hemiLight, sunLight;
     const MAP_SIZE = 5;
     let targetBgColor = new THREE.Color(0xe0f2fe), targetHemiColor = new THREE.Color(0xffffff), targetSunColor = new THREE.Color(0xfffaed);
 
+    // ★ カメラの上下角度・見下ろし管理
+    let camHeight = 7.8;
+    let camDist = 8.2;
+
     function init3D() {
       if (typeof THREE === 'undefined') return; const stage = document.getElementById('c3d'); if (!stage || renderer) return;
       const w = Math.max(stage.clientWidth || window.innerWidth || 360, 240), h = Math.max(stage.clientHeight || 280, 200);
       scene = new THREE.Scene(); const initialPhase = TIME_PHASES[getCurrentTimePhaseIdx()]; scene.background = new THREE.Color(initialPhase.bg);
-      camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100); camera.position.set(0, 7.8, 8.2); camera.lookAt(0, 0, 0);
+      camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100); camera.position.set(0, camHeight, camDist); camera.lookAt(0, 0.2, 0);
       renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(w, h); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); stage.appendChild(renderer.domElement);
       hemiLight = new THREE.HemisphereLight(initialPhase.hemi, 0x94a3b8, 1.15); scene.add(hemiLight);
       sunLight = new THREE.DirectionalLight(initialPhase.sun, 0.85); sunLight.position.set(5, 12, 6); scene.add(sunLight);
       world = new THREE.Group(); scene.add(world);
-      const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96), grassMat = new THREE.MeshLambertMaterial({ color: 0x7ca982 }), dirtMat = new THREE.MeshLambertMaterial({ color: 0xa89078 });
+      
+      const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
       const half = Math.floor(MAP_SIZE / 2);
+      allTerrainBlocks = []; clickBlocks = [];
+
       for (let x = -half; x <= half; x++) {
         for (let z = -half; z <= half; z++) {
-          const topB = new THREE.Mesh(boxGeo, grassMat); topB.position.set(x, 0, z); topB.userData = { gx: x, gz: z }; world.add(topB); clickBlocks.push(topB);
-          const underB = new THREE.Mesh(boxGeo, dirtMat); underB.position.set(x, -1, z); world.add(underB);
+          // 各ブロックに個別マテリアルを適用（邪魔なブロックだけ個別に透かすため）
+          const gMat = new THREE.MeshLambertMaterial({ color: 0x7ca982, transparent: true, opacity: 1.0 });
+          const topB = new THREE.Mesh(boxGeo, gMat);
+          topB.position.set(x, 0, z); topB.userData = { gx: x, gz: z, baseOpacity: 1.0, currentTargetOpacity: 1.0 };
+          world.add(topB); clickBlocks.push(topB); allTerrainBlocks.push(topB);
+
+          const dMat = new THREE.MeshLambertMaterial({ color: 0xa89078, transparent: true, opacity: 1.0 });
+          const underB = new THREE.Mesh(boxGeo, dMat);
+          underB.position.set(x, -1, z); underB.userData = { gx: x, gz: z, baseOpacity: 1.0, currentTargetOpacity: 1.0 };
+          world.add(underB); allTerrainBlocks.push(underB);
         }
       }
       chara = new THREE.Group(); world.add(chara);
@@ -699,14 +715,30 @@
 
     function setupTouchInteraction() {
       const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
-      let touchStartTime = 0, prevX = 0; const topWindow = document.querySelector('.top-window');
+      let touchStartTime = 0, prevX = 0, prevY = 0; const topWindow = document.querySelector('.top-window');
       topWindow.addEventListener('touchstart', e => {
         if (e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
-        touchStartTime = performance.now(); if (e.touches.length === 1) prevX = e.touches[0].clientX;
+        touchStartTime = performance.now();
+        if (e.touches.length === 1) {
+          prevX = e.touches[0].clientX;
+          prevY = e.touches[0].clientY;
+        }
       }, { passive: true });
       topWindow.addEventListener('touchmove', e => {
         if (!world || e.touches.length !== 1 || e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
-        world.rotation.y += (e.touches[0].clientX - prevX) * 0.008; prevX = e.touches[0].clientX;
+        
+        // ① 左右スワイプ：島を水平回転
+        const deltaX = e.touches[0].clientX - prevX;
+        world.rotation.y += deltaX * 0.008;
+        prevX = e.touches[0].clientX;
+
+        // ② 上下スワイプ：カメラの見下ろし角度を変更（ストッパー制限付き）
+        const deltaY = e.touches[0].clientY - prevY;
+        camHeight = Math.max(3.8, Math.min(11.5, camHeight + deltaY * 0.035));
+        camDist = Math.max(5.5, Math.min(10.5, camDist - deltaY * 0.012));
+        camera.position.set(0, camHeight, camDist);
+        camera.lookAt(0, 0.2, 0);
+        prevY = e.touches[0].clientY;
       }, { passive: true });
       topWindow.addEventListener('touchend', e => {
         if (e.target.closest('.top-gauge-panel') || e.target.closest('.side-btn-col') || e.target.closest('#btn-circle-toggle') || e.target.closest('.fan-sector') || e.target.closest('.placement-cancel-bar')) return;
@@ -1092,12 +1124,49 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
     let clock = 0, isWalking = false;
+    const occludeRaycaster = new THREE.Raycaster();
+    const camWorldPos = new THREE.Vector3();
+    const roboWorldPos = new THREE.Vector3();
+
+    // ★ ロボットを隠している手前のブロックだけを自動透過する処理
+    function updateOccludedBlocks() {
+      if (!chara || !camera || allTerrainBlocks.length === 0) return;
+
+      // カメラとロボットの胸の位置を取得
+      camera.getWorldPosition(camWorldPos);
+      chara.getWorldPosition(roboWorldPos);
+      roboWorldPos.y += 0.55; // ロボットの胴体・頭の高さ
+
+      // カメラからロボットへ向かう視線ベクトル
+      const dir = new THREE.Vector3().subVectors(roboWorldPos, camWorldPos);
+      const distToRobo = dir.length();
+      dir.normalize();
+
+      occludeRaycaster.set(camWorldPos, dir);
+      occludeRaycaster.far = Math.max(0.1, distToRobo - 0.2); // ロボットの手前まで
+
+      // 視線と交差するブロックを検出
+      const hits = occludeRaycaster.intersectObjects(allTerrainBlocks, false);
+      const occludedSet = new Set(hits.map(h => h.object));
+
+      // 遮っているブロックは 0.25（透明）、それ以外は 1.0（不透明）へスムーズに補間
+      for (const block of allTerrainBlocks) {
+        const isBlocking = occludedSet.has(block);
+        const targetOp = isBlocking ? 0.22 : 1.0;
+        block.material.opacity = THREE.MathUtils.lerp(block.material.opacity, targetOp, 0.18);
+      }
+    }
+
     function renderLoop() {
       requestAnimationFrame(renderLoop); clock += 0.04;
       for (const a of fieldObjects) a.mesh.rotation.y += 0.03;
       if (scene && scene.background) scene.background.lerp(targetBgColor, 0.02);
       if (hemiLight) hemiLight.color.lerp(targetHemiColor, 0.02);
       if (sunLight) sunLight.color.lerp(targetSunColor, 0.02);
+      
+      // 遮蔽ブロックのスマート透過を実行
+      updateOccludedBlocks();
+
       if (life.getState().isAlive && chara) {
         if (isWalking) {
           rArm.rotation.x = Math.sin(clock * 9) * 0.7; lArm.rotation.x = -Math.sin(clock * 9) * 0.7;
