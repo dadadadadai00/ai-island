@@ -1,39 +1,41 @@
+```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#0d2538">
   <title>ボクセルAI自律思考水槽</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background-color: #0f172a; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background-color: #0d2538; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; }
 
     #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; display: block; }
 
     #status-panel {
       position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
-      width: 94%; max-width: 420px; background: rgba(255, 255, 255, 0.96);
-      border-radius: 16px; box-shadow: 0 4px 18px rgba(0,0,0,0.28);
+      width: 95%; max-width: 430px; background: rgba(255, 255, 255, 0.96);
+      border-radius: 18px; box-shadow: 0 4px 18px rgba(0,0,0,0.25);
       padding: 10px 12px; z-index: 10;
       transition: opacity 0.35s ease, transform 0.35s ease;
     }
     #status-panel.sky-hidden {
-      opacity: 0; pointer-events: none; transform: translate(-50%, -20px);
+      opacity: 0; pointer-events: none; transform: translate(-50%, -22px);
     }
 
     .gauge-container { display: flex; justify-content: space-between; gap: 6px; }
     .gauge-box {
-      flex: 1; background: #f8fafc; border: 1px solid #e2e8f0;
+      flex: 1; background: #ffffff; border: 1px solid #e2e8f0;
       border-radius: 10px; padding: 5px 6px; text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
     }
     .gauge-title { font-size: 11px; font-weight: 800; color: #334155; margin-bottom: 4px; white-space: nowrap; }
     .gauge-bar-bg { width: 100%; height: 6px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
     .bar-fill { height: 100%; border-radius: 4px; transition: width 0.35s ease; }
 
-    #bar-stamina { background: #ef4444; }
+    #bar-stamina { background: #ef5350; }
     #bar-life { background: #eab308; }
-    #bar-mental { background: #10b981; }
+    #bar-mental { background: #26a69a; }
 
     .robot-status-row {
       display: flex; justify-content: space-between; align-items: center;
@@ -45,31 +47,31 @@
 
     .robot-id-tag { font-size: 11px; font-weight: 900; color: #334155; white-space: nowrap; }
     .badge {
-      font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px;
+      font-size: 10.5px; font-weight: 800; padding: 3px 8px; border-radius: 999px;
       display: inline-flex; align-items: center; justify-content: center; gap: 2px; white-space: nowrap;
     }
-    .badge-days { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-    .badge-time { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
-    .badge-mood { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+    .badge-days { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+    .badge-time { background: #e1f5fe; color: #0277bd; border: 1px solid #b3e5fc; }
+    .badge-mood { background: #fff9c4; color: #854d0e; border: 1px solid #fde047; }
     .btn-icon {
-      width: 26px; height: 26px; border-radius: 50%; background: #f1f5f9;
+      width: 28px; height: 28px; border-radius: 8px; background: #f1f5f9;
       display: flex; justify-content: center; align-items: center;
       font-size: 14px; cursor: pointer; border: 1px solid #cbd5e1; flex-shrink: 0;
     }
 
     #diary-btn {
-      position: fixed; top: 132px; right: 14px;
+      position: fixed; top: 126px; right: 14px;
       width: 46px; height: 46px; background: rgba(255,255,255,0.96); border-radius: 50%;
       box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex;
-      justify-content: center; align-items: center; font-size: 22px; z-index: 10; cursor: pointer;
+      justify-content: center; align-items: center; font-size: 21px; z-index: 10; cursor: pointer;
       border: 2px solid #e2e8f0; transition: opacity 0.35s ease;
     }
     #diary-btn.sky-hidden { opacity: 0; pointer-events: none; }
 
     #gacha-btn {
-      position: fixed; bottom: 208px; left: 50%; transform: translateX(-50%);
+      position: fixed; bottom: 205px; left: 50%; transform: translateX(-50%);
       width: 48px; height: 48px; background: rgba(255,255,255,0.98); border-radius: 50%;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.28); display: flex;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.25); display: flex;
       justify-content: center; align-items: center; font-size: 26px; font-weight: bold; color: #334155;
       z-index: 12; cursor: pointer; border: 2px solid #e2e8f0;
     }
@@ -77,25 +79,25 @@
 
     #bottom-panel {
       position: fixed; bottom: 0; left: 0; width: 100%;
-      background: rgba(255,255,255,0.98); border-top-left-radius: 20px; border-top-right-radius: 20px;
-      box-shadow: 0 -4px 20px rgba(0,0,0,0.2); padding: 12px 15px 14px; z-index: 10;
+      background: #ffffff; border-top-left-radius: 20px; border-top-right-radius: 20px;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.18); padding: 12px 15px 14px; z-index: 10;
       display: flex; flex-direction: column; gap: 8px;
     }
     .panel-header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 800; color: #475569; }
     .ai-badge { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: bold; }
     #message-box {
       background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
-      padding: 8px 10px; font-size: 13px; font-weight: 600; color: #1e293b;
-      height: 68px; overflow-y: auto; line-height: 1.45;
+      padding: 9px 11px; font-size: 13px; font-weight: 700; color: #1e293b;
+      height: 66px; overflow-y: auto; line-height: 1.45;
     }
     .action-history { font-size: 11px; color: #64748b; display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
     .history-tag { background: #f1f5f9; padding: 2px 8px; border-radius: 8px; color: #334155; }
     .btn-think {
-      background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%); color: white; border: none; border-radius: 12px;
+      background: linear-gradient(180deg, #5da0f2 0%, #4285f4 100%); color: white; border: none; border-radius: 12px;
       padding: 12px; font-size: 15px; font-weight: 900; text-align: center;
-      box-shadow: 0 4px 0 #2563eb; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px;
+      box-shadow: 0 3px 0 #2563eb; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px;
     }
-    .btn-think:active { transform: translateY(3px); box-shadow: 0 1px 0 #2563eb; }
+    .btn-think:active { transform: translateY(2px); box-shadow: 0 1px 0 #2563eb; }
     .btn-think:disabled { opacity: 0.6; pointer-events: none; }
 
     #toast {
@@ -107,7 +109,7 @@
 
     .modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(15,23,42,0.75); z-index: 50;
+      background: rgba(15,23,42,0.72); z-index: 50;
       display: none; justify-content: center; align-items: center;
     }
     .modal-overlay.active { display: flex; }
@@ -174,9 +176,9 @@
     <span>💭 ロボのきもち・心のさけび</span>
     <div class="ai-badge" id="ai-status">💤 待機中</div>
   </div>
-  <div id="message-box">ここは世界の果て。四角い大地のまわりを丸い海が包み込み、白い波しぶきを立てながら外の滝へと流れ落ちているよ。泡立つ滝のずっと下には、この世界を支える古代遺跡のカメさんが眠っているんだって！</div>
+  <div id="message-box">四角い大地のまわりを丸い海が包み込んで、白波を立てているよ！</div>
   <div class="action-history">
-    <span class="history-tag" id="history-action">👟 やった事：待機中（まだ動いていないよ）</span>
+    <div><span class="history-tag">👟 やった事</span> <span id="history-action">待機中</span></div>
     <span id="history-loc" style="color:#2563eb; font-weight:800;">中央静止中</span>
   </div>
   <button class="btn-think" id="btn-action">⚡ 今すぐ考える</button>
@@ -193,12 +195,12 @@
       <div style="font-size:36px;">🤖</div>
       <div>
         <div style="font-weight:900; font-size:14px; color:#1e293b;" id="diary-robo-name">ロボ1ごう（生存 1日目）</div>
-        <div style="font-size:11px; color:#64748b;" id="diary-robo-height">現在の高さ：0段目（平地） / 速度：3</div>
+        <div style="font-size:11px; color:#64748b;" id="diary-robo-height">現在の高さ：0段目 / 速度：3</div>
       </div>
     </div>
-    <div style="font-size:12px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ」（タップで足元に置く）</div>
+    <div style="font-size:12px; font-weight:bold; color:#0369a1;">🎒 宝箱から見つけた「どうぐ」（タップで足元に置く）</div>
     <div class="bag-grid" id="bag-grid"></div>
-    <div style="font-size:12px; font-weight:bold; color:#475569;">📝 世代のきろく・思い出</div>
+    <div style="font-size:12px; font-weight:bold; color:#475569;">📝 1日のきろく・思い出</div>
     <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; font-size:11.5px; color:#334155; max-height:110px; overflow-y:auto; line-height:1.4;">
       まだ記録はありません。行動するとここに思い出が刻まれます。
     </div>
@@ -221,8 +223,8 @@
         <circle cx="60" cy="114" r="12" fill="#ffffff" stroke="#db2777" stroke-width="3"/>
         <rect x="46" y="132" width="28" height="14" rx="4" fill="#9d174d"/>
       </svg>
-      <div id="gacha-result-text" style="font-size:13px; font-weight:800; color:#be185d; min-height:20px; margin-top:4px;">
-        🍎・🪨(段差ブロック)・🌿・🌳 がランダムに出るよ！
+      <div id="gacha-result-text" style="font-size:12px; font-weight:800; color:#64748b; min-height:20px; margin-top:4px;">
+        🍎・🌳・🪨・🌿・🎁(宝箱) がランダムに出るよ！
       </div>
     </div>
     <div style="display:flex; gap:8px;">
@@ -238,7 +240,7 @@
     <div class="modal-close" onclick="closeModal('modal-settings')">✕</div>
     <div class="modal-title">⚙️ システム・頭脳設定</div>
     <div class="setting-group">
-      <label class="setting-label">🤖 使う頭脳（切り替えでもデザインは不変）</label>
+      <label class="setting-label">🤖 使う頭脳</label>
       <select id="setting-ai-type" class="setting-input">
         <option value="none">🟩 アルゴンさん（通信なし・物理と本能で確実に動く）</option>
         <option value="groq">🟪 3.1 / Groq（爆速・1日1000回無料）</option>
@@ -246,7 +248,7 @@
       </select>
     </div>
     <div class="setting-group">
-      <label class="setting-label">⚡ 移動スピード（5にすると猛ダッシュ＆端へ飛び出し）</label>
+      <label class="setting-label">⚡ 移動スピード</label>
       <select id="setting-speed" class="setting-input">
         <option value="3">速度 3（通常・マスの中央に安全停止）</option>
         <option value="5">速度 5（猛ダッシュ・海や崖へ飛び出し注意！）</option>
@@ -302,33 +304,29 @@
 
   let life = new LifeCore();
   let GAME_DAY = 1;
-  let TIME_STEP = 0; // 0〜19 (20手で1日経過)
-  let BAG = ['stone', 'apple', 'stone', 'grass'];
+  let TIME_STEP = 0;
+  let BAG = ['stone', 'apple', 'grass'];
   let DIARY_LOGS = ['🌱 1日目：世界の果ての島に降り立ったよ！'];
 
-  // 内陸5x5 (-2〜2)、内部細分化 sx,sz (0〜4, 中央2)、高さblocks (0〜5段)
+  // 初期状態はすべて平らな5×5の大地（勝手に段差が積まれないよう0段で統一）
   let HEIGHT_MAP = {};
   for (let x = -2; x <= 2; x++) {
     for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
   }
-  // 初期の階段サンプル（すぐ星見展望台を試せるよう端っこに1〜3段配置）
-  HEIGHT_MAP['2,-2'] = 1;
-  HEIGHT_MAP['2,-1'] = 2;
-  HEIGHT_MAP['2,0'] = 3;
 
   let ROBOT = {
     gen: 1,
     pos: { x: 0, z: 0, sx: 2, sz: 2 },
     speed: 3
   };
+  // 21:36のスクリーンショットと同じ、初期配置は赤いリンゴ1個のみ
   let WORLD_ITEMS = [
-    { type: 'apple', x: -1, z: 1 },
-    { type: 'stone', x: 1, z: 1 }
+    { type: 'apple', x: 0, z: -1 }
   ];
 
   function loadWorldState() {
     try {
-      const raw = safeStorage.getItem('island_game_save_v5');
+      const raw = safeStorage.getItem('island_game_save_v6');
       if (!raw) return;
       const d = JSON.parse(raw);
       if (d.life) life = new LifeCore(d.life);
@@ -353,9 +351,7 @@
       if (Array.isArray(d.logs) && d.logs.length > 0) DIARY_LOGS = d.logs;
       GAME_DAY = Math.max(1, Number(d.day) || 1);
       TIME_STEP = Math.max(0, Math.min(19, Number(d.time) || 0));
-    } catch (e) {
-      console.warn('セーブデータの復旧を行いました', e);
-    }
+    } catch (e) {}
   }
 
   function saveWorldState() {
@@ -369,248 +365,296 @@
       day: GAME_DAY,
       time: TIME_STEP
     };
-    safeStorage.setItem('island_game_save_v5', JSON.stringify(data));
+    safeStorage.setItem('island_game_save_v6', JSON.stringify(data));
   }
 
   function resetGameDirectly() {
-    safeStorage.removeItem('island_game_save_v5');
+    safeStorage.removeItem('island_game_save_v6');
     location.reload();
   }
 
   loadWorldState();
 
   // ==========================================
-  // 2. 3D世界構築（海・滝・古代亀・星空の完全固定デザイン）
+  // 2. 3D世界構築（21:36スクショの基盤デザインを100%復元・固定）
   // ==========================================
   const container = document.getElementById('canvas-container');
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0f172a);
+  scene.background = new THREE.Color(0x0d2538);
 
-  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 120);
+  const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 120);
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   container.appendChild(renderer.domElement);
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.78);
   scene.add(ambientLight);
-  const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.85);
-  dirLight.position.set(8, 16, 6);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.65);
+  dirLight.position.set(6, 14, 8);
   scene.add(dirLight);
 
-  // --- [固定デザイン1] 5x5の内陸大地と最大5段の段差ブロック ---
+  // --- [固定基盤1] 21:36のパステルミントグリーンの5×5大地 ---
   const terrainGroup = new THREE.Group();
   scene.add(terrainGroup);
   const itemGroup = new THREE.Group();
   scene.add(itemGroup);
 
-  const baseGrassMat = new THREE.MeshLambertMaterial({ color: 0xa7f3d0 });
-  const baseSoilMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
-  const stepBlockMats = [
-    new THREE.MeshLambertMaterial({ color: 0x86efac }),
-    new THREE.MeshLambertMaterial({ color: 0x6ee7b7 }),
-    new THREE.MeshLambertMaterial({ color: 0xfde68a }),
-    new THREE.MeshLambertMaterial({ color: 0xfcd34d }),
-    new THREE.MeshLambertMaterial({ color: 0xfbbf24 })
-  ];
+  const landMat = new THREE.MeshLambertMaterial({ color: 0xc2ebd4 });
+  const stepMat = new THREE.MeshLambertMaterial({ color: 0xa7dcc0 });
 
   function rebuildTerrainAndItems() {
     while (terrainGroup.children.length > 0) terrainGroup.remove(terrainGroup.children[0]);
     while (itemGroup.children.length > 0) itemGroup.remove(itemGroup.children[0]);
 
-    const boxGeo = new THREE.BoxGeometry(0.98, 1.0, 0.98);
-    const stepGeo = new THREE.BoxGeometry(0.96, 0.5, 0.96);
+    const landGeo = new THREE.BoxGeometry(0.95, 0.72, 0.95);
+    const stepGeo = new THREE.BoxGeometry(0.95, 0.45, 0.95);
 
     for (let x = -2; x <= 2; x++) {
       for (let z = -2; z <= 2; z++) {
-        const topMesh = new THREE.Mesh(boxGeo, baseGrassMat);
-        topMesh.position.set(x, -0.5, z);
-        terrainGroup.add(topMesh);
-
-        const bottomMesh = new THREE.Mesh(boxGeo, baseSoilMat);
-        bottomMesh.position.set(x, -1.5, z);
-        terrainGroup.add(bottomMesh);
+        const block = new THREE.Mesh(landGeo, landMat);
+        block.position.set(x, -0.36, z);
+        terrainGroup.add(block);
 
         const h = HEIGHT_MAP[`${x},${z}`] || 0;
         for (let lv = 1; lv <= h; lv++) {
-          const sMesh = new THREE.Mesh(stepGeo, stepBlockMats[Math.min(lv - 1, 4)]);
-          sMesh.position.set(x, (lv - 0.5) * 0.5, z);
-          terrainGroup.add(sMesh);
+          const sBlock = new THREE.Mesh(stepGeo, stepMat);
+          sBlock.position.set(x, (lv - 0.5) * 0.45, z);
+          terrainGroup.add(sBlock);
         }
       }
     }
 
     WORLD_ITEMS.forEach(it => {
-      const h = (HEIGHT_MAP[`${it.x},${it.z}`] || 0) * 0.5;
+      const h = (HEIGHT_MAP[`${it.x},${it.z}`] || 0) * 0.45;
       let mesh;
       if (it.type === 'apple') {
         mesh = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.38, 0.38), new THREE.MeshLambertMaterial({ color: 0xf87171 }));
-        body.position.y = 0.19;
-        const stem = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.08), new THREE.MeshLambertMaterial({ color: 0x4ade80 }));
-        stem.position.y = 0.42;
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.42, 0.44), new THREE.MeshLambertMaterial({ color: 0xef6c6c }));
+        body.position.y = 0.21;
+        const stem = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.1), new THREE.MeshLambertMaterial({ color: 0x66bb6a }));
+        stem.position.y = 0.46;
         mesh.add(body); mesh.add(stem);
       } else if (it.type === 'stone') {
-        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.35, 0.42), new THREE.MeshLambertMaterial({ color: 0x94a3b8 }));
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.36, 0.42), new THREE.MeshLambertMaterial({ color: 0x94a3b8 }));
         mesh.position.y = 0.18;
       } else {
-        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.45, 0.32), new THREE.MeshLambertMaterial({ color: 0x34d399 }));
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.44, 0.34), new THREE.MeshLambertMaterial({ color: 0x4ade80 }));
         mesh.position.y = 0.22;
       }
-      mesh.position.x = it.x;
-      mesh.position.y += h;
-      mesh.position.z = it.z;
+      mesh.position.set(it.x, h, it.z);
       itemGroup.add(mesh);
     });
   }
 
-  // --- [固定デザイン2] 四角い大地を包む円形の海＆4角の白波しぶきグラデーション ---
+  // --- [固定基盤2] 21:36の丸い海と四隅の白泡・外縁の白波 ---
   const seaCanvas = document.createElement('canvas');
   seaCanvas.width = 512; seaCanvas.height = 512;
   const sCtx = seaCanvas.getContext('2d');
-  function drawSeaSurface(wavePhase) {
+
+  // 固定された泡粒の配置（チカチカせず21:36の優しい見た目を維持）
+  const seaFoamDots = [];
+  for (let i = 0; i < 65; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 145 + Math.random() * 90;
+    seaFoamDots.push({
+      x: 256 + Math.cos(ang) * dist,
+      y: 256 + Math.sin(ang) * dist,
+      r: 3 + Math.random() * 5.5
+    });
+  }
+
+  function drawSeaCanvas(timeSec) {
     sCtx.clearRect(0, 0, 512, 512);
-    const radGrad = sCtx.createRadialGradient(256, 256, 60, 256, 256, 256);
-    radGrad.addColorStop(0.0, 'rgba(186, 230, 253, 0.92)');
-    radGrad.addColorStop(0.58, 'rgba(56, 189, 248, 0.85)');
-    radGrad.addColorStop(0.88, 'rgba(125, 211, 252, 0.90)');
-    radGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0.98)');
-    sCtx.fillStyle = radGrad;
+    const rg = sCtx.createRadialGradient(256, 256, 95, 256, 256, 254);
+    rg.addColorStop(0.0, 'rgba(255, 255, 255, 0.96)');
+    rg.addColorStop(0.50, 'rgba(224, 247, 250, 0.92)');
+    rg.addColorStop(0.68, 'rgba(79, 195, 247, 0.88)');
+    rg.addColorStop(0.91, 'rgba(129, 212, 250, 0.92)');
+    rg.addColorStop(0.96, 'rgba(255, 255, 255, 0.98)');
+    rg.addColorStop(1.0, 'rgba(255, 255, 255, 1.0)');
+    sCtx.fillStyle = rg;
     sCtx.fillRect(0, 0, 512, 512);
 
-    // 内陸へ押し寄せる波紋リングと4角の白波しぶき
-    for (let i = 0; i < 4; i++) {
-      const p = ((wavePhase * 0.4 + i * 0.25) % 1);
-      const r = 250 - p * 125;
-      sCtx.strokeStyle = `rgba(255,255,255,${(1 - p) * 0.55})`;
-      sCtx.lineWidth = 4 + (1 - p) * 6;
-      sCtx.beginPath();
-      sCtx.arc(256, 256, r, 0, Math.PI * 2);
-      sCtx.stroke();
-    }
+    // 四角い大地のまわりの柔らかい白波ぼかし
+    sCtx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+    sCtx.fillRect(118, 118, 276, 276);
 
-    // 大地（中央正方形）のフチと四隅に立つ白い波しぶき
-    sCtx.save();
-    sCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-    sCtx.lineWidth = 14 + Math.sin(wavePhase * 3) * 4;
-    sCtx.strokeRect(132, 132, 248, 248);
-    sCtx.restore();
+    // 海面の白い泡粒（21:36の表現）
+    sCtx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+    seaFoamDots.forEach((d, idx) => {
+      const pulse = Math.sin(timeSec * 1.8 + idx) * 1.2;
+      sCtx.beginPath();
+      sCtx.arc(d.x, d.y, Math.max(1.5, d.r + pulse), 0, Math.PI * 2);
+      sCtx.fill();
+    });
   }
-  drawSeaSurface(0);
+  drawSeaCanvas(0);
   const seaTex = new THREE.CanvasTexture(seaCanvas);
-  const seaGeo = new THREE.CircleGeometry(5.3, 64);
+  const seaGeo = new THREE.CircleGeometry(4.45, 64);
   seaGeo.rotateX(-Math.PI / 2);
-  const seaMat = new THREE.MeshBasicMaterial({ map: seaTex, transparent: true, opacity: 0.92 });
+  const seaMat = new THREE.MeshBasicMaterial({ map: seaTex, transparent: true, opacity: 0.95 });
   const seaMesh = new THREE.Mesh(seaGeo, seaMat);
-  seaMesh.position.y = -0.58;
+  seaMesh.position.y = -0.35;
   scene.add(seaMesh);
 
-  // --- [固定デザイン3] 上から下へゆったり流れ落ちる360度シームレス円形滝 ---
+  // --- [固定基盤3] 21:36の爽やかな円形滝（上から下へゆっくり流れる） ---
   const wfCanvas = document.createElement('canvas');
-  wfCanvas.width = 256; wfCanvas.height = 256;
+  wfCanvas.width = 512; wfCanvas.height = 512;
   const wfCtx = wfCanvas.getContext('2d');
-  const wfDrops = [];
-  for (let i = 0; i < 90; i++) {
-    wfDrops.push({
-      x: Math.random() * 256,
-      y: Math.random() * 256,
-      len: 18 + Math.random() * 35,
-      speed: 0.75 + Math.random() * 0.55,
-      alpha: 0.25 + Math.random() * 0.5
-    });
-  }
-  function updateWaterfallCanvas() {
-    const g = wfCtx.createLinearGradient(0, 0, 0, 256);
-    g.addColorStop(0.0, 'rgba(224, 242, 254, 0.92)');
-    g.addColorStop(0.25, 'rgba(56, 189, 248, 0.72)');
-    g.addColorStop(0.75, 'rgba(186, 230, 253, 0.88)');
-    g.addColorStop(1.0, 'rgba(255, 255, 255, 0.98)');
-    wfCtx.fillStyle = g;
-    wfCtx.fillRect(0, 0, 256, 256);
 
-    // 上(y=0)から下(y=256)へゆったり流れ落ちる水筋
-    wfDrops.forEach(d => {
-      d.y += d.speed;
-      if (d.y > 256) d.y = -d.len;
-      wfCtx.fillStyle = `rgba(255, 255, 255, ${d.alpha})`;
-      wfCtx.fillRect(d.x, d.y, 3, d.len);
+  const wfStreaks = [];
+  for (let i = 0; i < 75; i++) {
+    wfStreaks.push({
+      x: Math.random() * 512,
+      y: Math.random() * 512,
+      w: 3 + Math.random() * 3,
+      h: 45 + Math.random() * 85,
+      alpha: 0.35 + Math.random() * 0.55
     });
   }
-  updateWaterfallCanvas();
+  const wfBubbles = [];
+  for (let i = 0; i < 60; i++) {
+    wfBubbles.push({
+      x: Math.random() * 512,
+      y: Math.random() * 512,
+      rx: 6 + Math.random() * 10,
+      ry: 3 + Math.random() * 4,
+      alpha: 0.4 + Math.random() * 0.45
+    });
+  }
+
+  function renderWaterfallTexture(scrollOffset) {
+    // 21:36の爽やかな水色〜白泡グラデーション背景（固定）
+    const grad = wfCtx.createLinearGradient(0, 0, 0, 512);
+    grad.addColorStop(0.0, '#ffffff');
+    grad.addColorStop(0.06, '#81d4fa');
+    grad.addColorStop(0.45, '#4fc3f7');
+    grad.addColorStop(0.82, '#b3e5fc');
+    grad.addColorStop(1.0, '#ffffff');
+    wfCtx.fillStyle = grad;
+    wfCtx.fillRect(0, 0, 512, 512);
+
+    // 縦の水色ストライプ
+    wfCtx.fillStyle = 'rgba(41, 182, 246, 0.35)';
+    for (let x = 0; x < 512; x += 16) {
+      wfCtx.fillRect(x, 0, 6, 512);
+    }
+
+    // 上から下へゆっくり流れる白い水筋（scrollOffset を加算して下方向へ移動）
+    wfStreaks.forEach(s => {
+      const curY = (s.y + scrollOffset) % 560 - 48;
+      wfCtx.fillStyle = `rgba(255, 255, 255, ${s.alpha})`;
+      wfCtx.fillRect(s.x, curY, s.w, s.h);
+    });
+
+    // 上から下へゆっくり流れる泡粒（21:36の特徴的な横長白泡）
+    wfBubbles.forEach(b => {
+      const curY = (b.y + scrollOffset * 0.85) % 540 - 20;
+      wfCtx.fillStyle = `rgba(255, 255, 255, ${b.alpha})`;
+      wfCtx.beginPath();
+      wfCtx.ellipse(b.x, curY, b.rx, b.ry, 0, 0, Math.PI * 2);
+      wfCtx.fill();
+    });
+  }
+  renderWaterfallTexture(0);
   const wfTex = new THREE.CanvasTexture(wfCanvas);
   wfTex.wrapS = THREE.RepeatWrapping;
-  wfTex.repeat.set(4, 1);
+  wfTex.repeat.set(3, 1);
 
-  const waterfallGeo = new THREE.CylinderGeometry(5.3, 5.45, 6.2, 64, 1, true);
+  const waterfallGeo = new THREE.CylinderGeometry(4.45, 4.45, 6.4, 64, 1, true);
   const waterfallMat = new THREE.MeshBasicMaterial({
-    map: wfTex, transparent: true, opacity: 0.88, side: THREE.DoubleSide
+    map: wfTex, transparent: true, opacity: 0.94, side: THREE.DoubleSide
   });
   const waterfallMesh = new THREE.Mesh(waterfallGeo, waterfallMat);
-  waterfallMesh.position.y = -3.68;
+  waterfallMesh.position.y = -3.55;
   scene.add(waterfallMesh);
 
-  // 滝壺の白泡リングと神秘の雲海（上からはカメが見え隠れする構造）
-  const foamRingGeo = new THREE.RingGeometry(3.8, 6.4, 64);
+  // 滝の落ちきる下の白泡と古代遺跡カメ
+  const foamRingGeo = new THREE.RingGeometry(3.2, 5.5, 64);
   foamRingGeo.rotateX(-Math.PI / 2);
-  const foamRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.82, side: THREE.DoubleSide });
+  const foamRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
   const foamRingMesh = new THREE.Mesh(foamRingGeo, foamRingMat);
-  foamRingMesh.position.y = -6.75;
+  foamRingMesh.position.y = -6.7;
   scene.add(foamRingMesh);
 
-  const mistGeo = new THREE.CircleGeometry(14, 48);
-  mistGeo.rotateX(-Math.PI / 2);
-  const mistMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.76, side: THREE.DoubleSide });
-  const mistMesh = new THREE.Mesh(mistGeo, mistMat);
-  mistMesh.position.y = -6.85;
-  scene.add(mistMesh);
-
-  // --- [固定デザイン4] 滝の下で世界を支える古代遺跡風のカメ（パステルサンドストーン） ---
   const turtleGroup = new THREE.Group();
   const sandstoneMain = new THREE.MeshLambertMaterial({ color: 0xd6bfa3 });
   const sandstoneDark = new THREE.MeshLambertMaterial({ color: 0xb89f80 });
-  const ruinAccent = new THREE.MeshLambertMaterial({ color: 0xe7d8c5 });
-
-  const shellBase = new THREE.Mesh(new THREE.BoxGeometry(6.4, 1.4, 7.4), sandstoneMain);
-  shellBase.position.y = 0;
+  const shellBase = new THREE.Mesh(new THREE.BoxGeometry(5.6, 1.2, 6.4), sandstoneMain);
   turtleGroup.add(shellBase);
-
-  const shellMid = new THREE.Mesh(new THREE.BoxGeometry(5.0, 1.1, 5.8), sandstoneDark);
-  shellMid.position.y = 1.1;
+  const shellMid = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.9, 4.8), sandstoneDark);
+  shellMid.position.y = 0.95;
   turtleGroup.add(shellMid);
-
-  const shellTop = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.8, 4.0), ruinAccent);
-  shellTop.position.y = 1.9;
-  turtleGroup.add(shellTop);
-
-  const tHead = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 2.0), sandstoneMain);
-  tHead.position.set(0, 0.2, 4.4);
+  const tHead = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 1.8), sandstoneMain);
+  tHead.position.set(0, 0.2, 3.8);
   turtleGroup.add(tHead);
-
-  const flipperCoords = [
-    [3.8, -0.2, 2.4, 0.3], [-3.8, -0.2, 2.4, -0.3],
-    [3.6, -0.2, -2.4, -0.2], [-3.6, -0.2, -2.4, 0.2]
-  ];
-  flipperCoords.forEach(fc => {
-    const fl = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.45, 1.5), sandstoneDark);
-    fl.position.set(fc[0], fc[1], fc[2]);
-    fl.rotation.y = fc[3];
-    turtleGroup.add(fl);
-  });
-  turtleGroup.position.y = -9.2;
+  turtleGroup.position.y = -8.8;
   scene.add(turtleGroup);
 
-  // --- [固定デザイン5] 球体大枠の星空エフェクト（プラネタリウム天球 ＆ 古代軌道リング） ---
+  // --- [固定基盤4] 21:36の腕付きボクセルロボット ---
+  const robotGroup = new THREE.Group();
+  const legMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.22, 0.18), legMat);
+  legL.position.set(-0.11, 0.11, 0);
+  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.22, 0.18), legMat);
+  legR.position.set(0.11, 0.11, 0);
+  robotGroup.add(legL); robotGroup.add(legR);
+
+  const rBody = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.44, 0.32), new THREE.MeshLambertMaterial({ color: 0x5da9f6 }));
+  rBody.position.y = 0.44;
+  robotGroup.add(rBody);
+
+  const armMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.34, 0.14), armMat);
+  armL.position.set(-0.27, 0.43, 0);
+  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.34, 0.14), armMat);
+  armR.position.set(0.27, 0.43, 0);
+  robotGroup.add(armL); robotGroup.add(armR);
+
+  const rHead = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.42, 0.42), new THREE.MeshLambertMaterial({ color: 0xb3e5fc }));
+  rHead.position.y = 0.87;
+  robotGroup.add(rHead);
+
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+  const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.10, 0.04), eyeMat);
+  eyeL.position.set(-0.10, 0.87, 0.22);
+  const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.10, 0.04), eyeMat);
+  eyeR.position.set(0.10, 0.87, 0.22);
+  robotGroup.add(eyeL); robotGroup.add(eyeR);
+
+  const bulbMesh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.12, 0.13), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+  bulbMesh.position.y = 1.14;
+  robotGroup.add(bulbMesh);
+  scene.add(robotGroup);
+
+  function syncRobot3DPosition() {
+    const gx = ROBOT.pos.x;
+    const gz = ROBOT.pos.z;
+    const subOffsetX = ((ROBOT.pos.sx ?? 2) - 2) * 0.16;
+    const subOffsetZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.16;
+
+    let baseY = 0;
+    if (gx >= -2 && gx <= 2 && gz >= -2 && gz <= 2) {
+      baseY = (HEIGHT_MAP[`${gx},${gz}`] || 0) * 0.45;
+    } else {
+      baseY = -0.35;
+    }
+    robotGroup.position.set(gx + subOffsetX, baseY, gz + subOffsetZ);
+  }
+
+  // --- 球体大枠の星空（上を見上げたときに広がる天球） ---
   const skyGroup = new THREE.Group();
   scene.add(skyGroup);
 
   const starGeo = new THREE.BufferGeometry();
   const starPositions = [];
-  for (let i = 0; i < 360; i++) {
+  for (let i = 0; i < 420; i++) {
     const u = Math.random();
     const v = Math.random();
     const theta = u * 2.0 * Math.PI;
     const phi = Math.acos(2.0 * v - 1.0);
-    const r = 34;
+    const r = 32;
     starPositions.push(
       r * Math.sin(phi) * Math.cos(theta),
       r * Math.cos(phi),
@@ -618,98 +662,58 @@
     );
   }
   starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
-  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.32, transparent: true, opacity: 0.15 });
+  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.28, transparent: true, opacity: 0.2 });
   const starPoints = new THREE.Points(starGeo, starMat);
   skyGroup.add(starPoints);
 
   const celestialRings = new THREE.Group();
-  for (let i = 0; i < 3; i++) {
-    const rGeo = new THREE.TorusGeometry(28 + i * 2, 0.06, 8, 96);
-    const rMat = new THREE.MeshBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0.12 });
+  for (let i = 0; i < 2; i++) {
+    const rGeo = new THREE.TorusGeometry(26 + i * 2.5, 0.05, 8, 96);
+    const rMat = new THREE.MeshBasicMaterial({ color: 0xffe082, transparent: true, opacity: 0.0 });
     const ring = new THREE.Mesh(rGeo, rMat);
-    ring.rotation.x = 0.6 + i * 0.5;
-    ring.rotation.y = i * 0.8;
+    ring.rotation.x = 0.7 + i * 0.5;
+    ring.rotation.y = i * 0.9;
     celestialRings.add(ring);
   }
   skyGroup.add(celestialRings);
 
-  // --- ロボット構築 ---
-  const robotGroup = new THREE.Group();
-  const rBody = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.55, 0.38), new THREE.MeshLambertMaterial({ color: 0x38bdf8 }));
-  rBody.position.y = 0.35;
-  robotGroup.add(rBody);
-
-  const rHead = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.44, 0.44), new THREE.MeshLambertMaterial({ color: 0xbae6fd }));
-  rHead.position.y = 0.86;
-  robotGroup.add(rHead);
-
-  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
-  const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.05), eyeMat);
-  eyeL.position.set(-0.11, 0.88, 0.22);
-  const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.05), eyeMat);
-  eyeR.position.set(0.11, 0.88, 0.22);
-  robotGroup.add(eyeL); robotGroup.add(eyeR);
-
-  const legMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.18, 0.16), legMat);
-  legL.position.set(-0.13, 0.09, 0);
-  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.18, 0.16), legMat);
-  legR.position.set(0.13, 0.09, 0);
-  robotGroup.add(legL); robotGroup.add(legR);
-
-  const bulbMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.14), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
-  bulbMesh.position.y = 1.15;
-  robotGroup.add(bulbMesh);
-  scene.add(robotGroup);
-
-  function syncRobot3DPosition() {
-    const gx = ROBOT.pos.x;
-    const gz = ROBOT.pos.z;
-    const subOffsetX = ((ROBOT.pos.sx ?? 2) - 2) * 0.18;
-    const subOffsetZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.18;
-
-    let baseY = 0;
-    if (gx >= -2 && gx <= 2 && gz >= -2 && gz <= 2) {
-      baseY = (HEIGHT_MAP[`${gx},${gz}`] || 0) * 0.5;
-    } else {
-      baseY = -0.55; // 海面
-    }
-    robotGroup.position.set(gx + subOffsetX, baseY, gz + subOffsetZ);
-  }
-
   // ==========================================
-  // 3. カメラワーク（星空見上げ解放 ＆ ゲージ枠自動非表示）
+  // 3. カメラワーク（21:36の初期アングル固定 ＋ 上を見上げたときゲージ枠非表示）
   // ==========================================
-  let camTheta = Math.PI / 4;      // 水平回転角
-  let camPhi = 1.05;               // 仰角（小さいほど上空からの見下ろし、大きいほど下から星空見上げ）
-  let camRadius = 12.5;
+  let camTheta = 0.72;   // 21:36スクショの斜め角度
+  let camPhi = 1.16;     // 21:36スクショの大地と滝が両方綺麗に見える高さ角度
+  let camRadius = 11.2;
   let isDragging = false;
   let prevPointer = { x: 0, y: 0 };
 
   function updateCameraTransform() {
-    // camPhi: 0.25(真上近く見下ろし) 〜 2.15(大地スレスレから上空の星空を仰ぎ見る)
-    camPhi = Math.max(0.25, Math.min(2.15, camPhi));
-    camRadius = Math.max(6.5, Math.min(22.0, camRadius));
+    camPhi = Math.max(0.30, Math.min(2.15, camPhi));
+    camRadius = Math.max(7.0, Math.min(20.0, camRadius));
 
     const cx = camRadius * Math.sin(camPhi) * Math.sin(camTheta);
     const cy = camRadius * Math.cos(camPhi);
     const cz = camRadius * Math.sin(camPhi) * Math.cos(camTheta);
 
-    // 見上げアングル（camPhi > 1.48）に入ったとき、視線を上空（星空ドーム）へ持ち上げ、ゲージ枠を非表示にする
     const statusPanel = document.getElementById('status-panel');
     const diaryBtn = document.getElementById('diary-btn');
 
-    if (camPhi > 1.48) {
-      const lookUpRatio = (camPhi - 1.48) / (2.15 - 1.48);
-      camera.position.set(cx * 0.65, Math.max(-0.2, cy), cz * 0.65);
-      camera.lookAt(0, lookUpRatio * 9.5, 0);
+    // 上を見上げたとき（camPhi > 1.42）、ゲージ枠と📖を非表示にして星空を映す
+    if (camPhi > 1.42) {
+      const lookUpRatio = (camPhi - 1.42) / (2.15 - 1.42);
+      camera.position.set(cx * 0.7, Math.max(-0.3, cy), cz * 0.7);
+      camera.lookAt(0, -1.0 + lookUpRatio * 10.5, 0);
       statusPanel.classList.add('sky-hidden');
       diaryBtn.classList.add('sky-hidden');
+      // 見上げたときは昼でも星がよく見えるように輝度を上げる
+      starMat.opacity = Math.max(starMat.opacity, 0.45 + lookUpRatio * 0.55);
+      celestialRings.children.forEach(r => { r.material.opacity = lookUpRatio * 0.35; });
     } else {
+      // 21:36スクショと全く同じ注視点 (0, -1.0, 0)
       camera.position.set(cx, cy, cz);
-      camera.lookAt(0, -0.5, 0);
+      camera.lookAt(0, -1.0, 0);
       statusPanel.classList.remove('sky-hidden');
       diaryBtn.classList.remove('sky-hidden');
+      celestialRings.children.forEach(r => { r.material.opacity = 0.0; });
     }
   }
   updateCameraTransform();
@@ -727,7 +731,7 @@
     prevPointer.x = e.clientX;
     prevPointer.y = e.clientY;
     camTheta -= dx * 0.008;
-    camPhi += dy * 0.008; // 下へスワイプすると星空を見上げる
+    camPhi += dy * 0.008;
     updateCameraTransform();
   });
   window.addEventListener('pointerup', () => { isDragging = false; });
@@ -737,11 +741,11 @@
   }, { passive: true });
 
   // ==========================================
-  // 4. 時間帯・星空・UIの更新（高さ×星空連動）
+  // 4. 時間帯・星空・UIの更新
   // ==========================================
   function getRobotHeightLevel() {
     const { x, z } = ROBOT.pos;
-    if (x < -2 || x > 2 || z < -2 || z > 2) return -1; // 海
+    if (x < -2 || x > 2 || z < -2 || z > 2) return -1;
     return HEIGHT_MAP[`${x},${z}`] || 0;
   }
 
@@ -760,32 +764,27 @@
     document.getElementById('ui-days').innerText = `🌱 ${GAME_DAY}日目`;
 
     let timeLabel = '☀️ 朝';
-    let skyHex = 0x0f172a;
-    let starOpacity = 0.25;
+    let skyHex = 0x0d2538;
+    let starOpacity = 0.15;
 
     if (TIME_STEP < 4) {
-      timeLabel = '☀️ 朝'; skyHex = 0x1e293b; starOpacity = 0.18;
+      timeLabel = '☀️ 朝'; skyHex = 0x0d2538; starOpacity = 0.15;
     } else if (TIME_STEP < 9) {
-      timeLabel = '🌤️ 昼'; skyHex = 0x1e3a8a; starOpacity = 0.12;
+      timeLabel = '🌤️ 昼'; skyHex = 0x12324a; starOpacity = 0.10;
     } else if (TIME_STEP < 13) {
-      timeLabel = '🌇 夕方'; skyHex = 0x31102f; starOpacity = 0.45;
+      timeLabel = '🌇 夕方'; skyHex = 0x241b35; starOpacity = 0.45;
     } else if (TIME_STEP < 17) {
-      timeLabel = '🌙 夜'; skyHex = 0x090d16; starOpacity = 0.85;
+      timeLabel = '🌙 夜'; skyHex = 0x071320; starOpacity = 0.85;
     } else {
-      timeLabel = '🌌 深淵'; skyHex = 0x020617; starOpacity = 1.0;
+      timeLabel = '🌌 深淵'; skyHex = 0x040911; starOpacity = 1.0;
     }
 
-    // 高い段（3〜5段）に登るほど星空の輝きが増す連動
     if (hLevel >= 3) {
       starOpacity = Math.min(1.0, starOpacity + 0.35);
-      starMat.size = hLevel === 5 ? 0.48 : 0.38;
-    } else {
-      starMat.size = 0.30;
     }
 
     scene.background.setHex(skyHex);
     starMat.opacity = starOpacity;
-    celestialRings.children.forEach(r => { r.material.opacity = starOpacity * 0.45; });
     document.getElementById('ui-time').innerText = timeLabel;
 
     let moodStr = '😊 あんしん・まんぷく';
@@ -796,10 +795,9 @@
     else if (st.mode === 'BORED') moodStr = '😐 たいくつ';
     document.getElementById('ui-mood').innerText = moodStr;
 
-    let locText = `${hLevel}段目（中央静止中）`;
+    let locText = '中央静止中';
     if (hLevel === -1) locText = '🌊 海の白波エリア';
-    else if (hLevel === 5) locText = '🌟 5段目・星の聖域';
-    else if (hLevel >= 3) locText = `🔭 ${hLevel}段目・展望台`;
+    else if (hLevel > 0) locText = `${hLevel}段目・中央静止中`;
     document.getElementById('history-loc').innerText = locText;
   }
 
@@ -822,7 +820,6 @@
     const curH = getRobotHeightLevel();
     const isNight = TIME_STEP >= 13;
 
-    // 周囲の移動可能候補をアルゴンさんが厳密判定（段差+1まで登れる）
     const dirs = [
       { name: '東', dx: 1, dz: 0 },
       { name: '西', dx: -1, dz: 0 },
@@ -830,30 +827,26 @@
       { name: '北', dx: 0, dz: -1 }
     ];
 
-    let chosenAction = 'REST';
     let thoughtText = '';
     let actionLabel = '';
 
-    // 海にいる場合は波の力で内陸へ押し戻される物理
     if (curH === -1) {
       ROBOT.pos.x = Math.max(-2, Math.min(2, ROBOT.pos.x));
       ROBOT.pos.z = Math.max(-2, Math.min(2, ROBOT.pos.z));
       ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
       life.stamina -= 10;
-      actionLabel = '🌊 白波に押し戻されて陸へ帰還';
-      thoughtText = 'わわっ！海の白い波がすごく強くて、内陸のほうへ押し戻されたよ！滝から落ちなくてよかった〜！';
+      actionLabel = '白波に押し戻されて陸へ帰還';
+      thoughtText = 'わわっ！海の白い波に押し戻されて大地に戻ったよ！';
     } else {
-      // 1. リンゴが近くにあれば優先、または夜に3段以上の高い段を目指す知能
       let bestDir = null;
       const validDirs = dirs.filter(d => {
         const nx = ROBOT.pos.x + d.dx;
         const nz = ROBOT.pos.z + d.dz;
-        if (nx < -2 || nx > 2 || nz < -2 || nz > 2) return ROBOT.speed === 5; // 速度5の時だけ海・外へ飛び出せる
+        if (nx < -2 || nx > 2 || nz < -2 || nz > 2) return ROBOT.speed === 5;
         const nextH = HEIGHT_MAP[`${nx},${nz}`] || 0;
-        return (nextH - curH) <= 1; // 段差+1なら登れる
+        return (nextH - curH) <= 1;
       });
 
-      // リンゴ探し
       const appleTarget = WORLD_ITEMS.find(it => it.type === 'apple');
       if (appleTarget && (life.energy <= 60 || !isNight || curH >= 3)) {
         validDirs.sort((a, b) => {
@@ -862,34 +855,22 @@
           return distA - distB;
         });
         bestDir = validDirs[0];
-      } else if (isNight && curH < 3 && validDirs.length > 0) {
-        // 夜は星がよく見える高い段へ登ろうとする
-        validDirs.sort((a, b) => {
-          const hA = HEIGHT_MAP[`${ROBOT.pos.x + a.dx},${ROBOT.pos.z + a.dz}`] || 0;
-          const hB = HEIGHT_MAP[`${ROBOT.pos.x + b.dx},${ROBOT.pos.z + b.dz}`] || 0;
-          return hB - hA;
-        });
-        bestDir = validDirs[0];
       } else if (validDirs.length > 0) {
         bestDir = validDirs[Math.floor(Math.random() * validDirs.length)];
       }
 
       if (life.stamina <= 25 && curH >= 0) {
-        // ひとやすみ
         life.stamina += (isNight || curH === 5) ? 45 : 30;
         life.energy -= 5;
         life.mental += 10;
-        actionLabel = '💤 その場でひとやすみ';
-        thoughtText = curH >= 3
-          ? `${curH}段目の高い場所でお星さまを眺めながらひとやすみ！風がきもちいいなぁ。`
-          : 'ちょっと疲れたから、ここでひとやすみして体力を回復するよ！';
+        actionLabel = 'その場でひとやすみ';
+        thoughtText = 'ここでひとやすみして、たいりょくを回復するよ！';
       } else if (bestDir) {
         const prevH = curH;
         ROBOT.pos.x += bestDir.dx;
         ROBOT.pos.z += bestDir.dz;
         ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
 
-        // 速度5のオーバーラン（端っこ飛び出し）物理
         if (ROBOT.speed === 5) {
           ROBOT.pos.sx = Math.max(0, Math.min(4, 2 + bestDir.dx * 2));
           ROBOT.pos.sz = Math.max(0, Math.min(4, 2 + bestDir.dz * 2));
@@ -902,27 +883,19 @@
         if (newH === 5) {
           life.stamina = Math.min(100, life.stamina + 20);
           life.mental = Math.min(100, life.mental + 25);
-          actionLabel = `🌟 5段目「星の聖域」へ登頂！`;
-          thoughtText = 'やったぁ！5段目のてっぺん「星の聖域」に登ったよ！満天の星空に手が届きそうで、体も心もポカポカ回復していくよ！';
-          DIARY_LOGS.push(`🌟 ${GAME_DAY}日目：5段目のてっぺんで星空と共鳴した！`);
+          actionLabel = '5段目「星の聖域」へ登頂！';
+          thoughtText = '5段目のてっぺんに登ったよ！お星さまがすごく近いね！';
         } else if (newH > prevH) {
           life.mental += 10;
-          actionLabel = `👟 ${bestDir.name}へ1段ピョンと登った（${newH}段目）`;
-          thoughtText = newH >= 3
-            ? `${newH}段目の展望台まで登ったよ！ここなら夜でも星の光で島全体が見渡せるね！`
-            : `よいしょっ！${bestDir.name}のブロックにピョンと1段登ったよ！`;
-        } else if (prevH - newH >= 3 && newH >= 0) {
-          life.stamina -= 10;
-          actionLabel = `💥 高い段から飛び降りた（-10ダメージ）`;
-          thoughtText = 'わわっ！高い段差から飛び降りてお尻をぶつけちゃった…！階段を使えばよかったなぁ。';
+          actionLabel = `${bestDir.name}へ1段登った（${newH}段目）`;
+          thoughtText = `よいしょっ！${bestDir.name}の段差にピョンと登ったよ！`;
         } else {
-          actionLabel = `👟 ${bestDir.name}へトコトコ歩いた`;
-          thoughtText = `${bestDir.name}のマスへ歩いてみたよ。下から滝のサラサラ流れる音が聞こえてくるね。`;
+          actionLabel = `${bestDir.name}へトコトコ歩いた`;
+          thoughtText = `${bestDir.name}へ歩いたよ。まわりを丸い海と滝が囲んでいてきれいだなあ。`;
         }
       }
     }
 
-    // 足元のアイテム回収・食事判定
     const itemIdx = WORLD_ITEMS.findIndex(it => it.x === ROBOT.pos.x && it.z === ROBOT.pos.z);
     if (itemIdx !== -1) {
       const picked = WORLD_ITEMS[itemIdx];
@@ -930,18 +903,17 @@
       if (picked.type === 'apple') {
         life.energy += 45;
         life.mental += 15;
-        actionLabel = '🍎 リンゴを見つけて食べた！';
-        thoughtText = 'わーい！甘くておいしいリンゴを食べたよ！おなかがいっぱいになって元気モリモリだぁ！';
-        DIARY_LOGS.push(`🍎 ${GAME_DAY}日目：おいしいリンゴを食べて元気になった。`);
+        actionLabel = '🍎 リンゴを食べた！';
+        thoughtText = 'わーい！あまくておいしいリンゴを食べて元気いっぱいだよ！';
+        DIARY_LOGS.push(`🍎 ${GAME_DAY}日目：リンゴを食べて元気になった。`);
       } else {
         if (BAG.length < 10) BAG.push(picked.type);
         life.mental += 10;
-        actionLabel = `🎒 ${picked.type === 'stone' ? '石ブロック' : '草'}をカバンに拾った`;
-        thoughtText = '足元にいいものが落ちていたから、カバンにしまったよ！手帳からいつでも積めるよ！';
+        actionLabel = 'どうぐをカバンに拾った';
+        thoughtText = '足元のアイテムをカバンにしまったよ！';
       }
     }
 
-    // オプション：Groq / Gemini APIが設定されていればセリフをリッチ化
     const aiType = safeStorage.getItem('ai_type') || 'none';
     if (aiType === 'groq' || aiType === 'gemini') {
       const customLine = await tryFetchAIComment(aiType, actionLabel, getRobotHeightLevel());
@@ -953,18 +925,18 @@
     updateEnvironmentAndUI();
     saveWorldState();
 
-    // ゲームオーバー＆世代交代判定（生存日数を1日目にクリア）
+    // ゲームオーバーで倒れた場合は生存日数を1日目にクリア
     const afterState = life.getState();
     if (afterState.mode === 'DEAD') {
-      document.getElementById('message-box').innerText = `力尽きて倒れてしまった…。手帳に記憶を残し、次のロボ${ROBOT.gen + 1}ごうへバトンタッチします（生存日数は1日目にリセットされます）。`;
+      document.getElementById('message-box').innerText = `力尽きて倒れてしまった…。生存日数はリセットされ、次のロボ${ROBOT.gen + 1}ごうが1日目からスタートします。`;
       setTimeout(() => {
         ROBOT.gen += 1;
         ROBOT.pos = { x: 0, z: 0, sx: 2, sz: 2 };
         GAME_DAY = 1;
         TIME_STEP = 0;
         life = new LifeCore();
-        DIARY_LOGS.push(`📖 ロボ${ROBOT.gen}ごうが1日目から新しく誕生した！`);
-        if (WORLD_ITEMS.length === 0) WORLD_ITEMS.push({ type: 'apple', x: 0, z: 1 });
+        DIARY_LOGS.push(`📖 ロボ${ROBOT.gen}ごうが1日目として誕生した！`);
+        if (WORLD_ITEMS.length === 0) WORLD_ITEMS.push({ type: 'apple', x: 0, z: -1 });
         rebuildTerrainAndItems();
         syncRobot3DPosition();
         updateEnvironmentAndUI();
@@ -980,7 +952,7 @@
       document.getElementById('ai-status').innerText = '💤 待機中';
       bulbMesh.material.color.setHex(0xfacc15);
       btn.disabled = false;
-    }, 350);
+    }, 320);
   }
 
   async function tryFetchAIComment(aiType, actionLabel, hLevel) {
@@ -1035,7 +1007,7 @@
   function renderDiaryModal() {
     const h = getRobotHeightLevel();
     document.getElementById('diary-robo-name').innerText = `🤖 ロボ${ROBOT.gen}ごう（生存 ${GAME_DAY}日目）`;
-    document.getElementById('diary-robo-height').innerText = `現在の高さ：${Math.max(0, h)}段目 / 移動速度：${ROBOT.speed}`;
+    document.getElementById('diary-robo-height').innerText = `現在の高さ：${Math.max(0, h)}段目 / 速度：${ROBOT.speed}`;
 
     const grid = document.getElementById('bag-grid');
     grid.innerHTML = '';
@@ -1088,8 +1060,8 @@
   document.getElementById('btn-spin').onclick = () => {
     const pool = [
       { type: 'apple', icon: '🍎', name: 'おいしいリンゴ（島に配置！）' },
-      { type: 'stone', icon: '🪨', name: '段差ブロック（カバンに追加＆地面も1段アップ！）' },
-      { type: 'grass', icon: '🌿', name: '星見の草ブロック（カバンに追加！）' }
+      { type: 'stone', icon: '🪨', name: '石ブロック（カバンに追加！）' },
+      { type: 'grass', icon: '🌿', name: '草ブロック（カバンに追加！）' }
     ];
     const picked = pool[Math.floor(Math.random() * pool.length)];
     const rx = Math.floor(Math.random() * 5) - 2;
@@ -1099,8 +1071,6 @@
       WORLD_ITEMS.push({ type: 'apple', x: rx, z: rz });
     } else {
       if (BAG.length < 10) BAG.push(picked.type);
-      const k = `${rx},${rz}`;
-      if ((HEIGHT_MAP[k] || 0) < 5) HEIGHT_MAP[k] = (HEIGHT_MAP[k] || 0) + 1;
     }
 
     life.mental = Math.min(100, life.mental + 25);
@@ -1134,7 +1104,6 @@
     setTimeout(() => { t.style.opacity = '0'; }, 2200);
   }
 
-  // 初回構築
   rebuildTerrainAndItems();
   syncRobot3DPosition();
   updateEnvironmentAndUI();
@@ -1143,38 +1112,24 @@
   // 7. メインアニメーションループ
   // ==========================================
   const clock = new THREE.Clock();
-  let waveTick = 0;
+  let wfScrollY = 0;
 
   function animate() {
     requestAnimationFrame(animate);
     const t = clock.getElapsedTime();
 
-    // 滝：上から下へゆったり流れ落ちるアニメーション
-    updateWaterfallCanvas();
+    // 滝：21:36のデザインで上から下へゆっくり流れる
+    wfScrollY = (wfScrollY + 0.9) % 512;
+    renderWaterfallTexture(wfScrollY);
     wfTex.needsUpdate = true;
 
-    // 海：内陸へ押し寄せる白波と四隅の波しぶき更新
-    waveTick += 0.02;
-    if (Math.floor(waveTick * 10) % 2 === 0) {
-      drawSeaSurface(t);
-      seaTex.needsUpdate = true;
-    }
+    // 海：21:36の白い泡立ちが優しく揺らぐ
+    drawSeaCanvas(t);
+    seaTex.needsUpdate = true;
 
-    // 滝壺の白泡の呼吸
-    const foamScale = 1 + Math.sin(t * 2.2) * 0.025;
-    foamRingMesh.scale.set(foamScale, foamScale, 1);
-
-    // 古代遺跡カメのゆったりした浮遊
-    turtleGroup.position.y = -9.2 + Math.sin(t * 0.7) * 0.18;
-    turtleGroup.rotation.y = Math.sin(t * 0.25) * 0.06;
-
-    // 星空天球と古代リングの回転
-    skyGroup.rotation.y += 0.0005;
-    celestialRings.rotation.z += 0.0008;
-
-    // ロボットの可愛い呼吸モーション
-    rBody.scale.y = 1 + Math.sin(t * 4) * 0.04;
-    rHead.position.y = 0.86 + Math.sin(t * 4) * 0.02;
+    // 古代亀と星空のゆったりした動き
+    turtleGroup.position.y = -8.8 + Math.sin(t * 0.7) * 0.15;
+    skyGroup.rotation.y += 0.0004;
 
     renderer.render(scene, camera);
   }
