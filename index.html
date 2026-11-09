@@ -14,186 +14,162 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      width: 100vw; height: 100vh; height: 100dvh; min-height: 540px;
-      margin: 0; padding: 0;
-      overflow: hidden; background: #0b1329; color: #f8fafc;
+      width: 100vw; height: 100vh; height: 100dvh;
+      overflow: hidden; background: #070d1e; color: #f8fafc;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Maru Gothic ProN", "Meiryo", sans-serif;
-      position: relative; user-select: none; -webkit-user-select: none;
+      user-select: none; -webkit-user-select: none;
     }
     input, select, textarea, button { user-select: auto; -webkit-user-select: auto; }
 
-    #stage { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; overflow: hidden; background: #0b1329; }
+    /* 全体：上下2分割＋フッター構成 */
+    .app-container {
+      display: flex; flex-direction: column;
+      width: 100%; height: 100%; height: 100dvh;
+      overflow: hidden;
+    }
+
+    /* ========================================================
+     * ① 上部ウィンドウ：マス目マップ 3Dプレビュー ＋ ゲージ
+     * ======================================================== */
+    .top-window {
+      position: relative;
+      flex: 1.1; min-height: 250px;
+      background: #0b1329; overflow: hidden;
+      border-bottom: 3px solid #38bdf8;
+    }
+    #stage-3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
     #c3d { width: 100%; height: 100%; display: block; }
     canvas { display: block; width: 100% !important; height: 100% !important; }
 
-    /* ひらめき電球ポップアップ */
-    #bulb-popup {
-      position: absolute; z-index: 15; pointer-events: none;
-      transform: translate(-50%, -100%);
-      display: none; align-items: center; justify-content: center;
-      flex-direction: column;
-      filter: drop-shadow(0 0 16px #fde047) drop-shadow(0 0 28px #f59e0b);
-      animation: bulbPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    /* プレビュー内・最上部の3本ゲージ（すべて100ポイント計算） */
+    .top-gauge-panel {
+      position: absolute; top: 8px; left: 8px; right: 8px; z-index: 20;
+      background: rgba(11, 19, 41, 0.92); backdrop-filter: blur(8px);
+      border: 1.5px solid rgba(56, 189, 248, 0.35); border-radius: 14px;
+      padding: 8px 10px; pointer-events: none;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
     }
-    .bulb-icon { font-size: 34px; line-height: 1; }
-    .bulb-tag {
-      background: #facc15; color: #0b1329;
-      font-size: 11px; font-weight: 900; padding: 3px 8px;
-      border-radius: 10px; margin-top: 3px; white-space: nowrap;
-      box-shadow: 0 2px 10px rgba(250, 204, 21, 0.8);
+    .gauge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .gauge-col {
+      background: rgba(255, 255, 255, 0.05); padding: 4px 6px; border-radius: 8px;
+      text-align: center; border: 1px solid rgba(255, 255, 255, 0.08);
     }
-    @keyframes bulbPop {
-      0% { transform: translate(-50%, -60%) scale(0.2); opacity: 0; }
-      70% { transform: translate(-50%, -115%) scale(1.2); opacity: 1; }
-      100% { transform: translate(-50%, -100%) scale(1); opacity: 1; }
-    }
+    .gauge-label { font-size: 11px; font-weight: 800; }
+    .gauge-num { font-size: 13px; font-weight: 900; color: #fff; margin-left: 2px; }
+    .bar-bg { background: rgba(0, 0, 0, 0.6); height: 8px; border-radius: 5px; margin-top: 3px; overflow: hidden; padding: 1px; }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.35s ease; }
 
-    /* 上部HUD：小学生にも直感でわかる3本メーター（いのち・げんき・こころ） */
-    .top-hud {
-      position: absolute; top: 10px; left: 10px; right: 10px; z-index: 20;
-      background: rgba(11, 19, 41, 0.94); backdrop-filter: blur(10px);
-      border: 2px solid rgba(56, 189, 248, 0.3); border-radius: 16px;
-      padding: 9px 12px; pointer-events: none;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
-    }
-    .status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
-    .status-col {
-      background: rgba(255, 255, 255, 0.05); padding: 5px 6px; border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    .status-label { font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 3px; }
-    .status-num { font-size: 13px; font-weight: 900; color: #fff; margin-left: 2px; }
-    .bar-box { background: rgba(0, 0, 0, 0.5); height: 9px; border-radius: 6px; margin-top: 4px; overflow: hidden; padding: 1px; }
-    .bar-val { height: 100%; border-radius: 5px; transition: width 0.3s ease; }
-
-    .hud-sub {
+    /* ゲージのすぐ下のロボット状態表示（小学生にも直感でわかるバッジ） */
+    .robot-status-row {
       display: flex; justify-content: space-between; align-items: center;
-      margin-top: 7px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.1);
-      font-size: 11px; font-weight: bold; color: #cbd5e1;
+      margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.1);
     }
-    .drive-badge {
-      padding: 3px 10px; border-radius: 12px; font-weight: 900; font-size: 11px;
+    .robot-id-tag { font-size: 11px; font-weight: 800; color: #94a3b8; }
+    .robot-drive-badge {
+      font-size: 12px; font-weight: 900; padding: 2px 10px; border-radius: 12px;
       background: #1e293b; color: #fde047; border: 1.5px solid #eab308;
-      box-shadow: 0 0 10px rgba(234, 179, 8, 0.25);
+      box-shadow: 0 0 10px rgba(234, 179, 8, 0.3);
     }
 
-    /* 思考・観察パネル（まんがの吹き出し風デザイン） */
-    .thought-card {
-      position: absolute; top: 92px; left: 10px; right: 58px; z-index: 20;
-      background: rgba(11, 19, 41, 0.96); border: 2px solid #38bdf8; border-radius: 16px;
-      padding: 10px 12px; backdrop-filter: blur(8px); pointer-events: none;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-      transition: border-color 0.3s ease, box-shadow 0.3s ease;
-    }
-    .thought-card.flash-success {
-      border-color: #fde047;
-      box-shadow: 0 0 25px rgba(250, 204, 21, 0.7);
-    }
-    .thought-header {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 7px; gap: 4px;
-    }
-    .thought-header-left {
-      display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 900; color: #38bdf8;
-    }
-    .server-status {
-      font-size: 10px; padding: 2px 8px; border-radius: 10px; white-space: nowrap; font-weight: 900;
-    }
-    .status-green { background: #065f46; color: #34d399; border: 1px solid #10b981; }
-    .status-yellow { background: #854d0e; color: #fde047; border: 1px solid #eab308; }
-    .status-red { background: #7f1d1d; color: #fca5a5; border: 1px solid #ef4444; }
-
-    .quick-switch-group { display: flex; gap: 4px; pointer-events: auto; }
-    .q-btn {
-      padding: 3px 8px; border-radius: 8px; font-size: 10px; font-weight: 900;
-      border: 1.5px solid #334155; background: #0f172a; color: #94a3b8; cursor: pointer;
-    }
-    .q-btn.active-google { background: #0284c7; color: #fff; border-color: #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
-    .q-btn.active-github { background: #6d28d9; color: #fff; border-color: #a78bfa; box-shadow: 0 0 8px rgba(167, 139, 250, 0.4); }
-
-    .balloon-box {
-      background: rgba(2, 6, 23, 0.85); border: 1.5px solid rgba(56, 189, 248, 0.35);
-      border-radius: 12px; padding: 8px 10px; margin-bottom: 6px;
-    }
-    .balloon-row { display: flex; align-items: flex-start; gap: 6px; font-size: 11px; line-height: 1.4; margin-bottom: 4px; }
-    .balloon-row:last-child { margin-bottom: 0; }
-    .balloon-tag {
-      font-weight: 900; min-width: 68px; flex-shrink: 0; border-radius: 6px; padding: 1px 5px; font-size: 10px; text-align: center;
-    }
-    .tag-see { background: rgba(56, 189, 248, 0.2); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.4); }
-    .tag-act { background: rgba(234, 179, 8, 0.2); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.4); }
-    .balloon-text { color: #f8fafc; font-weight: 600; word-break: break-all; }
-
-    .thought-voice-area {
-      background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));
-      border: 1.5px dashed rgba(250, 204, 21, 0.45);
-      border-radius: 12px; padding: 8px 10px;
-    }
-    .thought-voice-title { font-size: 10px; font-weight: 900; color: #fde047; margin-bottom: 3px; display: flex; align-items: center; gap: 4px; }
-    .thought-voice-text { font-size: 12px; font-weight: bold; line-height: 1.45; color: #ffffff; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
-
-    /* サイドボタン */
-    .side-btns {
-      position: absolute; top: 92px; right: 10px; z-index: 20;
-      display: flex; flex-direction: column; gap: 8px;
-    }
-    .circle-btn {
-      width: 42px; height: 42px; border-radius: 50%;
-      background: rgba(11, 19, 41, 0.95); border: 2px solid rgba(255, 255, 255, 0.25);
+    /* 右上の設定⚙️ボタン */
+    .btn-setting-gear {
+      position: absolute; top: 10px; right: 10px; z-index: 25;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(15, 23, 42, 0.95); border: 2px solid #38bdf8;
       color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center;
-      cursor: pointer; backdrop-filter: blur(4px); box-shadow: 0 4px 14px rgba(0,0,0,0.6);
-      pointer-events: auto; touch-action: manipulation;
-    }
-    .circle-btn:active { transform: scale(0.92); }
-    .circle-btn.active { border-color: #38bdf8; background: #0284c7; box-shadow: 0 0 12px rgba(56, 189, 248, 0.6); }
-
-    /* 下部HUD */
-    .bottom-hud {
-      position: absolute; bottom: max(12px, env(safe-area-inset-bottom)); left: 10px; right: 10px; z-index: 20;
-      display: flex; flex-direction: column; gap: 7px; pointer-events: none;
-    }
-    .tap-guide {
-      align-self: center; background: rgba(11, 19, 41, 0.96); border: 1.5px solid rgba(255, 255, 255, 0.3);
-      border-radius: 20px; padding: 5px 16px; font-size: 11px; font-weight: 800; color: #fde047;
-      pointer-events: auto; box-shadow: 0 4px 14px rgba(0,0,0,0.5);
-    }
-    .action-row {
-      display: flex; gap: 8px; width: 100%; max-width: 460px; margin: 0 auto; pointer-events: auto;
-    }
-    .main-btn {
-      flex: 1; padding: 14px 10px; border-radius: 14px; font-weight: 900; font-size: 14px;
-      color: #fff; border: none; cursor: pointer; box-shadow: 0 5px 16px rgba(0,0,0,0.6);
-      background: linear-gradient(135deg, #0284c7, #2563eb); border: 2px solid #38bdf8;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-    }
-    .main-btn:active { transform: scale(0.97); }
-    .main-btn.btn-github {
-      background: linear-gradient(135deg, #6d28d9, #7c3aed); border: 2px solid #c4b5fd;
-    }
-    .sub-instinct-btn {
-      padding: 14px 14px; border-radius: 14px; font-weight: 900; font-size: 12px;
-      color: #fde047; background: rgba(15, 23, 42, 0.96); border: 2px solid #eab308;
-      cursor: pointer; white-space: nowrap; box-shadow: 0 5px 16px rgba(0,0,0,0.6);
+      cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.6);
       touch-action: manipulation;
     }
-    .sub-instinct-btn:active { transform: scale(0.97); }
-    .main-btn:disabled, .sub-instinct-btn:disabled {
-      background: #334155 !important; border-color: #475569 !important; color: #94a3b8 !important; cursor: not-allowed;
-    }
-    .btn-respawn {
-      background: linear-gradient(135deg, #dc2626, #b91c1c); border: 2px solid #f87171; display: none; width: 100%;
+    .btn-setting-gear:active { transform: scale(0.92); }
+
+    /* リンゴ落下の案内ガイド */
+    .tap-hint-pill {
+      position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 15;
+      background: rgba(11, 19, 41, 0.9); border: 1px solid rgba(250, 204, 21, 0.5);
+      color: #fde047; font-size: 11px; font-weight: 800; padding: 4px 14px; border-radius: 20px;
+      pointer-events: none; box-shadow: 0 2px 10px rgba(0,0,0,0.5); white-space: nowrap;
     }
 
-    /* トースト通知（セーブ完了など） */
-    #toast-msg {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
-      background: rgba(15, 23, 42, 0.96); border: 2px solid #38bdf8; border-radius: 14px;
-      padding: 10px 20px; font-size: 13px; font-weight: 900; color: #f8fafc; z-index: 50;
-      opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    /* ========================================================
+     * ② 下部ウィンドウ：ロボットの気持ちや叫び（大文字）
+     * ======================================================== */
+    .bottom-window {
+      flex: 1; min-height: 190px; max-height: 48%;
+      background: #0f172a; padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 8px;
+      overflow-y: auto; box-shadow: inset 0 6px 16px rgba(0,0,0,0.5);
     }
-    #toast-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    .voice-header {
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .voice-title {
+      font-size: 13px; font-weight: 900; color: #38bdf8;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .comm-lamp {
+      font-size: 10px; font-weight: 900; padding: 2px 8px; border-radius: 10px;
+    }
+    .lamp-standby { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .lamp-busy { background: #854d0e; color: #fde047; border: 1px solid #eab308; }
+    .lamp-ok { background: #065f46; color: #34d399; border: 1px solid #10b981; }
+    .lamp-err { background: #7f1d1d; color: #fca5a5; border: 1px solid #ef4444; }
+
+    /* ロボットの心の声（小学生向け・大きく目立つフォント） */
+    .voice-bubble {
+      flex: 1; min-height: 85px;
+      background: #020617; border: 2px solid #1e293b;
+      border-radius: 14px; padding: 12px 14px;
+      display: flex; flex-direction: column; justify-content: center;
+      transition: border-color 0.3s ease;
+    }
+    .voice-bubble.bubble-active { border-color: #38bdf8; }
+    .voice-bubble.bubble-error { border-color: #ef4444; background: rgba(127, 29, 29, 0.15); }
+
+    .voice-text {
+      font-size: 17px; font-weight: 900; line-height: 1.45;
+      color: #ffffff; letter-spacing: 0.3px; word-break: break-all;
+    }
+    .voice-error-text {
+      font-size: 13px; font-weight: 800; line-height: 1.4; color: #f87171;
+    }
+
+    .action-note-row {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 800; color: #94a3b8;
+      background: rgba(255, 255, 255, 0.03); padding: 5px 10px; border-radius: 8px;
+    }
+    .action-badge {
+      font-size: 10px; font-weight: 900; background: #0284c7; color: #fff;
+      padding: 1px 6px; border-radius: 6px;
+    }
+
+    /* ========================================================
+     * ③ フッター：今すぐ考える ボタンのみ
+     * ======================================================== */
+    .footer-bar {
+      padding: 10px 14px max(12px, env(safe-area-inset-bottom));
+      background: #020617; border-top: 1.5px solid #1e293b;
+      display: flex; justify-content: center;
+    }
+    .btn-think-now {
+      width: 100%; max-width: 440px; height: 52px;
+      border-radius: 14px; border: none; cursor: pointer;
+      font-size: 17px; font-weight: 900; color: #ffffff;
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      border: 2px solid #38bdf8;
+      box-shadow: 0 4px 16px rgba(2, 132, 199, 0.5);
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    }
+    .btn-think-now:active { transform: scale(0.97); }
+    .btn-think-now:disabled {
+      background: #334155 !important; border-color: #475569 !important;
+      color: #94a3b8 !important; cursor: not-allowed; box-shadow: none;
+    }
+    .btn-respawn {
+      background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+      border: 2px solid #f87171 !important; display: none;
+    }
 
     /* モーダル共通 */
     .modal-cover {
@@ -206,186 +182,145 @@
       border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 12px;
       box-shadow: 0 16px 40px rgba(0,0,0,0.9); max-height: 90dvh; overflow-y: auto;
     }
-    .modal-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e293b; padding-bottom: 10px; }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e293b; padding-bottom: 8px; }
     .modal-title { font-size: 15px; font-weight: 900; color: #38bdf8; }
     .close-btn { font-size: 22px; color: #94a3b8; cursor: pointer; padding: 2px 6px; font-weight: bold; }
-    .diary-content {
-      background: #020617; border: 1.5px solid #1e293b; border-radius: 12px; padding: 12px;
-      font-size: 11px; line-height: 1.6; color: #cbd5e1; max-height: 180px; overflow-y: auto; white-space: pre-wrap;
-    }
-    .input-box {
-      width: 100%; padding: 11px 12px; background: #020617; border: 1.5px solid #334155;
-      color: #fff; border-radius: 10px; font-size: 12px; margin-top: 6px;
-    }
-    .input-box:focus { border-color: #38bdf8; outline: none; }
-    .save-btn {
-      padding: 14px; background: #0284c7; color: #fff; border: none; border-radius: 12px;
-      font-weight: 900; cursor: pointer; font-size: 14px; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
-    }
-    .reset-btn {
-      padding: 10px; background: transparent; color: #f87171; border: 1.5px dashed #dc2626;
-      border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 11px; margin-top: 4px;
-    }
 
-    /* 設定カード（小学生にも押しやすい大きな2択カード） */
     .settings-card {
       background: rgba(255,255,255,0.03); border: 2.5px solid #1e293b;
-      padding: 13px; border-radius: 14px; cursor: pointer; transition: all 0.2s ease;
+      padding: 12px; border-radius: 12px; cursor: pointer;
     }
-    .settings-card.selected-google {
-      border-color: #38bdf8; background: rgba(2, 132, 199, 0.16); box-shadow: 0 0 14px rgba(56, 189, 248, 0.3);
+    .settings-card.selected-google { border-color: #38bdf8; background: rgba(2, 132, 199, 0.16); }
+    .settings-card.selected-github { border-color: #a78bfa; background: rgba(109, 40, 217, 0.2); }
+    .input-box {
+      width: 100%; padding: 10px 12px; background: #020617; border: 1.5px solid #334155;
+      color: #fff; border-radius: 8px; font-size: 12px; margin-top: 6px;
     }
-    .settings-card.selected-github {
-      border-color: #a78bfa; background: rgba(109, 40, 217, 0.2); box-shadow: 0 0 14px rgba(167, 139, 250, 0.3);
+    .save-btn {
+      padding: 13px; background: #0284c7; color: #fff; border: none; border-radius: 12px;
+      font-weight: 900; cursor: pointer; font-size: 14px;
     }
-    .settings-card-head {
-      display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
+    /* 最下部に移動した初期化ボタン */
+    .reset-btn {
+      padding: 11px; background: rgba(220, 38, 38, 0.15); color: #fca5a5;
+      border: 1.5px solid #dc2626; border-radius: 10px; font-weight: 800;
+      cursor: pointer; font-size: 12px; margin-top: 6px;
     }
-    .settings-card-title { font-size: 13px; font-weight: 900; color: #fff; }
-    .key-status-tag { font-size: 10px; padding: 3px 8px; border-radius: 8px; font-weight: 900; }
-    .tag-saved { background: #065f46; color: #34d399; border: 1px solid #10b981; }
-    .tag-empty { background: #334155; color: #94a3b8; border: 1px solid #475569; }
-    .settings-help { font-size: 11px; color: #94a3b8; line-height: 1.4; margin-bottom: 6px; }
+
+    #toast-msg {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
+      background: rgba(15, 23, 42, 0.96); border: 2px solid #38bdf8; border-radius: 14px;
+      padding: 10px 20px; font-size: 13px; font-weight: 900; color: #f8fafc; z-index: 50;
+      opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    #toast-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   </style>
 
-  <!-- Three.js (3D空間の描画ライブラリ) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-  <div id="stage"><div id="c3d"></div></div>
+  <div class="app-container">
 
-  <!-- ひらめきポップアップ -->
-  <div id="bulb-popup">
-    <div class="bulb-icon">💡</div>
-    <div class="bulb-tag" id="bulb-tag-txt">ひらめいた!</div>
+    <!-- ① 上部ウィンドウ：マス目マップ 3Dプレビュー -->
+    <div class="top-window">
+      <div id="stage-3d"><div id="c3d"></div></div>
+
+      <!-- 最上部 3本ゲージ（すべて100ポイント計算） -->
+      <div class="top-gauge-panel">
+        <div class="gauge-grid">
+          <div class="gauge-col">
+            <div class="gauge-label">🍎 いのち <span id="v-energy" class="gauge-num">100</span></div>
+            <div class="bar-bg"><div id="b-energy" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #f87171, #ef4444);"></div></div>
+          </div>
+          <div class="gauge-col">
+            <div class="gauge-label">⚡ たいりょく <span id="v-stamina" class="gauge-num">100</span></div>
+            <div class="bar-bg"><div id="b-stamina" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #fde047, #eab308);"></div></div>
+          </div>
+          <div class="gauge-col">
+            <div class="gauge-label">🎵 きぶん <span id="v-mental" class="gauge-num">100</span></div>
+            <div class="bar-bg"><div id="b-mental" class="bar-fill" style="width:100%; background:linear-gradient(90deg, #6ee7b7, #10b981);"></div></div>
+          </div>
+        </div>
+
+        <!-- 小学生でもわかるロボットの状態 -->
+        <div class="robot-status-row">
+          <span id="ui-robot-id" class="robot-id-tag">🤖 ロボ1ごう (0, 0)</span>
+          <span id="ui-robot-drive" class="robot-drive-badge">😊 あんしん・まんぷく</span>
+          <span id="ui-step-count" class="robot-id-tag">⭐ 0手目</span>
+        </div>
+      </div>
+
+      <!-- 右上 ⚙️ 設定ボタン -->
+      <button type="button" class="btn-setting-gear" onclick="openModal('settingModal')" title="せってい">⚙️</button>
+
+      <!-- リンゴ落下のヒント -->
+      <div class="tap-hint-pill" id="tap-hint">👆 マス目をタップすると🍎リンゴが落ちるよ！</div>
+    </div>
+
+    <!-- ② 下部ウィンドウ：ロボットの気持ちや叫び（小学生レベル大文字） -->
+    <div class="bottom-window">
+      <div class="voice-header">
+        <span class="voice-title">💭 ロボのきもち・心のさけび</span>
+        <span id="comm-lamp" class="comm-lamp lamp-standby">💤 ま機中</span>
+      </div>
+
+      <!-- ロボットの叫び（通信完了時のみ更新。エラー時はエラー文） -->
+      <div class="voice-bubble" id="voice-bubble">
+        <div class="voice-text" id="voice-text">
+          ぼくはマス目の島に立つロボットだよ！<br>
+          下の「⚡ 今すぐ考える」ボタンを押すと、ほんとうに自分で考えて島を歩くよ！
+        </div>
+      </div>
+
+      <!-- やったことの簡単な説明 -->
+      <div class="action-note-row">
+        <span class="action-badge">👟 やった事</span>
+        <span id="action-note-text">待機中（まだ動いていないよ）</span>
+      </div>
+    </div>
+
+    <!-- ③ フッター：今すぐ考える ボタンのみ -->
+    <div class="footer-bar">
+      <button type="button" class="btn-think-now" id="btn-think-now" onclick="triggerThinkNow()">
+        ⚡ 今すぐ考える
+      </button>
+      <button type="button" class="btn-think-now btn-respawn" id="btn-respawn" onclick="respawnRobot()">
+        🔄 つぎの世代へ引き継ぐ
+      </button>
+    </div>
+
   </div>
 
   <!-- 一時通知トースト -->
-  <div id="toast-msg">💾 データをほぞんしたよ</div>
+  <div id="toast-msg">💾 データを保存したよ</div>
 
-  <!-- 上部ステータスメーター（小学生向け・3要素直感表示） -->
-  <div class="top-hud">
-    <div class="status-grid">
-      <div class="status-col">
-        <div class="status-label">🍎 いのち <span id="v-energy" class="status-num">100</span></div>
-        <div class="bar-box"><div id="b-energy" class="bar-val" style="width:100%; background:linear-gradient(90deg, #f87171, #ef4444);"></div></div>
-      </div>
-      <div class="status-col">
-        <div class="status-label">⚡ げんき <span id="v-stamina" class="status-num">100</span></div>
-        <div class="bar-box"><div id="b-stamina" class="bar-val" style="width:100%; background:linear-gradient(90deg, #fde047, #eab308);"></div></div>
-      </div>
-      <div class="status-col">
-        <div class="status-label">🎵 こころ <span id="v-mental" class="status-num">100</span></div>
-        <div class="bar-box"><div id="b-mental" class="bar-val" style="width:100%; background:linear-gradient(90deg, #6ee7b7, #10b981);"></div></div>
-      </div>
-    </div>
-    <div class="hud-sub">
-      <span id="ui-id">🤖 ロボ1ごう (0, 0, -1)</span>
-      <span id="ui-drive" class="drive-badge">😊 あんしん・まんぷく</span>
-      <span id="ui-timer">⭐ 0手目</span>
-    </div>
-  </div>
-
-  <!-- 思考・観察パネル（ロボの気持ちと行動がひと目でわかる吹き出し） -->
-  <div class="thought-card" id="thought-card">
-    <div class="thought-header">
-      <div class="thought-header-left">
-        <span>🧠 つかう頭脳:</span>
-        <div class="quick-switch-group">
-          <button type="button" id="q-btn-google" class="q-btn active-google" onclick="selectModelAndRefresh('gemini-3.8-flash')">🟦 Google 3.8</button>
-          <button type="button" id="q-btn-github" class="q-btn" onclick="selectModelAndRefresh('openai/gpt-oss-120b')">🟪 Groq 120B</button>
-        </div>
-      </div>
-      <span id="server-lamp" class="server-status status-yellow">⚙️ キー未せってい</span>
-    </div>
-
-    <!-- まんがの吹き出し枠：ロボが見ているもの・行動 -->
-    <div class="balloon-box">
-      <div class="balloon-row">
-        <span class="balloon-tag tag-see">👀 見えてる</span>
-        <span class="balloon-text" id="br-see">東に🍎リンゴ / 西に村人B</span>
-      </div>
-      <div class="balloon-row">
-        <span class="balloon-tag tag-act">👟 やった事</span>
-        <span class="balloon-text" id="br-act">ボタンを押して1歩動かしてみてね</span>
-      </div>
-    </div>
-
-    <!-- ロボのこころのこえ（一番大きく見やすい） -->
-    <div class="thought-voice-area">
-      <div class="thought-voice-title">💭 ロボのこころのこえ</div>
-      <div class="thought-voice-text" id="thought-txt">
-        下のボタンを押すと、AIが自分で考えて島をトコトコ歩き回るよ！
-      </div>
-    </div>
-  </div>
-
-  <!-- 右サイドの切り替えボタン -->
-  <div class="side-btns">
-    <button class="circle-btn active" id="btn-sur" onclick="changeCam('surface')" title="じじょう（島の上）を見る">🌲</button>
-    <button class="circle-btn" id="btn-ant" onclick="changeCam('antfarm')" title="ちか（断面）を見る">⛏️</button>
-    <button class="circle-btn" onclick="openModal('diaryModal')" title="手帳ときおく">📖</button>
-    <button class="circle-btn" onclick="openModal('settingModal')" title="せってい">⚙️</button>
-  </div>
-
-  <!-- 下部操作HUD -->
-  <div class="bottom-hud">
-    <div class="tap-guide" id="guide-txt">👆 地面をタップすると🍎リンゴが落ちるよ！</div>
-    <div class="action-row">
-      <button class="main-btn" id="think-btn" onclick="stepAiLife(true)">🟦 ⚡ Google 3.8 で1手かんがえさせる</button>
-      <button class="sub-instinct-btn" id="instinct-btn" onclick="stepAiLife(false)" title="通信しないでロボの自分のほんのうだけで動きます">🌱 ほんのう</button>
-      <button class="main-btn btn-respawn" id="respawn-btn" onclick="respawnRobot()">🔄 つぎの世代へ引き継ぐ</button>
-    </div>
-  </div>
-
-  <!-- 手帳・学習スコアモーダル -->
-  <div class="modal-cover" id="diaryModal">
-    <div class="modal-box">
-      <div class="modal-head">
-        <div class="modal-title">📖 ロボの手帳ときおく</div>
-        <div class="close-btn" onclick="closeModal('diaryModal')">✕</div>
-      </div>
-      <div style="font-size:12px; color:#fde047; font-weight:900;">🧬 体で覚えた「すき・きらい」スコア:</div>
-      <div class="diary-content" id="lifecore-mem-box" style="max-height:100px; color:#86efac;"></div>
-      <div style="font-size:12px; color:#38bdf8; font-weight:900;">📝 ロボが書いた日記:</div>
-      <div class="diary-content" id="diary-text"></div>
-      <button class="reset-btn" onclick="confirmResetGame()">🔄 データを消して最初からやり直す</button>
-      <button class="save-btn" onclick="closeModal('diaryModal')">とじる</button>
-    </div>
-  </div>
-
-  <!-- 設定モーダル（小学生にもわかりやすい2大選択カード） -->
+  <!-- 設定モーダル（最下部に初期化ボタンを配置） -->
   <div class="modal-cover" id="settingModal">
     <div class="modal-box">
       <div class="modal-head">
-        <div class="modal-title">⚙️ どっちのあたま（AI）をつかう？</div>
+        <div class="modal-title">⚙️ AIのせってい</div>
         <div class="close-btn" onclick="closeModal('settingModal')">✕</div>
       </div>
 
       <!-- Google Gemini カード -->
       <div class="settings-card selected-google" id="grp-google-key" onclick="selectModelInModal('gemini-3.8-flash')">
-        <div class="settings-card-head">
-          <span class="settings-card-title">🟦 Google Gemini 3.8（じっくり派）</span>
-          <span id="tag-google-status" class="key-status-tag tag-empty">キー未保存</span>
-        </div>
-        <div class="settings-help">Google AI Studio の無料キー（AIza...）をいれてね。</div>
+        <div style="font-size:13px; font-weight:900; color:#fff;">🟦 Google Gemini 3.8（じっくり派）</div>
+        <div style="font-size:11px; color:#94a3b8; margin:4px 0;">Google AI Studio の無料キー（AIza...）を入れてね。</div>
         <input type="password" id="input-google-key" class="input-box" placeholder="ここにGoogleキーを貼り付け" onclick="event.stopPropagation(); selectModelInModal('gemini-3.8-flash');" oninput="autoSaveKey('google', this.value)">
       </div>
 
       <!-- Groq 120B カード -->
       <div class="settings-card" id="grp-github-key" onclick="selectModelInModal('openai/gpt-oss-120b')">
-        <div class="settings-card-head">
-          <span class="settings-card-title">🟪 Groq 120B（ばくそく派）</span>
-          <span id="tag-github-status" class="key-status-tag tag-empty">キー未保存</span>
-        </div>
-        <div class="settings-help">Groq の無料キー（gsk_...）をいれてね。1日1000回まで無料！</div>
+        <div style="font-size:13px; font-weight:900; color:#fff;">🟪 Groq 120B（ばくそく派）</div>
+        <div style="font-size:11px; color:#94a3b8; margin:4px 0;">Groq の無料キー（gsk_...）を入れてね。1日1000回無料！</div>
         <input type="password" id="input-github-key" class="input-box" placeholder="ここにGroqキー (gsk_...) を貼り付け" onclick="event.stopPropagation(); selectModelInModal('openai/gpt-oss-120b');" oninput="autoSaveKey('github', this.value)">
       </div>
 
-      <div style="font-size:11px; color:#fde047; font-weight:800; text-align:center;" id="setting-msg">枠をタップすると使う頭脳が切り替わるよ！</div>
+      <button type="button" class="save-btn" id="modal-save-btn" onclick="saveKeys()">決定してとじる</button>
 
-      <button class="save-btn" id="modal-save-btn" onclick="saveKeys()">決定してとじる</button>
+      <!-- 最下部に移動した初期化ボタン -->
+      <button type="button" class="reset-btn" onclick="confirmResetGame()">🔄 データを消して最初からやり直す（初期化）</button>
     </div>
   </div>
 
@@ -399,17 +334,16 @@
      * ============================================================
      */
     class LifeCore {
-      // 1. 外部から直接いじれない秘密の内部データ（#マークでロック）
-      #energy = 100;   // エネルギー（水・食料の生存力：0で死）
-      #stamina = 100;  // スタミナ（動くための体力：0で気絶）
-      #mental = 100;   // メンタル（心の余裕・退屈さ：0で引きこもり/暴走）
-      #isAlive = true; // 生死フラグ
+      #energy = 100;
+      #stamina = 100;
+      #mental = 100;
+      #isAlive = true;
 
-      #memory = {};           // 経験の記憶（どの状態の時に何をしたら助かったか）
-      #lastStateKey = null;   // 直前の状態メモ
-      #lastAction = null;     // 直前に選んだ行動メモ
-      #lastWellbeing = 100;   // 直前の「心地よさ」合計スコア
-      #lastDelta = 0;         // 行動前後の「快・不快の変化量」（後付けの喜怒哀楽の元）
+      #memory = {};
+      #lastStateKey = null;
+      #lastAction = null;
+      #lastWellbeing = 100;
+      #lastDelta = 0;
 
       constructor(savedData = null) {
         if (savedData) {
@@ -417,50 +351,31 @@
         } else {
           this.#lastWellbeing = this.#calculateWellbeing();
         }
-        // コアの仕組み自体を凍結し、外部からのプログラム書き換えを完全に禁止する
         Object.freeze(this);
       }
 
-      // ------------------------------------------------------------
-      // 【内部の脳回路1】究極の天秤（今の「心地よさ」を1つの数字にする）
-      // 優先順位： エネルギー(命:50%) ＞ スタミナ(体:30%) ＞ メンタル(心:20%)
-      // ------------------------------------------------------------
       #calculateWellbeing() {
         if (!this.#isAlive) return 0;
         return (this.#energy * 0.5) + (this.#stamina * 0.3) + (this.#mental * 0.2);
       }
 
-      // ------------------------------------------------------------
-      // 【内部の脳回路2】今、自分がどんなピンチかを判断する（状態の決定）
-      // ------------------------------------------------------------
       #determineCurrentDrive() {
-        if (this.#energy <= 0) return 'DEAD';          // 生命停止
-        if (this.#stamina <= 0) return 'FAINT';        // 限界気絶（行動不能）
-        if (this.#energy <= 30) return 'STARVING';     // 命の危機（水・食料が最優先）
-        if (this.#stamina <= 25) return 'EXHAUSTED';   // 体力限界（睡眠が優先）
-        if (this.#energy <= 60) return 'HUNGRY';       // 小腹が減った
-        if (this.#mental <= 30) return 'BORED';        // 退屈でたまらない（刺激が欲しい）
-        return 'PEACE';                                // 平和で満たされている
+        if (this.#energy <= 0) return 'DEAD';
+        if (this.#stamina <= 0) return 'FAINT';
+        if (this.#energy <= 30) return 'STARVING';
+        if (this.#stamina <= 25) return 'EXHAUSTED';
+        if (this.#energy <= 60) return 'HUNGRY';
+        if (this.#mental <= 30) return 'BORED';
+        return 'PEACE';
       }
 
-      // ============================================================
-      // ▼ 外の世界（環境・画面）と繋ぐ「4つの窓口」 ▼
-      // ============================================================
-
-      /**
-       * 窓口1：時間を1コマ進め、AIに次の行動を決めさせる
-       * @param {Array<string>} availableActions - 今、環境で選べる行動の名前リスト
-       * @returns {string} AIが自分で決めた行動の名前
-       */
       tick(availableActions = []) {
         if (!this.#isAlive) return 'NONE';
 
-        // 生きているだけで少しずつ減る基本消費（生体タイマー）
         this.#energy = Math.max(0, this.#energy - 2);
         this.#stamina = Math.max(0, this.#stamina - 1);
         this.#mental = Math.max(0, this.#mental - 1);
 
-        // 命が尽きたかチェック
         if (this.#energy <= 0) {
           this.#isAlive = false;
           this.#lastAction = 'NONE';
@@ -470,44 +385,36 @@
         const currentDrive = this.#determineCurrentDrive();
         this.#lastWellbeing = this.#calculateWellbeing();
 
-        // スタミナが0なら、選択権を奪い強制的に「気絶（睡眠）」させる
         if (currentDrive === 'FAINT') {
           this.#lastStateKey = 'FAINT';
           this.#lastAction = 'FORCE_SLEEP';
           return 'FORCE_SLEEP';
         }
 
-        // 選べる行動が外から与えられていない場合は何もしない
         if (!Array.isArray(availableActions) || availableActions.length === 0) {
           return 'WAIT';
         }
 
-        // 初めての状況なら、脳内に新しい記憶ページを作る
         if (!this.#memory[currentDrive]) {
           this.#memory[currentDrive] = {};
         }
         for (const act of availableActions) {
           if (this.#memory[currentDrive][act] === undefined) {
-            this.#memory[currentDrive][act] = 0; // 初期スコアは0（白紙）
+            this.#memory[currentDrive][act] = 0;
           }
         }
 
-        // 【気まぐれ・好奇心の計算】
-        // 基本は20%の確率で新しいことを試すが、「退屈(BORED)」の時は70%の確率で未知の行動に走る
         const curiosityRate = (currentDrive === 'BORED') ? 0.7 : 0.2;
 
         let chosenAction;
         if (Math.random() < curiosityRate) {
-          // ランダムに試す（試行錯誤）
           chosenAction = availableActions[Math.floor(Math.random() * availableActions.length)];
         } else {
-          // 過去の記憶から、今の状況で一番スコアが高かった行動を選ぶ
           chosenAction = availableActions.reduce((best, current) => {
             return this.#memory[currentDrive][current] > this.#memory[currentDrive][best] ? current : best;
           }, availableActions[0]);
         }
 
-        // 同じ行動ばかり繰り返すと「退屈」が加速する仕組み
         if (chosenAction === this.#lastAction) {
           this.#mental = Math.max(0, this.#mental - 3);
         }
@@ -517,23 +424,15 @@
         return chosenAction;
       }
 
-      /**
-       * 窓口2：行動した結果を環境から受け取り、脳に学習させる
-       * @param {number} dEnergy  - エネルギーの変化量（例：食べたら +30）
-       * @param {number} dStamina - スタミナの変化量（例：動いたら -5、寝たら +50）
-       * @param {number} dMental  - メンタルの変化量（例：遊んだら +20）
-       */
       feedback(dEnergy = 0, dStamina = 0, dMental = 0) {
         if (!this.#isAlive) return;
 
-        // 強制気絶中だった場合は、スタミナを回復させるだけで学習はしない
         if (this.#lastAction === 'FORCE_SLEEP') {
           this.#stamina = Math.min(100, Math.max(0, this.#stamina + 30));
           this.#lastDelta = 0;
           return;
         }
 
-        // 1. パネルの数字を更新（0〜100の範囲に収める）
         this.#energy = Math.min(100, Math.max(0, this.#energy + dEnergy));
         this.#stamina = Math.min(100, Math.max(0, this.#stamina + dStamina));
         this.#mental = Math.min(100, Math.max(0, this.#mental + dMental));
@@ -542,38 +441,29 @@
           this.#isAlive = false;
         }
 
-        // 2. 行動する前と比べて「快（プラス）」になったか「不快（マイナス）」になったか計算
         const newWellbeing = this.#calculateWellbeing();
-        const reward = newWellbeing - this.#lastWellbeing; // これが「快・不快」の差
+        const reward = newWellbeing - this.#lastWellbeing;
         this.#lastDelta = Number(reward.toFixed(2));
 
-        // 3. 記憶（神経）の書き換え：助かったらスコアを増やし、苦しくなったら減らす
         if (this.#lastStateKey && this.#lastAction && this.#memory[this.#lastStateKey]) {
           const currentScore = this.#memory[this.#lastStateKey][this.#lastAction] || 0;
-          // 学習した経験を脳に刻む
           this.#memory[this.#lastStateKey][this.#lastAction] = Number((currentScore + reward).toFixed(2));
         }
       }
 
-      /**
-       * 窓口3：現在の状態を観察する（後からUIや喜怒哀楽を作るための読み取り専用データ）
-       */
       getState() {
         return Object.freeze({
           isAlive: this.#isAlive,
           energy: this.#energy,
           stamina: this.#stamina,
           mental: this.#mental,
-          drive: this.#determineCurrentDrive(), // 今一番気にしている欲求
-          lastAction: this.#lastAction,         // 直前にやった行動
-          feelingDelta: this.#lastDelta,        // 快・不快の変化（プラスなら喜、マイナスなら怒・哀の元）
-          memory: JSON.parse(JSON.stringify(this.#memory)) // 脳内の記憶マップ（コピー）
+          drive: this.#determineCurrentDrive(),
+          lastAction: this.#lastAction,
+          feelingDelta: this.#lastDelta,
+          memory: JSON.parse(JSON.stringify(this.#memory))
         });
       }
 
-      /**
-       * 窓口4：セーブデータの書き出しと読み込み（電波なしで端末間を移動するため）
-       */
       exportSave() {
         return JSON.stringify({
           e: this.#energy,
@@ -603,13 +493,15 @@
     Object.freeze(LifeCore.prototype);
 
     /* =====================================================================
-     * 通信コア：GeminiCore & GroqCore
+     * 通信コア：GeminiCore & GroqCore（張りぼて禁止・本物通信）
      * ===================================================================== */
     const GeminiCore = Object.freeze({
       DEFAULT_MODEL: 'gemini-3.8-flash',
 
       async think(prompt, apiKey, customModel) {
-        if (!apiKey || apiKey.trim().length <= 10) throw new Error('Google APIキーが未設定です。');
+        if (!apiKey || apiKey.trim().length <= 10) {
+          throw new Error('Googleキーがまだ設定されていません。右上の⚙️から入力してね。');
+        }
         let targetModel = customModel && customModel.trim() ? customModel.trim() : this.DEFAULT_MODEL;
         if (targetModel.includes('2.5') || targetModel.includes('2.0') || targetModel.includes('1.5')) {
           targetModel = this.DEFAULT_MODEL;
@@ -626,17 +518,17 @@
         });
 
         if (!res.ok) {
-          if (res.status === 429) throw new Error('Googleの無料枠が混雑中です。少し待って押してね！');
+          if (res.status === 429) throw new Error('Googleの無料枠が混雑中です。数秒待ってからもう一度押してね！');
           const errTxt = await res.text();
-          throw new Error(`Google エラー ${res.status}: ${errTxt.slice(0, 80)}`);
+          throw new Error(`Google エラー (${res.status}): ${errTxt.slice(0, 70)}`);
         }
 
         const data = await res.json();
         const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!rawText) throw new Error('AIから返答がありませんでした。');
+        if (!rawText) throw new Error('AIから返事が返ってきませんでした。');
         return this._parseJsonSafely(rawText);
       },
-      
+
       _parseJsonSafely(rawText) {
         const cleaned = rawText.replace(/\x60{3}json/gi, '').replace(/\x60{3}/g, '').trim();
         const firstBrace = cleaned.indexOf('{');
@@ -649,7 +541,9 @@
       DEFAULT_MODEL: 'openai/gpt-oss-120b',
 
       async think(prompt, apiKey, modelName) {
-        if (!apiKey || apiKey.trim().length <= 10) throw new Error('Groqキー（gsk_...）が未設定です。');
+        if (!apiKey || apiKey.trim().length <= 10) {
+          throw new Error('Groqキー (gsk_...) が設定されていません。右上の⚙️から入力してね。');
+        }
         const key = apiKey.trim();
         const endpoint = 'https://api.groq.com/openai/v1/chat/completions';
         const targetModel = modelName || this.DEFAULT_MODEL;
@@ -665,33 +559,11 @@
           })
         });
 
-        if (res.status === 400 || res.status === 404) {
-          const mRes = await fetch('https://api.groq.com/openai/v1/models', {
-            headers: { 'Authorization': `Bearer ${key}` }
-          });
-          if (mRes.ok) {
-            const mData = await mRes.json();
-            const available = (mData.data || []).map(m => m.id).filter(id => !id.includes('whisper') && !id.includes('tts') && !id.includes('guard'));
-            const fallbackModel = available.find(id => id.includes('gpt-oss-120b') || id.includes('70b')) || available[0];
-            if (fallbackModel) {
-              res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-                body: JSON.stringify({
-                  model: fallbackModel,
-                  messages: [{ role: 'user', content: prompt }],
-                  temperature: 0.7
-                })
-              });
-            }
-          }
-        }
-
         if (!res.ok) {
-          if (res.status === 401) throw new Error('Groqキーが無効です（gsk_から始まるか確認してね）。');
+          if (res.status === 401) throw new Error('Groqキーが無効です（gsk_から始まっているか確認してね）。');
           if (res.status === 429) throw new Error('Groqが混雑中です。数秒待って押してね！');
           const errTxt = await res.text();
-          throw new Error(`Groq エラー ${res.status}: ${errTxt.slice(0, 80)}`);
+          throw new Error(`Groq エラー (${res.status}): ${errTxt.slice(0, 70)}`);
         }
 
         const data = await res.json();
@@ -702,35 +574,42 @@
     });
 
     // =====================================================================
-    // 安全ストレージ＆自動セーブ（閉じても続きから再開できる仕組み）
+    // 状態管理 & 自動セーブ
     // =====================================================================
     const memStore = {};
     const safeStorage = {
-      getItem: (k) => {
-        if (memStore[k] !== undefined) return memStore[k];
-        try { return localStorage.getItem(k); } catch(e) { return null; }
-      },
-      setItem: (k, v) => {
-        memStore[k] = String(v);
-        try { localStorage.setItem(k, String(v)); } catch(e) {}
-      },
-      removeItem: (k) => {
-        delete memStore[k];
-        try { localStorage.removeItem(k); } catch(e) {}
-      }
+      getItem: (k) => memStore[k] !== undefined ? memStore[k] : (() => { try { return localStorage.getItem(k); } catch(e){ return null; } })(),
+      setItem: (k, v) => { memStore[k] = String(v); try { localStorage.setItem(k, String(v)); } catch(e){} },
+      removeItem: (k) => { delete memStore[k]; try { localStorage.removeItem(k); } catch(e){} }
     };
 
     function showToast(msg) {
       const el = document.getElementById('toast-msg');
       if (!el) return;
-      el.textContent = msg;
-      el.classList.add('show');
-      setTimeout(() => el.classList.remove('show'), 2000);
+      el.textContent = msg; el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 1800);
     }
 
-    function isGeminiModel(modelName) {
-      return String(modelName).startsWith('gemini');
-    }
+    const DRIVE_JA = {
+      PEACE: '😊 あんしん・まんぷく',
+      BORED: '🥱 たい屈（あそびたい！）',
+      HUNGRY: '🍙 おなかすいた…',
+      EXHAUSTED: '💤 くたくた（ねむい）',
+      STARVING: '🚨 はらぺこピンチ！！',
+      FAINT: '💫 たおれて気絶中',
+      DEAD: '💀 うごかなくなった'
+    };
+
+    let life = new LifeCore();
+
+    const ROBOT = {
+      gen: 1,
+      stepCount: 0,
+      pos: { x: 0, z: 0 },
+      hasApple: false,
+      lastVoice: "ぼくはマス目の島に立つロボットだよ！\n下の「⚡ 今すぐ考える」ボタンを押すと、ほんとうに自分で考えて島を歩くよ！",
+      lastActionNote: "待機中（まだ動いていないよ）"
+    };
 
     function getActiveModel() {
       const saved = safeStorage.getItem('ai_custom_model');
@@ -741,41 +620,12 @@
 
     function getKeyForCurrentModel() {
       const m = getActiveModel();
-      if (isGeminiModel(m)) {
-        return safeStorage.getItem('key_google') || safeStorage.getItem('ai_api_key') || '';
-      } else {
-        return safeStorage.getItem('key_github') || '';
-      }
+      return m.startsWith('gemini') ? (safeStorage.getItem('key_google') || '') : (safeStorage.getItem('key_github') || '');
     }
 
-    // =====================================================================
-    // 村人状態 & LifeCore
-    // =====================================================================
-    const DRIVE_JA = {
-      PEACE: '😊 あんしん・まんぷく',
-      BORED: '🥱 たいくつ（あそびたい！）',
-      HUNGRY: '🍙 おなかすいた…',
-      EXHAUSTED: '💤 くたくた（ねむい）',
-      STARVING: '🚨 はらぺこピンチ！！',
-      FAINT: '💫 たおれてきぜつ中',
-      DEAD: '💀 うごかなくなった'
-    };
-
-    let life = new LifeCore();
-
-    const ROBOT = {
-      gen: 1,
-      stepCount: 0,
-      pos: { x: 0, y: 0, z: -1 },
-      hasApple: false,
-      known: {},
-      diary: ["【第1世代の目覚め】\n生命コア（LifeCore）が起動した。島のマス目を歩いて、すき・きらいを学習しよう！"]
-    };
-
-    // 自動セーブとロードの処理
     function saveWorldState() {
       try {
-        const applesData = fieldApples.map(a => ({ gx: a.gx, gy: a.gy, gz: a.gz }));
+        const applesData = fieldApples.map(a => ({ gx: a.gx, gz: a.gz }));
         const saveData = {
           lifeSave: life.exportSave(),
           robot: {
@@ -783,22 +633,21 @@
             stepCount: ROBOT.stepCount,
             pos: ROBOT.pos,
             hasApple: ROBOT.hasApple,
-            known: ROBOT.known,
-            diary: ROBOT.diary
+            lastVoice: ROBOT.lastVoice,
+            lastActionNote: ROBOT.lastActionNote
           },
-          apples: applesData,
-          savedAt: Date.now()
+          apples: applesData
         };
-        safeStorage.setItem('island_game_save_v2', JSON.stringify(saveData));
-      } catch (err) {
-        console.error('Save error:', err);
+        safeStorage.setItem('island_game_save_clean', JSON.stringify(saveData));
+      } catch (e) {
+        console.error('Save error:', e);
       }
     }
 
     let pendingLoadedApples = null;
     function tryLoadWorldState() {
       try {
-        const raw = safeStorage.getItem('island_game_save_v2');
+        const raw = safeStorage.getItem('island_game_save_clean');
         if (!raw) return false;
         const data = JSON.parse(raw);
         if (!data || !data.lifeSave || !data.robot) return false;
@@ -806,131 +655,88 @@
         life = new LifeCore(data.lifeSave);
         ROBOT.gen = data.robot.gen || 1;
         ROBOT.stepCount = data.robot.stepCount || 0;
-        ROBOT.pos = data.robot.pos || { x: 0, y: 0, z: -1 };
+        ROBOT.pos = data.robot.pos || { x: 0, z: 0 };
         ROBOT.hasApple = Boolean(data.robot.hasApple);
-        ROBOT.known = data.robot.known || {};
-        ROBOT.diary = Array.isArray(data.robot.diary) ? data.robot.diary : [];
+        ROBOT.lastVoice = data.robot.lastVoice || ROBOT.lastVoice;
+        ROBOT.lastActionNote = data.robot.lastActionNote || ROBOT.lastActionNote;
         pendingLoadedApples = Array.isArray(data.apples) ? data.apples : null;
         return true;
-      } catch (err) {
-        console.error('Load error:', err);
+      } catch (e) {
+        console.error('Load error:', e);
         return false;
       }
     }
 
     function confirmResetGame() {
-      if (confirm('ほんとうに最初からやり直しますか？（きおくや手帳のデータが消えます）')) {
-        safeStorage.removeItem('island_game_save_v2');
+      if (confirm('ほんとうに最初からやり直しますか？\n（覚えた記憶やロボットのデータがすべてリセットされます）')) {
+        safeStorage.removeItem('island_game_save_clean');
         location.reload();
       }
     }
 
-    function markVision(cx, cy, cz) {
-      for (let ox = -1; ox <= 1; ox++) {
-        for (let oy = -1; oy <= 1; oy++) {
-          for (let oz = -1; oz <= 1; oz++) ROBOT.known[(cx + ox) + ',' + (cy + oy) + ',' + (cz + oz)] = true;
-        }
-      }
-    }
-
     // =====================================================================
-    // 空間コア（明るく立体的なライティングと美しいボクセル島）
+    // 上部ウィンドウ：マス目マップ 3D（ハシゴ・地下・お化け・仲間B全撤去）
     // =====================================================================
     let scene, camera, renderer, world, clickBlocks = [], voxelMap = {}, fieldApples = [];
-    let chara, bodyM, headM, eyeM, rArm, lArm, rLeg, lLeg, handApple;
-    let villagerB;
-    let bulbGroup, bulbGlass, bulbHalo, bulbLight, bulbTimer = 0;
-    let targetCamPos, targetCamLook, curCamLook;
+    let chara, bodyM, headM, rArm, lArm, rLeg, lLeg, handApple;
 
-    const CAM_COORDS = {
-      surface: { pos: [0, 8.5, 12.5], look: [0, 0, -1] },
-      antfarm: { pos: [0, -2.5, 11.5], look: [0, -2.5, 0] }
-    };
-
-    const PALETTE = {
-      lit: { grass: 0x34d399, dirt: 0x92400e, stone: 0x64748b },
-      dark: { grass: 0x1e3a2f, dirt: 0x3d2b1f, stone: 0x242d3d }
-    };
+    const MAP_SIZE = 5; // 5x5マス（-2 〜 +2）
 
     function init3D() {
       if (typeof THREE === 'undefined') return;
       const stage = document.getElementById('c3d');
       if (!stage || renderer) return;
 
-      const w = Math.max(stage.clientWidth || window.innerWidth || 360, 280);
-      const h = Math.max(stage.clientHeight || window.innerHeight || 640, 420);
+      const w = Math.max(stage.clientWidth || window.innerWidth || 360, 240);
+      const h = Math.max(stage.clientHeight || 260, 200);
 
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0x0b1329);
 
-      camera = new THREE.PerspectiveCamera(42, w / h, 0.1, 100);
-      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100);
+      camera.position.set(0, 7.8, 8.2);
+      camera.lookAt(0, 0, 0);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(w, h);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setClearColor(0x0b1329, 1.0);
       stage.innerHTML = '';
       stage.appendChild(renderer.domElement);
 
-      const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x1e293b, 1.2);
+      // 上品で立体感のあるライティング
+      const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x1e293b, 1.3);
       scene.add(hemiLight);
 
-      const sun = new THREE.DirectionalLight(0xffffff, 0.9);
-      sun.position.set(8, 16, 10);
+      const sun = new THREE.DirectionalLight(0xffffff, 0.95);
+      sun.position.set(6, 12, 7);
       scene.add(sun);
-
-      const fillSun = new THREE.DirectionalLight(0x38bdf8, 0.4);
-      fillSun.position.set(-8, 10, -8);
-      scene.add(fillSun);
 
       world = new THREE.Group();
       scene.add(world);
 
       const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+      const grassMat = new THREE.MeshLambertMaterial({ color: 0x34d399 });
+      const dirtMat = new THREE.MeshLambertMaterial({ color: 0x854d0e });
 
-      function makeBlock(x, y, z, type) {
-        const mat = new THREE.MeshLambertMaterial({ color: PALETTE.dark[type] });
-        const b = new THREE.Mesh(boxGeo, mat);
-        b.position.set(x, y, z);
-        b.userData = { gx: x, gy: y, gz: z, type: type };
-        world.add(b);
-        voxelMap[x + ',' + y + ',' + z] = b;
-        clickBlocks.push(b);
-      }
+      // 平坦な 5x5 マス目ブロックを生成
+      const half = Math.floor(MAP_SIZE / 2);
+      for (let x = -half; x <= half; x++) {
+        for (let z = -half; z <= half; z++) {
+          const topB = new THREE.Mesh(boxGeo, grassMat);
+          topB.position.set(x, 0, z);
+          topB.userData = { gx: x, gz: z };
+          world.add(topB);
+          voxelMap[x + ',' + z] = topB;
+          clickBlocks.push(topB);
 
-      for (let x = -4; x <= 4; x++) {
-        for (let z = -4; z <= 0; z++) {
-          if (!(x === 0 && z === -1)) makeBlock(x, 0, z, 'grass');
-          for (let y = -1; y >= -5; y--) {
-            if (x === 0 && z === -1 && y >= -4) continue;
-            if (Math.abs(x) <= 2 && y <= -2 && y >= -4 && z >= -2) continue;
-            makeBlock(x, y, z, y >= -2 ? 'dirt' : 'stone');
-          }
+          // 土台の下ブロック
+          const underB = new THREE.Mesh(boxGeo, dirtMat);
+          underB.position.set(x, -1, z);
+          world.add(underB);
         }
       }
 
-      const ladMat = new THREE.MeshLambertMaterial({ color: 0xf59e0b });
-      for (let y = 0; y >= -4; y--) {
-        const step = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.12, 0.12), ladMat);
-        step.position.set(0, y - 0.2, -1.4);
-        world.add(step);
-      }
-
-      const glass = new THREE.Mesh(
-        new THREE.PlaneGeometry(9.2, 6.2),
-        new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.16, side: THREE.DoubleSide })
-      );
-      glass.position.set(0, -2.5, 0.51);
-      scene.add(glass);
-
-      villagerB = new THREE.Group();
-      const bBody = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.4), new THREE.MeshLambertMaterial({ color: 0x10b981 }));
-      bBody.position.y = 0.3;
-      const bHead = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.38, 0.38), new THREE.MeshLambertMaterial({ color: 0x6ee7b7 }));
-      bHead.position.y = 0.72;
-      villagerB.add(bBody, bHead);
-      villagerB.position.set(-2, 0.5, -1);
-      world.add(villagerB);
-
+      // ロボットモデル
       chara = new THREE.Group();
       world.add(chara);
 
@@ -940,202 +746,121 @@
       headM = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0x93c5fd }));
       headM.scale.set(0.44, 0.42, 0.42); headM.position.y = 0.88; chara.add(headM);
 
-      eyeM = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.11, 0.08), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
-      eyeM.position.set(0, 0.9, 0.22); chara.add(eyeM);
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.11, 0.08), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+      eye.position.set(0, 0.9, 0.22); chara.add(eye);
 
-      const armGeo = new THREE.BoxGeometry(0.18, 0.4, 0.18);
+      const armGeo = new THREE.BoxGeometry(0.18, 0.38, 0.18);
       const armMat = new THREE.MeshLambertMaterial({ color: 0x1d4ed8 });
       rArm = new THREE.Mesh(armGeo, armMat); rArm.position.set(0.37, 0.5, 0); chara.add(rArm);
       lArm = new THREE.Mesh(armGeo, armMat); lArm.position.set(-0.37, 0.5, 0); chara.add(lArm);
 
       handApple = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), new THREE.MeshLambertMaterial({ color: 0xef4444, visible: false }));
-      handApple.position.set(0, -0.22, 0.15); rArm.add(handApple);
+      handApple.position.set(0, -0.2, 0.15); rArm.add(handApple);
 
       const legGeo = new THREE.BoxGeometry(0.2, 0.34, 0.2);
       const legMat = new THREE.MeshLambertMaterial({ color: 0x1e3a8a });
       rLeg = new THREE.Mesh(legGeo, legMat); rLeg.position.set(0.17, 0.17, 0); chara.add(rLeg);
       lLeg = new THREE.Mesh(legGeo, legMat); lLeg.position.set(-0.17, 0.17, 0); chara.add(lLeg);
 
-      bulbGroup = new THREE.Group();
-      bulbGroup.position.set(0, 1.42, 0); bulbGroup.visible = false; chara.add(bulbGroup);
-
-      const bulbBase = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.16), new THREE.MeshLambertMaterial({ color: 0x94a3b8 }));
-      bulbBase.position.y = -0.14; bulbGroup.add(bulbBase);
-
-      bulbGlass = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.34), new THREE.MeshBasicMaterial({ color: 0xfef08a }));
-      bulbGlass.position.y = 0.06; bulbGroup.add(bulbGlass);
-
-      bulbHalo = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.55), new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.5 }));
-      bulbHalo.position.y = 0.06; bulbGroup.add(bulbHalo);
-
-      bulbLight = new THREE.PointLight(0xfde047, 0, 5);
-      bulbLight.position.set(0, 0.2, 0); bulbGroup.add(bulbLight);
-
-      // ロボットの初期位置（ロードされた座標または初期値）
-      chara.position.set(ROBOT.pos.x, ROBOT.pos.y + 0.5, ROBOT.pos.z);
+      chara.position.set(ROBOT.pos.x, 0.5, ROBOT.pos.z);
       if (ROBOT.hasApple && handApple) handApple.material.visible = true;
 
-      targetCamPos = new THREE.Vector3(...CAM_COORDS.surface.pos);
-      targetCamLook = new THREE.Vector3(...CAM_COORDS.surface.look);
-      curCamLook = targetCamLook.clone();
-      camera.position.copy(targetCamPos);
-      camera.lookAt(curCamLook);
-
-      // 保存されたリンゴの復元、または初期リンゴの生成
+      // 保存リンゴの復元、または初期リンゴ
       if (pendingLoadedApples && pendingLoadedApples.length > 0) {
-        for (const ap of pendingLoadedApples) spawnApple(ap.gx, ap.gy, ap.gz, false);
+        for (const a of pendingLoadedApples) spawnApple(a.gx, a.gz, false);
       } else {
-        spawnApple(2, 0, -1, false);
+        spawnApple(1, 0, false);
       }
 
-      markVision(ROBOT.pos.x, ROBOT.pos.y, ROBOT.pos.z);
-      refreshFog();
-      setupTouch();
+      setupTouchInteraction();
       updateHUD();
       renderLoop();
-
-      setTimeout(resizeRenderer, 100);
-      setTimeout(resizeRenderer, 400);
+      setTimeout(resizeRenderer, 150);
     }
 
-    function triggerIdeaBulb(label) {
-      bulbTimer = 140;
-      bulbGroup.visible = true; bulbLight.intensity = 2.8; eyeM.material.color.setHex(0xfde047);
-
-      const popup = document.getElementById('bulb-popup');
-      document.getElementById('bulb-tag-txt').textContent = label;
-      popup.style.display = 'flex';
-
-      const card = document.getElementById('thought-card');
-      card.classList.add('flash-success');
-      setTimeout(() => card.classList.remove('flash-success'), 1500);
-    }
-
-    function updateBulbScreenPosition() {
-      const popup = document.getElementById('bulb-popup');
-      if (bulbTimer <= 0 || !bulbGroup || !bulbGroup.visible || !camera) {
-        if (popup && popup.style.display !== 'none') popup.style.display = 'none';
-        return;
-      }
-      const worldPos = new THREE.Vector3();
-      bulbGroup.getWorldPosition(worldPos); worldPos.y += 0.35; worldPos.project(camera);
-      const x = (worldPos.x * 0.5 + 0.5) * window.innerWidth;
-      const y = (-(worldPos.y * 0.5) + 0.5) * window.innerHeight;
-      popup.style.left = x + 'px'; popup.style.top = y + 'px';
-    }
-
-    function refreshFog() {
-      for (const key in voxelMap) {
-        const b = voxelMap[key];
-        const lit = Boolean(ROBOT.known[b.userData.gx + ',' + b.userData.gy + ',' + b.userData.gz]);
-        b.material.color.setHex(lit ? PALETTE.lit[b.userData.type] : PALETTE.dark[b.userData.type]);
-      }
-    }
-
-    function changeCam(type) {
-      if (!targetCamPos || !targetCamLook) return;
-      targetCamPos.set(...CAM_COORDS[type].pos);
-      targetCamLook.set(...CAM_COORDS[type].look);
-      document.getElementById('btn-sur').classList.toggle('active', type === 'surface');
-      document.getElementById('btn-ant').classList.toggle('active', type === 'antfarm');
-    }
-
-    function spawnApple(gx, gy, gz, shouldSave = true) {
+    function spawnApple(gx, gz, shouldSave = true) {
       if (!world) return;
       const grp = new THREE.Group();
-      const apple = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.34), new THREE.MeshLambertMaterial({ color: 0xef4444 }));
-      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.12, 0.09), new THREE.MeshLambertMaterial({ color: 0x22c55e }));
-      leaf.position.set(0, 0.2, 0); grp.add(apple, leaf);
-      grp.position.set(gx, gy + 0.65, gz);
+      const apple = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.36), new THREE.MeshLambertMaterial({ color: 0xef4444 }));
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), new THREE.MeshLambertMaterial({ color: 0x22c55e }));
+      leaf.position.set(0, 0.22, 0); grp.add(apple, leaf);
+      grp.position.set(gx, 0.65, gz);
       world.add(grp);
-      fieldApples.push({ mesh: grp, gx: gx, gy: gy, gz: gz });
-      updateHUD();
+      fieldApples.push({ mesh: grp, gx: gx, gz: gz });
+
+      document.getElementById('tap-hint').textContent = `🍎 リンゴが落ちたよ！ (島に${fieldApples.length}こ)`;
       if (shouldSave) saveWorldState();
     }
 
-    function setupTouch() {
-      let touchMode = 'none', prevX = 0, prevDist = 0, touchTime = 0;
-      const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+    function setupTouchInteraction() {
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+      let touchStartTime = 0;
+      let prevX = 0;
 
-      window.addEventListener('touchstart', e => {
-        if (e.target.closest('.top-hud, .thought-card, .side-btns, .bottom-hud, .modal-cover')) return;
-        touchTime = performance.now();
-        if (e.touches.length === 1) { touchMode = 'drag'; prevX = e.touches[0].clientX; }
-        else if (e.touches.length === 2) {
-          touchMode = 'pinch'; prevDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-        }
+      const topWindow = document.querySelector('.top-window');
+      topWindow.addEventListener('touchstart', e => {
+        if (e.target.closest('.top-gauge-panel, .btn-setting-gear')) return;
+        touchStartTime = performance.now();
+        if (e.touches.length === 1) prevX = e.touches[0].clientX;
       }, { passive: true });
 
-      window.addEventListener('touchmove', e => {
-        if (!world || !camera) return;
-        if (touchMode === 'drag' && e.touches.length === 1) {
-          world.rotation.y += (e.touches[0].clientX - prevX) * 0.007; prevX = e.touches[0].clientX;
-        } else if (touchMode === 'pinch' && e.touches.length === 2) {
-          const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-          camera.fov = Math.max(20, Math.min(65, camera.fov + (prevDist - d) * 0.02)); camera.updateProjectionMatrix(); prevDist = d;
-        }
+      topWindow.addEventListener('touchmove', e => {
+        if (!world || e.touches.length !== 1) return;
+        const dx = e.touches[0].clientX - prevX;
+        world.rotation.y += dx * 0.008;
+        prevX = e.touches[0].clientX;
       }, { passive: true });
 
-      window.addEventListener('touchend', e => {
-        if (performance.now() - touchTime < 250 && touchMode === 'drag' && e.changedTouches.length === 1) dropAppleAtPoint(e.changedTouches[0]);
-        touchMode = 'none';
+      topWindow.addEventListener('touchend', e => {
+        if (performance.now() - touchStartTime < 250 && e.changedTouches.length === 1) {
+          const rect = topWindow.getBoundingClientRect();
+          const touch = e.changedTouches[0];
+          mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+          mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+          raycaster.setFromCamera(mouse, camera);
+          const hits = raycaster.intersectObjects(clickBlocks);
+          if (hits.length > 0) {
+            const gx = hits[0].object.userData.gx;
+            const gz = hits[0].object.userData.gz;
+            spawnApple(gx, gz, true);
+          }
+        }
       });
-
-      function dropAppleAtPoint(touch) {
-        if (!life.getState().isAlive || !camera) return;
-        mouse.x = (touch.clientX / window.innerWidth) * 2 - 1; mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        const hits = raycaster.intersectObjects(clickBlocks);
-        if (hits.length === 0) return;
-        let gx = hits[0].object.userData.gx, gy = hits[0].object.userData.gy, gz = hits[0].object.userData.gz;
-        while (gy > -4 && !voxelMap[gx + ',' + gy + ',' + gz]) gy--;
-        spawnApple(gx, gy, gz, true);
-        document.getElementById('guide-txt').textContent = '🍎 リンゴを落としたよ！ (島に' + fieldApples.length + 'こ)';
-      }
     }
 
-    function canWalk(x, y, z) {
-      if (voxelMap[x + ',' + y + ',' + z]) return false;
-      if (x < -4 || x > 4 || z < -4 || z > 0 || y > 0 || y < -4) return false;
-      const hasFloor = Boolean(voxelMap[x + ',' + (y - 1) + ',' + z]);
-      const onLadder = (x === 0 && z === -1 && y >= -4 && y <= 0);
-      return (hasFloor || onLadder);
+    function getSurroundings(cx, cz) {
+      const dirs = [
+        { label: "東", dx: 1, dz: 0 },
+        { label: "西", dx: -1, dz: 0 },
+        { label: "南", dx: 0, dz: 1 },
+        { label: "北", dx: 0, dz: -1 }
+      ];
+      const half = Math.floor(MAP_SIZE / 2);
+      return dirs.map(d => {
+        const tx = cx + d.dx, tz = cz + d.dz;
+        if (tx < -half || tx > half || tz < -half || tz > half) return `${d.label}:島の端(崖)`;
+        return `${d.label}:進める`;
+      }).join(' / ');
     }
 
-    function inspectSurroundings(cx, cy, cz) {
-      const check = (dx, dy, dz, label) => {
-        const tx = cx + dx, ty = cy + dy, tz = cz + dz;
-        if (voxelMap[tx + ',' + ty + ',' + tz]) return label + ':壁';
-        if (tx === 0 && tz === -1 && ty >= -4 && ty <= 0) return label + ':ハシゴ';
-        if (canWalk(tx, ty, tz)) return label + ':進める';
-        return label + ':崖';
-      };
-      return [check(1, 0, 0, "東"), check(-1, 0, 0, "西"), check(0, 0, 1, "南"), check(0, 0, -1, "北"), check(0, 1, 0, "上"), check(0, -1, 0, "下")].join(" / ");
+    function getAppleInfo(cx, cz) {
+      if (fieldApples.length === 0) return "島にリンゴはありません";
+      return fieldApples.map((a, i) => {
+        const dist = Math.hypot(a.gx - cx, a.gz - cz).toFixed(1);
+        const dirs = [];
+        if (a.gx > cx) dirs.push("東"); if (a.gx < cx) dirs.push("西");
+        if (a.gz > cz) dirs.push("南"); if (a.gz < cz) dirs.push("北");
+        return `🍎リンゴ#${i+1}:${dirs.length > 0 ? dirs.join('') : '足元'}(距離${dist}マス)`;
+      }).join(' / ');
     }
 
-    function scanSmell(cx, cy, cz) {
-      let str = "";
-      if (fieldApples.length === 0) {
-        str = "リンゴなし";
-      } else {
-        str = fieldApples.map((a, i) => {
-          const dist = Math.hypot(a.gx - cx, a.gy - cy, a.gz - cz).toFixed(1);
-          const dirs = [];
-          if (a.gx > cx) dirs.push("東"); if (a.gx < cx) dirs.push("西");
-          if (a.gz > cz) dirs.push("南"); if (a.gz < cz) dirs.push("北");
-          if (a.gy > cy) dirs.push("上"); if (a.gy < cy) dirs.push("下");
-          return '🍎リンゴ#' + (i + 1) + ':' + (dirs.length > 0 ? dirs.join("") : "足元") + '(' + dist + 'マス)';
-        }).join(' / ');
-      }
-      return str + ' ｜ 西(-2,0,-1)に仲間村人B';
-    }
-
-    function getPossibleActions(cx, cy, cz) {
+    function getPossibleActions(cx, cz) {
       const list = [];
       if (ROBOT.hasApple) {
         list.push({ key: "EAT_HAND", txt: "右手の🍎リンゴを食べる" });
       }
-      const nearIdx = fieldApples.findIndex(a => Math.abs(a.gx - cx) + Math.abs(a.gy - cy) + Math.abs(a.gz - cz) <= 1);
+      const nearIdx = fieldApples.findIndex(a => Math.abs(a.gx - cx) + Math.abs(a.gz - cz) <= 1);
       if (nearIdx !== -1) {
         list.push({ key: "EAT_FIELD", appleIdx: nearIdx, txt: "目の前の🍎リンゴを食べる" });
         if (!ROBOT.hasApple) {
@@ -1143,228 +868,167 @@
         }
       }
 
+      const half = Math.floor(MAP_SIZE / 2);
       const dirs = [
-        { key: "MOVE_E", dx: 1, dy: 0, dz: 0, name: "東へ1歩あるく" },
-        { key: "MOVE_W", dx: -1, dy: 0, dz: 0, name: "西へ1歩あるく" },
-        { key: "MOVE_S", dx: 0, dy: 0, dz: 1, name: "南へ1歩あるく" },
-        { key: "MOVE_N", dx: 0, dy: 0, dz: -1, name: "北へ1歩あるく" },
-        { key: "CLIMB_UP", dx: 0, dy: 1, dz: 0, name: "ハシゴをのぼる" },
-        { key: "CLIMB_DOWN", dx: 0, dy: -1, dz: 0, name: "ハシゴをおりる" }
+        { key: "MOVE_E", dx: 1, dz: 0, name: "東へ1歩あるく" },
+        { key: "MOVE_W", dx: -1, dz: 0, name: "西へ1歩あるく" },
+        { key: "MOVE_S", dx: 0, dz: 1, name: "南へ1歩あるく" },
+        { key: "MOVE_N", dx: 0, dz: -1, name: "北へ1歩あるく" }
       ];
       for (const d of dirs) {
-        const tx = cx + d.dx, ty = cy + d.dy, tz = cz + d.dz;
-        if (d.dy !== 0 && !(cx === 0 && cz === -1 && cy >= -4 && cy <= 0 && ty >= -4 && ty <= 0)) continue;
-        if (canWalk(tx, ty, tz)) {
-          list.push({ key: d.key, pos: [tx, ty, tz], txt: d.name + ' (' + tx + ',' + ty + ',' + tz + ')' });
+        const tx = cx + d.dx, tz = cz + d.dz;
+        if (tx >= -half && tx <= half && tz >= -half && tz <= half) {
+          list.push({ key: d.key, pos: [tx, tz], txt: `${d.name} (${tx}, ${tz})` });
         }
       }
 
-      list.push({ key: "SLEEP_REST", txt: "その場でひとやすみ（仮眠）" });
+      list.push({ key: "REST_HERE", txt: "その場でひとやすみ" });
       return list;
     }
 
-    function buildPrompt(cx, cy, cz, actions, smell, touch, lifeState, instinctKey) {
-      const curMem = lifeState.memory[lifeState.drive] || {};
-      return `あなたは3Dボクセル空間で生きる村人（第${ROBOT.gen}世代）の「理性」です。
-体と本能を司る「LifeCore」からの信号と空間知覚をもとに、次の行動を1つ決定してください。
+    // =====================================================================
+    // 思考実行（張りぼて禁止・通信成功時のみ反映・体力-10）
+    // =====================================================================
+    async function triggerThinkNow() {
+      const st = life.getState();
+      if (!st.isAlive) return;
 
-【LifeCore（身体と本能の状態）】
-・🍎エネルギー(命): ${lifeState.energy}/100
-・⚡スタミナ(体): ${lifeState.stamina}/100
-・🎵メンタル(心): ${lifeState.mental}/100
-・🔥現在の本能欲求(Drive): ${DRIVE_JA[lifeState.drive] || lifeState.drive}
-・直前の快/不快変化(feelingDelta): ${lifeState.feelingDelta}
-・今の欲求での身体記憶スコア: ${JSON.stringify(curMem)}
-・本能が衝動的にやりたがっている行動: ${instinctKey}
-
-【空間の知覚】
-・現在座標: (${cx}, ${cy}, ${cz}) / 右手: ${ROBOT.hasApple ? "リンゴ所持" : "空"}
-・周囲の地形: ${touch}
-・知覚情報: ${smell}
-
-【過去の手帳ログ】
-${ROBOT.diary.slice(-3).join("\n")}
-
-【現在選べる行動リスト】
-${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
-
-以下のJSON形式のみで出力してください：
-{
-  "reason": "本能(${lifeState.drive})と周囲の状況を踏まえた葛藤・判断理由（55字以内）",
-  "actionKey": "選んだ行動のkey（上記リストのkey文字列）",
-  "note": "手帳に残す1行メモ（35字以内）"
-}`;
-    }
-
-    async function stepAiLife(useLLM = true) {
-      const preState = life.getState();
-      if (!preState.isAlive) return;
-
-      const thinkBtn = document.getElementById('think-btn');
-      const instinctBtn = document.getElementById('instinct-btn');
-      const lamp = document.getElementById('server-lamp');
+      const btn = document.getElementById('btn-think-now');
+      const lamp = document.getElementById('comm-lamp');
+      const bubble = document.getElementById('voice-bubble');
+      const voiceText = document.getElementById('voice-text');
       const activeModel = getActiveModel();
       const currentKey = getKeyForCurrentModel();
 
-      if (useLLM && currentKey.length <= 5) {
-        const keyLabel = isGeminiModel(activeModel) ? 'Googleキー' : 'Groqキー (gsk_...)';
-        document.getElementById('thought-txt').innerHTML = '<span style="color:#fde047; font-weight:900;">⚠️ ' + keyLabel + 'がまだ入っていないよ！</span><br>右上の⚙️からキーを入れるか、となりの「🌱ほんのう」ボタンを押してみてね。';
+      if (currentKey.length <= 5) {
         openModal('settingModal');
         return;
       }
 
-      thinkBtn.disabled = true;
-      instinctBtn.disabled = true;
+      btn.disabled = true;
+      btn.innerHTML = '⚡ かんがえ中...';
+      lamp.className = 'comm-lamp lamp-busy';
+      lamp.textContent = '⚡ 通信中...';
+      bubble.className = 'voice-bubble bubble-active';
 
-      const cx = ROBOT.pos.x, cy = ROBOT.pos.y, cz = ROBOT.pos.z;
-      const actions = getPossibleActions(cx, cy, cz);
-      const actionKeys = actions.map(a => a.key);
+      const cx = ROBOT.pos.x, cz = ROBOT.pos.z;
+      const actions = getPossibleActions(cx, cz);
 
-      let chosenKey = actionKeys[0];
-      let reasonText = '';
-      let noteText = '';
+      // 小学生向けの感情豊かな叫びを指示
+      const prompt = `あなたは小さなマス目の島に立つロボット（第${ROBOT.gen}世代）です。
+いまの自分の体の状態と、まわりの景色を見て、心の中で感じている「素直な気持ち・叫び」を、小学3年生でもわかる言葉（ひらがな多め、感情豊かな叫び）で教えてください！
+
+【ロボットの今のじょうたい】
+・🍎 いのち: ${st.energy}/100
+・⚡ たいりょく: ${st.stamina}/100
+・🎵 きぶん: ${st.mental}/100
+・今の気持ちのモード: ${DRIVE_JA[st.drive] || st.drive}
+・現在地: (${cx}, ${cz}) / 手にリンゴ: ${ROBOT.hasApple ? "持ってる" : "持ってない"}
+・リンゴの様子: ${getAppleInfo(cx, cz)}
+・島の端の様子: ${getSurroundings(cx, cz)}
+
+【いま選べる行動】
+${JSON.stringify(actions.map(a => ({ key: a.key, 行動: a.txt })))}
+
+以下のJSON形式だけで答えてください。張りぼては禁止です：
+{
+  "feeling": "小学3年生にもわかる、ロボットの素直な気持ちや叫び（例: おなかすいたよー！あっちのリンゴを食べに行こう！）（65字以内）",
+  "actionKey": "選んだ行動のkey（上記リストのkey文字列）",
+  "actionName": "やったことの短い説明（例: 東へ1歩あるいた）"
+}`;
 
       try {
-        if (useLLM) {
-          thinkBtn.innerHTML = "⚡ かんがえ中...";
-          lamp.className = "server-status status-yellow";
-          lamp.textContent = "⚡ つうしん中...";
-
-          const memForDrive = preState.memory[preState.drive] || {};
-          const instinctSuggestion = actionKeys.reduce((best, cur) => (memForDrive[cur] || 0) > (memForDrive[best] || 0) ? cur : best, actionKeys[0]);
-
-          const prompt = buildPrompt(cx, cy, cz, actions, scanSmell(cx, cy, cz), inspectSurroundings(cx, cy, cz), preState, instinctSuggestion);
-
-          let decision;
-          if (isGeminiModel(activeModel)) {
-            decision = await GeminiCore.think(prompt, currentKey, activeModel);
-          } else {
-            decision = await GroqCore.think(prompt, currentKey, activeModel);
-          }
-
-          if (decision.actionKey && actionKeys.includes(decision.actionKey)) {
-            chosenKey = decision.actionKey;
-          }
-          reasonText = decision.reason || 'まわりのようすを見てきめたよ。';
-          noteText = decision.note || '';
-
-          const actualTickAction = life.tick([chosenKey]);
-          chosenKey = actualTickAction;
-
-          lamp.className = "server-status status-green";
-          lamp.textContent = "🟢 通信OK!";
-          triggerIdeaBulb(isGeminiModel(activeModel) ? '💡 Google 3.8' : '💡 Groq 120B');
+        let decision;
+        if (activeModel.startsWith('gemini')) {
+          decision = await GeminiCore.think(prompt, currentKey, activeModel);
         } else {
-          chosenKey = life.tick(actionKeys);
-          const afterTick = life.getState();
-          reasonText = '頭を使わず、体のほんのう（' + (DRIVE_JA[afterTick.drive] || afterTick.drive) + '）に従って動いたよ！';
-          noteText = 'ほんのうに従って「' + chosenKey + '」を実行。';
-          triggerIdeaBulb('🌱 ほんのう');
+          decision = await GroqCore.think(prompt, currentKey, activeModel);
         }
 
+        // 張りぼて禁止：通信成功が確定したここでのみ下部文章を更新！
+        lamp.className = 'comm-lamp lamp-ok';
+        lamp.textContent = '🟢 通信OK!';
+
+        const rawFeeling = decision.feeling || 'まわりをキョロキョロ見わたしたよ！';
+        const actionKey = decision.actionKey || actions[0].key;
+        const actionName = decision.actionName || '1手動いたよ';
+
+        voiceText.innerHTML = rawFeeling;
+        document.getElementById('action-note-text').textContent = actionName;
+        bubble.className = 'voice-bubble';
+
+        ROBOT.lastVoice = rawFeeling;
+        ROBOT.lastActionNote = actionName;
         ROBOT.stepCount++;
-        await executeWorldActionAndFeedback(chosenKey, actions, reasonText, noteText);
+
+        // LifeCoreの行動決定と、世界の実行
+        life.tick([actionKey]);
+        await executeWorldAction(actionKey, actions);
+
+        // ★指示通りの体力計算：通信完了後に「体力ゲージ -10ポイント」
+        // （tickで基本-1されているため、feedbackで-9を指定して合計-10にする）
+        let dEnergy = -2;
+        let dMental = +3;
+        if (actionKey === 'EAT_HAND' || actionKey === 'EAT_FIELD') {
+          dEnergy = +40;
+          dMental = +15;
+        }
+        life.feedback(dEnergy, -9, dMental);
+
+        const afterState = life.getState();
+        if (!afterState.isAlive) {
+          triggerRobotDown("いのち（エネルギー）が0になって、動けなくなっちゃった…");
+        }
 
       } catch (err) {
-        lamp.className = "server-status status-red";
-        lamp.textContent = "❌ つうしんストップ";
-        document.getElementById('thought-txt').innerHTML = '<div style="color:#f87171; font-weight:900;">❌ 【通信エラー】</div><div style="font-size:11px; color:#fde047; margin-top:2px;">' + err.message + '</div>';
+        // 通信失敗時は絶対に誤魔化さずエラーを表示
+        lamp.className = 'comm-lamp lamp-err';
+        lamp.textContent = '❌ 通信エラー';
+        bubble.className = 'voice-bubble bubble-error';
+        voiceText.innerHTML = `<div class="voice-error-text">❌ 【通信できませんでした】<br>${err.message}</div>`;
       } finally {
-        thinkBtn.disabled = false;
-        instinctBtn.disabled = false;
+        btn.disabled = false;
+        btn.innerHTML = '⚡ 今すぐ考える';
         updateHUD();
         saveWorldState();
       }
     }
 
-    async function executeWorldActionAndFeedback(chosenKey, actions, reasonText, noteText) {
-      if (chosenKey === 'NONE' || !life.getState().isAlive) {
-        triggerShutdown("いのち（エネルギー）が0になって、たおれてしまいました。");
-        return;
-      }
-
-      if (chosenKey === 'FORCE_SLEEP') {
-        if (chara) chara.rotation.z = Math.PI / 4;
-        await new Promise(r => setTimeout(r, 550));
-        if (chara) chara.rotation.z = 0;
-        life.feedback(0, 0, 0);
-        document.getElementById('br-act').textContent = '💫 きぜつ中（強制すいみんでスタミナ回復）';
-        document.getElementById('thought-txt').textContent = 'げんきが限界になってバッタリきぜつしてしまいました…（スタミナ+30回復）';
-        ROBOT.diary.push('・[第' + ROBOT.stepCount + '手] げんきが切れてきぜつし、強制睡眠をとった。');
-        return;
-      }
-
+    async function executeWorldAction(chosenKey, actions) {
       const act = actions.find(a => a.key === chosenKey) || actions[0];
-      let dEnergy = 0, dStamina = 0, dMental = 0;
 
       if (act.key === 'EAT_HAND') {
         ROBOT.hasApple = false;
         if (handApple) handApple.material.visible = false;
         if (rArm) rArm.rotation.x = -0.9;
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 450));
         if (rArm) rArm.rotation.x = 0;
-        dEnergy = +45; dStamina = +5; dMental = +10;
       } else if (act.key === 'EAT_FIELD') {
         const ap = fieldApples[act.appleIdx];
         if (ap && world) { world.remove(ap.mesh); fieldApples.splice(act.appleIdx, 1); }
         if (rArm) rArm.rotation.x = -0.9;
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 450));
         if (rArm) rArm.rotation.x = 0;
-        dEnergy = +45; dStamina = +5; dMental = +10;
       } else if (act.key === 'PICK_APPLE') {
         const ap = fieldApples[act.appleIdx];
         if (ap && world) { world.remove(ap.mesh); fieldApples.splice(act.appleIdx, 1); }
         ROBOT.hasApple = true;
         if (handApple) handApple.material.visible = true;
-        dEnergy = 0; dStamina = -2; dMental = +8;
-      } else if (act.key === 'SLEEP_REST') {
-        if (rArm) rArm.rotation.x = 0.3; if (lArm) lArm.rotation.x = 0.3;
-        await new Promise(r => setTimeout(r, 450));
-        if (rArm) rArm.rotation.x = 0; if (lArm) lArm.rotation.x = 0;
-        dEnergy = -1; dStamina = +35; dMental = +5;
       } else if (act.pos) {
-        const tx = act.pos[0], ty = act.pos[1], tz = act.pos[2];
-        const isNewTile = !ROBOT.known[tx + ',' + ty + ',' + tz];
-        if (headM) headM.rotation.y = tx > ROBOT.pos.x ? -0.35 : (tx < ROBOT.pos.x ? 0.35 : 0);
-        await walkCharaTo(tx, ty + 0.5, tz, 460);
-        if (headM) headM.rotation.y = 0;
-        ROBOT.pos = { x: tx, y: ty, z: tz };
-        markVision(tx, ty, tz);
-        refreshFog();
-        if (ty <= -2) changeCam('antfarm'); else if (ty >= 0) changeCam('surface');
-
-        dEnergy = -3;
-        dStamina = -5;
-        dMental = isNewTile ? +15 : +2;
-      }
-
-      life.feedback(dEnergy, dStamina, dMental);
-      const afterState = life.getState();
-
-      const deltaVal = afterState.feelingDelta;
-      const deltaStr = deltaVal > 0 ? `うれしい！ (+${deltaVal})` : (deltaVal < 0 ? `つかれた… (${deltaVal})` : `ふつう (±0)`);
-      const deltaColor = deltaVal > 0 ? '#34d399' : (deltaVal < 0 ? '#f87171' : '#cbd5e1');
-
-      document.getElementById('br-act').textContent = act.txt + ' ｜ きぶん: ' + deltaStr;
-      document.getElementById('thought-txt').textContent = '「' + reasonText + '」';
-
-      ROBOT.diary.push('・[第' + ROBOT.stepCount + '手] ' + (noteText || act.txt) + ' (' + deltaStr + ')');
-
-      if (!afterState.isAlive) {
-        triggerShutdown("エネルギーが尽きて倒れてしまいました。");
+        const tx = act.pos[0], tz = act.pos[1];
+        await walkCharaTo(tx, 0.5, tz, 400);
+        ROBOT.pos = { x: tx, z: tz };
       }
     }
 
-    function triggerShutdown(reason) {
+    function triggerRobotDown(msg) {
       if (chara) {
         chara.rotation.z = Math.PI / 2;
-        chara.position.y = ROBOT.pos.y + 0.25;
+        chara.position.y = 0.25;
       }
-      ROBOT.diary.push('【第' + ROBOT.gen + '世代のおわり】\n' + reason + '（手帳を次の世代へ残す）');
-      document.getElementById('thought-txt').textContent = '🚨 【生命停止】' + reason;
-      document.getElementById('think-btn').style.display = 'none';
-      document.getElementById('instinct-btn').style.display = 'none';
-      document.getElementById('respawn-btn').style.display = 'flex';
+      document.getElementById('voice-text').innerHTML = `<span style="color:#f87171;">🚨 【ロボがたおれました】</span><br>${msg}`;
+      document.getElementById('btn-think-now').style.display = 'none';
+      document.getElementById('btn-respawn').style.display = 'flex';
       updateHUD();
       saveWorldState();
     }
@@ -1379,31 +1043,30 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
       life = new LifeCore(inheritedSave);
       ROBOT.gen++;
       ROBOT.stepCount = 0;
-      ROBOT.pos = { x: 0, y: 0, z: -1 };
+      ROBOT.pos = { x: 0, z: 0 };
       ROBOT.hasApple = false;
-      if (handApple) handApple.material.visible = false;
+      ROBOT.lastVoice = `前の世代のきおくを引き継いで、第${ROBOT.gen}世代のロボがめざめたよ！`;
+      ROBOT.lastActionNote = "新しいロボが目覚めた！";
 
+      if (handApple) handApple.material.visible = false;
       if (chara) {
         chara.rotation.z = 0;
-        chara.position.set(0, 0.5, -1);
+        chara.position.set(0, 0.5, 0);
       }
-      changeCam('surface');
 
-      if (fieldApples.length === 0) spawnApple(2, 0, -1, false);
+      if (fieldApples.length === 0) spawnApple(1, 0, false);
 
-      ROBOT.diary.push('【第' + ROBOT.gen + '世代の誕生】\n前の世代が覚えた体の記憶（すき・きらい）と手帳を引き継いで目覚めたよ！');
-      document.getElementById('think-btn').style.display = 'flex';
-      document.getElementById('instinct-btn').style.display = 'block';
-      document.getElementById('respawn-btn').style.display = 'none';
-      document.getElementById('br-act').textContent = '前の世代の記憶を引き継いで目覚めた！';
-      document.getElementById('thought-txt').textContent = '前の世代の経験を胸に、新しいロボとして目覚めました！';
+      document.getElementById('btn-think-now').style.display = 'flex';
+      document.getElementById('btn-respawn').style.display = 'none';
+      document.getElementById('voice-text').textContent = ROBOT.lastVoice;
+      document.getElementById('action-note-text').textContent = ROBOT.lastActionNote;
       updateHUD();
       saveWorldState();
-      openModal('diaryModal');
+      showToast('✨ 新しい世代がめざめたよ！');
     }
 
     // =====================================================================
-    // UI更新 & モーダル
+    // UI更新 & モーダル設定
     // =====================================================================
     function updateHUD() {
       const st = life.getState();
@@ -1415,62 +1078,17 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
       document.getElementById('v-mental').textContent = st.mental;
       document.getElementById('b-mental').style.width = st.mental + '%';
 
-      document.getElementById('ui-id').textContent = '🤖 ロボ' + ROBOT.gen + 'ごう (' + ROBOT.pos.x + ',' + ROBOT.pos.y + ',' + ROBOT.pos.z + ')';
-      document.getElementById('ui-drive').textContent = DRIVE_JA[st.drive] || st.drive;
-      document.getElementById('ui-timer').textContent = '⭐ ' + ROBOT.stepCount + '手目';
-
-      document.getElementById('br-see').textContent = scanSmell(ROBOT.pos.x, ROBOT.pos.y, ROBOT.pos.z);
-
-      const memBox = document.getElementById('lifecore-mem-box');
-      if (memBox) {
-        const memKeys = Object.keys(st.memory);
-        memBox.textContent = memKeys.length === 0
-          ? 'まだ学習データはありません。動くと「この行動をすると気持ちよかった！」が記録されるよ。'
-          : JSON.stringify(st.memory, null, 2);
-      }
-      const dtEl = document.getElementById('diary-text');
-      if (dtEl) dtEl.textContent = ROBOT.diary.join("\n\n");
-
-      const activeModel = getActiveModel();
-      const isGem = isGeminiModel(activeModel);
-
-      const qGoogle = document.getElementById('q-btn-google');
-      const qGithub = document.getElementById('q-btn-github');
-      if (qGoogle) qGoogle.className = 'q-btn ' + (isGem ? 'active-google' : '');
-      if (qGithub) qGithub.className = 'q-btn ' + (!isGem ? 'active-github' : '');
-
-      const thinkBtn = document.getElementById('think-btn');
-      if (thinkBtn && !thinkBtn.disabled) {
-        thinkBtn.className = 'main-btn ' + (isGem ? '' : 'btn-github');
-        thinkBtn.innerHTML = isGem ? '🟦 ⚡ Google 3.8 で1手かんがえさせる' : '🟪 ⚡ Groq 120B で1手かんがえさせる';
-      }
-
-      const curKey = getKeyForCurrentModel();
-      const lamp = document.getElementById('server-lamp');
-      if (lamp) {
-        if (curKey.length > 5) {
-          lamp.className = "server-status status-green";
-          lamp.textContent = "🟢 じゅんびOK";
-        } else {
-          lamp.className = "server-status status-yellow";
-          lamp.textContent = "⚙️ キー未せってい";
-        }
-      }
-    }
-
-    function selectModelAndRefresh(modelName) {
-      safeStorage.setItem('ai_custom_model', modelName);
-      updateHUD();
-      saveWorldState();
+      document.getElementById('ui-robot-id').textContent = `🤖 ロボ${ROBOT.gen}ごう (${ROBOT.pos.x}, ${ROBOT.pos.z})`;
+      document.getElementById('ui-robot-drive').textContent = DRIVE_JA[st.drive] || st.drive;
+      document.getElementById('ui-step-count').textContent = `⭐ ${ROBOT.stepCount}手目`;
     }
 
     function selectModelInModal(modelName) {
       safeStorage.setItem('ai_custom_model', modelName);
-      const isGem = isGeminiModel(modelName);
+      const isGem = modelName.startsWith('gemini');
       const grpG = document.getElementById('grp-google-key');
       const grpGh = document.getElementById('grp-github-key');
       const saveBtn = document.getElementById('modal-save-btn');
-      const msg = document.getElementById('setting-msg');
 
       if (grpG) grpG.className = 'settings-card ' + (isGem ? 'selected-google' : '');
       if (grpGh) grpGh.className = 'settings-card ' + (!isGem ? 'selected-github' : '');
@@ -1478,11 +1096,6 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
         saveBtn.style.background = isGem ? '#0284c7' : '#6d28d9';
         saveBtn.textContent = isGem ? '🟦 Google 3.8 に決定して閉じる' : '🟪 Groq 120B に決定して閉じる';
       }
-      if (msg) {
-        msg.style.color = isGem ? '#38bdf8' : '#c4b5fd';
-        msg.textContent = isGem ? '✓ Google Gemini 3.8 を選択中だよ' : '✓ Groq (openai/gpt-oss-120b) を選択中だよ';
-      }
-      updateHUD();
     }
 
     function autoSaveKey(type, val) {
@@ -1494,24 +1107,6 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
         safeStorage.setItem('key_github', trimmed);
         selectModelInModal('openai/gpt-oss-120b');
       }
-      refreshModalKeyTags();
-      updateHUD();
-    }
-
-    function refreshModalKeyTags() {
-      const gKey = safeStorage.getItem('key_google') || safeStorage.getItem('ai_api_key') || '';
-      const ghKey = safeStorage.getItem('key_github') || '';
-      const tagG = document.getElementById('tag-google-status');
-      const tagGh = document.getElementById('tag-github-status');
-
-      if (tagG) {
-        tagG.textContent = gKey.length > 5 ? '✓ キー保存済' : 'キー未保存';
-        tagG.className = 'key-status-tag ' + (gKey.length > 5 ? 'tag-saved' : 'tag-empty');
-      }
-      if (tagGh) {
-        tagGh.textContent = ghKey.length > 5 ? '✓ キー保存済' : 'キー未保存';
-        tagGh.className = 'key-status-tag ' + (ghKey.length > 5 ? 'tag-saved' : 'tag-empty');
-      }
     }
 
     function saveKeys() {
@@ -1519,7 +1114,6 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
       const ghInput = document.getElementById('input-github-key');
       if (gInput && gInput.value.trim().length > 5) safeStorage.setItem('key_google', gInput.value.trim());
       if (ghInput && ghInput.value.trim().length > 5) safeStorage.setItem('key_github', ghInput.value.trim());
-      updateHUD();
       closeModal('settingModal');
       showToast('💾 設定をほぞんしたよ！');
     }
@@ -1527,47 +1121,35 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
     function openModal(id) {
       if (id === 'settingModal') {
         const curModel = getActiveModel();
-        const gKey = safeStorage.getItem('key_google') || safeStorage.getItem('ai_api_key') || '';
+        const gKey = safeStorage.getItem('key_google') || '';
         const ghKey = safeStorage.getItem('key_github') || '';
         const inpG = document.getElementById('input-google-key');
         const inpGh = document.getElementById('input-github-key');
         if (inpG) inpG.value = gKey;
         if (inpGh) inpGh.value = ghKey;
-        refreshModalKeyTags();
         selectModelInModal(curModel);
       }
-      const modalEl = document.getElementById(id);
-      if (modalEl) modalEl.style.display = 'flex';
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'flex';
     }
 
     function closeModal(id) {
-      const modalEl = document.getElementById(id);
-      if (modalEl) modalEl.style.display = 'none';
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
     }
 
     let clock = 0, isWalking = false;
     function renderLoop() {
       requestAnimationFrame(renderLoop); clock += 0.04;
-      if (camera && targetCamPos) {
-        camera.position.lerp(targetCamPos, 0.06); curCamLook.lerp(targetCamLook, 0.06); camera.lookAt(curCamLook);
-      }
       for (const a of fieldApples) a.mesh.rotation.y += 0.03;
-      if (villagerB) villagerB.position.y = 0.5 + Math.sin(clock * 3) * 0.04;
 
-      if (bulbTimer > 0 && bulbGroup) {
-        bulbTimer--; bulbGroup.rotation.y += 0.12; bulbGroup.position.y = 1.42 + Math.sin(clock * 6) * 0.06;
-        const scalePulse = 1 + Math.sin(clock * 10) * 0.15; bulbHalo.scale.set(scalePulse, scalePulse, scalePulse);
-        updateBulbScreenPosition();
-        if (bulbTimer === 0) {
-          bulbGroup.visible = false; bulbLight.intensity = 0; eyeM.material.color.setHex(0x38bdf8); document.getElementById('bulb-popup').style.display = 'none';
-        }
-      }
       if (life.getState().isAlive && chara) {
         if (isWalking) {
-          rArm.rotation.x = Math.sin(clock * 8) * 0.7; lArm.rotation.x = -Math.sin(clock * 8) * 0.7;
-          rLeg.rotation.x = -Math.sin(clock * 8) * 0.7; lLeg.rotation.x = Math.sin(clock * 8) * 0.7;
+          rArm.rotation.x = Math.sin(clock * 9) * 0.7; lArm.rotation.x = -Math.sin(clock * 9) * 0.7;
+          rLeg.rotation.x = -Math.sin(clock * 9) * 0.7; lLeg.rotation.x = Math.sin(clock * 9) * 0.7;
         } else {
-          rLeg.rotation.x = 0; lLeg.rotation.x = 0; bodyM.scale.y = 0.52 + Math.sin(clock * 2) * 0.02;
+          rLeg.rotation.x = 0; lLeg.rotation.x = 0;
+          bodyM.scale.y = 0.52 + Math.sin(clock * 2.5) * 0.02;
         }
       }
       if (renderer && scene && camera) renderer.render(scene, camera);
@@ -1576,11 +1158,16 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
     function walkCharaTo(tx, ty, tz, dur) {
       return new Promise(resolve => {
         if (!chara) { resolve(); return; }
-        isWalking = true; const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z; const start = performance.now();
+        isWalking = true;
+        const sx = chara.position.x, sy = chara.position.y, sz = chara.position.z;
+        const start = performance.now();
         function s(now) {
           const p = Math.min((now - start) / dur, 1);
-          chara.position.x = sx + (tx - sx) * p; chara.position.y = sy + (ty - sy) * p; chara.position.z = sz + (tz - sz) * p;
-          if (p < 1) requestAnimationFrame(s); else { isWalking = false; resolve(); }
+          chara.position.x = sx + (tx - sx) * p;
+          chara.position.y = sy + (ty - sy) * p;
+          chara.position.z = sz + (tz - sz) * p;
+          if (p < 1) requestAnimationFrame(s);
+          else { isWalking = false; resolve(); }
         }
         requestAnimationFrame(s);
       });
@@ -1588,43 +1175,23 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 説明: a.txt })))}
 
     function resizeRenderer() {
       if (!camera || !renderer) return;
-      const stage = document.getElementById('c3d');
-      const w = Math.max(stage?.clientWidth || window.innerWidth || 360, 280);
-      const h = Math.max(stage?.clientHeight || window.innerHeight || 640, 420);
+      const stage = document.querySelector('.top-window');
+      const w = Math.max(stage?.clientWidth || window.innerWidth || 360, 240);
+      const h = Math.max(stage?.clientHeight || 260, 200);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h, false);
-      renderer.domElement.style.width = '100%';
-      renderer.domElement.style.height = '100%';
     }
 
     window.addEventListener('resize', resizeRenderer);
 
     function startApp() {
       const isLoaded = tryLoadWorldState();
-
-      if (typeof THREE === 'undefined') {
-        let count = 0;
-        const timer = setInterval(() => {
-          count++;
-          if (typeof THREE !== 'undefined') {
-            clearInterval(timer);
-            init3D();
-            updateHUD();
-            if (isLoaded) showToast('💾 つづきから再開したよ！');
-          } else if (count > 30) {
-            clearInterval(timer);
-            const s = document.createElement('script');
-            s.src = 'https://unpkg.com/three@0.128.0/build/three.min.js';
-            s.onload = () => { init3D(); updateHUD(); if (isLoaded) showToast('💾 つづきから再開したよ！'); };
-            document.head.appendChild(s);
-          }
-        }, 100);
-      } else {
-        init3D();
-        updateHUD();
-        if (isLoaded) showToast('💾 つづきから再開したよ！');
-      }
+      init3D();
+      if (ROBOT.lastVoice) document.getElementById('voice-text').textContent = ROBOT.lastVoice;
+      if (ROBOT.lastActionNote) document.getElementById('action-note-text').textContent = ROBOT.lastActionNote;
+      updateHUD();
+      if (isLoaded) showToast('💾 つづきから再開したよ！');
     }
 
     if (document.readyState === 'loading') {
