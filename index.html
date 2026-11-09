@@ -29,7 +29,7 @@
     }
 
     /* ========================================================
-     * ① プレビュー（キャラクターのいる画面）：目に優しい落ち着いたパステル調
+     * ① プレビュー（キャラクターのいる画面）：目に優しいセージ＆モカ調
      * ======================================================== */
     .top-window {
       position: relative;
@@ -69,11 +69,9 @@
       font-size: 11px; font-weight: 900; padding: 2px 9px; border-radius: 12px;
       background: #fef9c3; color: #854d0e; border: 1.5px solid #fde047;
     }
-    .status-right-col {
-      display: flex; align-items: center; gap: 6px;
-    }
+    .status-right-col { display: flex; align-items: center; gap: 6px; }
 
-    /* 右下の⚙️ 設定ボタン（ゲージパネル内にすっきり収容） */
+    /* 右下の⚙️ 設定ボタン */
     .btn-setting-gear-inline {
       width: 28px; height: 28px; border-radius: 8px;
       background: #f1f5f9; border: 1.5px solid #cbd5e1;
@@ -83,20 +81,20 @@
     .btn-setting-gear-inline:active { transform: scale(0.92); background: #e2e8f0; }
 
     /* ========================================================
-     * ★ 新設：シンプル◯ボタン ＆ 上に広がる白色透過の扇状メニュー
+     * ★ 改良：特大・余白最小の扇状メニュー ＆ シンプル◯ボタン
      * ======================================================== */
     .fan-menu-wrapper {
       position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
       z-index: 25; display: flex; flex-direction: column; align-items: center;
     }
 
-    /* 扇状メニュー（3分割アーク） */
+    /* 扇状メニュー（◯ボタンとギリギリ接し、大きく広がる特大扇） */
     .fan-radial-container {
-      position: absolute; bottom: 58px; left: 50%; transform: translateX(-50%) scale(0.6);
-      width: 240px; height: 125px;
+      position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%) scale(0.4);
+      width: 320px; height: 160px;
       pointer-events: none; opacity: 0;
       transform-origin: 50% 100%;
-      transition: all 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
     .fan-radial-container.open {
       pointer-events: auto; opacity: 1;
@@ -104,43 +102,45 @@
     }
 
     .fan-svg {
-      width: 100%; height: 100%; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.1));
+      width: 100%; height: 100%; filter: drop-shadow(0 8px 20px rgba(0,0,0,0.15));
     }
     .fan-sector {
-      fill: rgba(255, 255, 255, 0.88);
+      fill: rgba(255, 255, 255, 0.94);
       stroke: rgba(203, 213, 225, 0.95);
       stroke-width: 1.5;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.18s ease;
       touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
     .fan-sector:hover, .fan-sector:active {
-      fill: rgba(239, 246, 255, 0.96);
-      stroke: #60a5fa;
+      fill: rgba(224, 242, 254, 0.98);
+      stroke: #3b82f6;
     }
     .fan-label {
-      font-size: 11px; font-weight: 900; fill: #334155;
+      font-size: 13px; font-weight: 900; fill: #1e293b;
       pointer-events: none; text-anchor: middle; dominant-baseline: middle;
+      font-family: inherit;
     }
     .fan-icon {
-      font-size: 16px; pointer-events: none; text-anchor: middle; dominant-baseline: middle;
+      font-size: 22px; pointer-events: none; text-anchor: middle; dominant-baseline: middle;
     }
 
     /* シンプル◯ボタン（白色・中央配置） */
     .btn-circle-main {
-      width: 44px; height: 44px; border-radius: 50%;
-      background: #ffffff; border: 1.5px solid #cbd5e1;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+      width: 48px; height: 48px; border-radius: 50%;
+      background: #ffffff; border: 2px solid #cbd5e1;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-      transition: transform 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s;
+      transition: transform 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s, border-color 0.2s;
     }
     .btn-circle-main:active { transform: scale(0.92); }
     .btn-circle-main.active {
-      background: #f1f5f9; border-color: #94a3b8;
+      background: #f8fafc; border-color: #64748b;
     }
     .circle-icon {
-      font-size: 18px; color: #475569; transition: transform 0.25s ease;
+      font-size: 20px; color: #475569; transition: transform 0.25s ease;
       line-height: 1; font-weight: bold;
     }
     .btn-circle-main.active .circle-icon {
@@ -157,16 +157,12 @@
       overflow-y: auto; border-top: 1.5px solid #cbd5e1;
       box-shadow: 0 -2px 10px rgba(0,0,0,0.03);
     }
-    .voice-header {
-      display: flex; justify-content: space-between; align-items: center;
-    }
+    .voice-header { display: flex; justify-content: space-between; align-items: center; }
     .voice-title {
       font-size: 12px; font-weight: 900; color: #475569;
       display: flex; align-items: center; gap: 4px;
     }
-    .comm-lamp {
-      font-size: 10px; font-weight: 900; padding: 1px 7px; border-radius: 8px;
-    }
+    .comm-lamp { font-size: 10px; font-weight: 900; padding: 1px 7px; border-radius: 8px; }
     .lamp-standby { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
     .lamp-busy { background: #fef3c7; color: #b45309; border: 1px solid #fde047; }
     .lamp-ok { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
@@ -314,34 +310,34 @@
         </div>
       </div>
 
-      <!-- ★ 新設：シンプル◯ボタン ＆ 上に広がる白色透過の扇状3分割メニュー -->
+      <!-- ★ 改良：◯ボタンとギリギリ接し、メニュー同士の隙間を最小にした特大扇状メニュー -->
       <div class="fan-menu-wrapper">
         <div class="fan-radial-container" id="fanRadialMenu">
-          <svg class="fan-svg" viewBox="0 0 240 125">
-            <!-- 扇形パーツ（左：アイテム） 角度: 162°〜118° -->
+          <svg class="fan-svg" viewBox="0 0 320 160">
+            <!-- 扇形パーツ（左：アイテム） 角度: 168°〜117° -->
             <path class="fan-sector" id="sector-item"
-              d="M 28 106 A 98 98 0 0 1 73 34 L 88 64 A 62 62 0 0 0 59 109 Z"
+              d="M 18.2 124.9 A 145 145 0 0 1 94.2 25.8 L 145.5 126.5 A 32 32 0 0 0 128.7 148.3 Z"
               onclick="triggerFanAction('item')"></path>
-            <!-- 扇形パーツ（中：ガチャガチャ） 角度: 112°〜68° -->
+            <!-- 扇形パーツ（中：ガチャガチャ） 角度: 114°〜66°（隙間わずか3°） -->
             <path class="fan-sector" id="sector-gacha"
-              d="M 83 29 A 98 98 0 0 1 157 29 L 143 61 A 62 62 0 0 0 97 61 Z"
+              d="M 101.0 22.5 A 145 145 0 0 1 219.0 22.5 L 173.0 125.8 A 32 32 0 0 0 147.0 125.8 Z"
               onclick="triggerFanAction('gacha')"></path>
-            <!-- 扇形パーツ（右：整地） 角度: 62°〜18° -->
+            <!-- 扇形パーツ（右：整地） 角度: 63°〜12°（隙間わずか3°） -->
             <path class="fan-sector" id="sector-clean"
-              d="M 167 34 A 98 98 0 0 1 212 106 L 181 109 A 62 62 0 0 0 152 64 Z"
+              d="M 225.8 25.8 A 145 145 0 0 1 301.8 124.9 L 191.3 148.3 A 32 32 0 0 0 174.5 126.5 Z"
               onclick="triggerFanAction('clean')"></path>
 
             <!-- アイコンと文字（左：アイテム） -->
-            <text x="58" y="70" class="fan-icon">🎒</text>
-            <text x="58" y="86" class="fan-label">アイテム</text>
+            <text x="89" y="86" class="fan-icon">🎒</text>
+            <text x="89" y="108" class="fan-label">アイテム</text>
 
             <!-- アイコンと文字（中：ガチャ） -->
-            <text x="120" y="38" class="fan-icon">🎰</text>
-            <text x="120" y="54" class="fan-label">ガチャ</text>
+            <text x="160" y="54" class="fan-icon">🎰</text>
+            <text x="160" y="78" class="fan-label">ガチャ</text>
 
             <!-- アイコンと文字（右：整地） -->
-            <text x="182" y="70" class="fan-icon">⛏️</text>
-            <text x="182" y="86" class="fan-label">整地</text>
+            <text x="231" y="86" class="fan-icon">⛏️</text>
+            <text x="231" y="108" class="fan-label">整地</text>
           </svg>
         </div>
 
@@ -927,7 +923,7 @@
     }
 
     // =====================================================================
-    // ★ 扇状メニューの開閉とアクション
+    // ★ 扇状メニューの開閉とアクション（特大・余白最小）
     // =====================================================================
     let isFanMenuOpen = false;
 
@@ -954,14 +950,12 @@
     function triggerFanAction(type) {
       closeFanMenu();
       if (type === 'item') {
-        // アイテム：ロボットの目の前（またはランダムな空きマス）にリンゴを落とす
         const half = Math.floor(MAP_SIZE / 2);
         const rx = Math.floor(Math.random() * MAP_SIZE) - half;
         const rz = Math.floor(Math.random() * MAP_SIZE) - half;
         spawnApple(rx, rz, true);
         showToast('🎒 リンゴを1こ出したよ！');
       } else if (type === 'gacha') {
-        // ガチャガチャ：島にランダムで2〜3個のリンゴが降ってくる！
         const half = Math.floor(MAP_SIZE / 2);
         for (let i = 0; i < 2; i++) {
           const rx = Math.floor(Math.random() * MAP_SIZE) - half;
@@ -971,7 +965,6 @@
         saveWorldState();
         showToast('🎰 ガチャ！リンゴが降ってきた！');
       } else if (type === 'clean') {
-        // 整地：島に落ちすぎたリンゴをすべて回収して地面をきれいにする
         if (fieldApples.length === 0) {
           showToast('⛏️ 整地：すでに綺麗だよ！');
           return;
