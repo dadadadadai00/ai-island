@@ -110,9 +110,9 @@
     }
     .placement-cancel-bar.active { display: flex; }
 
-    /* 扇状メニュー本体 */
+    /* 扇状メニュー本体（3Dプレビュー画面の内側にすっきり配置） */
     .fan-menu-wrapper {
-      position: absolute; bottom: -27px; left: 50%; transform: translateX(-50%);
+      position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
       z-index: 40; width: 340px; height: 195px; pointer-events: none;
     }
     .fan-radial-container {
@@ -147,14 +147,14 @@
     .circle-icon { font-size: 22px; color: #475569; transition: transform 0.25s ease, color 0.2s ease; line-height: 1; font-weight: bold; }
     .btn-circle-main.active .circle-icon { transform: rotate(45deg); color: #ef4444; }
 
-    /* ② 文章枠 */
+    /* ② 文章枠（文字溢れ・ボタン重なり防止） */
     .bottom-window {
-      position: relative; z-index: 10; flex: none; height: 146px;
-      background: #ffffff; padding: 10px 12px 8px;
+      position: relative; z-index: 10; flex: none; height: 154px;
+      background: #ffffff; padding: 8px 12px 6px;
       display: flex; flex-direction: column; gap: 4px;
-      overflow-y: auto; border-top: 1.5px solid #cbd5e1; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+      overflow: hidden; border-top: 1.5px solid #cbd5e1; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
     }
-    .voice-header { display: flex; justify-content: space-between; align-items: center; }
+    .voice-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
     .voice-title { font-size: 12px; font-weight: 900; color: #475569; display: flex; align-items: center; gap: 4px; }
     .comm-lamp { font-size: 10px; font-weight: 900; padding: 1px 7px; border-radius: 8px; line-height: 1.4; }
     .lamp-standby { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
@@ -163,16 +163,16 @@
     .lamp-err { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
 
     .voice-bubble {
-      flex: 1; min-height: 68px; background: #f8fafc; border: 1.5px solid #cbd5e1;
-      border-radius: 10px; padding: 7px 10px; display: flex; flex-direction: column; justify-content: center;
-      transition: all 0.3s ease;
+      flex: 1; min-height: 62px; max-height: 82px; background: #f8fafc; border: 1.5px solid #cbd5e1;
+      border-radius: 10px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: flex-start;
+      overflow-y: auto; -webkit-overflow-scrolling: touch; transition: all 0.3s ease;
     }
     .voice-bubble.bubble-active { border-color: #60a5fa; background: #f0f9ff; }
     .voice-bubble.bubble-error { border-color: #f87171; background: #fff1f2; }
-    .voice-text { font-size: 14px; font-weight: 900; line-height: 1.45; color: #1e293b; word-break: break-all; }
+    .voice-text { font-size: 13px; font-weight: 800; line-height: 1.45; color: #1e293b; word-break: break-all; }
     .voice-error-text { font-size: 12px; font-weight: 800; line-height: 1.4; color: #dc2626; }
 
-    .action-note-row { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 800; color: #64748b; }
+    .action-note-row { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 800; color: #64748b; margin-top: 1px; }
     .action-badge { font-size: 10px; font-weight: 900; background: #f1f5f9; color: #475569; padding: 1px 6px; border-radius: 5px; border: 1px solid #cbd5e1; }
 
     /* ③ フッター */
@@ -687,27 +687,9 @@
     let camHeight = 8.5;
     let camDist = 9.8;
 
-    function init3D() {
-      if (typeof THREE === 'undefined') return; const stage = document.getElementById('c3d'); if (!stage || renderer) return;
-      const w = Math.max(stage.clientWidth || window.innerWidth || 360, 240), h = Math.max(stage.clientHeight || 280, 200);
-      scene = new THREE.Scene(); const initialPhase = TIME_PHASES[getCurrentTimePhaseIdx()]; scene.background = new THREE.Color(initialPhase.bg);
-      camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100); camera.position.set(0, camHeight, camDist); camera.lookAt(0, 0.1, 0);
-      renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(w, h); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); stage.appendChild(renderer.domElement);
-      hemiLight = new THREE.HemisphereLight(initialPhase.hemi, 0x1e293b, 1.2); scene.add(hemiLight);
-      sunLight = new THREE.DirectionalLight(initialPhase.sun, 0.9); sunLight.position.set(6, 14, 7); scene.add(sunLight);
-      world = new THREE.Group(); scene.add(world);
-
-      // 神秘の雲海と世界の果ての滝
-      buildCloudSea();
-      buildWaterfalls();
-
-      // 下を支える古代遺跡のカメ（雲海の底深くに配置）
-      buildWorldTurtle();
-
-      stepMeshGroup = new THREE.Group();
-      world.add(stepMeshGroup);
-    // 🐢 世界を背負う古代の巨大遺跡ウミガメ（古代サンドストーン・遺跡カラー）
     let turtleFlippers = [];
+
+    // 🐢 世界を背負う古代の巨大遺跡ウミガメ（古代サンドストーン・遺跡カラー）
     function buildWorldTurtle() {
       turtleGroup = new THREE.Group();
       // 普段は雲海の下深く（-5.8）に隠れ、丸見えにならないように配置
@@ -720,12 +702,12 @@
       const matRuin  = new THREE.MeshLambertMaterial({ color: 0xc8b6a6 }); // 遺跡の彫刻ブロック
       const matEye   = new THREE.MeshBasicMaterial({ color: 0x4a3b32 });   // 石彫の目
 
-      // 甲羅（古代遺跡の石組みのような巨大ボクセル）
+      // 甲羅
       const shell = new THREE.Mesh(new THREE.BoxGeometry(7.8, 1.5, 7.8), matShell);
       shell.position.set(0, -0.6, 0);
       turtleGroup.add(shell);
 
-      // 甲羅の背中に刻まれた古代遺跡のレリーフ（隆起した石の紋様）
+      // 甲羅の彫刻
       const ruinPlate = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.5, 6.4), matRuin);
       ruinPlate.position.set(0, 0.2, 0);
       turtleGroup.add(ruinPlate);
@@ -734,12 +716,12 @@
       ruinCenter.position.set(0, 0.5, 0);
       turtleGroup.add(ruinCenter);
 
-      // カメの頭（古代の石造彫刻）
+      // カメの頭
       const head = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.3, 2.5), matSkin);
       head.position.set(0, -0.4, -4.9);
       turtleGroup.add(head);
 
-      // 石彫りの目
+      // 目
       const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), matEye);
       eyeL.position.set(-0.95, -0.2, -5.4);
       turtleGroup.add(eyeL);
@@ -747,9 +729,10 @@
       eyeR.position.set(0.95, -0.2, -5.4);
       turtleGroup.add(eyeR);
 
-      // 4本の大きなパドルヒレ（石のヒレ）
+      // 4本のヒレ
       const flipperGeo = new THREE.BoxGeometry(2.6, 0.42, 1.8);
-      
+      turtleFlippers = [];
+
       const flL = new THREE.Mesh(flipperGeo, matSkin);
       flL.position.set(-4.6, -0.8, -2.5); flL.rotation.y = 0.4;
       turtleGroup.add(flL); turtleFlippers.push(flL);
@@ -780,12 +763,9 @@
       world.add(cloudGroup);
 
       const cloudMat = new THREE.MeshLambertMaterial({
-        color: 0xedf2f7,
-        transparent: true,
-        opacity: 0.72
+        color: 0xedf2f7, transparent: true, opacity: 0.72
       });
 
-      // ふわふわと大地の真下を覆う雲のクッション
       const cloudDefs = [
         { x: -2.5, y: 0.2, z: -2.0, w: 4.5, h: 0.8, d: 4.0 },
         { x: 2.2,  y: -0.1, z: 2.2,  w: 4.8, h: 0.7, d: 4.2 },
@@ -794,6 +774,7 @@
         { x: 0,    y: -0.4, z: 0,    w: 6.5, h: 0.9, d: 6.5 }
       ];
 
+      cloudPlates = [];
       cloudDefs.forEach((cd, i) => {
         const cMesh = new THREE.Mesh(new THREE.BoxGeometry(cd.w, cd.h, cd.d), cloudMat);
         cMesh.position.set(cd.x, cd.y, cd.z);
@@ -810,42 +791,23 @@
       world.add(waterfallGroup);
 
       const waterMat = new THREE.MeshLambertMaterial({
-        color: 0xa5f3fc,
-        transparent: true,
-        opacity: 0.75
+        color: 0xa5f3fc, transparent: true, opacity: 0.75
       });
       const foamMat = new THREE.MeshLambertMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.85
+        color: 0xffffff, transparent: true, opacity: 0.85
       });
 
-      // 海の四方の外縁（北・南・東・西）から流れ落ちる滝の幕
       const fallLength = 2.4;
       const fallGeo = new THREE.BoxGeometry(6.6, fallLength, 0.16);
+      waterfallMeshes = [];
 
-      // 北の滝 (z = -3.5)
-      const wN = new THREE.Mesh(fallGeo, waterMat);
-      wN.position.set(0, -1.3, -3.48);
-      waterfallGroup.add(wN); waterfallMeshes.push(wN);
+      const wN = new THREE.Mesh(fallGeo, waterMat); wN.position.set(0, -1.3, -3.48); waterfallGroup.add(wN); waterfallMeshes.push(wN);
+      const wS = new THREE.Mesh(fallGeo, waterMat); wS.position.set(0, -1.3, 3.48); waterfallGroup.add(wS); waterfallMeshes.push(wS);
 
-      // 南の滝 (z = +3.5)
-      const wS = new THREE.Mesh(fallGeo, waterMat);
-      wS.position.set(0, -1.3, 3.48);
-      waterfallGroup.add(wS); waterfallMeshes.push(wS);
-
-      // 東の滝 (x = +3.5)
       const fallGeoEW = new THREE.BoxGeometry(0.16, fallLength, 6.6);
-      const wE = new THREE.Mesh(fallGeoEW, waterMat);
-      wE.position.set(3.48, -1.3, 0);
-      waterfallGroup.add(wE); waterfallMeshes.push(wE);
+      const wE = new THREE.Mesh(fallGeoEW, waterMat); wE.position.set(3.48, -1.3, 0); waterfallGroup.add(wE); waterfallMeshes.push(wE);
+      const wW = new THREE.Mesh(fallGeoEW, waterMat); wW.position.set(-3.48, -1.3, 0); waterfallGroup.add(wW); waterfallMeshes.push(wW);
 
-      // 西の滝 (x = -3.5)
-      const wW = new THREE.Mesh(fallGeoEW, waterMat);
-      wW.position.set(-3.48, -1.3, 0);
-      waterfallGroup.add(wW); waterfallMeshes.push(wW);
-
-      // 滝口の白い泡しぶき
       const foamRimGeoNS = new THREE.BoxGeometry(6.8, 0.12, 0.22);
       const foamN = new THREE.Mesh(foamRimGeoNS, foamMat); foamN.position.set(0, -0.22, -3.45); waterfallGroup.add(foamN);
       const foamS = new THREE.Mesh(foamRimGeoNS, foamMat); foamS.position.set(0, -0.22, 3.45);  waterfallGroup.add(foamS);
@@ -853,6 +815,117 @@
       const foamRimGeoEW = new THREE.BoxGeometry(0.22, 0.12, 6.8);
       const foamE = new THREE.Mesh(foamRimGeoEW, foamMat); foamE.position.set(3.45, -0.22, 0);  waterfallGroup.add(foamE);
       const foamW = new THREE.Mesh(foamRimGeoEW, foamMat); foamW.position.set(-3.45, -0.22, 0);  waterfallGroup.add(foamW);
+    }
+
+    // 🤖 ロボットのボクセルキャラクター生成
+    function buildChara() {
+      chara = new THREE.Group();
+
+      const bodyMat  = new THREE.MeshLambertMaterial({ color: 0x60a5fa }); // 明るい水色
+      const headMat  = new THREE.MeshLambertMaterial({ color: 0x93c5fd });
+      const jointMat = new THREE.MeshLambertMaterial({ color: 0x334155 });
+      const eyeMat   = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+      const bulbMat  = new THREE.MeshBasicMaterial({ color: 0xfacc15 }); // 黄色のランプ
+
+      // 体
+      bodyM = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.22), bodyMat);
+      bodyM.position.y = 0.32;
+      chara.add(bodyM);
+
+      // 頭
+      headM = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.32, 0.3), headMat);
+      headM.position.y = 0.68;
+      chara.add(headM);
+
+      // 目
+      const eyeGeo = new THREE.BoxGeometry(0.06, 0.08, 0.04);
+      const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.1, 0.69, 0.16); chara.add(eyeL);
+      const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.1, 0.69, 0.16); chara.add(eyeR);
+
+      // ランプ
+      const bulb = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.08), bulbMat);
+      bulb.position.set(0, 0.88, 0); chara.add(bulb);
+
+      // 腕
+      const armGeo = new THREE.BoxGeometry(0.1, 0.28, 0.1);
+      rArm = new THREE.Mesh(armGeo, jointMat); rArm.position.set(0.24, 0.32, 0); chara.add(rArm);
+      lArm = new THREE.Mesh(armGeo, jointMat); lArm.position.set(-0.24, 0.32, 0); chara.add(lArm);
+
+      // リンゴ（右手）
+      const appleGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+      const appleMat = new THREE.MeshLambertMaterial({ color: 0xef4444, visible: false });
+      handApple = new THREE.Mesh(appleGeo, appleMat);
+      handApple.position.set(0, -0.16, 0.06);
+      rArm.add(handApple);
+
+      // 足
+      const legGeo = new THREE.BoxGeometry(0.12, 0.2, 0.12);
+      rLeg = new THREE.Mesh(legGeo, jointMat); rLeg.position.set(0.09, 0.1, 0); chara.add(rLeg);
+      lLeg = new THREE.Mesh(legGeo, jointMat); lLeg.position.set(-0.09, 0.1, 0); chara.add(lLeg);
+
+      world.add(chara);
+    }
+
+    function init3D() {
+      if (typeof THREE === 'undefined') return;
+      const stage = document.getElementById('c3d');
+      if (!stage || renderer) return;
+      const w = Math.max(stage.clientWidth || window.innerWidth || 360, 240);
+      const h = Math.max(stage.clientHeight || 280, 200);
+
+      scene = new THREE.Scene();
+      const initialPhase = TIME_PHASES[getCurrentTimePhaseIdx()];
+      scene.background = new THREE.Color(initialPhase.bg);
+
+      camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
+      camera.position.set(0, camHeight, camDist);
+      camera.lookAt(0, 0.1, 0);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(w, h);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      stage.appendChild(renderer.domElement);
+
+      hemiLight = new THREE.HemisphereLight(initialPhase.hemi, 0x1e293b, 1.2);
+      scene.add(hemiLight);
+
+      sunLight = new THREE.DirectionalLight(initialPhase.sun, 0.9);
+      sunLight.position.set(6, 14, 7);
+      scene.add(sunLight);
+
+      world = new THREE.Group();
+      scene.add(world);
+
+      // 雲海・滝・古代遺跡亀
+      buildCloudSea();
+      buildWaterfalls();
+      buildWorldTurtle();
+
+      stepMeshGroup = new THREE.Group();
+      world.add(stepMeshGroup);
+
+      // 地形
+      buildTerrainVisuals();
+
+      // ロボット
+      buildChara();
+
+      // ロボットの初期位置
+      const wp = calcWorldPos(ROBOT.pos.gx, ROBOT.pos.gz, ROBOT.pos.sx, ROBOT.pos.sz);
+      const curH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
+      chara.position.set(wp.x, 0.5 + (curH > 0 ? curH * STEP_H : 0), wp.z);
+      chara.rotation.y = ROBOT.rotY || 0;
+
+      // 復元アイテム
+      if (pendingLoadedObjs && Array.isArray(pendingLoadedObjs)) {
+        for (const obj of pendingLoadedObjs) spawnObject(obj.gx, obj.gz, obj.type, false);
+        pendingLoadedObjs = null;
+      } else if (fieldObjects.length === 0) {
+        spawnObject(1, 0, 'apple', false);
+      }
+
+      setupTouchInteraction();
+      renderLoop();
     }
 
     // 地形生成（中央大地 5x5 ＋ 外周海 7x7 ＋ 奈落）
