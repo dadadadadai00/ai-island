@@ -635,12 +635,113 @@
     let scene, camera, renderer, world, clickBlocks = [];
     let allTerrainBlocks = [];
     let stepMeshGroup = null, turtleGroup = null, cloudGroup = null, waterfallGroup = null;
+    let celestialGroup = null, starPoints = null, starDomeMesh = null, celestialRings = [];
+    let starOpacityTarget = 0;
     let chara, bodyM, headM, rArm, lArm, rLeg, lLeg, handApple;
     let hemiLight, sunLight;
     let targetBgColor = new THREE.Color(0x0f2b46), targetHemiColor = new THREE.Color(0xdbeafe), targetSunColor = new THREE.Color(0xfffaed);
 
     let camHeight = 8.5;
     let camDist = 9.8;
+
+    function generateCelestialDomeTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512; canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, 512, 256);
+
+      const grad = ctx.createLinearGradient(0, 0, 512, 256);
+      grad.addColorStop(0.0, 'rgba(30, 27, 75, 0.0)');
+      grad.addColorStop(0.35, 'rgba(99, 102, 241, 0.18)');
+      grad.addColorStop(0.5, 'rgba(244, 114, 182, 0.22)');
+      grad.addColorStop(0.65, 'rgba(56, 189, 248, 0.18)');
+      grad.addColorStop(1.0, 'rgba(30, 27, 75, 0.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 256);
+
+      for (let i = 0; i < 180; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 256;
+        const r = 0.6 + Math.random() * 1.4;
+        ctx.fillStyle = `rgba(255, 255, 255, ${(0.3 + Math.random() * 0.6).toFixed(2)})`;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function buildCelestialSphere() {
+      celestialGroup = new THREE.Group();
+      world.add(celestialGroup);
+
+      const domeTex = generateCelestialDomeTexture();
+      const domeGeo = new THREE.SphereGeometry(24, 32, 24);
+      const domeMat = new THREE.MeshBasicMaterial({
+        map: domeTex,
+        transparent: true,
+        opacity: 0.0,
+        side: THREE.BackSide,
+        depthWrite: false
+      });
+      starDomeMesh = new THREE.Mesh(domeGeo, domeMat);
+      celestialGroup.add(starDomeMesh);
+
+      const starCount = 320;
+      const positions = new Float32Array(starCount * 3);
+      const colors = new Float32Array(starCount * 3);
+      const palette = [
+        new THREE.Color(0xffffff),
+        new THREE.Color(0xfef08a),
+        new THREE.Color(0xbae6fd),
+        new THREE.Color(0xfbcfe8),
+        new THREE.Color(0xfde047)
+      ];
+
+      for (let i = 0; i < starCount; i++) {
+        const rad = 17.5 + Math.random() * 5.0;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+
+        positions[i * 3]     = rad * Math.sin(phi) * Math.cos(theta);
+        positions[i * 3 + 1] = rad * Math.cos(phi);
+        positions[i * 3 + 2] = rad * Math.sin(phi) * Math.sin(theta);
+
+        const c = palette[Math.floor(Math.random() * palette.length)];
+        colors[i * 3]     = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+      }
+
+      const starGeo = new THREE.BufferGeometry();
+      starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const starMat = new THREE.PointsMaterial({
+        size: 0.42,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.0,
+        depthWrite: false
+      });
+      starPoints = new THREE.Points(starGeo, starMat);
+      celestialGroup.add(starPoints);
+
+      celestialRings = [];
+      const ringMat1 = new THREE.MeshBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false });
+      const ring1 = new THREE.Mesh(new THREE.RingGeometry(16.8, 16.92, 64), ringMat1);
+      ring1.rotation.x = Math.PI / 2.3;
+      ring1.rotation.y = 0.3;
+      celestialGroup.add(ring1);
+      celestialRings.push(ring1);
+
+      const ringMat2 = new THREE.MeshBasicMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false });
+      const ring2 = new THREE.Mesh(new THREE.RingGeometry(18.2, 18.3, 64), ringMat2);
+      ring2.rotation.x = -Math.PI / 3.0;
+      ring2.rotation.z = 0.4;
+      celestialGroup.add(ring2);
+      celestialRings.push(ring2);
+    }
 
     let turtleFlippers = [];
 
@@ -989,6 +1090,7 @@
       world = new THREE.Group();
       scene.add(world);
 
+      buildCelestialSphere();
       buildCloudSea();
       buildWaterfalls();
       buildWorldTurtle();
@@ -1312,6 +1414,8 @@
     function getEnvironmentInfo(cx, cz, timePhaseIdx) {
       const isEvening = (timePhaseIdx === 2);
       const isNight = (timePhaseIdx === 3 || timePhaseIdx === 4);
+      const curH = getTileHeight(cx, cz);
+      const hasHighVision = (!isSea(cx, cz) && curH >= 3);
       
       let vision = [];
       if (fieldObjects.length === 0) vision.push("周りに何もない");
@@ -1319,24 +1423,36 @@
       fieldObjects.forEach(obj => {
         const dist = Math.max(Math.abs(obj.gx - cx), Math.abs(obj.gz - cz));
         let canSee = true;
-        if (isNight && dist > 0) canSee = false;
-        if (isEvening && dist > 1) canSee = false;
+        if (!hasHighVision) {
+          if (isNight && dist > 0) canSee = false;
+          if (isEvening && dist > 1) canSee = false;
+        }
         
         if (canSee) {
           const dir = getDirection(cx, cz, obj.gx, obj.gz);
-          vision.push(`[視界] ${dir}(距離${dist}歩)に${obj.meta.icon}${obj.meta.name}が見える`);
+          const objH = getTileHeight(obj.gx, obj.gz);
+          vision.push(`[視界] ${dir}(距離${dist}歩・高さ${objH}段)に${obj.meta.icon}${obj.meta.name}が見える`);
         }
       });
       
-      if (vision.length === 0) vision.push("暗くて見えない…");
+      if (vision.length === 0) {
+        vision.push("暗くて足元しか見えない…（3段以上の高い段に登れば星の光で遠くまで見渡せるよ！）");
+      } else if (isNight && hasHighVision) {
+        vision.unshift(`🔭【高台の星見視界(${curH}段目)】天球の星の光で夜でも島全体がくっきり見渡せる！`);
+      }
 
       let sounds = recentSounds.map(s => {
         const dir = getDirection(cx, cz, s.x, s.z);
         return `[耳] ${dir}の方から『${s.text}』と聞こえる！`;
       });
       
-      const locName = isSea(cx, cz) ? "🌊 島の外周の海の中" : "🟩 平坦な大地の上";
-      return `【現在の場所】 ${locName}\n【見えているもの】 ${vision.join(' / ')}\n【聞こえた音】 ${sounds.length > 0 ? sounds.join(' / ') : '静寂（波の音だけが聞こえる）'}`;
+      let locName = isSea(cx, cz) ? "🌊 島の外周の海の中" : `🟩 大地の上（高さ ${curH}段目）`;
+      if (!isSea(cx, cz) && curH === 5) {
+        locName += " 🌟【5段目・星の聖域（天球の星々に一番近い最高峰！）】";
+      } else if (!isSea(cx, cz) && curH >= 3) {
+        locName += " 🔭【星見の展望台（見晴らし最高！）】";
+      }
+      return `【現在の場所】 ${locName}\n【見えているもの】 ${vision.join(' / ')}\n【聞こえた音】 ${sounds.length > 0 ? sounds.join(' / ') : '静寂（波の音と星のきらめき）'}`;
     }
 
     function getPossibleActions(gx, gz) {
@@ -1367,7 +1483,8 @@
         if (!isAbyss(tx, tz)) {
           const targetH = getTileHeight(tx, tz);
           const diff = targetH - curH;
-          const targetArea = isSea(tx, tz) ? "海" : "大地";
+          const targetArea = isSea(tx, tz) ? "海" : `大地(${targetH}段)`;
+          const starNote = (!isSea(tx, tz) && targetH === 5) ? "🌟星の聖域！" : ((!isSea(tx, tz) && targetH >= 3) ? "🔭見晴らし台" : "");
 
           const curDistToCenter = Math.max(Math.abs(gx), Math.abs(gz));
           const nextDistToCenter = Math.max(Math.abs(tx), Math.abs(tz));
@@ -1375,11 +1492,11 @@
 
           if (!isMovingOutwardInSea) {
             if (diff === 1) {
-              list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: `${d.n}の${targetArea}へピョンと登る（速度3・安全移動）` });
+              list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: `${d.n}の${targetArea}${starNote}へピョンと登る（速度3・安全移動）` });
             } else if (diff === 0) {
-              list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: `${d.n}の${targetArea}へ歩く（速度3・安全移動）` });
+              list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: `${d.n}の${targetArea}${starNote}へ歩く（速度3・安全移動）` });
             } else if (diff < 0 && diff >= -2) {
-              list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: `${d.n}の${targetArea}へ降りる（速度3・安全移動）` });
+              list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, txt: `${d.n}の${targetArea}${starNote}へ降りる（速度3・安全移動）` });
             } else if (diff <= -3) {
               list.push({ key: d.k + "_NORMAL", baseKey: d.k, pos: [tx, tz], rotY: d.ry, diff: diff, speed: 3, isFall: true, txt: `${d.n}の崖から飛び降りる（高低差注意！）` });
             }
@@ -1403,6 +1520,10 @@
 
       if (isSea(gx, gz)) {
         list.push({ key: "PUSH_BY_WAVE", speed: 1, txt: "白波に身をまかせて内陸側へ押し戻される（波に乗る）" });
+      } else if (curH === 5) {
+        list.push({ key: "REST_HERE", speed: 1, txt: "🌟 5段目のてっぺん（星の聖域）で星空を見上げてひとやすみする" });
+      } else if (curH >= 3) {
+        list.push({ key: "REST_HERE", speed: 1, txt: `🔭 ${curH}段目の展望台で景色を眺めながらひとやすみする` });
       } else {
         list.push({ key: "REST_HERE", speed: 1, txt: "その場の中央でひとやすみする（休む）" });
       }
@@ -1423,35 +1544,35 @@
       bubble.className = 'voice-bubble bubble-active';
 
       const gx = ROBOT.pos.gx, gz = ROBOT.pos.gz;
+      const curH = getTileHeight(gx, gz);
       const actions = getPossibleActions(gx, gz);
       const timeIdx = getCurrentTimePhaseIdx(); const phaseData = TIME_PHASES[timeIdx];
 
       const prompt = `あなたは古代の神話にあるような、雲海の底に眠る古代の巨亀が支える平坦世界の島に立つロボットです。
-中央には5×5の石の大地があり、その周りを自然な白波の立つ円形の海が囲んでいます。
-海の端は360度ぐるりと流れ落ちる「世界の果ての滝」となっており、その下は泡立つ雲海と古代亀が佇む深淵です。
-海の水は内陸（大地）へ向かって強く押し寄せており、通常の歩行では波に押し戻されて外の滝へは近づけません。
+世界の外側は巨大な球体の天球（星空の大枠）に包まれており、夜や深淵になると満天の星々と天球の軌道が輝き出します。
+大地は0段〜5段までの高さがあり、高く登るほど星空に近づきます。
+
+【高さ×星空の特別ルール】
+・0〜2段目: 夜は暗くて足元しか見えず、夜歩きすると寒さと怖さでたいりょくが減る。
+・3〜4段目(展望台): 星の光が届くため、夜や深淵でも島全体がくっきり見渡せる！夜のダメージも大幅に減る。
+・5段目(星の聖域・てっぺん): 星々に手が届きそうな最高峰！夜でもダメージを一切受けず、星の加護でごきげんとたいりょくが回復する特別な場所。
 
 【ロボットのいま】
 ・❤️ たいりょく(HP): ${st.energy}/100 （ゼロで倒れます！）
 ・🍙 おなか: ${st.stamina}/100
 ・🎵 ごきげん: ${st.mental}/100
 ・時間帯: ${phaseData.name}
-・位置: (${gx}, ${gz})
+・位置: (${gx}, ${gz}) / 足元の高さ: ${isSea(gx, gz) ? '海' : curH + '段目'}
 ・${getEnvironmentInfo(gx, gz, timeIdx)}
-
-【物理と海と滝のルール】
-・速度1〜4: マスの中央で安全に止まる。海にいる時は波の抵抗で外側へ進めず、内陸へ押し戻される。
-・速度5(猛ダッシュ): 荒波を蹴散らして突き進むが、勢い余って端へ滑り込む！
-  滑り込んだ先が滝の縁を越えると、雲海を突き抜けて深淵の古代亀の姿を見ながらヒュ〜…と奈落ダイブ（HP-15）！
 
 【選べる行動リスト】
 ${JSON.stringify(actions.map(a => ({ key: a.key, 速度: a.speed, 行動: a.txt })))}
 
 以下のJSON形式で答えてください：
 {
-  "feeling": "ロボットの素直な気持ちや叫び（例: ざっぱーん！四角い大地の周りに白い波しぶきが立って綺麗だな！外の滝に吸い込まれないように気をつけよう！）（65字以内）",
+  "feeling": "ロボットの素直な気持ちや叫び（例: 夜になって天球の星がキラキラ輝き出したよ！3段以上の高い場所に登れば星の光で遠くまで見渡せるぞ！）（65字以内）",
   "actionKey": "選んだ行動のkey",
-  "actionName": "やったことの説明（例: 白波を蹴散らして速度5で東へ突っ走った！）"
+  "actionName": "やったことの説明（例: 星を見ようと1段上のブロックへピョンと登った！）"
 }`;
 
       try {
@@ -1473,14 +1594,25 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 速度: a.speed, 行動: a.txt 
 
         life.tick([actionKey]); 
         const resultAct = await executeWorldAction(actionKey, actions);
+        const afterH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
+        const onLandAfter = !isSea(ROBOT.pos.gx, ROBOT.pos.gz);
 
         let dEnergy = 0, dStamina = 0, dMental = 0;
         if (resultAct && resultAct.speed) {
           ROBOT.speed = resultAct.speed;
           dStamina = -(resultAct.speed * 3);
           if (st.stamina <= 0) dEnergy -= 15;
-          if (timeIdx === 3) dEnergy -= 10;
-          if (timeIdx === 4) { dEnergy -= 20; dMental -= 20; }
+
+          if (onLandAfter && afterH === 5) {
+            dEnergy += 10; dMental += 15;
+            showToast("🌟 5段目・星の聖域！星の光で元気とごきげん回復！");
+          } else if (onLandAfter && afterH >= 3) {
+            dMental += 5;
+            if (timeIdx === 4) dEnergy -= 8;
+          } else {
+            if (timeIdx === 3) dEnergy -= 10;
+            if (timeIdx === 4) { dEnergy -= 20; dMental -= 20; }
+          }
           
           if (resultAct.overrunFell) {
             dEnergy -= 15;
@@ -1493,7 +1625,14 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 速度: a.speed, 行動: a.txt 
         else if (actionKey === 'REST_HERE') {
           ROBOT.speed = 1;
           dStamina = -3;
-          if (timeIdx === 3 || timeIdx === 4) { dEnergy += 100; dMental += 20; }
+          if (onLandAfter && afterH === 5) {
+            dEnergy += 100; dMental += 35;
+            showToast("🌟 てっぺんで星見休憩！たいりょく全回復＆ごきげん大アップ！");
+          } else if (timeIdx === 3 || timeIdx === 4) {
+            dEnergy += 100; dMental += 20;
+          } else if (onLandAfter && afterH >= 3) {
+            dEnergy += 25; dMental += 15;
+          }
         }
         else if (actionKey === 'PUSH_BY_WAVE') {
           ROBOT.speed = 1;
@@ -1683,15 +1822,28 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 速度: a.speed, 行動: a.txt 
       document.getElementById('v-energy').textContent = st.energy; document.getElementById('b-energy').style.width = st.energy + '%';
       document.getElementById('v-stamina').textContent = st.stamina; document.getElementById('b-stamina').style.width = st.stamina + '%';
       document.getElementById('v-mental').textContent = st.mental; document.getElementById('b-mental').style.width = st.mental + '%';
-      const locLabel = isSea(ROBOT.pos.gx, ROBOT.pos.gz) ? '海' : `${ROBOT.pos.gx},${ROBOT.pos.gz}`;
+      const curH = getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz);
+      const locLabel = isSea(ROBOT.pos.gx, ROBOT.pos.gz) ? '海' : `${ROBOT.pos.gx},${ROBOT.pos.gz}・${curH}段`;
       document.getElementById('ui-robot-id').textContent = `🤖 ロボ${ROBOT.gen} (${locLabel})`;
       document.getElementById('ui-speed-tag').textContent = `⚡ 速度 ${ROBOT.speed}`;
       document.getElementById('ui-robot-drive').textContent = DRIVE_JA[st.drive] || st.drive;
       document.getElementById('ui-step-count').textContent = `⭐ ${ROBOT.stepCount}手目`;
 
-      const phase = TIME_PHASES[getCurrentTimePhaseIdx()];
+      const timeIdx = getCurrentTimePhaseIdx();
+      const phase = TIME_PHASES[timeIdx];
       const badge = document.getElementById('ui-time-phase');
       badge.textContent = phase.name; badge.style.color = phase.tagColor; badge.style.background = phase.tagBg; badge.style.borderColor = phase.tagColor;
+
+      if (timeIdx === 0 || timeIdx === 1) starOpacityTarget = 0.0;
+      else if (timeIdx === 2) starOpacityTarget = 0.32;
+      else if (timeIdx === 3) starOpacityTarget = 0.88;
+      else starOpacityTarget = 1.0;
+
+      if (!isSea(ROBOT.pos.gx, ROBOT.pos.gz)) {
+        const physEl = document.getElementById('physics-note-text');
+        if (curH === 5) physEl.textContent = '🌟 5段目: 星の聖域 (視界＆加護MAX)';
+        else if (curH >= 3) physEl.textContent = `🔭 ${curH}段目: 星見の展望台 (夜間視界◎)`;
+      }
 
       targetBgColor.setHex(phase.bg); targetHemiColor.setHex(phase.hemi); targetSunColor.setHex(phase.sun);
       document.getElementById('sky-window').style.backgroundColor = '#' + phase.bg.toString(16).padStart(6, '0');
@@ -1753,6 +1905,28 @@ ${JSON.stringify(actions.map(a => ({ key: a.key, 速度: a.speed, 行動: a.txt 
       if (scene && scene.background) scene.background.lerp(targetBgColor, 0.02);
       if (hemiLight) hemiLight.color.lerp(targetHemiColor, 0.02);
       if (sunLight) sunLight.color.lerp(targetSunColor, 0.02);
+
+      if (celestialGroup) {
+        celestialGroup.rotation.y += 0.0008;
+        celestialGroup.rotation.x = Math.sin(clock * 0.15) * 0.08;
+        const curH = (!isSea(ROBOT.pos.gx, ROBOT.pos.gz)) ? getTileHeight(ROBOT.pos.gx, ROBOT.pos.gz) : 0;
+        const heightBoost = curH >= 3 ? (curH - 2) * 0.12 : 0;
+        const finalStarOp = Math.min(1.0, starOpacityTarget + (starOpacityTarget > 0 ? heightBoost : 0));
+
+        if (starPoints) {
+          starPoints.material.opacity = THREE.MathUtils.lerp(starPoints.material.opacity, finalStarOp, 0.03);
+          starPoints.material.size = (0.38 + (curH >= 3 ? curH * 0.04 : 0)) + Math.sin(clock * 2.0) * 0.04;
+        }
+        if (starDomeMesh) {
+          starDomeMesh.material.opacity = THREE.MathUtils.lerp(starDomeMesh.material.opacity, finalStarOp * 0.75, 0.03);
+        }
+        if (celestialRings.length > 0) {
+          celestialRings.forEach((r, idx) => {
+            r.rotation.z += (idx === 0 ? 0.0012 : -0.0009);
+            r.material.opacity = THREE.MathUtils.lerp(r.material.opacity, finalStarOp * 0.35, 0.03);
+          });
+        }
+      }
 
       if (cloudPlates.length > 0) {
         cloudPlates.forEach((cp, idx) => {
