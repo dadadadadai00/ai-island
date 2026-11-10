@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -10,17 +9,18 @@
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background-color: #0d2538; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; }
 
-    #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; display: block; }
+    #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; display: block; touch-action: none; }
 
     #status-panel {
       position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
       width: 95%; max-width: 430px; background: rgba(255, 255, 255, 0.96);
       border-radius: 18px; box-shadow: 0 4px 18px rgba(0,0,0,0.25);
       padding: 10px 12px; z-index: 10;
-      transition: opacity 0.35s ease, transform 0.35s ease;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      will-change: opacity, transform;
     }
     #status-panel.sky-hidden {
-      opacity: 0; pointer-events: none; transform: translate(-50%, -22px);
+      opacity: 0; pointer-events: none; transform: translate(-50%, -28px);
     }
 
     .gauge-container { display: flex; justify-content: space-between; gap: 6px; }
@@ -64,9 +64,9 @@
       width: 46px; height: 46px; background: rgba(255,255,255,0.96); border-radius: 50%;
       box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex;
       justify-content: center; align-items: center; font-size: 21px; z-index: 10; cursor: pointer;
-      border: 2px solid #e2e8f0; transition: opacity 0.35s ease;
+      border: 2px solid #e2e8f0; transition: opacity 0.4s ease, transform 0.4s ease;
     }
-    #diary-btn.sky-hidden { opacity: 0; pointer-events: none; }
+    #diary-btn.sky-hidden { opacity: 0; pointer-events: none; transform: translateY(-16px); }
 
     #gacha-btn {
       position: fixed; bottom: 205px; left: 50%; transform: translateX(-50%);
@@ -74,6 +74,7 @@
       box-shadow: 0 4px 14px rgba(0,0,0,0.25); display: flex;
       justify-content: center; align-items: center; font-size: 26px; font-weight: bold; color: #334155;
       z-index: 12; cursor: pointer; border: 2px solid #e2e8f0;
+      transition: opacity 0.4s ease, transform 0.2s ease;
     }
     #gacha-btn:active { transform: translateX(-50%) scale(0.94); }
 
@@ -176,7 +177,7 @@
     <span>💭 ロボのきもち・心のさけび</span>
     <div class="ai-badge" id="ai-status">💤 待機中</div>
   </div>
-  <div id="message-box">四角い大地のまわりを丸い海が包み込んで、白波を立てているよ！</div>
+  <div id="message-box">四角い大地のまわりを丸い海が包み込んで、白波を立てているよ！上へスワイプするとお星さまも見えるよ！</div>
   <div class="action-history">
     <div><span class="history-tag">👟 やった事</span> <span id="history-action">待機中</span></div>
     <span id="history-loc" style="color:#2563eb; font-weight:800;">中央静止中</span>
@@ -308,7 +309,6 @@
   let BAG = ['stone', 'apple', 'grass'];
   let DIARY_LOGS = ['🌱 1日目：世界の果ての島に降り立ったよ！'];
 
-  // 初期状態はすべて平らな5×5の大地（勝手に段差が積まれないよう0段で統一）
   let HEIGHT_MAP = {};
   for (let x = -2; x <= 2; x++) {
     for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
@@ -319,7 +319,6 @@
     pos: { x: 0, z: 0, sx: 2, sz: 2 },
     speed: 3
   };
-  // 21:36のスクリーンショットと同じ、初期配置は赤いリンゴ1個のみ
   let WORLD_ITEMS = [
     { type: 'apple', x: 0, z: -1 }
   ];
@@ -376,14 +375,14 @@
   loadWorldState();
 
   // ==========================================
-  // 2. 3D世界構築（21:36スクショの基盤デザインを100%復元・固定）
+  // 2. 3D世界構築（21:36の基盤デザインを100%固定）
   // ==========================================
   const container = document.getElementById('canvas-container');
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0d2538);
 
   const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 120);
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   container.appendChild(renderer.domElement);
@@ -394,7 +393,7 @@
   dirLight.position.set(6, 14, 8);
   scene.add(dirLight);
 
-  // --- [固定基盤1] 21:36のパステルミントグリーンの5×5大地 ---
+  // --- [固定基盤1] パステルミントグリーンの5×5大地 ---
   const terrainGroup = new THREE.Group();
   scene.add(terrainGroup);
   const itemGroup = new THREE.Group();
@@ -402,23 +401,22 @@
 
   const landMat = new THREE.MeshLambertMaterial({ color: 0xc2ebd4 });
   const stepMat = new THREE.MeshLambertMaterial({ color: 0xa7dcc0 });
+  const sharedLandGeo = new THREE.BoxGeometry(0.95, 0.72, 0.95);
+  const sharedStepGeo = new THREE.BoxGeometry(0.95, 0.45, 0.95);
 
   function rebuildTerrainAndItems() {
     while (terrainGroup.children.length > 0) terrainGroup.remove(terrainGroup.children[0]);
     while (itemGroup.children.length > 0) itemGroup.remove(itemGroup.children[0]);
 
-    const landGeo = new THREE.BoxGeometry(0.95, 0.72, 0.95);
-    const stepGeo = new THREE.BoxGeometry(0.95, 0.45, 0.95);
-
     for (let x = -2; x <= 2; x++) {
       for (let z = -2; z <= 2; z++) {
-        const block = new THREE.Mesh(landGeo, landMat);
+        const block = new THREE.Mesh(sharedLandGeo, landMat);
         block.position.set(x, -0.36, z);
         terrainGroup.add(block);
 
         const h = HEIGHT_MAP[`${x},${z}`] || 0;
         for (let lv = 1; lv <= h; lv++) {
-          const sBlock = new THREE.Mesh(stepGeo, stepMat);
+          const sBlock = new THREE.Mesh(sharedStepGeo, stepMat);
           sBlock.position.set(x, (lv - 0.5) * 0.45, z);
           terrainGroup.add(sBlock);
         }
@@ -447,12 +445,11 @@
     });
   }
 
-  // --- [固定基盤2] 21:36の丸い海と四隅の白泡・外縁の白波 ---
+  // --- [固定基盤2] 丸い海と四隅の白泡・外縁の白波 ---
   const seaCanvas = document.createElement('canvas');
   seaCanvas.width = 512; seaCanvas.height = 512;
   const sCtx = seaCanvas.getContext('2d');
 
-  // 固定された泡粒の配置（チカチカせず21:36の優しい見た目を維持）
   const seaFoamDots = [];
   for (let i = 0; i < 65; i++) {
     const ang = Math.random() * Math.PI * 2;
@@ -476,11 +473,9 @@
     sCtx.fillStyle = rg;
     sCtx.fillRect(0, 0, 512, 512);
 
-    // 四角い大地のまわりの柔らかい白波ぼかし
     sCtx.fillStyle = 'rgba(255, 255, 255, 0.72)';
     sCtx.fillRect(118, 118, 276, 276);
 
-    // 海面の白い泡粒（21:36の表現）
     sCtx.fillStyle = 'rgba(255, 255, 255, 0.78)';
     seaFoamDots.forEach((d, idx) => {
       const pulse = Math.sin(timeSec * 1.8 + idx) * 1.2;
@@ -498,7 +493,7 @@
   seaMesh.position.y = -0.35;
   scene.add(seaMesh);
 
-  // --- [固定基盤3] 21:36の爽やかな円形滝（上から下へゆっくり流れる） ---
+  // --- [固定基盤3] 円形滝（上から下へゆっくり流れる） ---
   const wfCanvas = document.createElement('canvas');
   wfCanvas.width = 512; wfCanvas.height = 512;
   const wfCtx = wfCanvas.getContext('2d');
@@ -525,7 +520,6 @@
   }
 
   function renderWaterfallTexture(scrollOffset) {
-    // 21:36の爽やかな水色〜白泡グラデーション背景（固定）
     const grad = wfCtx.createLinearGradient(0, 0, 0, 512);
     grad.addColorStop(0.0, '#ffffff');
     grad.addColorStop(0.06, '#81d4fa');
@@ -535,20 +529,17 @@
     wfCtx.fillStyle = grad;
     wfCtx.fillRect(0, 0, 512, 512);
 
-    // 縦の水色ストライプ
     wfCtx.fillStyle = 'rgba(41, 182, 246, 0.35)';
     for (let x = 0; x < 512; x += 16) {
       wfCtx.fillRect(x, 0, 6, 512);
     }
 
-    // 上から下へゆっくり流れる白い水筋（scrollOffset を加算して下方向へ移動）
     wfStreaks.forEach(s => {
       const curY = (s.y + scrollOffset) % 560 - 48;
       wfCtx.fillStyle = `rgba(255, 255, 255, ${s.alpha})`;
       wfCtx.fillRect(s.x, curY, s.w, s.h);
     });
 
-    // 上から下へゆっくり流れる泡粒（21:36の特徴的な横長白泡）
     wfBubbles.forEach(b => {
       const curY = (b.y + scrollOffset * 0.85) % 540 - 20;
       wfCtx.fillStyle = `rgba(255, 255, 255, ${b.alpha})`;
@@ -570,7 +561,6 @@
   waterfallMesh.position.y = -3.55;
   scene.add(waterfallMesh);
 
-  // 滝の落ちきる下の白泡と古代遺跡カメ
   const foamRingGeo = new THREE.RingGeometry(3.2, 5.5, 64);
   foamRingGeo.rotateX(-Math.PI / 2);
   const foamRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
@@ -592,7 +582,7 @@
   turtleGroup.position.y = -8.8;
   scene.add(turtleGroup);
 
-  // --- [固定基盤4] 21:36の腕付きボクセルロボット ---
+  // --- [固定基盤4] 腕付きボクセルロボット（天体観測時に首も一緒に見上げる構造） ---
   const robotGroup = new THREE.Group();
   const legMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
   const legL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.22, 0.18), legMat);
@@ -612,20 +602,25 @@
   armR.position.set(0.27, 0.43, 0);
   robotGroup.add(armL); robotGroup.add(armR);
 
+  const headPivot = new THREE.Group();
+  headPivot.position.set(0, 0.66, 0);
+  robotGroup.add(headPivot);
+
   const rHead = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.42, 0.42), new THREE.MeshLambertMaterial({ color: 0xb3e5fc }));
-  rHead.position.y = 0.87;
-  robotGroup.add(rHead);
+  rHead.position.y = 0.21;
+  headPivot.add(rHead);
 
   const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
   const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.10, 0.04), eyeMat);
-  eyeL.position.set(-0.10, 0.87, 0.22);
+  eyeL.position.set(-0.10, 0.21, 0.22);
   const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.10, 0.04), eyeMat);
-  eyeR.position.set(0.10, 0.87, 0.22);
-  robotGroup.add(eyeL); robotGroup.add(eyeR);
+  eyeR.position.set(0.10, 0.21, 0.22);
+  headPivot.add(eyeL); headPivot.add(eyeR);
 
   const bulbMesh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.12, 0.13), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
-  bulbMesh.position.y = 1.14;
-  robotGroup.add(bulbMesh);
+  bulbMesh.position.y = 0.48;
+  headPivot.add(bulbMesh);
+
   scene.add(robotGroup);
 
   function syncRobot3DPosition() {
@@ -643,13 +638,13 @@
     robotGroup.position.set(gx + subOffsetX, baseY, gz + subOffsetZ);
   }
 
-  // --- 球体大枠の星空（上を見上げたときに広がる天球） ---
+  // --- 天球の星空・6つの星座・流れ星（スマホ負荷ゼロ設計） ---
   const skyGroup = new THREE.Group();
   scene.add(skyGroup);
 
   const starGeo = new THREE.BufferGeometry();
   const starPositions = [];
-  for (let i = 0; i < 420; i++) {
+  for (let i = 0; i < 480; i++) {
     const u = Math.random();
     const v = Math.random();
     const theta = u * 2.0 * Math.PI;
@@ -668,7 +663,7 @@
 
   const celestialRings = new THREE.Group();
   for (let i = 0; i < 2; i++) {
-    const rGeo = new THREE.TorusGeometry(26 + i * 2.5, 0.05, 8, 96);
+    const rGeo = new THREE.TorusGeometry(27 + i * 2.5, 0.04, 8, 96);
     const rMat = new THREE.MeshBasicMaterial({ color: 0xffe082, transparent: true, opacity: 0.0 });
     const ring = new THREE.Mesh(rGeo, rMat);
     ring.rotation.x = 0.7 + i * 0.5;
@@ -677,46 +672,235 @@
   }
   skyGroup.add(celestialRings);
 
+  // 天球座標変換ヘルパー（azDeg: 方位角, zDeg: 天頂からの角度）
+  function skyPos(azDeg, zDeg, r = 29.5) {
+    const az = azDeg * Math.PI / 180;
+    const za = zDeg * Math.PI / 180;
+    return new THREE.Vector3(
+      r * Math.sin(za) * Math.cos(az),
+      r * Math.cos(za),
+      r * Math.sin(za) * Math.sin(az)
+    );
+  }
+
+  // 星座データ（見上げた空にバランスよく配置）
+  const CONSTELLATIONS = [
+    {
+      name: '🌟 オリオン座',
+      stars: [
+        [220, 38], [238, 40], [226, 48], [230, 49], [234, 50], [223, 58], [239, 57]
+      ],
+      lines: [[0,2],[1,4],[2,3],[3,4],[2,5],[4,6],[0,1],[5,6]],
+      labelPos: [230, 33]
+    },
+    {
+      name: '🥄 北斗七星',
+      stars: [
+        [10, 26], [22, 28], [20, 38], [8, 36], [34, 33], [46, 36], [58, 42]
+      ],
+      lines: [[0,1],[1,2],[2,3],[3,0],[1,4],[4,5],[5,6]],
+      labelPos: [30, 21]
+    },
+    {
+      name: '👑 カシオペア座',
+      stars: [
+        [162, 26], [172, 33], [182, 27], [192, 34], [202, 25]
+      ],
+      lines: [[0,1],[1,2],[2,3],[3,4]],
+      labelPos: [182, 19]
+    },
+    {
+      name: '🦢 はくちょう座',
+      stars: [
+        [105, 8], [105, 19], [105, 31], [85, 20], [125, 20]
+      ],
+      lines: [[0,1],[1,2],[3,1],[1,4]],
+      labelPos: [105, 4]
+    },
+    {
+      name: '🦂 さそり座',
+      stars: [
+        [292, 36], [295, 42], [299, 48], [306, 45], [315, 51], [324, 56], [332, 53], [335, 47]
+      ],
+      lines: [[0,3],[1,3],[2,3],[3,4],[4,5],[5,6],[6,7]],
+      labelPos: [312, 36]
+    },
+    {
+      name: '🐎 ペガスス座',
+      stars: [
+        [125, 40], [148, 40], [148, 54], [125, 54], [112, 34], [160, 33]
+      ],
+      lines: [[0,1],[1,2],[2,3],[3,0],[0,4],[1,5]],
+      labelPos: [137, 34]
+    }
+  ];
+
+  const constellationLineVertices = [];
+  const majorStarVertices = [];
+  const constellationLabels = [];
+
+  function makeLabelSprite(text) {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 64;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(18, 10, 220, 44, 22) : ctx.fillRect(18, 10, 220, 44);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(147, 197, 253, 0.75)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillStyle = '#e0f2fe';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 33);
+
+    const tex = new THREE.CanvasTexture(c);
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.0, depthWrite: false });
+    const sp = new THREE.Sprite(mat);
+    sp.scale.set(5.2, 1.3, 1);
+    return sp;
+  }
+
+  CONSTELLATIONS.forEach(con => {
+    const pts = con.stars.map(s => skyPos(s[0], s[1], 29.5));
+    pts.forEach(p => majorStarVertices.push(p.x, p.y, p.z));
+    con.lines.forEach(pair => {
+      const p1 = pts[pair[0]];
+      const p2 = pts[pair[1]];
+      constellationLineVertices.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+    });
+    const labelSp = makeLabelSprite(con.name);
+    const lp = skyPos(con.labelPos[0], con.labelPos[1], 28.5);
+    labelSp.position.copy(lp);
+    skyGroup.add(labelSp);
+    constellationLabels.push(labelSp);
+  });
+
+  const conLineGeo = new THREE.BufferGeometry();
+  conLineGeo.setAttribute('position', new THREE.Float32BufferAttribute(constellationLineVertices, 3));
+  const conLineMat = new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.0 });
+  const conLines = new THREE.LineSegments(conLineGeo, conLineMat);
+  skyGroup.add(conLines);
+
+  const majorStarGeo = new THREE.BufferGeometry();
+  majorStarGeo.setAttribute('position', new THREE.Float32BufferAttribute(majorStarVertices, 3));
+  const majorStarMat = new THREE.PointsMaterial({ color: 0xfef08a, size: 0.58, transparent: true, opacity: 0.25 });
+  const majorStars = new THREE.Points(majorStarGeo, majorStarMat);
+  skyGroup.add(majorStars);
+
+  // 流れ星（1つの軽量ラインを使い回してメモリ負荷ゼロ）
+  const shootGeo = new THREE.BufferGeometry();
+  shootGeo.setAttribute('position', new THREE.Float32BufferAttribute([0,0,0, 0,0,0], 3));
+  const shootMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0 });
+  const shootingStar = new THREE.Line(shootGeo, shootMat);
+  scene.add(shootingStar);
+
+  let shootState = { active: false, timer: 2.5, progress: 0, start: new THREE.Vector3(), dir: new THREE.Vector3() };
+
+  function updateShootingStar(dt, lookUpRatio) {
+    if (!shootState.active) {
+      shootState.timer -= dt;
+      if (shootState.timer <= 0) {
+        shootState.active = true;
+        shootState.progress = 0;
+        shootState.timer = (lookUpRatio > 0.1) ? (2.5 + Math.random() * 3.5) : (6.0 + Math.random() * 6.0);
+        const az = Math.random() * 360;
+        const za = 12 + Math.random() * 40;
+        shootState.start.copy(skyPos(az, za, 27.5));
+        shootState.dir.set((Math.random() - 0.5) * 18, -4 - Math.random() * 5, (Math.random() - 0.5) * 18);
+      }
+    } else {
+      shootState.progress += dt * 1.8;
+      if (shootState.progress >= 1.0) {
+        shootState.active = false;
+        shootMat.opacity = 0.0;
+      } else {
+        const head = shootState.start.clone().addScaledVector(shootState.dir, shootState.progress);
+        const tail = shootState.start.clone().addScaledVector(shootState.dir, Math.max(0, shootState.progress - 0.22));
+        const posAttr = shootGeo.attributes.position;
+        posAttr.setXYZ(0, head.x, head.y, head.z);
+        posAttr.setXYZ(1, tail.x, tail.y, tail.z);
+        posAttr.needsUpdate = true;
+        shootMat.opacity = Math.sin(shootState.progress * Math.PI) * 0.95;
+      }
+    }
+  }
+
   // ==========================================
-  // 3. カメラワーク（21:36の初期アングル固定 ＋ 上を見上げたときゲージ枠非表示）
+  // 3. カメラワーク（カクつきゼロの連続補間 ＋ 真上の星空まで天体観測）
   // ==========================================
-  let camTheta = 0.72;   // 21:36スクショの斜め角度
-  let camPhi = 1.16;     // 21:36スクショの大地と滝が両方綺麗に見える高さ角度
+  let camTheta = 0.72;
+  let camPhi = 1.16;
   let camRadius = 11.2;
+  let currentLookUpRatio = 0;
   let isDragging = false;
   let prevPointer = { x: 0, y: 0 };
 
   function updateCameraTransform() {
-    camPhi = Math.max(0.30, Math.min(2.15, camPhi));
+    // 2.75まで上限を広げ、真上の星空（天頂）まで見上げ可能にする
+    camPhi = Math.max(0.30, Math.min(2.75, camPhi));
     camRadius = Math.max(7.0, Math.min(20.0, camRadius));
-
-    const cx = camRadius * Math.sin(camPhi) * Math.sin(camTheta);
-    const cy = camRadius * Math.cos(camPhi);
-    const cz = camRadius * Math.sin(camPhi) * Math.cos(camTheta);
 
     const statusPanel = document.getElementById('status-panel');
     const diaryBtn = document.getElementById('diary-btn');
 
-    // 上を見上げたとき（camPhi > 1.42）、ゲージ枠と📖を非表示にして星空を映す
+    // 1.38を超えたら「見上げモード」へ段差なく滑らかに移行
+    const rawT = Math.max(0, Math.min(1, (camPhi - 1.38) / (2.75 - 1.38)));
+    const smoothT = rawT * rawT * (3 - 2 * rawT); // カクつきを完全に消す滑らかな曲線
+    currentLookUpRatio = smoothT;
+
+    // カメラ位置はワープさせず、島のそばに留まりながら首を真上へ傾ける
+    const effectivePhi = camPhi <= 1.38 ? camPhi : 1.38 + (camPhi - 1.38) * 0.16;
+    const effectiveRadius = camRadius * (1.0 - smoothT * 0.28);
+
+    const cx = effectiveRadius * Math.sin(effectivePhi) * Math.sin(camTheta);
+    const cy = effectiveRadius * Math.cos(effectivePhi);
+    const cz = effectiveRadius * Math.sin(effectivePhi) * Math.cos(camTheta);
+
+    camera.position.set(cx, cy, cz);
+
+    // 注視点が -1.0（島）から +26.0（真上の星空）へ連続的に上がる
+    const lookY = -1.0 + smoothT * 27.0;
+    camera.lookAt(0, lookY, 0);
+
+    // ロボの頭もカメラと一緒に空を見上げる
+    headPivot.rotation.x = -smoothT * 0.55;
+
+    // ゲージ枠と手帳ボタンの自然な非表示・復帰
     if (camPhi > 1.42) {
-      const lookUpRatio = (camPhi - 1.42) / (2.15 - 1.42);
-      camera.position.set(cx * 0.7, Math.max(-0.3, cy), cz * 0.7);
-      camera.lookAt(0, -1.0 + lookUpRatio * 10.5, 0);
       statusPanel.classList.add('sky-hidden');
       diaryBtn.classList.add('sky-hidden');
-      // 見上げたときは昼でも星がよく見えるように輝度を上げる
-      starMat.opacity = Math.max(starMat.opacity, 0.45 + lookUpRatio * 0.55);
-      celestialRings.children.forEach(r => { r.material.opacity = lookUpRatio * 0.35; });
     } else {
-      // 21:36スクショと全く同じ注視点 (0, -1.0, 0)
-      camera.position.set(cx, cy, cz);
-      camera.lookAt(0, -1.0, 0);
       statusPanel.classList.remove('sky-hidden');
       diaryBtn.classList.remove('sky-hidden');
-      celestialRings.children.forEach(r => { r.material.opacity = 0.0; });
     }
+
+    // 見上げ具合に応じて星空・星座ライン・星座名が浮かび上がる
+    conLineMat.opacity = smoothT * 0.62;
+    majorStarMat.opacity = 0.25 + smoothT * 0.75;
+    celestialRings.children.forEach(r => { r.material.opacity = smoothT * 0.32; });
+    const labelAlpha = Math.max(0, (smoothT - 0.12) / 0.88) * 0.92;
+    constellationLabels.forEach(sp => { sp.material.opacity = labelAlpha; });
+
+    refreshSkyBrightness();
   }
-  updateCameraTransform();
+
+  function refreshSkyBrightness() {
+    const hLevel = getRobotHeightLevel();
+    let baseStarOpacity = 0.15;
+    if (TIME_STEP < 4) baseStarOpacity = 0.15;
+    else if (TIME_STEP < 9) baseStarOpacity = 0.10;
+    else if (TIME_STEP < 13) baseStarOpacity = 0.45;
+    else if (TIME_STEP < 17) baseStarOpacity = 0.85;
+    else baseStarOpacity = 1.0;
+
+    if (hLevel >= 3) baseStarOpacity = Math.min(1.0, baseStarOpacity + 0.35);
+
+    // 見上げたときは昼間でも星と星座がはっきり観察できる
+    starMat.opacity = Math.max(baseStarOpacity, currentLookUpRatio * 0.95);
+  }
 
   const domElem = renderer.domElement;
   domElem.addEventListener('pointerdown', (e) => {
@@ -735,6 +919,7 @@
     updateCameraTransform();
   });
   window.addEventListener('pointerup', () => { isDragging = false; });
+  window.addEventListener('pointercancel', () => { isDragging = false; });
   domElem.addEventListener('wheel', (e) => {
     camRadius += e.deltaY * 0.01;
     updateCameraTransform();
@@ -765,26 +950,21 @@
 
     let timeLabel = '☀️ 朝';
     let skyHex = 0x0d2538;
-    let starOpacity = 0.15;
 
     if (TIME_STEP < 4) {
-      timeLabel = '☀️ 朝'; skyHex = 0x0d2538; starOpacity = 0.15;
+      timeLabel = '☀️ 朝'; skyHex = 0x0d2538;
     } else if (TIME_STEP < 9) {
-      timeLabel = '🌤️ 昼'; skyHex = 0x12324a; starOpacity = 0.10;
+      timeLabel = '🌤️ 昼'; skyHex = 0x12324a;
     } else if (TIME_STEP < 13) {
-      timeLabel = '🌇 夕方'; skyHex = 0x241b35; starOpacity = 0.45;
+      timeLabel = '🌇 夕方'; skyHex = 0x241b35;
     } else if (TIME_STEP < 17) {
-      timeLabel = '🌙 夜'; skyHex = 0x071320; starOpacity = 0.85;
+      timeLabel = '🌙 夜'; skyHex = 0x071320;
     } else {
-      timeLabel = '🌌 深淵'; skyHex = 0x040911; starOpacity = 1.0;
-    }
-
-    if (hLevel >= 3) {
-      starOpacity = Math.min(1.0, starOpacity + 0.35);
+      timeLabel = '🌌 深淵'; skyHex = 0x040911;
     }
 
     scene.background.setHex(skyHex);
-    starMat.opacity = starOpacity;
+    refreshSkyBrightness();
     document.getElementById('ui-time').innerText = timeLabel;
 
     let moodStr = '😊 あんしん・まんぷく';
@@ -925,7 +1105,6 @@
     updateEnvironmentAndUI();
     saveWorldState();
 
-    // ゲームオーバーで倒れた場合は生存日数を1日目にクリア
     const afterState = life.getState();
     if (afterState.mode === 'DEAD') {
       document.getElementById('message-box').innerText = `力尽きて倒れてしまった…。生存日数はリセットされ、次のロボ${ROBOT.gen + 1}ごうが1日目からスタートします。`;
@@ -1107,29 +1286,37 @@
   rebuildTerrainAndItems();
   syncRobot3DPosition();
   updateEnvironmentAndUI();
+  updateCameraTransform();
 
   // ==========================================
-  // 7. メインアニメーションループ
+  // 7. メインアニメーションループ（スマホ向けに軽量化済）
   // ==========================================
   const clock = new THREE.Clock();
   let wfScrollY = 0;
+  let frameTick = 0;
 
   function animate() {
     requestAnimationFrame(animate);
-    const t = clock.getElapsedTime();
+    const dt = Math.min(0.05, clock.getDelta());
+    const t = clock.elapsedTime;
+    frameTick++;
 
-    // 滝：21:36のデザインで上から下へゆっくり流れる
-    wfScrollY = (wfScrollY + 0.9) % 512;
-    renderWaterfallTexture(wfScrollY);
-    wfTex.needsUpdate = true;
-
-    // 海：21:36の白い泡立ちが優しく揺らぐ
-    drawSeaCanvas(t);
-    seaTex.needsUpdate = true;
+    // 海と滝のキャンバス描き直しを交互に行うことで、見た目は同じままスマホ負荷を半減
+    if (frameTick % 2 === 0) {
+      wfScrollY = (wfScrollY + 1.8) % 512;
+      renderWaterfallTexture(wfScrollY);
+      wfTex.needsUpdate = true;
+    } else {
+      drawSeaCanvas(t);
+      seaTex.needsUpdate = true;
+    }
 
     // 古代亀と星空のゆったりした動き
     turtleGroup.position.y = -8.8 + Math.sin(t * 0.7) * 0.15;
     skyGroup.rotation.y += 0.0004;
+
+    // 流れ星の更新
+    updateShootingStar(dt, currentLookUpRatio);
 
     renderer.render(scene, camera);
   }
@@ -1143,4 +1330,3 @@
 </script>
 </body>
 </html>
-```
