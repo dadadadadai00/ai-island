@@ -12,6 +12,7 @@
 
     #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; display: block; }
 
+    /* 上部ステータス枠 */
     #status-panel {
       position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
       width: 95%; max-width: 430px; background: rgba(255, 255, 255, 0.96);
@@ -53,33 +54,63 @@
     .badge-days { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
     .badge-time { background: #e1f5fe; color: #0277bd; border: 1px solid #b3e5fc; }
     .badge-mood { background: #fff9c4; color: #854d0e; border: 1px solid #fde047; }
-
-    /* 扇状メニュー */
-    .circular-menu {
-      position: fixed; bottom: 130px; right: 18px; z-index: 12;
+    .btn-icon {
+      width: 26px; height: 26px; border-radius: 50%; background: #f1f5f9;
       display: flex; justify-content: center; align-items: center;
-      transition: opacity 0.35s ease, transform 0.35s ease;
+      font-size: 14px; cursor: pointer; border: 1px solid #cbd5e1; flex-shrink: 0;
     }
-    .circular-menu.sky-hidden { opacity: 0; pointer-events: none; transform: translateY(20px); }
-    .menu-btn {
-      width: 52px; height: 52px; background: rgba(255,255,255,0.98); border-radius: 50%;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.25); display: flex;
-      justify-content: center; align-items: center; font-size: 28px; color: #334155;
-      cursor: pointer; border: 2px solid #e2e8f0; z-index: 2; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .circular-menu.open .menu-btn { transform: rotate(135deg); }
-    .menu-item {
-      position: absolute; width: 44px; height: 44px; background: rgba(255,255,255,0.96);
-      border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.15); display: flex;
-      justify-content: center; align-items: center; font-size: 20px; cursor: pointer;
-      border: 1px solid #cbd5e1; z-index: 1; opacity: 0; pointer-events: none;
-      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
-      top: 4px; left: 4px;
-    }
-    .circular-menu.open .menu-item.i-1 { transform: translate(0, -75px); opacity: 1; pointer-events: auto; }
-    .circular-menu.open .menu-item.i-2 { transform: translate(-60px, -50px); opacity: 1; pointer-events: auto; }
-    .circular-menu.open .menu-item.i-3 { transform: translate(-75px, 10px); opacity: 1; pointer-events: auto; }
 
+    /* 右上の日記帳ボタン（ゲージ枠の下・重ならない位置） */
+    #diary-btn {
+      position: fixed; top: 118px; right: 14px;
+      width: 44px; height: 44px; background: rgba(255,255,255,0.96); border-radius: 50%;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex;
+      justify-content: center; align-items: center; font-size: 21px; z-index: 10; cursor: pointer;
+      border: 2px solid #e2e8f0; transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    #diary-btn.sky-hidden { opacity: 0; pointer-events: none; transform: translateY(-15px); }
+
+    /* 中央下部の「＋」＆扇状メニュー（21:36の位置に完全固定） */
+    #fan-menu-container {
+      position: fixed; bottom: 204px; left: 50%; transform: translateX(-50%);
+      width: 48px; height: 48px; z-index: 12;
+      transition: opacity 0.35s ease;
+    }
+    #fan-menu-container.sky-hidden { opacity: 0; pointer-events: none; }
+
+    #fan-main-btn {
+      width: 48px; height: 48px; background: rgba(255,255,255,0.98); border-radius: 50%;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.28); display: flex;
+      justify-content: center; align-items: center; font-size: 26px; font-weight: bold; color: #334155;
+      cursor: pointer; border: 2px solid #e2e8f0; position: relative; z-index: 2;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #fan-menu-container.open #fan-main-btn {
+      transform: rotate(135deg); background: #f8fafc;
+    }
+
+    .fan-item {
+      position: absolute; top: 3px; left: 3px;
+      width: 42px; height: 42px; background: rgba(255,255,255,0.98);
+      border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.22);
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      font-size: 18px; cursor: pointer; border: 1.5px solid #cbd5e1;
+      z-index: 1; opacity: 0; pointer-events: none;
+      transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.25s ease;
+    }
+    .fan-label {
+      position: absolute; bottom: -16px; font-size: 9px; font-weight: 900;
+      color: #ffffff; background: rgba(15,23,42,0.85); padding: 1px 5px;
+      border-radius: 6px; white-space: nowrap; pointer-events: none;
+    }
+    /* 扇状（上向きアーチ）に5つ展開 */
+    #fan-menu-container.open .fan-item.f-1 { transform: translate(-88px, -24px); opacity: 1; pointer-events: auto; }
+    #fan-menu-container.open .fan-item.f-2 { transform: translate(-48px, -68px); opacity: 1; pointer-events: auto; }
+    #fan-menu-container.open .fan-item.f-3 { transform: translate(0px, -84px); opacity: 1; pointer-events: auto; }
+    #fan-menu-container.open .fan-item.f-4 { transform: translate(48px, -68px); opacity: 1; pointer-events: auto; }
+    #fan-menu-container.open .fan-item.f-5 { transform: translate(88px, -24px); opacity: 1; pointer-events: auto; }
+
+    /* 下部メッセージパネル */
     #bottom-panel {
       position: fixed; bottom: 0; left: 0; width: 100%;
       background: #ffffff; border-top-left-radius: 20px; border-top-right-radius: 20px;
@@ -105,7 +136,7 @@
 
     #toast {
       position: fixed; top: 82px; left: 50%; transform: translateX(-50%);
-      background: rgba(15,23,42,0.9); color: white; padding: 8px 16px;
+      background: rgba(15,23,42,0.92); color: white; padding: 8px 16px;
       border-radius: 20px; font-size: 12px; font-weight: bold;
       opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 100; white-space: nowrap;
     }
@@ -143,6 +174,7 @@
 
 <div id="canvas-container"></div>
 
+<!-- 上部ステータス枠 -->
 <div id="status-panel">
   <div class="gauge-container">
     <div class="gauge-box">
@@ -166,17 +198,25 @@
     </div>
     <div class="status-right-group">
       <div class="badge badge-mood" id="ui-mood">😊 あんしん・まんぷく</div>
+      <button class="btn-icon" id="btn-settings" title="設定">⚙️</button>
     </div>
   </div>
 </div>
 
-<div class="circular-menu" id="circular-menu">
-  <div class="menu-item i-1" onclick="openMenuModal('modal-diary')" title="ロボット手帳">📖</div>
-  <div class="menu-item i-2" onclick="openMenuModal('modal-gacha')" title="ガチャ">🎰</div>
-  <div class="menu-item i-3" onclick="openMenuModal('modal-settings')" title="設定">⚙️</div>
-  <div class="menu-btn" id="menu-main-btn">＋</div>
+<!-- 右上の手帳ボタン -->
+<div id="diary-btn" title="ロボット手帳">📖</div>
+
+<!-- 中央下部の「＋」ボタン＆扇状メニュー -->
+<div id="fan-menu-container">
+  <div class="fan-item f-1" onclick="fanAction('apple')">🍎<span class="fan-label">リンゴ</span></div>
+  <div class="fan-item f-2" onclick="fanAction('step')">🪨<span class="fan-label">1段積む</span></div>
+  <div class="fan-item f-3" onclick="fanAction('gacha')">🎰<span class="fan-label">ガチャ</span></div>
+  <div class="fan-item f-4" onclick="fanAction('diary')">📖<span class="fan-label">カバン</span></div>
+  <div class="fan-item f-5" onclick="fanAction('flat')">⛏️<span class="fan-label">ならす</span></div>
+  <div id="fan-main-btn" title="メニューを開く">＋</div>
 </div>
 
+<!-- 下部メッセージ枠 -->
 <div id="bottom-panel">
   <div class="panel-header">
     <span>💭 ロボのきもち・心のさけび</span>
@@ -314,7 +354,6 @@
   let BAG = ['stone', 'apple', 'grass'];
   let DIARY_LOGS = ['🌱 1日目：世界の果ての島に降り立ったよ！'];
 
-  // 初期状態はすべて平らな5×5の大地（勝手に段差が積まれないよう0段で統一）
   let HEIGHT_MAP = {};
   for (let x = -2; x <= 2; x++) {
     for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
@@ -325,14 +364,13 @@
     pos: { x: 0, z: 0, sx: 2, sz: 2 },
     speed: 3
   };
-  // 21:36のスクリーンショットと同じ、初期配置は赤いリンゴ1個のみ
   let WORLD_ITEMS = [
     { type: 'apple', x: 0, z: -1 }
   ];
 
   function loadWorldState() {
     try {
-      const raw = safeStorage.getItem('island_game_save_v6');
+      const raw = safeStorage.getItem('island_game_save_v7');
       if (!raw) return;
       const d = JSON.parse(raw);
       if (d.life) life = new LifeCore(d.life);
@@ -352,7 +390,7 @@
           }
         }
       }
-      if (Array.isArray(d.items)) WORLD_ITEMS = d.items;
+      if (Array.isArray(d.items) && d.items.length > 0) WORLD_ITEMS = d.items;
       if (Array.isArray(d.bag)) BAG = d.bag;
       if (Array.isArray(d.logs) && d.logs.length > 0) DIARY_LOGS = d.logs;
       GAME_DAY = Math.max(1, Number(d.day) || 1);
@@ -371,18 +409,18 @@
       day: GAME_DAY,
       time: TIME_STEP
     };
-    safeStorage.setItem('island_game_save_v6', JSON.stringify(data));
+    safeStorage.setItem('island_game_save_v7', JSON.stringify(data));
   }
 
   function resetGameDirectly() {
-    safeStorage.removeItem('island_game_save_v6');
+    safeStorage.removeItem('island_game_save_v7');
     location.reload();
   }
 
   loadWorldState();
 
   // ==========================================
-  // 2. 3D世界構築（21:36スクショの基盤デザインを100%復元・固定）
+  // 2. 3D世界構築（21:36の陰影・海・滝デザインを完全固定）
   // ==========================================
   const container = document.getElementById('canvas-container');
   const scene = new THREE.Scene();
@@ -394,32 +432,32 @@
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   container.appendChild(renderer.domElement);
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.78);
+  // 21:36のブロック上面と側面の立体的な色分けを作るライティング
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.56);
   scene.add(ambientLight);
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.65);
-  dirLight.position.set(6, 14, 8);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.54);
+  dirLight.position.set(-5, 14, 4);
   scene.add(dirLight);
 
-  // --- [固定基盤1] 21:36のパステルミントグリーンの5×5大地 ---
   const terrainGroup = new THREE.Group();
   scene.add(terrainGroup);
   const itemGroup = new THREE.Group();
   scene.add(itemGroup);
 
-  const landMat = new THREE.MeshLambertMaterial({ color: 0xc2ebd4 });
-  const stepMat = new THREE.MeshLambertMaterial({ color: 0xa7dcc0 });
+  const landMat = new THREE.MeshLambertMaterial({ color: 0xbde8d0 });
+  const stepMat = new THREE.MeshLambertMaterial({ color: 0x9edbbd });
 
   function rebuildTerrainAndItems() {
     while (terrainGroup.children.length > 0) terrainGroup.remove(terrainGroup.children[0]);
     while (itemGroup.children.length > 0) itemGroup.remove(itemGroup.children[0]);
 
-    const landGeo = new THREE.BoxGeometry(0.95, 0.72, 0.95);
+    const landGeo = new THREE.BoxGeometry(0.95, 0.74, 0.95);
     const stepGeo = new THREE.BoxGeometry(0.95, 0.45, 0.95);
 
     for (let x = -2; x <= 2; x++) {
       for (let z = -2; z <= 2; z++) {
         const block = new THREE.Mesh(landGeo, landMat);
-        block.position.set(x, -0.36, z);
+        block.position.set(x, -0.37, z);
         terrainGroup.add(block);
 
         const h = HEIGHT_MAP[`${x},${z}`] || 0;
@@ -453,12 +491,11 @@
     });
   }
 
-  // --- [固定基盤2] 21:36の丸い海と四隅の白泡・外縁の白波 ---
+  // --- [固定基盤] 21:36の丸い海と四隅の白泡・外縁の白波 ---
   const seaCanvas = document.createElement('canvas');
   seaCanvas.width = 512; seaCanvas.height = 512;
   const sCtx = seaCanvas.getContext('2d');
 
-  // 固定された泡粒の配置（チカチカせず21:36の優しい見た目を維持）
   const seaFoamDots = [];
   for (let i = 0; i < 65; i++) {
     const ang = Math.random() * Math.PI * 2;
@@ -482,11 +519,9 @@
     sCtx.fillStyle = rg;
     sCtx.fillRect(0, 0, 512, 512);
 
-    // 四角い大地のまわりの柔らかい白波ぼかし
     sCtx.fillStyle = 'rgba(255, 255, 255, 0.72)';
     sCtx.fillRect(118, 118, 276, 276);
 
-    // 海面の白い泡粒（21:36の表現）
     sCtx.fillStyle = 'rgba(255, 255, 255, 0.78)';
     seaFoamDots.forEach((d, idx) => {
       const pulse = Math.sin(timeSec * 1.8 + idx) * 1.2;
@@ -504,7 +539,7 @@
   seaMesh.position.y = -0.35;
   scene.add(seaMesh);
 
-  // --- [固定基盤3] 21:36の爽やかな円形滝（上から下へゆっくり流れる） ---
+  // --- [固定基盤] 21:36の爽やかな円形滝（上から下へゆっくり流れる） ---
   const wfCanvas = document.createElement('canvas');
   wfCanvas.width = 512; wfCanvas.height = 512;
   const wfCtx = wfCanvas.getContext('2d');
@@ -531,7 +566,6 @@
   }
 
   function renderWaterfallTexture(scrollOffset) {
-    // 21:36の爽やかな水色〜白泡グラデーション背景（固定）
     const grad = wfCtx.createLinearGradient(0, 0, 0, 512);
     grad.addColorStop(0.0, '#ffffff');
     grad.addColorStop(0.06, '#81d4fa');
@@ -541,20 +575,17 @@
     wfCtx.fillStyle = grad;
     wfCtx.fillRect(0, 0, 512, 512);
 
-    // 縦の水色ストライプ
     wfCtx.fillStyle = 'rgba(41, 182, 246, 0.35)';
     for (let x = 0; x < 512; x += 16) {
       wfCtx.fillRect(x, 0, 6, 512);
     }
 
-    // 上から下へゆっくり流れる白い水筋（scrollOffset を加算して下方向へ移動）
     wfStreaks.forEach(s => {
       const curY = (s.y + scrollOffset) % 560 - 48;
       wfCtx.fillStyle = `rgba(255, 255, 255, ${s.alpha})`;
       wfCtx.fillRect(s.x, curY, s.w, s.h);
     });
 
-    // 上から下へゆっくり流れる泡粒（21:36の特徴的な横長白泡）
     wfBubbles.forEach(b => {
       const curY = (b.y + scrollOffset * 0.85) % 540 - 20;
       wfCtx.fillStyle = `rgba(255, 255, 255, ${b.alpha})`;
@@ -576,7 +607,6 @@
   waterfallMesh.position.y = -3.55;
   scene.add(waterfallMesh);
 
-  // 滝の落ちきる下の白泡と古代遺跡カメ
   const foamRingGeo = new THREE.RingGeometry(3.2, 5.5, 64);
   foamRingGeo.rotateX(-Math.PI / 2);
   const foamRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
@@ -598,7 +628,7 @@
   turtleGroup.position.y = -8.8;
   scene.add(turtleGroup);
 
-  // --- [固定基盤4] 21:36の腕付きボクセルロボット ---
+  // --- 腕付きボクセルロボット ---
   const robotGroup = new THREE.Group();
   const legMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
   const legL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.22, 0.18), legMat);
@@ -649,7 +679,7 @@
     robotGroup.position.set(gx + subOffsetX, baseY, gz + subOffsetZ);
   }
 
-  // --- 球体大枠の星空（上を見上げたときに広がる天球） ---
+  // --- 球体大枠の星空 ---
   const skyGroup = new THREE.Group();
   scene.add(skyGroup);
 
@@ -668,7 +698,7 @@
     );
   }
   starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
-  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.28, transparent: true, opacity: 0.2 });
+  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.28, transparent: true, opacity: 0.15 });
   const starPoints = new THREE.Points(starGeo, starMat);
   skyGroup.add(starPoints);
 
@@ -686,39 +716,39 @@
   // ==========================================
   // 3. カメラワーク（21:36の初期アングル固定 ＋ 上を見上げたときゲージ枠非表示）
   // ==========================================
-  let camTheta = 0.72;   // 21:36スクショの斜め角度
-  let camPhi = 1.16;     // 21:36スクショの大地と滝が両方綺麗に見える高さ角度
-  let camRadius = 11.2;
+  let camTheta = 0.72;
+  let camPhi = 1.24;    // 21:36スクショと同じく島と滝全体が美しく収まる角度
+  let camRadius = 12.4;
   let isDragging = false;
   let prevPointer = { x: 0, y: 0 };
 
   function updateCameraTransform() {
     camPhi = Math.max(0.30, Math.min(2.15, camPhi));
-    camRadius = Math.max(7.0, Math.min(20.0, camRadius));
+    camRadius = Math.max(7.5, Math.min(20.0, camRadius));
 
     const cx = camRadius * Math.sin(camPhi) * Math.sin(camTheta);
     const cy = camRadius * Math.cos(camPhi);
     const cz = camRadius * Math.sin(camPhi) * Math.cos(camTheta);
 
     const statusPanel = document.getElementById('status-panel');
-    const circularMenu = document.getElementById('circular-menu');
+    const diaryBtn = document.getElementById('diary-btn');
+    const fanContainer = document.getElementById('fan-menu-container');
 
-    // 上を見上げたとき（camPhi > 1.42）、ゲージ枠と扇状メニューを非表示にして星空を映す
-    if (camPhi > 1.42) {
-      const lookUpRatio = (camPhi - 1.42) / (2.15 - 1.42);
+    if (camPhi > 1.45) {
+      const lookUpRatio = (camPhi - 1.45) / (2.15 - 1.45);
       camera.position.set(cx * 0.7, Math.max(-0.3, cy), cz * 0.7);
-      camera.lookAt(0, -1.0 + lookUpRatio * 10.5, 0);
+      camera.lookAt(0, -1.35 + lookUpRatio * 10.5, 0);
       statusPanel.classList.add('sky-hidden');
-      if (circularMenu) circularMenu.classList.add('sky-hidden');
-      // 見上げたときは昼でも星がよく見えるように輝度を上げる
+      diaryBtn.classList.add('sky-hidden');
+      fanContainer.classList.add('sky-hidden');
       starMat.opacity = Math.max(starMat.opacity, 0.45 + lookUpRatio * 0.55);
       celestialRings.children.forEach(r => { r.material.opacity = lookUpRatio * 0.35; });
     } else {
-      // 21:36スクショと全く同じ注視点 (0, -1.0, 0)
       camera.position.set(cx, cy, cz);
-      camera.lookAt(0, -1.0, 0);
+      camera.lookAt(0, -1.35, 0);
       statusPanel.classList.remove('sky-hidden');
-      if (circularMenu) circularMenu.classList.remove('sky-hidden');
+      diaryBtn.classList.remove('sky-hidden');
+      fanContainer.classList.remove('sky-hidden');
       celestialRings.children.forEach(r => { r.material.opacity = 0.0; });
     }
   }
@@ -790,7 +820,7 @@
     }
 
     scene.background.setHex(skyHex);
-    starMat.opacity = starOpacity;
+    if (camPhi <= 1.45) starMat.opacity = starOpacity;
     document.getElementById('ui-time').innerText = timeLabel;
 
     let moodStr = '😊 あんしん・まんぷく';
@@ -931,7 +961,6 @@
     updateEnvironmentAndUI();
     saveWorldState();
 
-    // ゲームオーバーで倒れた場合は生存日数を1日目にクリア
     const afterState = life.getState();
     if (afterState.mode === 'DEAD') {
       document.getElementById('message-box').innerText = `力尽きて倒れてしまった…。生存日数はリセットされ、次のロボ${ROBOT.gen + 1}ごうが1日目からスタートします。`;
@@ -996,8 +1025,49 @@
   }
 
   // ==========================================
-  // 6. モーダル・手帳・ガチャ操作
+  // 6. 扇状メニュー・手帳・ガチャ・設定操作
   // ==========================================
+  const fanContainer = document.getElementById('fan-menu-container');
+  document.getElementById('fan-main-btn').onclick = () => {
+    fanContainer.classList.toggle('open');
+  };
+
+  function fanAction(type) {
+    fanContainer.classList.remove('open');
+    const key = `${ROBOT.pos.x},${ROBOT.pos.z}`;
+    if (type === 'apple') {
+      const rx = Math.floor(Math.random() * 5) - 2;
+      const rz = Math.floor(Math.random() * 5) - 2;
+      WORLD_ITEMS.push({ type: 'apple', x: rx, z: rz });
+      rebuildTerrainAndItems();
+      saveWorldState();
+      showToast('🍎 島にリンゴを置いたよ！');
+    } else if (type === 'step') {
+      const cur = HEIGHT_MAP[key] || 0;
+      if (cur >= 5) {
+        showToast('ここはすでに最高峰（5段目）だよ！');
+        return;
+      }
+      HEIGHT_MAP[key] = cur + 1;
+      rebuildTerrainAndItems();
+      syncRobot3DPosition();
+      updateEnvironmentAndUI();
+      saveWorldState();
+      showToast(`🪨 足元を「${cur + 1}段目」に積んだよ！`);
+    } else if (type === 'flat') {
+      HEIGHT_MAP[key] = 0;
+      rebuildTerrainAndItems();
+      syncRobot3DPosition();
+      updateEnvironmentAndUI();
+      saveWorldState();
+      showToast('⛏️ 足元を0段（平地）にならしたよ！');
+    } else if (type === 'gacha') {
+      openModal('modal-gacha');
+    } else if (type === 'diary') {
+      openModal('modal-diary');
+    }
+  }
+
   function openModal(id) {
     if (id === 'modal-diary') renderDiaryModal();
     const el = document.getElementById(id);
@@ -1058,15 +1128,8 @@
     renderDiaryModal();
   }
 
-  const circularMenuEl = document.getElementById('circular-menu');
-  document.getElementById('menu-main-btn').onclick = () => {
-    circularMenuEl.classList.toggle('open');
-  };
-  function openMenuModal(id) {
-    circularMenuEl.classList.remove('open');
-    openModal(id);
-  }
-
+  document.getElementById('diary-btn').onclick = () => openModal('modal-diary');
+  document.getElementById('btn-settings').onclick = () => openModal('modal-settings');
   document.getElementById('btn-action').onclick = executeTurn;
 
   document.getElementById('btn-spin').onclick = () => {
