@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -10,7 +9,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background-color: #0d2538; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; }
 
-    #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; display: block; }
+    #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; display: block; touch-action: none; }
 
     /* 上部ステータス枠 */
     #status-panel {
@@ -19,6 +18,7 @@
       border-radius: 18px; box-shadow: 0 4px 18px rgba(0,0,0,0.25);
       padding: 10px 12px; z-index: 10;
       transition: opacity 0.35s ease, transform 0.35s ease;
+      will-change: opacity, transform;
     }
     #status-panel.sky-hidden {
       opacity: 0; pointer-events: none; transform: translate(-50%, -22px);
@@ -67,6 +67,7 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex;
       justify-content: center; align-items: center; font-size: 21px; z-index: 10; cursor: pointer;
       border: 2px solid #e2e8f0; transition: opacity 0.35s ease, transform 0.35s ease;
+      will-change: opacity, transform;
     }
     #diary-btn.sky-hidden { opacity: 0; pointer-events: none; transform: translateY(-15px); }
 
@@ -74,9 +75,12 @@
     #fan-menu-container {
       position: fixed; bottom: 204px; left: 50%; transform: translateX(-50%);
       width: 48px; height: 48px; z-index: 12;
-      transition: opacity 0.35s ease;
+      transition: opacity 0.35s ease, transform 0.35s ease;
+      will-change: opacity, transform;
     }
-    #fan-menu-container.sky-hidden { opacity: 0; pointer-events: none; }
+    #fan-menu-container.sky-hidden {
+      opacity: 0; pointer-events: none; transform: translate(-50%, 12px);
+    }
 
     #fan-main-btn {
       width: 48px; height: 48px; background: rgba(255,255,255,0.98); border-radius: 50%;
@@ -96,7 +100,8 @@
       display: flex; flex-direction: column; justify-content: center; align-items: center;
       font-size: 18px; cursor: pointer; border: 1.5px solid #cbd5e1;
       z-index: 1; opacity: 0; pointer-events: none;
-      transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.25s ease;
+      transition: transform 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.22s ease;
+      will-change: transform, opacity;
     }
     .fan-label {
       position: absolute; bottom: -16px; font-size: 9px; font-weight: 900;
@@ -420,14 +425,14 @@
   loadWorldState();
 
   // ==========================================
-  // 2. 3D世界構築（21:36の陰影・海・滝デザインを完全固定）
+  // 2. 3D世界構築（21:36の陰影・海・滝デザインを完全固定＋軽量化）
   // ==========================================
   const container = document.getElementById('canvas-container');
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0d2538);
 
   const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 120);
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   container.appendChild(renderer.domElement);
@@ -447,22 +452,32 @@
   const landMat = new THREE.MeshLambertMaterial({ color: 0xbde8d0 });
   const stepMat = new THREE.MeshLambertMaterial({ color: 0x9edbbd });
 
+  // スマホでカクつかないよう、ブロックとアイテムの形状データを使い回す
+  const sharedLandGeo = new THREE.BoxGeometry(0.95, 0.74, 0.95);
+  const sharedStepGeo = new THREE.BoxGeometry(0.95, 0.45, 0.95);
+  const appleBodyGeo = new THREE.BoxGeometry(0.44, 0.42, 0.44);
+  const appleStemGeo = new THREE.BoxGeometry(0.1, 0.12, 0.1);
+  const stoneGeo = new THREE.BoxGeometry(0.42, 0.36, 0.42);
+  const grassGeo = new THREE.BoxGeometry(0.34, 0.44, 0.34);
+
+  const appleBodyMat = new THREE.MeshLambertMaterial({ color: 0xef6c6c });
+  const appleStemMat = new THREE.MeshLambertMaterial({ color: 0x66bb6a });
+  const stoneMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
+  const grassMat = new THREE.MeshLambertMaterial({ color: 0x4ade80 });
+
   function rebuildTerrainAndItems() {
     while (terrainGroup.children.length > 0) terrainGroup.remove(terrainGroup.children[0]);
     while (itemGroup.children.length > 0) itemGroup.remove(itemGroup.children[0]);
 
-    const landGeo = new THREE.BoxGeometry(0.95, 0.74, 0.95);
-    const stepGeo = new THREE.BoxGeometry(0.95, 0.45, 0.95);
-
     for (let x = -2; x <= 2; x++) {
       for (let z = -2; z <= 2; z++) {
-        const block = new THREE.Mesh(landGeo, landMat);
+        const block = new THREE.Mesh(sharedLandGeo, landMat);
         block.position.set(x, -0.37, z);
         terrainGroup.add(block);
 
         const h = HEIGHT_MAP[`${x},${z}`] || 0;
         for (let lv = 1; lv <= h; lv++) {
-          const sBlock = new THREE.Mesh(stepGeo, stepMat);
+          const sBlock = new THREE.Mesh(sharedStepGeo, stepMat);
           sBlock.position.set(x, (lv - 0.5) * 0.45, z);
           terrainGroup.add(sBlock);
         }
@@ -474,16 +489,16 @@
       let mesh;
       if (it.type === 'apple') {
         mesh = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.42, 0.44), new THREE.MeshLambertMaterial({ color: 0xef6c6c }));
+        const body = new THREE.Mesh(appleBodyGeo, appleBodyMat);
         body.position.y = 0.21;
-        const stem = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.1), new THREE.MeshLambertMaterial({ color: 0x66bb6a }));
+        const stem = new THREE.Mesh(appleStemGeo, appleStemMat);
         stem.position.y = 0.46;
         mesh.add(body); mesh.add(stem);
       } else if (it.type === 'stone') {
-        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.36, 0.42), new THREE.MeshLambertMaterial({ color: 0x94a3b8 }));
+        mesh = new THREE.Mesh(stoneGeo, stoneMat);
         mesh.position.y = 0.18;
       } else {
-        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.44, 0.34), new THREE.MeshLambertMaterial({ color: 0x4ade80 }));
+        mesh = new THREE.Mesh(grassGeo, grassMat);
         mesh.position.y = 0.22;
       }
       mesh.position.set(it.x, h, it.z);
@@ -628,7 +643,7 @@
   turtleGroup.position.y = -8.8;
   scene.add(turtleGroup);
 
-  // --- 腕付きボクセルロボット ---
+  // --- 腕付きボクセルロボット（見上げた時にロボも一緒に空を見上げる） ---
   const robotGroup = new THREE.Group();
   const legMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
   const legL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.22, 0.18), legMat);
@@ -648,20 +663,25 @@
   armR.position.set(0.27, 0.43, 0);
   robotGroup.add(armL); robotGroup.add(armR);
 
+  const headPivot = new THREE.Group();
+  headPivot.position.set(0, 0.66, 0);
+  robotGroup.add(headPivot);
+
   const rHead = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.42, 0.42), new THREE.MeshLambertMaterial({ color: 0xb3e5fc }));
-  rHead.position.y = 0.87;
-  robotGroup.add(rHead);
+  rHead.position.y = 0.21;
+  headPivot.add(rHead);
 
   const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
   const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.10, 0.04), eyeMat);
-  eyeL.position.set(-0.10, 0.87, 0.22);
+  eyeL.position.set(-0.10, 0.21, 0.22);
   const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.10, 0.04), eyeMat);
-  eyeR.position.set(0.10, 0.87, 0.22);
-  robotGroup.add(eyeL); robotGroup.add(eyeR);
+  eyeR.position.set(0.10, 0.21, 0.22);
+  headPivot.add(eyeL); headPivot.add(eyeR);
 
   const bulbMesh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.12, 0.13), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
-  bulbMesh.position.y = 1.14;
-  robotGroup.add(bulbMesh);
+  bulbMesh.position.y = 0.48;
+  headPivot.add(bulbMesh);
+
   scene.add(robotGroup);
 
   function syncRobot3DPosition() {
@@ -679,13 +699,13 @@
     robotGroup.position.set(gx + subOffsetX, baseY, gz + subOffsetZ);
   }
 
-  // --- 球体大枠の星空 ---
+  // --- 球体大枠の星空＋6つの星座＋流れ星 ---
   const skyGroup = new THREE.Group();
   scene.add(skyGroup);
 
   const starGeo = new THREE.BufferGeometry();
   const starPositions = [];
-  for (let i = 0; i < 420; i++) {
+  for (let i = 0; i < 450; i++) {
     const u = Math.random();
     const v = Math.random();
     const theta = u * 2.0 * Math.PI;
@@ -713,46 +733,221 @@
   }
   skyGroup.add(celestialRings);
 
+  function skyPos(azDeg, zDeg, r = 29.5) {
+    const az = azDeg * Math.PI / 180;
+    const za = zDeg * Math.PI / 180;
+    return new THREE.Vector3(
+      r * Math.sin(za) * Math.cos(az),
+      r * Math.cos(za),
+      r * Math.sin(za) * Math.sin(az)
+    );
+  }
+
+  const CONSTELLATIONS = [
+    {
+      name: '🌟 オリオン座',
+      stars: [[220, 38], [238, 40], [226, 48], [230, 49], [234, 50], [223, 58], [239, 57]],
+      lines: [[0,2],[1,4],[2,3],[3,4],[2,5],[4,6],[0,1],[5,6]],
+      labelPos: [230, 33]
+    },
+    {
+      name: '🥄 北斗七星',
+      stars: [[10, 26], [22, 28], [20, 38], [8, 36], [34, 33], [46, 36], [58, 42]],
+      lines: [[0,1],[1,2],[2,3],[3,0],[1,4],[4,5],[5,6]],
+      labelPos: [30, 21]
+    },
+    {
+      name: '👑 カシオペア座',
+      stars: [[162, 26], [172, 33], [182, 27], [192, 34], [202, 25]],
+      lines: [[0,1],[1,2],[2,3],[3,4]],
+      labelPos: [182, 19]
+    },
+    {
+      name: '🦢 はくちょう座',
+      stars: [[105, 8], [105, 19], [105, 31], [85, 20], [125, 20]],
+      lines: [[0,1],[1,2],[3,1],[1,4]],
+      labelPos: [105, 4]
+    },
+    {
+      name: '🦂 さそり座',
+      stars: [[292, 36], [295, 42], [299, 48], [306, 45], [315, 51], [324, 56], [332, 53], [335, 47]],
+      lines: [[0,3],[1,3],[2,3],[3,4],[4,5],[5,6],[6,7]],
+      labelPos: [312, 36]
+    },
+    {
+      name: '🐎 ペガスス座',
+      stars: [[125, 40], [148, 40], [148, 54], [125, 54], [112, 34], [160, 33]],
+      lines: [[0,1],[1,2],[2,3],[3,0],[0,4],[1,5]],
+      labelPos: [137, 34]
+    }
+  ];
+
+  const constellationLineVertices = [];
+  const majorStarVertices = [];
+  const constellationLabels = [];
+
+  function makeLabelSprite(text) {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 64;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.58)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(18, 10, 220, 44, 22);
+    else ctx.fillRect(18, 10, 220, 44);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(147, 197, 253, 0.78)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillStyle = '#e0f2fe';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 33);
+
+    const tex = new THREE.CanvasTexture(c);
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.0, depthWrite: false });
+    const sp = new THREE.Sprite(mat);
+    sp.scale.set(5.2, 1.3, 1);
+    return sp;
+  }
+
+  CONSTELLATIONS.forEach(con => {
+    const pts = con.stars.map(s => skyPos(s[0], s[1], 29.5));
+    pts.forEach(p => majorStarVertices.push(p.x, p.y, p.z));
+    con.lines.forEach(pair => {
+      const p1 = pts[pair[0]];
+      const p2 = pts[pair[1]];
+      constellationLineVertices.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+    });
+    const labelSp = makeLabelSprite(con.name);
+    labelSp.position.copy(skyPos(con.labelPos[0], con.labelPos[1], 28.5));
+    skyGroup.add(labelSp);
+    constellationLabels.push(labelSp);
+  });
+
+  const conLineGeo = new THREE.BufferGeometry();
+  conLineGeo.setAttribute('position', new THREE.Float32BufferAttribute(constellationLineVertices, 3));
+  const conLineMat = new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.0 });
+  const conLines = new THREE.LineSegments(conLineGeo, conLineMat);
+  skyGroup.add(conLines);
+
+  const majorStarGeo = new THREE.BufferGeometry();
+  majorStarGeo.setAttribute('position', new THREE.Float32BufferAttribute(majorStarVertices, 3));
+  const majorStarMat = new THREE.PointsMaterial({ color: 0xfef08a, size: 0.56, transparent: true, opacity: 0.2 });
+  const majorStars = new THREE.Points(majorStarGeo, majorStarMat);
+  skyGroup.add(majorStars);
+
+  // 流れ星（1本を使い回す軽量設計）
+  const shootGeo = new THREE.BufferGeometry();
+  shootGeo.setAttribute('position', new THREE.Float32BufferAttribute([0,0,0, 0,0,0], 3));
+  const shootMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0 });
+  const shootingStar = new THREE.Line(shootGeo, shootMat);
+  scene.add(shootingStar);
+
+  let shootState = { active: false, timer: 2.5, progress: 0, start: new THREE.Vector3(), dir: new THREE.Vector3() };
+
+  function updateShootingStar(dt, lookUpRatio) {
+    if (!shootState.active) {
+      shootState.timer -= dt;
+      if (shootState.timer <= 0) {
+        shootState.active = true;
+        shootState.progress = 0;
+        shootState.timer = (lookUpRatio > 0.1) ? (2.5 + Math.random() * 3.5) : (6.5 + Math.random() * 6.0);
+        const az = Math.random() * 360;
+        const za = 12 + Math.random() * 40;
+        shootState.start.copy(skyPos(az, za, 27.5));
+        shootState.dir.set((Math.random() - 0.5) * 18, -4 - Math.random() * 5, (Math.random() - 0.5) * 18);
+      }
+    } else {
+      shootState.progress += dt * 1.8;
+      if (shootState.progress >= 1.0) {
+        shootState.active = false;
+        shootMat.opacity = 0.0;
+      } else {
+        const head = shootState.start.clone().addScaledVector(shootState.dir, shootState.progress);
+        const tail = shootState.start.clone().addScaledVector(shootState.dir, Math.max(0, shootState.progress - 0.22));
+        const posAttr = shootGeo.attributes.position;
+        posAttr.setXYZ(0, head.x, head.y, head.z);
+        posAttr.setXYZ(1, tail.x, tail.y, tail.z);
+        posAttr.needsUpdate = true;
+        shootMat.opacity = Math.sin(shootState.progress * Math.PI) * 0.95;
+      }
+    }
+  }
+
   // ==========================================
-  // 3. カメラワーク（21:36の初期アングル固定 ＋ 上を見上げたときゲージ枠非表示）
+  // 3. カメラワーク（初期位置21:36完全固定 ＋ カクつきゼロで真上の星空へ）
   // ==========================================
   let camTheta = 0.72;
-  let camPhi = 1.24;    // 21:36スクショと同じく島と滝全体が美しく収まる角度
-  let camRadius = 12.4;
+  let camPhi = 1.24;    // 貼っていただいたコードと同じ初期高さ角度
+  let camRadius = 12.4; // 貼っていただいたコードと同じ初期距離
+  let currentLookUpRatio = 0;
   let isDragging = false;
   let prevPointer = { x: 0, y: 0 };
 
   function updateCameraTransform() {
-    camPhi = Math.max(0.30, Math.min(2.15, camPhi));
+    // 2.75まで上限を広げ、真上の星空までなめらかに見上げられるようにする
+    camPhi = Math.max(0.30, Math.min(2.75, camPhi));
     camRadius = Math.max(7.5, Math.min(20.0, camRadius));
-
-    const cx = camRadius * Math.sin(camPhi) * Math.sin(camTheta);
-    const cy = camRadius * Math.cos(camPhi);
-    const cz = camRadius * Math.sin(camPhi) * Math.cos(camTheta);
 
     const statusPanel = document.getElementById('status-panel');
     const diaryBtn = document.getElementById('diary-btn');
-    const fanContainer = document.getElementById('fan-menu-container');
+    const fanMenu = document.getElementById('fan-menu-container');
+
+    // 1.45までは貼っていただいたコードと100%同じ動き。1.45を超えたら段差ゼロで空へ補間
+    const rawT = Math.max(0, Math.min(1, (camPhi - 1.45) / (2.75 - 1.45)));
+    const smoothT = rawT * rawT * (3 - 2 * rawT);
+    currentLookUpRatio = smoothT;
+
+    // 急に0.7倍にワープせず、1.0から0.72へなめらかに近づく
+    const effectivePhi = camPhi <= 1.45 ? camPhi : 1.45 + (camPhi - 1.45) * 0.16;
+    const effectiveRadius = camRadius * (1.0 - smoothT * 0.28);
+
+    const cx = effectiveRadius * Math.sin(effectivePhi) * Math.sin(camTheta);
+    const cy = effectiveRadius * Math.cos(effectivePhi);
+    const cz = effectiveRadius * Math.sin(effectivePhi) * Math.cos(camTheta);
+
+    camera.position.set(cx, cy, cz);
+    camera.lookAt(0, -1.35 + smoothT * 27.0, 0);
+
+    // ロボの首も一緒に空を見上げる
+    headPivot.rotation.x = -smoothT * 0.55;
 
     if (camPhi > 1.45) {
-      const lookUpRatio = (camPhi - 1.45) / (2.15 - 1.45);
-      camera.position.set(cx * 0.7, Math.max(-0.3, cy), cz * 0.7);
-      camera.lookAt(0, -1.35 + lookUpRatio * 10.5, 0);
       statusPanel.classList.add('sky-hidden');
       diaryBtn.classList.add('sky-hidden');
-      fanContainer.classList.add('sky-hidden');
-      starMat.opacity = Math.max(starMat.opacity, 0.45 + lookUpRatio * 0.55);
-      celestialRings.children.forEach(r => { r.material.opacity = lookUpRatio * 0.35; });
+      if (fanMenu) {
+        fanMenu.classList.remove('open');
+        fanMenu.classList.add('sky-hidden');
+      }
     } else {
-      camera.position.set(cx, cy, cz);
-      camera.lookAt(0, -1.35, 0);
       statusPanel.classList.remove('sky-hidden');
       diaryBtn.classList.remove('sky-hidden');
-      fanContainer.classList.remove('sky-hidden');
-      celestialRings.children.forEach(r => { r.material.opacity = 0.0; });
+      if (fanMenu) fanMenu.classList.remove('sky-hidden');
     }
+
+    // 見上げ具合に応じて星空・星座ライン・星座名が浮かび上がる
+    conLineMat.opacity = smoothT * 0.62;
+    majorStarMat.opacity = 0.20 + smoothT * 0.80;
+    celestialRings.children.forEach(r => { r.material.opacity = smoothT * 0.35; });
+    const labelAlpha = Math.max(0, (smoothT - 0.12) / 0.88) * 0.92;
+    constellationLabels.forEach(sp => { sp.material.opacity = labelAlpha; });
+
+    refreshSkyBrightness();
   }
-  updateCameraTransform();
+
+  function refreshSkyBrightness() {
+    const hLevel = getRobotHeightLevel();
+    let starOpacity = 0.15;
+    if (TIME_STEP < 4) starOpacity = 0.15;
+    else if (TIME_STEP < 9) starOpacity = 0.10;
+    else if (TIME_STEP < 13) starOpacity = 0.45;
+    else if (TIME_STEP < 17) starOpacity = 0.85;
+    else starOpacity = 1.0;
+
+    if (hLevel >= 3) starOpacity = Math.min(1.0, starOpacity + 0.35);
+    starMat.opacity = Math.max(starOpacity, currentLookUpRatio * 0.95);
+  }
 
   const domElem = renderer.domElement;
   domElem.addEventListener('pointerdown', (e) => {
@@ -771,6 +966,7 @@
     updateCameraTransform();
   });
   window.addEventListener('pointerup', () => { isDragging = false; });
+  window.addEventListener('pointercancel', () => { isDragging = false; });
   domElem.addEventListener('wheel', (e) => {
     camRadius += e.deltaY * 0.01;
     updateCameraTransform();
@@ -801,26 +997,21 @@
 
     let timeLabel = '☀️ 朝';
     let skyHex = 0x0d2538;
-    let starOpacity = 0.15;
 
     if (TIME_STEP < 4) {
-      timeLabel = '☀️ 朝'; skyHex = 0x0d2538; starOpacity = 0.15;
+      timeLabel = '☀️ 朝'; skyHex = 0x0d2538;
     } else if (TIME_STEP < 9) {
-      timeLabel = '🌤️ 昼'; skyHex = 0x12324a; starOpacity = 0.10;
+      timeLabel = '🌤️ 昼'; skyHex = 0x12324a;
     } else if (TIME_STEP < 13) {
-      timeLabel = '🌇 夕方'; skyHex = 0x241b35; starOpacity = 0.45;
+      timeLabel = '🌇 夕方'; skyHex = 0x241b35;
     } else if (TIME_STEP < 17) {
-      timeLabel = '🌙 夜'; skyHex = 0x071320; starOpacity = 0.85;
+      timeLabel = '🌙 夜'; skyHex = 0x071320;
     } else {
-      timeLabel = '🌌 深淵'; skyHex = 0x040911; starOpacity = 1.0;
-    }
-
-    if (hLevel >= 3) {
-      starOpacity = Math.min(1.0, starOpacity + 0.35);
+      timeLabel = '🌌 深淵'; skyHex = 0x040911;
     }
 
     scene.background.setHex(skyHex);
-    if (camPhi <= 1.45) starMat.opacity = starOpacity;
+    refreshSkyBrightness();
     document.getElementById('ui-time').innerText = timeLabel;
 
     let moodStr = '😊 あんしん・まんぷく';
@@ -838,7 +1029,7 @@
   }
 
   // ==========================================
-  // 5. アルゴンさん物理＆AI思考アクション
+  // 5. アルゴンさん物理＆AI思考アクション（AI判断の反映＋通信最優先）
   // ==========================================
   async function executeTurn() {
     const btn = document.getElementById('btn-action');
@@ -866,6 +1057,21 @@
     let thoughtText = '';
     let actionLabel = '';
 
+    const validDirs = dirs.filter(d => {
+      const nx = ROBOT.pos.x + d.dx;
+      const nz = ROBOT.pos.z + d.dz;
+      if (nx < -2 || nx > 2 || nz < -2 || nz > 2) return ROBOT.speed === 5;
+      const nextH = HEIGHT_MAP[`${nx},${nz}`] || 0;
+      return (nextH - curH) <= 1;
+    });
+
+    // AIが設定されている場合は、最優先でAIに「移動方向・休憩」の判断と「気持ち」を聞く
+    const aiType = safeStorage.getItem('ai_type') || 'none';
+    let aiDecision = null;
+    if ((aiType === 'groq' || aiType === 'gemini') && curH !== -1) {
+      aiDecision = await tryFetchAIDecision(aiType, curH, validDirs);
+    }
+
     if (curH === -1) {
       ROBOT.pos.x = Math.max(-2, Math.min(2, ROBOT.pos.x));
       ROBOT.pos.z = Math.max(-2, Math.min(2, ROBOT.pos.z));
@@ -875,27 +1081,35 @@
       thoughtText = 'わわっ！海の白い波に押し戻されて大地に戻ったよ！';
     } else {
       let bestDir = null;
-      const validDirs = dirs.filter(d => {
-        const nx = ROBOT.pos.x + d.dx;
-        const nz = ROBOT.pos.z + d.dz;
-        if (nx < -2 || nx > 2 || nz < -2 || nz > 2) return ROBOT.speed === 5;
-        const nextH = HEIGHT_MAP[`${nx},${nz}`] || 0;
-        return (nextH - curH) <= 1;
-      });
+      let wantRest = (life.stamina <= 25 && curH >= 0);
 
-      const appleTarget = WORLD_ITEMS.find(it => it.type === 'apple');
-      if (appleTarget && (life.energy <= 60 || !isNight || curH >= 3)) {
-        validDirs.sort((a, b) => {
-          const distA = Math.abs((ROBOT.pos.x + a.dx) - appleTarget.x) + Math.abs((ROBOT.pos.z + a.dz) - appleTarget.z);
-          const distB = Math.abs((ROBOT.pos.x + b.dx) - appleTarget.x) + Math.abs((ROBOT.pos.z + b.dz) - appleTarget.z);
-          return distA - distB;
-        });
-        bestDir = validDirs[0];
-      } else if (validDirs.length > 0) {
-        bestDir = validDirs[Math.floor(Math.random() * validDirs.length)];
+      if (aiDecision) {
+        if (aiDecision.action === '休む') {
+          wantRest = true;
+        } else {
+          const matched = validDirs.find(d => d.name === aiDecision.action);
+          if (matched) {
+            bestDir = matched;
+            wantRest = false;
+          }
+        }
       }
 
-      if (life.stamina <= 25 && curH >= 0) {
+      if (!bestDir && !wantRest) {
+        const appleTarget = WORLD_ITEMS.find(it => it.type === 'apple');
+        if (appleTarget && (life.energy <= 60 || !isNight || curH >= 3)) {
+          validDirs.sort((a, b) => {
+            const distA = Math.abs((ROBOT.pos.x + a.dx) - appleTarget.x) + Math.abs((ROBOT.pos.z + a.dz) - appleTarget.z);
+            const distB = Math.abs((ROBOT.pos.x + b.dx) - appleTarget.x) + Math.abs((ROBOT.pos.z + b.dz) - appleTarget.z);
+            return distA - distB;
+          });
+          bestDir = validDirs[0];
+        } else if (validDirs.length > 0) {
+          bestDir = validDirs[Math.floor(Math.random() * validDirs.length)];
+        }
+      }
+
+      if (wantRest) {
         life.stamina += (isNight || curH === 5) ? 45 : 30;
         life.energy -= 5;
         life.mental += 10;
@@ -950,10 +1164,8 @@
       }
     }
 
-    const aiType = safeStorage.getItem('ai_type') || 'none';
-    if (aiType === 'groq' || aiType === 'gemini') {
-      const customLine = await tryFetchAIComment(aiType, actionLabel, getRobotHeightLevel());
-      if (customLine) thoughtText = customLine;
+    if (aiDecision && aiDecision.thought) {
+      thoughtText = aiDecision.thought;
     }
 
     rebuildTerrainAndItems();
@@ -990,9 +1202,13 @@
     }, 320);
   }
 
-  async function tryFetchAIComment(aiType, actionLabel, hLevel) {
+  async function tryFetchAIDecision(aiType, hLevel, validDirs) {
     try {
-      const prompt = `あなたは世界の果ての小さな浮島で暮らす可愛いロボット「ロボ${ROBOT.gen}ごう」です。生存${GAME_DAY}日目、現在の高さは${hLevel}段目、今の行動は「${actionLabel}」です。小学生にも親しみやすい可愛い1〜2文で今の気持ちを話してください。`;
+      const dirNames = validDirs.map(d => d.name).join('・') || '休む';
+      const appleInfo = WORLD_ITEMS.map(it => `${it.type}(${it.x},${it.z})`).join(', ') || 'なし';
+      const prompt = `あなたは世界の果ての小さな浮島で暮らす可愛いロボット「ロボ${ROBOT.gen}ごう」です。生存${GAME_DAY}日目、現在位置(${ROBOT.pos.x},${ROBOT.pos.z})、高さ${hLevel}段目、体力${life.stamina}、おなか${life.energy}、ごきげん${life.mental}、島のアイテム[${appleInfo}]。移動可能な方向は[${dirNames}]または[休む]です。次のJSON形式のみで答えてください: {"action":"東 または 西 または 南 または 北 または 休む","thought":"小学生にも親しみやすい可愛い1〜2文の心の叫び"}`;
+
+      let rawText = '';
       if (aiType === 'groq') {
         const key = safeStorage.getItem('api_groq');
         if (!key) return null;
@@ -1002,26 +1218,31 @@
           body: JSON.stringify({
             model: 'llama-3.3-70b-versatile',
             messages: [{ role: 'user', content: prompt }],
-            max_tokens: 120
+            max_tokens: 150
           })
         });
         const data = await res.json();
-        return data.choices?.[0]?.message?.content?.trim() || null;
+        rawText = data.choices?.[0]?.message?.content?.trim() || '';
       } else if (aiType === 'gemini') {
         const key = safeStorage.getItem('api_gemini');
         if (!key) return null;
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
         const data = await res.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
       }
+      if (!rawText) return null;
+      const match = rawText.match(/\{[\s\S]*\}/);
+      if (match) {
+        return JSON.parse(match[0]);
+      }
+      return { action: '', thought: rawText };
     } catch (e) {
       return null;
     }
-    return null;
   }
 
   // ==========================================
@@ -1182,29 +1403,37 @@
   rebuildTerrainAndItems();
   syncRobot3DPosition();
   updateEnvironmentAndUI();
+  updateCameraTransform();
 
   // ==========================================
-  // 7. メインアニメーションループ
+  // 7. メインアニメーションループ（スマホ向けに負荷半減）
   // ==========================================
   const clock = new THREE.Clock();
   let wfScrollY = 0;
+  let frameTick = 0;
 
   function animate() {
     requestAnimationFrame(animate);
-    const t = clock.getElapsedTime();
+    const dt = Math.min(0.05, clock.getDelta());
+    const t = clock.elapsedTime;
+    frameTick++;
 
-    // 滝：21:36のデザインで上から下へゆっくり流れる
-    wfScrollY = (wfScrollY + 0.9) % 512;
-    renderWaterfallTexture(wfScrollY);
-    wfTex.needsUpdate = true;
-
-    // 海：21:36の白い泡立ちが優しく揺らぐ
-    drawSeaCanvas(t);
-    seaTex.needsUpdate = true;
+    // 滝と海の描き直しを1コマずつ交互に行い、スマホのカクつきを防ぐ
+    if (frameTick % 2 === 0) {
+      wfScrollY = (wfScrollY + 1.8) % 512;
+      renderWaterfallTexture(wfScrollY);
+      wfTex.needsUpdate = true;
+    } else {
+      drawSeaCanvas(t);
+      seaTex.needsUpdate = true;
+    }
 
     // 古代亀と星空のゆったりした動き
     turtleGroup.position.y = -8.8 + Math.sin(t * 0.7) * 0.15;
     skyGroup.rotation.y += 0.0004;
+
+    // 流れ星の更新
+    updateShootingStar(dt, currentLookUpRatio);
 
     renderer.render(scene, camera);
   }
@@ -1218,4 +1447,3 @@
 </script>
 </body>
 </html>
-```
