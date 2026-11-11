@@ -12,7 +12,7 @@
 
     #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; display: block; touch-action: none; }
 
-    /* 上部ステータス枠 */
+    /* 1. 上部ステータス枠（完全に独立） */
     #status-panel {
       position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
       width: 95%; max-width: 430px; background: rgba(255, 255, 255, 0.96);
@@ -48,29 +48,42 @@
 
     .robot-id-tag { font-size: 11px; font-weight: 900; color: #334155; white-space: nowrap; }
     .badge {
-    /* 右上の日記帳ボタン ＆ 地上・地下カメラアイコン（縦列） */
+      font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 2px; white-space: nowrap;
+    }
+    .badge-days { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-time { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+    .badge-mood { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+    .btn-icon {
+      width: 26px; height: 26px; border-radius: 50%; background: #f1f5f9;
+      display: flex; justify-content: center; align-items: center;
+      font-size: 14px; cursor: pointer; border: 1px solid #cbd5e1; flex-shrink: 0;
+    }
+
+    /* 2. 右上の日記帳ボタン ＆ 地上・地下カメラアイコン（縦一列・アイコンのみ） */
     #diary-btn, .cam-switch-btn {
       position: fixed; right: 14px;
       width: 44px; height: 44px; background: rgba(255,255,255,0.96); border-radius: 50%;
       box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex;
-      justify-content: center; align-items: center; font-size: 21px; z-index: 10; cursor: pointer;
-      border: 2px solid #e2e8f0; transition: opacity 0.35s ease, transform 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
+      justify-content: center; align-items: center; font-size: 20px; z-index: 10; cursor: pointer;
+      border: 2px solid #e2e8f0;
+      transition: opacity 0.35s ease, transform 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
     }
-    #diary-btn { top: 118px; }
-    #cam-ground-btn { top: 170px; }
-    #cam-under-btn { top: 222px; }
+    #diary-btn { top: 116px; }
+    #cam-ground-btn { top: 168px; }
+    #cam-under-btn { top: 220px; }
 
     .cam-switch-btn.active-cam {
       border-color: #3b82f6;
       background: #eff6ff;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.28), 0 4px 12px rgba(0,0,0,0.25);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3), 0 4px 12px rgba(0,0,0,0.25);
       transform: scale(1.06);
     }
     #diary-btn.sky-hidden, .cam-switch-btn.sky-hidden {
-      opacity: 0; pointer-events: none; transform: translateY(-15px);
+      opacity: 0; pointer-events: none;
     }
 
-    /* 中央下部の「＋」＆扇状メニュー */
+    /* 3. 中央下部の「＋」＆扇状メニュー（ゲージ枠や下部パネルと完全に独立） */
     #fan-menu-container {
       position: fixed; bottom: 204px; left: 50%; transform: translateX(-50%);
       width: 48px; height: 48px; z-index: 12;
@@ -109,7 +122,7 @@
     #fan-menu-container.open .fan-item.f-4 { transform: translate(48px, -68px); opacity: 1; pointer-events: auto; }
     #fan-menu-container.open .fan-item.f-5 { transform: translate(88px, -24px); opacity: 1; pointer-events: auto; }
 
-    /* 下部メッセージパネル */
+    /* 4. 下部メッセージパネル（ロボのきもち欄・完全に独立） */
     #bottom-panel {
       position: fixed; bottom: 0; left: 0; width: 100%;
       background: #ffffff; border-top-left-radius: 20px; border-top-right-radius: 20px;
@@ -140,6 +153,7 @@
       opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 100; white-space: nowrap;
     }
 
+    /* モーダル窓 */
     .modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(15,23,42,0.72); z-index: 50;
@@ -173,7 +187,7 @@
 
 <div id="canvas-container"></div>
 
-<!-- 上部ステータス枠 -->
+<!-- 1. 上部ステータス枠（閉じタグ完備で独立） -->
 <div id="status-panel">
   <div class="gauge-container">
     <div class="gauge-box">
@@ -200,12 +214,14 @@
       <button class="btn-icon" id="btn-settings" title="設定">⚙️</button>
     </div>
   </div>
-<!-- 右上の手帳ボタン ＆ 縦並びの地上・地下カメラアイコン（アイコンのみ） -->
-<div id="diary-btn" title="ロボット手帳">📖</div>
-<div id="cam-ground-btn" class="cam-switch-btn active-cam" onclick="selectCameraMode('ground')" title="地上・星空カメラ">🌌</div>
-<div id="cam-under-btn" class="cam-switch-btn" onclick="selectCameraMode('underground')" title="地下透過カメラ">⛏️</div>
+</div>
 
-<!-- 中央下部の「＋」ボタン＆扇状メニュー -->
+<!-- 2. 右上の手帳ボタン ＆ 縦並びの地上・地下カメラアイコン（アイコンのみ） -->
+<div id="diary-btn" title="ロボット手帳">📖</div>
+<div id="cam-ground-btn" class="cam-switch-btn active-cam" onclick="selectCameraMode('ground')" title="地上カメラ（星空観察ポジション）">🌌</div>
+<div id="cam-under-btn" class="cam-switch-btn" onclick="selectCameraMode('underground')" title="地下カメラ（地下底観察ポジション）">⛏️</div>
+
+<!-- 3. 中央下部の「＋」ボタン＆扇状メニュー -->
 <div id="fan-menu-container">
   <div class="fan-item f-1" onclick="fanAction('apple')">🍎<span class="fan-label">リンゴ</span></div>
   <div class="fan-item f-2" onclick="fanAction('step')">🪨<span class="fan-label">1段積む</span></div>
@@ -215,16 +231,16 @@
   <div id="fan-main-btn" title="メニューを開く">＋</div>
 </div>
 
-<!-- 下部メッセージ枠 -->
+<!-- 4. 下部メッセージ枠（ロボのきもち欄） -->
 <div id="bottom-panel">
   <div class="panel-header">
     <span>💭 ロボのきもち・心のさけび</span>
     <div class="ai-badge" id="ai-status">💤 待機中</div>
   </div>
-  <div id="message-box">四角い大地のまわりを丸い海が包み込んで、白波を立てているよ！北西の階段から地下のひみつ空間にも潜れるよ！</div>
+  <div id="message-box">四角い大地のまわりを丸い海が包み込んで、白波を立てているよ！</div>
   <div class="action-history">
     <div><span class="history-tag">👟 やった事</span> <span id="history-action">待機中</span></div>
-    <span id="history-loc" style="color:#2563eb; font-weight:800;">🎥地上カメラ・0段目</span>
+    <span id="history-loc" style="color:#2563eb; font-weight:800;">🌌地上カメラ・0段目</span>
   </div>
   <button class="btn-think" id="btn-action">⚡ 今すぐ考える</button>
 </div>
@@ -353,16 +369,16 @@
   let BAG = ['stone', 'apple', 'grass'];
   let DIARY_LOGS = ['🌱 1日目：世界の果ての島に降り立ったよ！'];
 
-  // HEIGHT_MAP: -3（地下3階）〜 0（地上平地）〜 +5（地上5段目）
+  // HEIGHT_MAP: -3（地下3階・地下底）〜 0（地上平地）〜 +5（地上5段目）
   let HEIGHT_MAP = {};
   for (let x = -2; x <= 2; x++) {
     for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
   }
-  // 初期状態でキャラが地下へ行ける階段＆地下空間（北西エリア）を用意
-  HEIGHT_MAP['-1,-1'] = -1; // 地下1階への入り口階段
-  HEIGHT_MAP['-2,-1'] = -2; // 地下2階の通路
-  HEIGHT_MAP['-2,-2'] = -2; // 地下2階のひみつ部屋
-  HEIGHT_MAP['-1,-2'] = -1; // 地下1階の踊り場
+  // 初期状態で地下底まで階段で降りられる地下空間を用意（地上カメラ時は表面から自然に見え、地下カメラ時は地下底までくっきり見える）
+  HEIGHT_MAP['-1,-1'] = -1; // 地下1階階段
+  HEIGHT_MAP['-2,-1'] = -2; // 地下2階階段
+  HEIGHT_MAP['-2,-2'] = -3; // 地下3階（地下底のひみつ部屋）
+  HEIGHT_MAP['-1,-2'] = -3; // 地下3階（地下底の広場）
 
   let ROBOT = {
     gen: 1,
@@ -372,12 +388,12 @@
   };
   let WORLD_ITEMS = [
     { type: 'apple', x: 0, z: -1 },
-    { type: 'apple', x: -2, z: -2 } // 地下のひみつ部屋にもリンゴを配置
+    { type: 'apple', x: -1, z: -2 } // 地下底にもリンゴを配置
   ];
 
   function loadWorldState() {
     try {
-      const raw = safeStorage.getItem('island_game_save_v8');
+      const raw = safeStorage.getItem('island_game_save_v9');
       if (!raw) return;
       const d = JSON.parse(raw);
       if (d.life) life = new LifeCore(d.life);
@@ -419,28 +435,27 @@
       day: GAME_DAY,
       time: TIME_STEP
     };
-    safeStorage.setItem('island_game_save_v8', JSON.stringify(data));
+    safeStorage.setItem('island_game_save_v9', JSON.stringify(data));
   }
 
   function resetGameDirectly() {
-    safeStorage.removeItem('island_game_save_v8');
+    safeStorage.removeItem('island_game_save_v9');
     location.reload();
   }
 
   loadWorldState();
 
   // ==========================================
-  // 2. 3D世界構築 ＆ 地上・地下の2台カメラ生成
+  // 2. 3D世界構築 ＆ 地上・地下それぞれの専用カメラ生成
   // ==========================================
   const container = document.getElementById('canvas-container');
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0d2538);
 
-  // ★ カメラ1：地上カメラ（groundCamera）
-  const groundCamera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 120);
-  // ★ カメラ2：地下カメラ（undergroundCamera）
-  const undergroundCamera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 120);
-  // 現在アクティブなカメラ（地上と地下で自動連動スイッチ）
+  // ★ カメラ1：地上カメラ（星空と地上がよく観察できる専用ポジション）
+  const groundCamera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 140);
+  // ★ カメラ2：地下カメラ（地下底と地下空間がよく観察できる専用ポジション）
+  const undergroundCamera = new THREE.PerspectiveCamera(44, window.innerWidth / window.innerHeight, 0.1, 140);
   let activeCamera = groundCamera;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -453,9 +468,8 @@
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.54);
   dirLight.position.set(-5, 14, 4);
   scene.add(dirLight);
-  // 地下空間でもキャラや掘った部屋が立体的に見える補助ライト
-  const underLight = new THREE.DirectionalLight(0xffedd5, 0.35);
-  underLight.position.set(4, -8, -4);
+  const underLight = new THREE.DirectionalLight(0xffedd5, 0.42);
+  underLight.position.set(4, 8, -4);
   scene.add(underLight);
 
   const terrainGroup = new THREE.Group();
@@ -464,9 +478,8 @@
   scene.add(itemGroup);
 
   let terrainMeshes = [];
-  const LAYER_H = 0.48; // 1段あたりの高さ（地上・地下共通）
+  const LAYER_H = 0.48;
 
-  // 座標と段数(lv)から上面のY座標を返す関数（lv=0のとき上面は y=0）
   function getSurfaceY(lv) {
     return lv * LAYER_H;
   }
@@ -482,18 +495,19 @@
       for (let z = -2; z <= 2; z++) {
         const topLv = HEIGHT_MAP[`${x},${z}`] ?? 0;
 
-        // 地下4階（底盤 lv=-4）から現在の高さ（topLv）までブロックを積み上げる
-        // これにより地下を掘った場所（topLv = -1, -2, -3）がリアルな空間として凹む！
+        // 地下底（lv = -4）から現在の高さ（topLv）までブロックを構築
         for (let lv = -4; lv <= topLv; lv++) {
-          let col = 0xbde8d0; // 地上0段（ミントグリーン）
+          let col = 0xbde8d0;
           if (lv > 0) {
-            col = 0x9edbbd;   // 地上1〜5段の段差ブロック
+            col = 0x9edbbd; // 地上段差ブロック
           } else if (lv === 0) {
-            col = 0xbde8d0;   // 0段目（地表）
+            col = 0xbde8d0; // 地上0段（21:36のミントグリーン）
+          } else if (lv === -4) {
+            col = 0x8d6e63; // 地下底（一番下の岩盤・床）
           } else if (lv === topLv && lv < 0) {
-            col = 0xd6b492;   // キャラが掘って露出した地下空間の床（明るいサンドブラウン）
+            col = 0xd7ccc8; // 掘られた地下空間の床・階段（明るく見やすい色）
           } else {
-            col = (lv % 2 === 0) ? 0xb08968 : 0x9c7350; // 手をつけていない地下の土ブロック層
+            col = (lv % 2 === 0) ? 0xa1887f : 0x8d6e63; // 地下の土ブロック層
           }
 
           const mat = new THREE.MeshLambertMaterial({
@@ -502,14 +516,13 @@
             opacity: 1.0
           });
           const mesh = new THREE.Mesh(blockGeo, mat);
-          // lv=0 の上面が y=0 になるよう配置
           mesh.position.set(x, (lv - 0.5) * LAYER_H, z);
           mesh.userData = {
             gx: x,
             gz: z,
             lv: lv,
             isTopSurface: (lv === topLv),
-            isUndergroundSoil: (lv < 0),
+            isBottomBedrock: (lv === -4),
             targetOpacity: 1.0
           };
           terrainGroup.add(mesh);
@@ -541,7 +554,7 @@
     });
   }
 
-  // --- [固定基盤] 丸い海と四隅の白泡・外縁の白波 ---
+  // --- 丸い海と四隅の白泡 ---
   const seaCanvas = document.createElement('canvas');
   seaCanvas.width = 512; seaCanvas.height = 512;
   const sCtx = seaCanvas.getContext('2d');
@@ -589,7 +602,7 @@
   seaMesh.position.y = -0.35;
   scene.add(seaMesh);
 
-  // --- [固定基盤] 円形滝（上から下へゆっくり流れる ＆ 地下時は自動透過） ---
+  // --- 円形滝（上から下へゆっくり流れる ＆ 地下カメラ時は透過） ---
   const wfCanvas = document.createElement('canvas');
   wfCanvas.width = 512; wfCanvas.height = 512;
   const wfCtx = wfCanvas.getContext('2d');
@@ -736,18 +749,18 @@
     }
   }
 
-  // --- 球体大枠の星空 ---
+  // --- 球体大枠の星空 ＆ 星座ライン（地上カメラで360°眺められる） ---
   const skyGroup = new THREE.Group();
   scene.add(skyGroup);
 
   const starGeo = new THREE.BufferGeometry();
   const starPositions = [];
-  for (let i = 0; i < 420; i++) {
+  for (let i = 0; i < 480; i++) {
     const u = Math.random();
     const v = Math.random();
     const theta = u * 2.0 * Math.PI;
     const phi = Math.acos(2.0 * v - 1.0);
-    const r = 32;
+    const r = 34;
     starPositions.push(
       r * Math.sin(phi) * Math.cos(theta),
       r * Math.cos(phi),
@@ -755,85 +768,98 @@
     );
   }
   starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
-  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.28, transparent: true, opacity: 0.15 });
+  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.34, transparent: true, opacity: 0.65 });
   const starPoints = new THREE.Points(starGeo, starMat);
   skyGroup.add(starPoints);
 
-  const celestialRings = new THREE.Group();
-  for (let i = 0; i < 2; i++) {
-    const rGeo = new THREE.TorusGeometry(26 + i * 2.5, 0.05, 8, 96);
-    const rMat = new THREE.MeshBasicMaterial({ color: 0xffe082, transparent: true, opacity: 0.0 });
-    const ring = new THREE.Mesh(rGeo, rMat);
-    ring.rotation.x = 0.7 + i * 0.5;
-    ring.rotation.y = i * 0.9;
-    celestialRings.add(ring);
-  }
-  skyGroup.add(celestialRings);
+  // 星座ライン（はくちょう座などの輝く星とライン）
+  const constellationGroup = new THREE.Group();
+  const constLineMat = new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.55 });
+  const constStarMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+  const cygnusPts = [
+    new THREE.Vector3(0, 22, -18),
+    new THREE.Vector3(0, 17, -21),
+    new THREE.Vector3(0, 12, -24),
+    new THREE.Vector3(-6, 17, -20),
+    new THREE.Vector3(6, 17, -20)
+  ];
+  const cygnusLine1 = new THREE.BufferGeometry().setFromPoints([cygnusPts[0], cygnusPts[1], cygnusPts[2]]);
+  const cygnusLine2 = new THREE.BufferGeometry().setFromPoints([cygnusPts[3], cygnusPts[1], cygnusPts[4]]);
+  constellationGroup.add(new THREE.Line(cygnusLine1, constLineMat));
+  constellationGroup.add(new THREE.Line(cygnusLine2, constLineMat));
+  cygnusPts.forEach(p => {
+    const s = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), constStarMat);
+    s.position.copy(p);
+    constellationGroup.add(s);
+  });
+  skyGroup.add(constellationGroup);
 
   // ==========================================
-  // 3. 地上カメラ＆地下カメラ（2台連動・グリグリ観察・滝＆土ブロック透過）
+  // 3. 別々のポジションを持つ「地上カメラ」と「地下カメラ」
   // ==========================================
-  let targetCamTheta = 0.72;
-  let targetCamPhi = 1.24;   // 21:36スクショと同じ初期角度
-  let targetCamRadius = 12.4;
+  // ★ 地上カメラ専用ポジション（初期状態から島と上空の星空が広く眺められ、グリグリ見上げられるアングル）
+  const groundCamState = {
+    targetTheta: 0.72,
+    targetPhi: 1.42,     // 低い位置から島と背後の広い星空を一緒に収める角度
+    targetRadius: 12.0,
+    theta: 0.72,
+    phi: 1.42,
+    radius: 12.0,
+    focus: new THREE.Vector3(0, 0.85, 0) // 視点の中心を島の上空寄りに置き、星空が画面上部に広く映るポジション
+  };
 
-  let camTheta = 0.72;
-  let camPhi = 1.24;
-  let camRadius = 12.4;
+  // ★ 地下カメラ専用ポジション（地下底 lv=-3,-4 と掘った空間を斜め上から覗き込んで360°観察できる別ポジション）
+  const underCamState = {
+    targetTheta: 0.72,
+    targetPhi: 1.06,     // 地下底（一番下の床）がよく見渡せる斜め俯瞰ポジション
+    targetRadius: 9.8,
+    theta: 0.72,
+    phi: 1.06,
+    radius: 9.8,
+    focus: new THREE.Vector3(-0.6, -1.45, -0.6) // 地下底（y = -1.45付近）にピントを合わせた専用ポジション
+  };
 
-  // カメラモード管理：null = キャラ位置に自動連動 / 'ground' = 地上カメラ手動 / 'underground' = 地下カメラ手動
+  // カメラモード管理：null = キャラ位置に自動連動 / 'ground' = 地上カメラ固定 / 'underground' = 地下カメラ固定
   let cameraOverride = null;
-
   let isDragging = false;
   let prevPointer = { x: 0, y: 0 };
-  let baseStarOpacity = 0.15;
+  let baseStarOpacity = 0.65;
 
   const raycaster = new THREE.Raycaster();
-  const groundFocus = new THREE.Vector3(0, -1.35, 0);
-  const underFocus = new THREE.Vector3(0, -1.0, 0);
 
   function smoothstep(min, max, value) {
     const x = Math.max(0, Math.min(1, (value - min) / (max - min)));
     return x * x * (3 - 2 * x);
   }
 
+  function getEffectiveCameraMode() {
+    const curH = getRobotHeightLevel();
+    const isRobotUnderground = (curH < 0 && curH > -90);
+    return cameraOverride || (isRobotUnderground ? 'underground' : 'ground');
+  }
+
   // 右側のカメラアイコンをタップしたときの切り替え処理
   function selectCameraMode(mode) {
-    const curH = getRobotHeightLevel();
-    const autoMode = (curH < 0 && curH > -90) ? 'underground' : 'ground';
-
-    if (cameraOverride === mode) {
-      // 同じアイコンをもう一度押したら「キャラ位置の自動連動」に戻す
-      cameraOverride = null;
+    cameraOverride = mode;
+    if (mode === 'ground') {
+      // 地上カメラアイコンを押したときは、星空と島がよく観察できるポジションにセット
+      if (groundCamState.targetPhi < 1.35) groundCamState.targetPhi = 1.46;
+      showToast('🌌 地上カメラ（星空がよく観察できるポジション）');
     } else {
-      cameraOverride = mode;
-    }
-
-    const effectiveMode = cameraOverride || autoMode;
-    if (effectiveMode === 'ground') {
-      showToast('🌌 地上・星空カメラ（上下左右にグリグリ見渡せるよ）');
-    } else {
-      showToast('⛏️ 地下カメラ（滝と土を透過して地下内をグリグリ観察）');
+      // 地下カメラアイコンを押したときは、地下底がよく観察できるポジションにセット
+      underCamState.targetPhi = 1.06;
+      showToast('⛏️ 地下カメラ（滝と土を透過して地下底を観察できるポジション）');
     }
     updateEnvironmentAndUI();
   }
 
   function updateDualCamerasAndTransparency() {
-    targetCamPhi = Math.max(0.22, Math.min(2.35, targetCamPhi));
-    targetCamRadius = Math.max(6.5, Math.min(20.0, targetCamRadius));
-
-    camTheta += (targetCamTheta - camTheta) * 0.22;
-    camPhi += (targetCamPhi - camPhi) * 0.22;
-    camRadius += (targetCamRadius - camRadius) * 0.22;
-
     const curH = getRobotHeightLevel();
     const isRobotUnderground = (curH < 0 && curH > -90);
-
-    // 基本はキャラの位置（地上 or 地下）に自動連動し、アイコン操作時はそのカメラを優先
-    const effectiveMode = cameraOverride || (isRobotUnderground ? 'underground' : 'ground');
+    const effectiveMode = getEffectiveCameraMode();
     const isUndergroundView = (effectiveMode === 'underground');
 
-    // 右側アイコンのアクティブ表示を同期
+    // 右側アイコンの点灯状態を更新
     const groundBtn = document.getElementById('cam-ground-btn');
     const underBtn = document.getElementById('cam-under-btn');
     if (groundBtn && underBtn) {
@@ -842,99 +868,102 @@
     }
 
     // ----------------------------------------------------
-    // 【カメラ1：地上カメラ (groundCamera)】の軌道計算（地上・星空グリグリ用）
+    // 【カメラ1：地上カメラ (groundCamera)】専用ポジション計算（星空＆地上観察）
     // ----------------------------------------------------
-    const lookUpRatio = smoothstep(1.28, 2.25, camPhi);
-    const gPivotX = robotGroup.position.x * (0.35 + 0.65 * lookUpRatio);
-    const gPivotZ = robotGroup.position.z * (0.35 + 0.65 * lookUpRatio);
-    const gPivotY = (-1.35 * (1 - lookUpRatio)) + ((robotGroup.position.y + 1.45) * lookUpRatio);
+    groundCamState.targetPhi = Math.max(0.35, Math.min(2.35, groundCamState.targetPhi));
+    groundCamState.targetRadius = Math.max(6.5, Math.min(20.0, groundCamState.targetRadius));
 
-    groundFocus.x += (gPivotX - groundFocus.x) * 0.22;
-    groundFocus.y += (gPivotY - groundFocus.y) * 0.22;
-    groundFocus.z += (gPivotZ - groundFocus.z) * 0.22;
+    groundCamState.theta += (groundCamState.targetTheta - groundCamState.theta) * 0.22;
+    groundCamState.phi += (groundCamState.targetPhi - groundCamState.phi) * 0.22;
+    groundCamState.radius += (groundCamState.targetRadius - groundCamState.radius) * 0.22;
 
-    const gRadius = camRadius * (1.0 - 0.28 * lookUpRatio);
+    const lookUpRatio = smoothstep(1.25, 2.20, groundCamState.phi);
+    const gTargetX = robotGroup.position.x * 0.55;
+    const gTargetZ = robotGroup.position.z * 0.55;
+    // 見上げるほどピントが空高く（+2.4）へ上がり、キャラの背中越しに満天の星空が画面いっぱいに広がる
+    const gTargetY = (-0.6 * (1 - lookUpRatio)) + ((Math.max(0, robotGroup.position.y) + 2.4) * lookUpRatio);
+
+    groundCamState.focus.x += (gTargetX - groundCamState.focus.x) * 0.22;
+    groundCamState.focus.y += (gTargetY - groundCamState.focus.y) * 0.22;
+    groundCamState.focus.z += (gTargetZ - groundCamState.focus.z) * 0.22;
+
+    const gRadius = groundCamState.radius * (1.0 - 0.25 * lookUpRatio);
     groundCamera.position.set(
-      groundFocus.x + gRadius * Math.sin(camPhi) * Math.sin(camTheta),
-      groundFocus.y + gRadius * Math.cos(camPhi),
-      groundFocus.z + gRadius * Math.sin(camPhi) * Math.cos(camTheta)
+      groundCamState.focus.x + gRadius * Math.sin(groundCamState.phi) * Math.sin(groundCamState.theta),
+      groundCamState.focus.y + gRadius * Math.cos(groundCamState.phi),
+      groundCamState.focus.z + gRadius * Math.sin(groundCamState.phi) * Math.cos(groundCamState.theta)
     );
-    groundCamera.lookAt(groundFocus);
+    groundCamera.lookAt(groundCamState.focus);
 
     // ----------------------------------------------------
-    // 【カメラ2：地下カメラ (undergroundCamera)】の連動軌道計算（地下内グリグリ用）
+    // 【カメラ2：地下カメラ (undergroundCamera)】専用ポジション計算（地下底観察）
     // ----------------------------------------------------
-    // キャラが地下にいる時はキャラ中心、キャラが地上にいる時に地下カメラを押した場合は地下空間の中心を映す
-    const uPivotX = isRobotUnderground ? (robotGroup.position.x * 0.85) : -0.6;
-    const uPivotY = isRobotUnderground ? (robotGroup.position.y + 0.35) : -0.75;
-    const uPivotZ = isRobotUnderground ? (robotGroup.position.z * 0.85) : -0.6;
+    underCamState.targetPhi = Math.max(0.30, Math.min(1.85, underCamState.targetPhi));
+    underCamState.targetRadius = Math.max(6.0, Math.min(18.0, underCamState.targetRadius));
 
-    underFocus.x += (uPivotX - underFocus.x) * 0.22;
-    underFocus.y += (uPivotY - underFocus.y) * 0.22;
-    underFocus.z += (uPivotZ - underFocus.z) * 0.22;
+    underCamState.theta += (underCamState.targetTheta - underCamState.theta) * 0.22;
+    underCamState.phi += (underCamState.targetPhi - underCamState.phi) * 0.22;
+    underCamState.radius += (underCamState.targetRadius - underCamState.radius) * 0.22;
 
-    const uRadius = camRadius * 0.82;
+    // 地下底（y = -1.45）をしっかりと中心に捉え、キャラが地下にいるときはその地下底のキャラ位置を追う
+    const uTargetX = isRobotUnderground ? (robotGroup.position.x * 0.75) : -0.8;
+    const uTargetY = isRobotUnderground ? Math.min(-1.1, robotGroup.position.y + 0.15) : -1.45;
+    const uTargetZ = isRobotUnderground ? (robotGroup.position.z * 0.75) : -0.8;
+
+    underCamState.focus.x += (uTargetX - underCamState.focus.x) * 0.22;
+    underCamState.focus.y += (uTargetY - underCamState.focus.y) * 0.22;
+    underCamState.focus.z += (uTargetZ - underCamState.focus.z) * 0.22;
+
     undergroundCamera.position.set(
-      underFocus.x + uRadius * Math.sin(camPhi) * Math.sin(camTheta),
-      underFocus.y + uRadius * Math.cos(camPhi),
-      underFocus.z + uRadius * Math.sin(camPhi) * Math.cos(camTheta)
+      underCamState.focus.x + underCamState.radius * Math.sin(underCamState.phi) * Math.sin(underCamState.theta),
+      underCamState.focus.y + underCamState.radius * Math.cos(underCamState.phi),
+      underCamState.focus.z + underCamState.radius * Math.sin(underCamState.phi) * Math.cos(underCamState.theta)
     );
-    undergroundCamera.lookAt(underFocus);
+    undergroundCamera.lookAt(underCamState.focus);
 
-    // アクティブカメラの切り替え
+    // アクティブカメラの選択
     activeCamera = isUndergroundView ? undergroundCamera : groundCamera;
 
-    // 地上カメラで星空を見上げたときのUIフェードアウト
+    // 地上カメラで大きく空を見上げたときのみ上部ゲージをフェードアウト（下部気持ち欄は常時表示）
     const statusPanel = document.getElementById('status-panel');
-    const diaryBtn = document.getElementById('diary-btn');
-    const fanContainer = document.getElementById('fan-menu-container');
-
-    if (camPhi > 1.48 && !isUndergroundView) {
+    if (!isUndergroundView && groundCamState.phi > 1.62) {
       statusPanel.classList.add('sky-hidden');
-      diaryBtn.classList.add('sky-hidden');
-      groundBtn.classList.add('sky-hidden');
-      underBtn.classList.add('sky-hidden');
-      fanContainer.classList.add('sky-hidden');
-      starMat.opacity = Math.max(baseStarOpacity, 0.45 + lookUpRatio * 0.55);
-      celestialRings.children.forEach(r => { r.material.opacity = lookUpRatio * 0.35; });
+      starMat.opacity = Math.max(baseStarOpacity, 0.85);
+      constLineMat.opacity = 0.75;
     } else {
       statusPanel.classList.remove('sky-hidden');
-      diaryBtn.classList.remove('sky-hidden');
-      groundBtn.classList.remove('sky-hidden');
-      underBtn.classList.remove('sky-hidden');
-      fanContainer.classList.remove('sky-hidden');
       starMat.opacity = baseStarOpacity;
-      celestialRings.children.forEach(r => { r.material.opacity = 0.0; });
+      constLineMat.opacity = 0.45;
     }
 
     // ----------------------------------------------------
-    // 【滝・海・土ブロックの透過処理（地下カメラ連動）】
+    // 【滝・海・地下土ブロックの透過処理】
     // ----------------------------------------------------
-    const targetWfOpacity = isUndergroundView ? 0.14 : 0.94;
-    const targetSeaOpacity = isUndergroundView ? 0.22 : 0.95;
-    const targetFoamOpacity = isUndergroundView ? 0.15 : 0.85;
+    const targetWfOpacity = isUndergroundView ? 0.12 : 0.94;
+    const targetSeaOpacity = isUndergroundView ? 0.18 : 0.95;
+    const targetFoamOpacity = isUndergroundView ? 0.12 : 0.85;
 
-    waterfallMat.opacity += (targetWfOpacity - waterfallMat.opacity) * 0.18;
+    waterfallMat.opacity += (targetWfOpacity - waterfallMat.opacity) * 0.2;
     waterfallMat.depthWrite = (waterfallMat.opacity > 0.8);
-    seaMat.opacity += (targetSeaOpacity - seaMat.opacity) * 0.18;
+    seaMat.opacity += (targetSeaOpacity - seaMat.opacity) * 0.2;
     seaMat.depthWrite = (seaMat.opacity > 0.8);
-    foamRingMat.opacity += (targetFoamOpacity - foamRingMat.opacity) * 0.18;
+    foamRingMat.opacity += (targetFoamOpacity - foamRingMat.opacity) * 0.2;
 
     for (let i = 0; i < terrainMeshes.length; i++) {
       const m = terrainMeshes[i];
       if (isUndergroundView) {
-        // 地下カメラ扱い：掘られた地下空間の床・階段（lv < 0 かつ isTopSurface）はくっきり表示し、手をつけていない土は透過
-        if (m.userData.lv < 0 && m.userData.isTopSurface) {
-          m.userData.targetOpacity = 0.96;
+        // 地下カメラ時：地下底（lv === -4）と掘られた地下床・階段（lv < 0 かつ isTopSurface）はくっきり表示し、上層の土は透過
+        if ((m.userData.lv < 0 && m.userData.isTopSurface) || m.userData.isBottomBedrock) {
+          m.userData.targetOpacity = 0.98;
         } else {
-          m.userData.targetOpacity = 0.18;
+          m.userData.targetOpacity = 0.14;
         }
       } else {
         m.userData.targetOpacity = 1.0;
       }
     }
 
-    // カメラとキャラの間を遮る手前の土ブロックをさらに透過
+    // カメラとキャラの間を遮る手前の土ブロックを透過
     const roboCenter = new THREE.Vector3(
       robotGroup.position.x,
       robotGroup.position.y + 0.55,
@@ -955,7 +984,7 @@
         if (hits[i].distance < distToRobo - 0.15) {
           const m = hits[i].object;
           const isStandingFloor = (m.userData.gx === ROBOT.pos.x && m.userData.gz === ROBOT.pos.z && m.position.y < robotGroup.position.y);
-          if (!isStandingFloor) {
+          if (!isStandingFloor && !m.userData.isBottomBedrock) {
             m.userData.targetOpacity = 0.12;
           }
         }
@@ -970,7 +999,7 @@
         const closestPt = camPos.clone().addScaledVector(dirToRobo, proj);
         const perpDist = closestPt.distanceTo(m.position);
         const isStandingFloor = (m.userData.gx === ROBOT.pos.x && m.userData.gz === ROBOT.pos.z && m.position.y < robotGroup.position.y);
-        if (perpDist < 0.85 && !isStandingFloor) {
+        if (perpDist < 0.85 && !isStandingFloor && !m.userData.isBottomBedrock) {
           m.userData.targetOpacity = 0.12;
         }
       }
@@ -979,6 +1008,7 @@
     }
   }
 
+  // スワイプ時は、現在アクティブな方のカメラ（地上カメラ or 地下カメラ）をそれぞれのポジションでグリグリ回す
   const domElem = renderer.domElement;
   domElem.addEventListener('pointerdown', (e) => {
     isDragging = true;
@@ -991,13 +1021,25 @@
     const dy = e.clientY - prevPointer.y;
     prevPointer.x = e.clientX;
     prevPointer.y = e.clientY;
-    targetCamTheta -= dx * 0.0085;
-    targetCamPhi += dy * 0.0085;
+
+    const mode = getEffectiveCameraMode();
+    if (mode === 'underground') {
+      underCamState.targetTheta -= dx * 0.0085;
+      underCamState.targetPhi += dy * 0.0085;
+    } else {
+      groundCamState.targetTheta -= dx * 0.0085;
+      groundCamState.targetPhi += dy * 0.0085;
+    }
   });
   window.addEventListener('pointerup', () => { isDragging = false; });
   window.addEventListener('pointercancel', () => { isDragging = false; });
   domElem.addEventListener('wheel', (e) => {
-    targetCamRadius += e.deltaY * 0.01;
+    const mode = getEffectiveCameraMode();
+    if (mode === 'underground') {
+      underCamState.targetRadius += e.deltaY * 0.01;
+    } else {
+      groundCamState.targetRadius += e.deltaY * 0.01;
+    }
   }, { passive: true });
 
   // ==========================================
@@ -1005,7 +1047,7 @@
   // ==========================================
   function getRobotHeightLevel() {
     const { x, z } = ROBOT.pos;
-    if (x < -2 || x > 2 || z < -2 || z > 2) return -99; // 海
+    if (x < -2 || x > 2 || z < -2 || z > 2) return -99;
     return HEIGHT_MAP[`${x},${z}`] ?? 0;
   }
 
@@ -1025,22 +1067,18 @@
 
     let timeLabel = '☀️ 朝';
     let skyHex = 0x0d2538;
-    let starOpacity = 0.15;
+    let starOpacity = 0.55;
 
     if (TIME_STEP < 4) {
-      timeLabel = '☀️ 朝'; skyHex = 0x0d2538; starOpacity = 0.15;
+      timeLabel = '☀️ 朝'; skyHex = 0x0d2538; starOpacity = 0.55;
     } else if (TIME_STEP < 9) {
-      timeLabel = '🌤️ 昼'; skyHex = 0x12324a; starOpacity = 0.10;
+      timeLabel = '🌤️ 昼'; skyHex = 0x12324a; starOpacity = 0.45;
     } else if (TIME_STEP < 13) {
-      timeLabel = '🌇 夕方'; skyHex = 0x241b35; starOpacity = 0.45;
+      timeLabel = '🌇 夕方'; skyHex = 0x241b35; starOpacity = 0.75;
     } else if (TIME_STEP < 17) {
-      timeLabel = '🌙 夜'; skyHex = 0x071320; starOpacity = 0.85;
+      timeLabel = '🌙 夜'; skyHex = 0x071320; starOpacity = 0.95;
     } else {
       timeLabel = '🌌 深淵'; skyHex = 0x040911; starOpacity = 1.0;
-    }
-
-    if (hLevel >= 3) {
-      starOpacity = Math.min(1.0, starOpacity + 0.35);
     }
 
     baseStarOpacity = starOpacity;
@@ -1056,13 +1094,13 @@
     else if (st.mode === 'BORED') moodStr = '😐 たいくつ';
     document.getElementById('ui-mood').innerText = moodStr;
 
-    const effectiveMode = cameraOverride || ((hLevel < 0 && hLevel > -90) ? 'underground' : 'ground');
+    const effectiveMode = getEffectiveCameraMode();
     let locText = '🌌地上カメラ・0段目';
     if (hLevel === -99) locText = '🌊 海の白波エリア';
     else if (effectiveMode === 'underground') {
       locText = hLevel < 0
-        ? `⛏️地下カメラ・地下${Math.abs(hLevel)}階（透過中）`
-        : `⛏️地下カメラ・地下空間を観察中`;
+        ? `⛏️地下カメラ・地下${Math.abs(hLevel)}階`
+        : `⛏️地下カメラ（地下底を観察中）`;
     } else {
       locText = hLevel < 0
         ? `🌌地上カメラ（ロボは地下${Math.abs(hLevel)}階）`
@@ -1072,7 +1110,7 @@
   }
 
   // ==========================================
-  // 5. アルゴンさん物理＆AI思考アクション（地下探索＆穴掘り対応）
+  // 5. アルゴンさん物理＆AI思考アクション
   // ==========================================
   async function executeTurn() {
     const btn = document.getElementById('btn-action');
@@ -1080,7 +1118,7 @@
     document.getElementById('ai-status').innerText = '⚡ 思考中...';
     bulbMesh.material.color.setHex(0xf87171);
 
-    // キャラが動くときは基本の「キャラ位置に応じた自動カメラ」に戻す
+    // 行動時はアイコン手動固定を解除し、キャラが地上なら地上カメラ、地下なら地下カメラへ自動連動
     cameraOverride = null;
 
     TIME_STEP++;
@@ -1117,7 +1155,6 @@
         const nz = ROBOT.pos.z + d.dz;
         if (nx < -2 || nx > 2 || nz < -2 || nz > 2) return ROBOT.speed === 5;
         const nextH = HEIGHT_MAP[`${nx},${nz}`] ?? 0;
-        // 上り段差は+1段まで、下り段差は-2段まで移動可能（地上0段 ⇄ 地下-1段 ⇄ 地下-2段 を自在に行き来できる！）
         return (nextH - curH) <= 1 && (curH - nextH) <= 2;
       });
 
@@ -1133,7 +1170,6 @@
         bestDir = validDirs[Math.floor(Math.random() * validDirs.length)];
       }
 
-      // たまに自分の意思で足元の土を掘って地下空間を広げる！
       const canDigHere = (curH > -3 && Math.random() < 0.18 && life.stamina > 35);
 
       if (life.stamina <= 25) {
@@ -1142,7 +1178,7 @@
         life.mental += 10;
         actionLabel = 'その場でひとやすみ';
         thoughtText = curH < 0
-          ? `地下${Math.abs(curH)}階のひみつ基地でひとやすみ！静かで落ち着くなぁ。`
+          ? `地下${Math.abs(curH)}階のひみつ空間でひとやすみ！静かで落ち着くなぁ。`
           : 'ここでひとやすみして、たいりょくを回復するよ！';
       } else if (canDigHere) {
         const key = `${ROBOT.pos.x},${ROBOT.pos.z}`;
@@ -1152,7 +1188,7 @@
         life.mental += 15;
         actionLabel = `⛏️ 土を掘って「${afterH < 0 ? '地下' + Math.abs(afterH) + '階' : afterH + '段目'}」にした！`;
         thoughtText = afterH < 0
-          ? `ザクザクッ！足元の土を掘って、地下${Math.abs(afterH)}階のひみつ空間を広げたよ！`
+          ? `ザクザクッ！足元の土を掘って、地下${Math.abs(afterH)}階の空間を広げたよ！`
           : '足元のブロックを1段掘って平らにしたよ！';
         DIARY_LOGS.push(`⛏️ ${GAME_DAY}日目：土を掘って地下空間を開拓した！`);
       } else if (bestDir) {
@@ -1169,17 +1205,16 @@
 
         const newH = getRobotHeightLevel();
         life.energy -= 8;
-        // 地下は夜でも寒くないのでスタミナ消費が優しい
         life.stamina -= (isNight && newH >= 0 && newH < 3) ? 14 : 8;
 
         if (newH < 0) {
           actionLabel = `${bestDir.name}の地下${Math.abs(newH)}階へ潜った`;
           thoughtText = prevH >= 0
-            ? `階段をおりて地下${Math.abs(newH)}階に潜ったよ！地下カメラに切り替わって滝や手前の土が透けて見えるね！`
-            : `地下${Math.abs(newH)}階の空間をトコトコ探検しているよ！`;
+            ? `階段をおりて地下${Math.abs(newH)}階に潜ったよ！地下カメラに切り替わって地下底までよく見えるね！`
+            : `地下${Math.abs(newH)}階の地下底をトコトコ探検しているよ！`;
         } else if (prevH < 0 && newH >= 0) {
           actionLabel = `地下から地上へ出た！`;
-          thoughtText = '地下の階段を登って、明るい地上へ出てきたよ！';
+          thoughtText = '地下の階段を登って、星空が見える地上へ出てきたよ！';
         } else if (newH > prevH) {
           life.mental += 10;
           actionLabel = `${bestDir.name}へ1段登った（${newH}段目）`;
@@ -1315,7 +1350,7 @@
       updateEnvironmentAndUI();
       saveWorldState();
       const nextLv = cur + 1;
-      showToast(`🪨 足元に土・石を積んで「${nextLv < 0 ? '地下' + Math.abs(nextLv) + '階' : nextLv + '段目'}」にしたよ！`);
+      showToast(`🪨 足元にブロックを積んで「${nextLv < 0 ? '地下' + Math.abs(nextLv) + '階' : nextLv + '段目'}」にしたよ！`);
     } else if (type === 'dig') {
       const cur = HEIGHT_MAP[key] ?? 0;
       if (cur <= -3) {
@@ -1453,7 +1488,7 @@
   updateEnvironmentAndUI();
 
   // ==========================================
-  // 7. メインアニメーションループ（地上・地下2台カメラ連動描画）
+  // 7. メインアニメーションループ
   // ==========================================
   const clock = new THREE.Clock();
   let wfScrollY = 0;
@@ -1469,7 +1504,6 @@
     while (diffRot > Math.PI) diffRot -= Math.PI * 2;
     robotGroup.rotation.y += diffRot * 0.22;
 
-    // 地上カメラ(groundCamera)と地下カメラ(undergroundCamera)の2台連動＆滝・土透過
     updateDualCamerasAndTransparency();
 
     wfScrollY = (wfScrollY + 0.9) % 512;
@@ -1482,7 +1516,6 @@
     turtleGroup.position.y = -8.8 + Math.sin(t * 0.7) * 0.15;
     skyGroup.rotation.y += 0.0004;
 
-    // アクティブな方のカメラ（地上 or 地下）で描画
     renderer.render(scene, activeCamera);
   }
   animate();
