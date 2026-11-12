@@ -72,7 +72,6 @@
     }
     .side-circle-btn:active { transform: scale(0.92); }
 
-    /* カメラボタンが押された（ON）状態の見た目 */
     .side-circle-btn.cam-active {
       background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
       border-color: #fde047;
@@ -312,8 +311,8 @@
     <div class="setting-group">
       <label class="setting-label">🎥 カメラの5×5ブロック透過・分割線（3段階切り替え）</label>
       <select id="setting-cam-style" class="setting-input">
-        <option value="glass_noline">① 分割線なし・すりガラス透過（標準・おすすめ）</option>
-        <option value="glass_line">② 分割線あり・すりガラス透過（1マス枠線つき）</option>
+        <option value="glass_noline">① 分割線なし・すりガラス透過（標準・線ゼロ）</option>
+        <option value="glass_line">② 分割線あり・すりガラス透過（5×5＆1マス線つき）</option>
         <option value="hide">③ 手前の小ブロックが完全に消える（最軽量・100%くっきり）</option>
       </select>
     </div>
@@ -387,7 +386,6 @@
   let DIARY_LOGS = ['🌱 1日目：世界の果ての島に降り立ったよ！'];
 
   // 3段階のカメラ透過・分割線モード（デフォルトは 'glass_noline'：分割線なし・すりガラス透過）
-  // 'glass_noline' | 'glass_line' | 'hide'
   let CAM_VISUAL_STYLE = safeStorage.getItem('cam_visual_style') || 'glass_noline';
 
   // HEIGHT_MAP: -3(地下3階) 〜 0(平地) 〜 +5(地上5段目)
@@ -476,7 +474,7 @@
   loadWorldState();
 
   // ==========================================
-  // 2. 3D世界構築（5×5分割構造＋3段階カメラ透過システム）
+  // 2. 3D世界構築（5×5分割構造＋分割線完全ゼロ対応）
   // ==========================================
   const container = document.getElementById('canvas-container');
   const scene = new THREE.Scene();
@@ -488,7 +486,6 @@
   const robotCamera = new THREE.PerspectiveCamera(62, aspect, 0.08, 160);
 
   let activeCamera = groundCamera;
-  // manualCameraMode: null(ボタンを押さないキャラ追従視点) | 'ground'(🌌地上) | 'underground'(⛏️地下) | 'robot'(🤖キャラ視点)
   let manualCameraMode = null;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -502,62 +499,79 @@
   dirLight.position.set(7, 15, 9);
   scene.add(dirLight);
 
-  // 省エネ自動ブレーキ用タイマー
   let activeUntilTime = performance.now() + 3500;
   function wakeUpRenderer(durationMs = 2600) {
     activeUntilTime = Math.max(activeUntilTime, performance.now() + durationMs);
   }
 
-  // --- 地上用：1マス＝1ブロックのジオメトリ＆枠線テクスチャ ---
-  const sharedFullBlockGeo = new THREE.BoxGeometry(0.95, 0.5, 0.95);
+  // --- 地上用：1マス＝1ブロックのジオメトリ（隙間なし 1.0 × 0.5 × 1.0） ---
+  const sharedFullBlockGeo = new THREE.BoxGeometry(1.0, 0.5, 1.0);
   const fullBlockEdgeGeo = new THREE.EdgesGeometry(sharedFullBlockGeo);
 
+  // 「② 分割線あり」を選んだときだけ使う枠線テクスチャ
   const blockEdgeCanvas = document.createElement('canvas');
   blockEdgeCanvas.width = 64; blockEdgeCanvas.height = 64;
   const bCtx = blockEdgeCanvas.getContext('2d');
   bCtx.fillStyle = '#ffffff';
   bCtx.fillRect(0, 0, 64, 64);
-  bCtx.strokeStyle = 'rgba(0, 0, 0, 0.14)';
+  bCtx.strokeStyle = 'rgba(0, 0, 0, 0.18)';
   bCtx.lineWidth = 4;
   bCtx.strokeRect(2, 2, 60, 60);
   const sharedBlockTex = new THREE.CanvasTexture(blockEdgeCanvas);
 
-  // --- 地下＆掘削用：1マス＝5×5（25個）に分割した小ブロック一括描画（InstancedMesh） ---
+  // --- 地下＆掘削用：1マスを5×5（25個）に分割した小ブロック（0.20 × 0.50 × 0.20 で隙間ゼロ！） ---
   const MAX_SUB_INSTANCES = 3200;
-  const subVoxelGeo = new THREE.BoxGeometry(0.184, 0.492, 0.184);
+  const subVoxelGeo = new THREE.BoxGeometry(0.20, 0.50, 0.20);
 
-  // ① 不透明な小ブロック用（奥側・地上モード・完全消去モードの裏側出現用）
+  // ① 不透明な小ブロック用（奥側・床面・地上モード用）
   const opaqueSubMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
   const opaqueSubMesh = new THREE.InstancedMesh(subVoxelGeo, opaqueSubMat, MAX_SUB_INSTANCES);
   opaqueSubMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  opaqueSubMesh.renderOrder = 0;
   scene.add(opaqueSubMesh);
 
-  // ② すりガラス半透明の小ブロック用（すりガラスモード時に手前に来た小ブロックだけを描画）
+  // ② すりガラス半透明の内側線消し用（深度プリパス：手前の表面だけを描画して内側の5×5壁の重なり線を完全に消す）
+  const glassDepthMat = new THREE.MeshBasicMaterial({
+    colorWrite: false,
+    depthWrite: true,
+    depthTest: true
+  });
+  const glassDepthMesh = new THREE.InstancedMesh(subVoxelGeo, glassDepthMat, MAX_SUB_INSTANCES);
+  glassDepthMesh.instanceMatrix = opaqueSubMesh.instanceMatrix; // 後でglassSubMeshと共有
+  glassDepthMesh.renderOrder = 9;
+  scene.add(glassDepthMesh);
+
+  // ③ すりガラス半透明の小ブロック本体
   const glassSubMat = new THREE.MeshLambertMaterial({
     color: 0xffffff,
     transparent: true,
-    opacity: 0.15,
-    depthWrite: false
+    opacity: 0.24,
+    depthWrite: false,
+    depthTest: true,
+    depthFunc: THREE.LessEqualDepth
   });
   const glassSubMesh = new THREE.InstancedMesh(subVoxelGeo, glassSubMat, MAX_SUB_INSTANCES);
   glassSubMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  glassSubMesh.renderOrder = 10;
+  // glassDepthMesh と同じ行列データを共有（CPU負荷ゼロで内側の重なり線をカット）
+  glassDepthMesh.instanceMatrix = glassSubMesh.instanceMatrix;
   scene.add(glassSubMesh);
 
   const zeroMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
   const tempColor = new THREE.Color();
 
-  // 「分割線あり（glass_line）」を選んだ時だけ表示される1マス枠線グループ
+  // 「② 分割線あり（glass_line）」を選んだ時だけ表示する1マス枠線グループ
   const macroOutlineGroup = new THREE.Group();
   macroOutlineGroup.visible = false;
   scene.add(macroOutlineGroup);
   const macroOutlineMat = new THREE.LineBasicMaterial({
-    color: 0x94a3b8,
+    color: 0x64748b,
     transparent: true,
-    opacity: 0.24,
+    opacity: 0.35,
     depthWrite: false
   });
 
-  // 地上の1マス＝1ブロック用グループ
+  // 地上の1マス＝1ブロック用グループ（不透明・深度プリパス・半透明）
   const groundBlocksGroup = new THREE.Group();
   scene.add(groundBlocksGroup);
   const itemGroup = new THREE.Group();
@@ -568,13 +582,22 @@
   let subVoxelsMeta = [];
 
   function rebuildTerrainAndItems() {
-    groundBlocksMeta.forEach(b => b.mat.dispose());
+    groundBlocksMeta.forEach(b => {
+      b.mat.dispose();
+      b.depthMat.dispose();
+    });
     while (groundBlocksGroup.children.length > 0) groundBlocksGroup.remove(groundBlocksGroup.children[0]);
     while (macroOutlineGroup.children.length > 0) macroOutlineGroup.remove(macroOutlineGroup.children[0]);
     while (itemGroup.children.length > 0) itemGroup.remove(itemGroup.children[0]);
 
     groundBlocksMeta = [];
     subVoxelsMeta = [];
+
+    const showLines = (CAM_VISUAL_STYLE === 'glass_line');
+    // 「分割線あり」の時だけ内側の壁も見える設定にし、「分割線なし」の時は一番手前の表面だけ描いて内側の縦線を完全に消す
+    glassSubMat.depthFunc = showLines ? THREE.LessDepth : THREE.LessEqualDepth;
+    glassSubMat.opacity = showLines ? 0.15 : 0.26;
+    glassSubMat.needsUpdate = true;
 
     let subIdx = 0;
 
@@ -588,7 +611,7 @@
           const chipKey = `${x},${z},${lv}`;
           const chippedSet = CHIP_MAP[chipKey] || null;
 
-          // 地上（lv >= 0）で、砕かれていないブロックは1マス＝1ブロックとして配置
+          // 地上（lv >= 0）で砕かれていないブロックは1マス＝1ブロック
           if (lv >= 0 && !chippedSet) {
             let colorHex = 0xb9f6ca;
             if (lv === 0) {
@@ -598,22 +621,37 @@
             }
             const mat = new THREE.MeshLambertMaterial({
               color: colorHex,
-              map: sharedBlockTex,
+              map: showLines ? sharedBlockTex : null,
               transparent: false,
               opacity: 1.0
             });
             const mesh = new THREE.Mesh(sharedFullBlockGeo, mat);
             mesh.position.set(x, centerY, z);
+            // 「分割線あり」の時だけ隙間をつくり、「分割線なし」の時は1.0でピタッとくっつけて線を消す
+            const gScale = showLines ? 0.95 : 1.0;
+            mesh.scale.set(gScale, 1.0, gScale);
+            mesh.renderOrder = 0;
             groundBlocksGroup.add(mesh);
 
+            // 半透明時に隣のブロックとの境目の縦線を消すための深度メッシュ
+            const depthMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, depthTest: true });
+            const depthMesh = new THREE.Mesh(sharedFullBlockGeo, depthMat);
+            depthMesh.position.set(x, centerY, z);
+            depthMesh.scale.set(gScale, 1.0, gScale);
+            depthMesh.renderOrder = 9;
+            depthMesh.visible = false;
+            groundBlocksGroup.add(depthMesh);
+
             groundBlocksMeta.push({
-              mesh, mat, gx: x, gz: z, lv, centerY, isFloorTile
+              mesh, mat, depthMesh, depthMat, gx: x, gz: z, lv, centerY, isFloorTile
             });
           } else {
             // 地下層（lv < 0）または5×5分割で削られたブロックは「5×5＝25個の小ブロック」構造を維持
-            const outlineWire = new THREE.LineSegments(fullBlockEdgeGeo, macroOutlineMat);
-            outlineWire.position.set(x, centerY, z);
-            macroOutlineGroup.add(outlineWire);
+            if (showLines) {
+              const outlineWire = new THREE.LineSegments(fullBlockEdgeGeo, macroOutlineMat);
+              outlineWire.position.set(x, centerY, z);
+              macroOutlineGroup.add(outlineWire);
+            }
 
             let baseColorHex = 0x6d4c41;
             if (lv >= 0) {
@@ -633,16 +671,30 @@
                 if (chippedSet && chippedSet[`${sx},${sz}`]) continue;
                 if (subIdx >= MAX_SUB_INSTANCES) break;
 
-                const wx = x + (sx - 2) * 0.19;
-                const wz = z + (sz - 2) * 0.19;
+                // 0.20刻みで配置（5個×0.20＝1.00マスぴったり）
+                const wx = x + (sx - 2) * 0.20;
+                const wz = z + (sz - 2) * 0.20;
 
-                const shade = ((sx + sz) % 2 === 0) ? 1.0 : 0.94;
+                // 「分割線なし」の時は色差ゼロ（1.0）にして白い床や茶色の土の5×5マス目模様を完全に消す！
+                const shade = showLines ? (((sx + sz) % 2 === 0) ? 1.0 : 0.92) : 1.0;
                 tempColor.setHex(baseColorHex).multiplyScalar(shade);
 
                 opaqueSubMesh.setColorAt(subIdx, tempColor);
                 glassSubMesh.setColorAt(subIdx, tempColor);
 
-                const fullMat = new THREE.Matrix4().makeTranslation(wx, centerY, wz);
+                const fullMat = new THREE.Matrix4();
+                if (showLines) {
+                  // 「分割線あり」の時だけわずかな隙間を入れて5×5の線を見せる
+                  fullMat.compose(
+                    new THREE.Vector3(wx, centerY, wz),
+                    new THREE.Quaternion(),
+                    new THREE.Vector3(0.91, 0.96, 0.91)
+                  );
+                } else {
+                  // 「分割線なし」の時は隙間ゼロ（1.0, 1.0, 1.0）でつなぎ目の線を完全に消す
+                  fullMat.makeTranslation(wx, centerY, wz);
+                }
+
                 subVoxelsMeta.push({
                   idx: subIdx,
                   gx: x, gz: z,
@@ -661,6 +713,7 @@
     }
 
     opaqueSubMesh.count = subIdx;
+    glassDepthMesh.count = subIdx;
     glassSubMesh.count = subIdx;
     if (opaqueSubMesh.instanceColor) opaqueSubMesh.instanceColor.needsUpdate = true;
     if (glassSubMesh.instanceColor) glassSubMesh.instanceColor.needsUpdate = true;
@@ -721,6 +774,7 @@
   const seaMat = new THREE.MeshBasicMaterial({ map: seaTex, transparent: true, opacity: 0.95, depthWrite: false });
   const seaMesh = new THREE.Mesh(seaGeo, seaMat);
   seaMesh.position.y = -0.35;
+  seaMesh.renderOrder = 1;
   scene.add(seaMesh);
 
   // --- 上から下へゆったり流れ落ちる円形滝 ---
@@ -764,6 +818,7 @@
   });
   const waterfallMesh = new THREE.Mesh(waterfallGeo, waterfallMat);
   waterfallMesh.position.y = -3.55;
+  waterfallMesh.renderOrder = 1;
   scene.add(waterfallMesh);
 
   // 滝壺の白泡リング・雲海・古代遺跡のカメ
@@ -891,13 +946,14 @@
   const bulbMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.14), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
   bulbMesh.position.y = 1.11;
   robotGroup.add(bulbMesh);
+  robotGroup.renderOrder = 0;
   scene.add(robotGroup);
 
   function syncRobot3DPosition() {
     const gx = ROBOT.pos.x;
     const gz = ROBOT.pos.z;
-    const subOffsetX = ((ROBOT.pos.sx ?? 2) - 2) * 0.19;
-    const subOffsetZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.19;
+    const subOffsetX = ((ROBOT.pos.sx ?? 2) - 2) * 0.20;
+    const subOffsetZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.20;
 
     let baseY = 0;
     if (gx >= -2 && gx <= 2 && gz >= -2 && gz <= 2) {
@@ -915,12 +971,10 @@
     return HEIGHT_MAP[`${x},${z}`] ?? 0;
   }
 
-  // 4つの視点状態（🌌地上 / ⛏️地下 / 🤖キャラ視点 / ボタンを押さないキャラ追従視点）から現在の有効カメラを決定
   function getEffectiveCameraMode() {
     if (manualCameraMode === 'ground') return 'ground';
     if (manualCameraMode === 'underground') return 'underground';
     if (manualCameraMode === 'robot') return 'robot';
-    // ボタンを押していない時はキャラの位置（地上 or 地下）に自動追従
     const h = getRobotHeightLevel();
     return (h < 0 && h !== -99) ? 'underground' : 'ground';
   }
@@ -941,43 +995,52 @@
     document.getElementById('cam-fpv-btn').classList.toggle('cam-active', manualCameraMode === 'robot');
   }
 
-  // 地上1マスブロックの表示・透過切り替え（完全消去モード時は visible=false で描画負荷ゼロ）
   function applyGroundBlockState(b, isFrontInUnderground) {
+    const showLines = (CAM_VISUAL_STYLE === 'glass_line');
+
     if (!isFrontInUnderground) {
       b.mesh.visible = true;
+      b.mesh.renderOrder = 0;
+      b.depthMesh.visible = false;
       if (b.mat.transparent) {
         b.mat.transparent = false;
         b.mat.depthWrite = true;
+        b.mat.depthFunc = THREE.LessEqualDepth;
         b.mat.opacity = 1.0;
         b.mat.needsUpdate = true;
       }
       return;
     }
 
-    // 地下観察時にカメラの手前側に入った1マスブロック
     if (CAM_VISUAL_STYLE === 'hide') {
-      b.mesh.visible = false; // 完全に消える（最軽量）
+      b.mesh.visible = false;
+      b.depthMesh.visible = false;
     } else {
       b.mesh.visible = true;
+      b.mesh.renderOrder = 10;
+      // 「分割線なし」の時は深度プリパスを有効にして隣の緑ブロックとの境目の縦線も消す
+      b.depthMesh.visible = !showLines;
       if (!b.mat.transparent) {
         b.mat.transparent = true;
         b.mat.depthWrite = false;
         b.mat.needsUpdate = true;
       }
-      b.mat.opacity = 0.18;
+      b.mat.depthFunc = showLines ? THREE.LessDepth : THREE.LessEqualDepth;
+      b.mat.opacity = showLines ? 0.18 : 0.24;
     }
   }
 
-  // 地上・地下・キャラ視点・キャラ追従視点それぞれに3段階設定を適用
   function updateTransparencyAndOcclusion() {
     const mode = getEffectiveCameraMode();
+    const showLines = (CAM_VISUAL_STYLE === 'glass_line');
 
     // 【A】地上カメラON・キャラ視点ON・キャラ追従（地上時）：透過禁止（100%くっきり不透明）
     if (mode === 'ground' || mode === 'robot') {
       waterfallMat.opacity = 0.92;
       seaMat.opacity = 0.95;
       macroOutlineGroup.visible = false;
-      glassSubMesh.visible = false; // 半透明小ブロックの描画自体をオフにしてスマホ負荷をゼロに
+      glassDepthMesh.visible = false;
+      glassSubMesh.visible = false;
 
       for (let i = 0; i < groundBlocksMeta.length; i++) {
         applyGroundBlockState(groundBlocksMeta[i], false);
@@ -994,11 +1057,11 @@
     waterfallMat.opacity = 0.16;
     seaMat.opacity = 0.24;
 
-    // 1マスの分割線（外枠ワイヤー）は「② 分割線あり（glass_line）」の時だけ表示、それ以外は非表示で計算緩和
-    macroOutlineGroup.visible = (CAM_VISUAL_STYLE === 'glass_line');
-    // 「③ 完全に消える（hide）」の時は半透明メッシュ自体を非表示にして色混ぜ計算を完全カット！
+    macroOutlineGroup.visible = showLines;
     const useFrostedGlass = (CAM_VISUAL_STYLE !== 'hide');
     glassSubMesh.visible = useFrostedGlass;
+    // 「① 分割線なし」の時は深度プリパスをONにして半透明小ブロックの内側の縦線を完全に消す
+    glassDepthMesh.visible = (CAM_VISUAL_STYLE === 'glass_noline');
 
     const camPos = undergroundCamera.position;
     const h = getRobotHeightLevel();
@@ -1029,7 +1092,6 @@
     for (let i = 0; i < subVoxelsMeta.length; i++) {
       const sv = subVoxelsMeta[i];
 
-      // ロボットが歩く地下の床タイルは常に不透明でくっきり表示
       if (sv.isFloorTile && sv.lv < 0) {
         opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
         if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
@@ -1044,11 +1106,9 @@
       const isSubVoxelInFront = (dotFront > -0.15 && perpDist < 1.55) || (sv.centerY > focusY + 0.25 && dotFront > -0.55 && perpDist < 1.85);
 
       if (isSubVoxelInFront) {
-        // 手前に来た5×5小ブロック：完全に消える（zeroMatrix）か、すりガラスになる
         opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
         if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, sv.fullMat);
       } else {
-        // カメラを回して後ろ側へ移った5×5小ブロック：パッと元の色で出現する！
         opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
         if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
       }
@@ -1569,6 +1629,9 @@
   function openModal(id) {
     wakeUpRenderer();
     if (id === 'modal-diary') renderDiaryModal();
+    if (id === 'modal-settings') {
+      document.getElementById('setting-cam-style').value = CAM_VISUAL_STYLE;
+    }
     const el = document.getElementById(id);
     el.style.display = 'flex';
     el.classList.add('active');
@@ -1667,6 +1730,9 @@
     safeStorage.setItem('api_gemini', document.getElementById('setting-gemini-key').value.trim());
     safeStorage.setItem('api_groq', document.getElementById('setting-groq-key').value.trim());
     ROBOT.speed = Number(document.getElementById('setting-speed').value) || 3;
+
+    // 保存ボタンを押した瞬間にブロックの隙間・枠線・透過方式を即座に作り直す
+    rebuildTerrainAndItems();
     cameraDirty = true;
     updateAllCamerasTransform();
     updateEnvironmentAndUI();
