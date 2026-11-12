@@ -1,39 +1,40 @@
-```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#0d2538">
+  <meta name="theme-color" content="#0b1528">
   <title>ボクセルAI自律思考水槽</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background-color: #0d2538; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background-color: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; }
 
-    #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; display: block; touch-action: none; }
+    #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; display: block; }
 
-    /* 1. 上部ステータス枠（独立） */
+    /* 上部ステータス枠 */
     #status-panel {
       position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
-      width: 95%; max-width: 430px; background: rgba(255, 255, 255, 0.96);
-      border-radius: 18px; box-shadow: 0 4px 18px rgba(0,0,0,0.25);
+      width: 94%; max-width: 420px; background: rgba(255, 255, 255, 0.96);
+      border-radius: 18px; box-shadow: 0 4px 18px rgba(0,0,0,0.28);
       padding: 10px 12px; z-index: 10;
       transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    #status-panel.sky-hidden {
+      opacity: 0; pointer-events: none; transform: translate(-50%, -20px);
     }
 
     .gauge-container { display: flex; justify-content: space-between; gap: 6px; }
     .gauge-box {
-      flex: 1; background: #ffffff; border: 1px solid #e2e8f0;
+      flex: 1; background: #f8fafc; border: 1px solid #e2e8f0;
       border-radius: 10px; padding: 5px 6px; text-align: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
     }
     .gauge-title { font-size: 11px; font-weight: 800; color: #334155; margin-bottom: 4px; white-space: nowrap; }
     .gauge-bar-bg { width: 100%; height: 6px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
     .bar-fill { height: 100%; border-radius: 4px; transition: width 0.35s ease; }
 
-    #bar-stamina { background: #ef5350; }
+    #bar-stamina { background: #ef4444; }
     #bar-life { background: #eab308; }
-    #bar-mental { background: #26a69a; }
+    #bar-mental { background: #10b981; }
 
     .robot-status-row {
       display: flex; justify-content: space-between; align-items: center;
@@ -57,95 +58,99 @@
       font-size: 14px; cursor: pointer; border: 1px solid #cbd5e1; flex-shrink: 0;
     }
 
-    /* 2. 右上の日記帳ボタン ＆ 縦並びの地上・地下カメラボタン（小学生でも押された状態がひと目でわかるデザイン） */
-    #diary-btn, .cam-switch-btn {
-      position: fixed; right: 14px;
+    /* 右側の縦並びアイコン列（📖・🌌・⛏️・🤖） */
+    #side-icon-column {
+      position: fixed; top: 122px; right: 14px;
+      display: flex; flex-direction: column; gap: 10px; z-index: 12;
+      transition: opacity 0.35s ease;
+    }
+    .side-circle-btn {
       width: 46px; height: 46px; background: rgba(255,255,255,0.96); border-radius: 50%;
-      box-shadow: 0 4px 0 #cbd5e1, 0 6px 12px rgba(0,0,0,0.22); display: flex;
-      justify-content: center; align-items: center; font-size: 21px; z-index: 10; cursor: pointer;
-      border: 2px solid #cbd5e1;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex;
+      justify-content: center; align-items: center; font-size: 21px; cursor: pointer;
+      border: 2.5px solid #e2e8f0; position: relative;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
     }
-    #diary-btn { top: 116px; }
-    #cam-ground-btn { top: 172px; }
-    #cam-under-btn { top: 228px; }
+    .side-circle-btn:active { transform: scale(0.9); }
 
-    /* 押された状態（ON）：背景が鮮やかに光り、ボタンがグッと押し込まれた見た目になる */
-    .cam-switch-btn.pressed {
-      background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
-      border-color: #fef08a;
-      border-width: 3px;
-      transform: translateY(3px) scale(1.06);
-      box-shadow: 0 1px 0 #1e3a8a, 0 0 16px rgba(59, 130, 246, 0.85);
+    /* カメラボタンが押された（ON）状態の見た目 */
+    .side-circle-btn.cam-active {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      border-color: #fde047;
+      box-shadow: 0 0 0 3px rgba(253, 224, 71, 0.55), 0 6px 14px rgba(29, 78, 216, 0.5);
+      transform: scale(1.08);
     }
-    /* 押された時に右下に光る「ON」マーク */
-    .cam-switch-btn.pressed::after {
+    .side-circle-btn.cam-active::after {
       content: 'ON';
       position: absolute; bottom: -5px; right: -4px;
-      background: #facc15; color: #0f172a; font-size: 8.5px; font-weight: 900;
-      padding: 1px 4px; border-radius: 6px; border: 1.5px solid #ffffff;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      background: #ef4444; color: #ffffff;
+      font-size: 9px; font-weight: 900; padding: 1px 5px;
+      border-radius: 999px; border: 1.5px solid #ffffff;
+      line-height: 1.1; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
 
-    /* 3. 中央下部の「＋」＆扇状メニュー */
-    #fan-menu-container {
-      position: fixed; bottom: 204px; left: 50%; transform: translateX(-50%);
-      width: 48px; height: 48px; z-index: 12;
+    /* 中央下部の「＋」と扇状メニュー */
+    #fan-menu-wrapper {
+      position: fixed; bottom: 206px; left: 50%; transform: translateX(-50%);
+      width: 50px; height: 50px; z-index: 15;
     }
-
-    #fan-main-btn {
-      width: 48px; height: 48px; background: rgba(255,255,255,0.98); border-radius: 50%;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.28); display: flex;
-      justify-content: center; align-items: center; font-size: 26px; font-weight: bold; color: #334155;
-      cursor: pointer; border: 2px solid #e2e8f0; position: relative; z-index: 2;
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    #plus-main-btn {
+      width: 50px; height: 50px; border-radius: 50%;
+      background: rgba(255,255,255,0.98); border: 2px solid #e2e8f0;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.28);
+      display: flex; justify-content: center; align-items: center;
+      font-size: 28px; font-weight: bold; color: #334155; cursor: pointer;
+      position: relative; z-index: 2;
+      transition: transform 0.25s ease, background-color 0.25s ease;
     }
-    #fan-menu-container.open #fan-main-btn {
-      transform: rotate(135deg); background: #f8fafc;
+    #fan-menu-wrapper.open #plus-main-btn {
+      transform: rotate(45deg); background: #f1f5f9;
     }
-
     .fan-item {
-      position: absolute; top: 3px; left: 3px;
-      width: 42px; height: 42px; background: rgba(255,255,255,0.98);
-      border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.22);
+      position: absolute; top: 4px; left: 4px;
+      width: 42px; height: 42px; border-radius: 50%;
+      background: rgba(255,255,255,0.98); border: 2px solid #cbd5e1;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.22);
       display: flex; flex-direction: column; justify-content: center; align-items: center;
-      font-size: 18px; cursor: pointer; border: 1.5px solid #cbd5e1;
-      z-index: 1; opacity: 0; pointer-events: none;
-      transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.25s ease;
+      font-size: 18px; cursor: pointer;
+      opacity: 0; pointer-events: none; transform: translate(0, 0) scale(0.4);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+      z-index: 1;
     }
     .fan-label {
       position: absolute; bottom: -16px; font-size: 9px; font-weight: 900;
       color: #ffffff; background: rgba(15,23,42,0.85); padding: 1px 5px;
       border-radius: 6px; white-space: nowrap; pointer-events: none;
     }
-    #fan-menu-container.open .fan-item.f-1 { transform: translate(-88px, -24px); opacity: 1; pointer-events: auto; }
-    #fan-menu-container.open .fan-item.f-2 { transform: translate(-48px, -68px); opacity: 1; pointer-events: auto; }
-    #fan-menu-container.open .fan-item.f-3 { transform: translate(0px, -84px); opacity: 1; pointer-events: auto; }
-    #fan-menu-container.open .fan-item.f-4 { transform: translate(48px, -68px); opacity: 1; pointer-events: auto; }
-    #fan-menu-container.open .fan-item.f-5 { transform: translate(88px, -24px); opacity: 1; pointer-events: auto; }
+    #fan-menu-wrapper.open .fan-item { opacity: 1; pointer-events: auto; }
+    #fan-menu-wrapper.open .fan-item:nth-child(1) { transform: translate(-102px, -36px) scale(1); }
+    #fan-menu-wrapper.open .fan-item:nth-child(2) { transform: translate(-54px, -74px) scale(1); }
+    #fan-menu-wrapper.open .fan-item:nth-child(3) { transform: translate(0px, -90px) scale(1); }
+    #fan-menu-wrapper.open .fan-item:nth-child(4) { transform: translate(54px, -74px) scale(1); }
+    #fan-menu-wrapper.open .fan-item:nth-child(5) { transform: translate(102px, -36px) scale(1); }
 
-    /* 4. 下部メッセージパネル（ロボのきもち欄） */
+    /* 下部パネル */
     #bottom-panel {
       position: fixed; bottom: 0; left: 0; width: 100%;
-      background: #ffffff; border-top-left-radius: 20px; border-top-right-radius: 20px;
-      box-shadow: 0 -4px 20px rgba(0,0,0,0.18); padding: 12px 15px 14px; z-index: 10;
+      background: rgba(255,255,255,0.98); border-top-left-radius: 20px; border-top-right-radius: 20px;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.2); padding: 12px 15px 14px; z-index: 10;
       display: flex; flex-direction: column; gap: 8px;
     }
     .panel-header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 800; color: #475569; }
     .ai-badge { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: bold; }
     #message-box {
       background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
-      padding: 9px 11px; font-size: 13px; font-weight: 700; color: #1e293b;
-      height: 66px; overflow-y: auto; line-height: 1.45;
+      padding: 8px 10px; font-size: 13px; font-weight: 600; color: #1e293b;
+      height: 64px; overflow-y: auto; line-height: 1.45;
     }
     .action-history { font-size: 11px; color: #64748b; display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
     .history-tag { background: #f1f5f9; padding: 2px 8px; border-radius: 8px; color: #334155; }
     .btn-think {
-      background: linear-gradient(180deg, #5da0f2 0%, #4285f4 100%); color: white; border: none; border-radius: 12px;
+      background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%); color: white; border: none; border-radius: 12px;
       padding: 12px; font-size: 15px; font-weight: 900; text-align: center;
-      box-shadow: 0 3px 0 #2563eb; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px;
+      box-shadow: 0 4px 0 #2563eb; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px;
     }
-    .btn-think:active { transform: translateY(2px); box-shadow: 0 1px 0 #2563eb; }
+    .btn-think:active { transform: translateY(3px); box-shadow: 0 1px 0 #2563eb; }
     .btn-think:disabled { opacity: 0.6; pointer-events: none; }
 
     #toast {
@@ -155,10 +160,10 @@
       opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 100; white-space: nowrap;
     }
 
-    /* モーダル窓 */
+    /* モーダル（初期状態は必ず display: none;） */
     .modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(15,23,42,0.72); z-index: 50;
+      background: rgba(15,23,42,0.75); z-index: 50;
       display: none; justify-content: center; align-items: center;
     }
     .modal-overlay.active { display: flex; }
@@ -189,7 +194,7 @@
 
 <div id="canvas-container"></div>
 
-<!-- 1. 上部ステータス枠 -->
+<!-- 上部ステータス枠 -->
 <div id="status-panel">
   <div class="gauge-container">
     <div class="gauge-box">
@@ -213,35 +218,38 @@
     </div>
     <div class="status-right-group">
       <div class="badge badge-mood" id="ui-mood">😊 あんしん・まんぷく</div>
-      <button class="btn-icon" id="btn-settings" title="設定">⚙️</button>
+      <button class="btn-icon" id="btn-settings" aria-label="設定">⚙️</button>
     </div>
   </div>
 </div>
 
-<!-- 2. 右上の手帳ボタン ＆ 地上・地下カメラボタン（同時押し不可・再クリックでキャラ追従へ戻る） -->
-<div id="diary-btn" title="ロボット手帳">📖</div>
-<div id="cam-ground-btn" class="cam-switch-btn" onclick="toggleCameraButton('ground')" title="地上カメラ固定（もう一度押すと解除）">🌌</div>
-<div id="cam-under-btn" class="cam-switch-btn" onclick="toggleCameraButton('underground')" title="地下カメラ固定（もう一度押すと解除）">⛏️</div>
-
-<!-- 3. 中央下部の「＋」ボタン＆扇状メニュー -->
-<div id="fan-menu-container">
-  <div class="fan-item f-1" onclick="fanAction('apple')">🍎<span class="fan-label">リンゴ</span></div>
-  <div class="fan-item f-2" onclick="fanAction('step')">🪨<span class="fan-label">1段積む</span></div>
-  <div class="fan-item f-3" onclick="fanAction('gacha')">🎰<span class="fan-label">ガチャ</span></div>
-  <div class="fan-item f-4" onclick="fanAction('diary')">📖<span class="fan-label">カバン</span></div>
-  <div class="fan-item f-5" onclick="fanAction('dig')">⛏️<span class="fan-label">地下を掘る</span></div>
-  <div id="fan-main-btn" title="メニューを開く">＋</div>
+<!-- 右側の縦並びアイコン列（📖手帳・🌌地上カメラ・⛏️地下カメラ・🤖ロボット視点） -->
+<div id="side-icon-column">
+  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳">📖</div>
+  <div class="side-circle-btn" id="cam-ground-btn" title="地上カメラ">🌌</div>
+  <div class="side-circle-btn" id="cam-ug-btn" title="地下カメラ">⛏️</div>
+  <div class="side-circle-btn" id="cam-fpv-btn" title="ロボット視点カメラ">🤖</div>
 </div>
 
-<!-- 4. 下部メッセージ枠 -->
+<!-- 中央下部の「＋」扇状メニュー -->
+<div id="fan-menu-wrapper">
+  <div class="fan-item" onclick="quickDropApple()">🍎<span class="fan-label">リンゴ</span></div>
+  <div class="fan-item" onclick="quickStackBlock()">🪨<span class="fan-label">1段積む</span></div>
+  <div class="fan-item" onclick="openModal('modal-gacha'); closeFanMenu();">🎰<span class="fan-label">ガチャ</span></div>
+  <div class="fan-item" onclick="openModal('modal-diary'); closeFanMenu();">📖<span class="fan-label">カバン</span></div>
+  <div class="fan-item" onclick="quickDigBlock()">⛏️<span class="fan-label">地下を掘る</span></div>
+  <div id="plus-main-btn" title="メニューを開く">＋</div>
+</div>
+
+<!-- 下部メッセージ＆思考ボタン -->
 <div id="bottom-panel">
   <div class="panel-header">
     <span>💭 ロボのきもち・心のさけび</span>
     <div class="ai-badge" id="ai-status">💤 待機中</div>
   </div>
-  <div id="message-box">四角い大地のまわりを丸い海が包み込んで、白波を立てているよ！</div>
+  <div id="message-box">ここは世界の果て。四角い大地のまわりを丸い海が包み込んで、白波を立てているよ！右のカメラボタンで地上・地下・ロボ目線を切り替えられるよ！</div>
   <div class="action-history">
-    <div><span class="history-tag">👟 やった事</span> <span id="history-action">待機中</span></div>
+    <span class="history-tag" id="history-action">👟 やった事 待機中</span>
     <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖自動カメラ・地上0段目</span>
   </div>
   <button class="btn-think" id="btn-action">⚡ 今すぐ考える</button>
@@ -263,7 +271,7 @@
     </div>
     <div style="font-size:12px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ」（タップで足元に使う）</div>
     <div class="bag-grid" id="bag-grid"></div>
-    <div style="font-size:12px; font-weight:bold; color:#475569;">📝 1日のきろく・思い出</div>
+    <div style="font-size:12px; font-weight:bold; color:#475569;">📝 世代のきろく・思い出</div>
     <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; font-size:11.5px; color:#334155; max-height:110px; overflow-y:auto; line-height:1.4;">
       まだ記録はありません。行動するとここに思い出が刻まれます。
     </div>
@@ -286,8 +294,8 @@
         <circle cx="60" cy="114" r="12" fill="#ffffff" stroke="#db2777" stroke-width="3"/>
         <rect x="46" y="132" width="28" height="14" rx="4" fill="#9d174d"/>
       </svg>
-      <div id="gacha-result-text" style="font-size:12px; font-weight:800; color:#64748b; min-height:20px; margin-top:4px;">
-        🍎・🪨・🌿 がランダムに出るよ！
+      <div id="gacha-result-text" style="font-size:13px; font-weight:800; color:#be185d; min-height:20px; margin-top:4px;">
+        🍎・🪨(段差ブロック)・🌿 がランダムに出るよ！
       </div>
     </div>
     <div style="display:flex; gap:8px;">
@@ -303,11 +311,11 @@
     <div class="modal-close" onclick="closeModal('modal-settings')">✕</div>
     <div class="modal-title">⚙️ システム・頭脳設定</div>
     <div class="setting-group">
-      <label class="setting-label">🤖 使う頭脳</label>
+      <label class="setting-label">🤖 使う頭脳（AIの判断をゲームに反映）</label>
       <select id="setting-ai-type" class="setting-input">
-        <option value="none">🟩 アルゴンさん（通信なし・物理と本能で確実に動く）</option>
-        <option value="groq">🟪 3.1 / Groq（爆速・1日1000回無料）</option>
-        <option value="gemini">🟦 3.8 / Gemini（優秀な言語表現・日記と心の叫び）</option>
+        <option value="gemini">🟦 3.8 / Gemini（gemini-3.8-flash 通信最優先）</option>
+        <option value="groq">🟪 3.1 / Groq（爆速AI通信）</option>
+        <option value="none">🟩 アルゴンさん（通信なし・物理と本能で動く）</option>
       </select>
     </div>
     <div class="setting-group">
@@ -318,12 +326,12 @@
       </select>
     </div>
     <div class="setting-group">
-      <label class="setting-label">🟪 Groq APIキー (gsk_...)</label>
-      <input type="password" id="setting-groq-key" class="setting-input" placeholder="Groqキーを貼り付け">
-    </div>
-    <div class="setting-group">
       <label class="setting-label">🟦 Gemini APIキー (AIzaSy...)</label>
       <input type="password" id="setting-gemini-key" class="setting-input" placeholder="Geminiキーを貼り付け">
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">🟪 Groq APIキー (gsk_...)</label>
+      <input type="password" id="setting-groq-key" class="setting-input" placeholder="Groqキーを貼り付け">
     </div>
     <button class="btn-primary" onclick="saveSettings()">設定を保存して閉じる</button>
     <hr style="border:0; border-top:1px solid #e2e8f0; margin:4px 0;">
@@ -334,7 +342,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
   // ==========================================
-  // 1. セーブストレージ＆生命コア
+  // 1. セーブストレージ＆生命コア（LifeCore）
   // ==========================================
   const safeStorage = {
     getItem(k) { try { return localStorage.getItem(k); } catch(e) { return null; } },
@@ -368,29 +376,32 @@
   let life = new LifeCore();
   let GAME_DAY = 1;
   let TIME_STEP = 0;
-  let BAG = ['stone', 'apple', 'grass'];
+  let BAG = ['stone', 'apple', 'stone', 'grass'];
   let DIARY_LOGS = ['🌱 1日目：世界の果ての島に降り立ったよ！'];
 
-  // HEIGHT_MAP: -3（地下3階）〜 0（地上平地）〜 +5（地上5段目）
+  // HEIGHT_MAP: -3(地下3階) 〜 0(平地) 〜 +5(地上5段目)
   let HEIGHT_MAP = {};
-  for (let x = -2; x <= 2; x++) {
-    for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
+  function initDefaultMap() {
+    for (let x = -2; x <= 2; x++) {
+      for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
+    }
+    // 北西エリアに地下へ降りられる階段と地下空間を初期配置
+    HEIGHT_MAP['-1,-2'] = -1;
+    HEIGHT_MAP['-2,-2'] = -2;
+    HEIGHT_MAP['-2,-1'] = -2;
+    HEIGHT_MAP['-2,0']  = -3;
   }
-  // 北西エリアに地下階段＆地下3階の空間
-  HEIGHT_MAP['-1,-1'] = -1;
-  HEIGHT_MAP['-2,-1'] = -2;
-  HEIGHT_MAP['-2,-2'] = -3;
-  HEIGHT_MAP['-1,-2'] = -3;
+  initDefaultMap();
 
   let ROBOT = {
     gen: 1,
     pos: { x: 0, z: 0, sx: 2, sz: 2 },
-    dirAngle: 0,
+    rotY: 0,
     speed: 3
   };
   let WORLD_ITEMS = [
     { type: 'apple', x: 0, z: -1 },
-    { type: 'apple', x: -1, z: -2 }
+    { type: 'apple', x: -2, z: 0 }
   ];
 
   function loadWorldState() {
@@ -405,25 +416,27 @@
         ROBOT.pos.z = Number.isFinite(d.robot.pos.z) ? d.robot.pos.z : 0;
         ROBOT.pos.sx = Number.isFinite(d.robot.pos.sx) ? d.robot.pos.sx : 2;
         ROBOT.pos.sz = Number.isFinite(d.robot.pos.sz) ? d.robot.pos.sz : 2;
-        ROBOT.dirAngle = Number.isFinite(d.robot.dirAngle) ? d.robot.dirAngle : 0;
+        ROBOT.rotY = Number.isFinite(d.robot.rotY) ? d.robot.rotY : 0;
         ROBOT.speed = Number(d.robot.speed) || 3;
       }
       if (d.heightMap && typeof d.heightMap === 'object') {
         for (let x = -2; x <= 2; x++) {
           for (let z = -2; z <= 2; z++) {
             const k = `${x},${z}`;
-            if (typeof d.heightMap[k] === 'number') {
-              HEIGHT_MAP[k] = Math.max(-3, Math.min(5, Math.round(d.heightMap[k])));
+            if ( d.heightMap[k] !== undefined ) {
+              HEIGHT_MAP[k] = Math.max(-3, Math.min(5, Number(d.heightMap[k]) || 0));
             }
           }
         }
       }
-      if (Array.isArray(d.items) && d.items.length > 0) WORLD_ITEMS = d.items;
+      if (Array.isArray(d.items)) WORLD_ITEMS = d.items;
       if (Array.isArray(d.bag)) BAG = d.bag;
       if (Array.isArray(d.logs) && d.logs.length > 0) DIARY_LOGS = d.logs;
       GAME_DAY = Math.max(1, Number(d.day) || 1);
       TIME_STEP = Math.max(0, Math.min(19, Number(d.time) || 0));
-    } catch (e) {}
+    } catch (e) {
+      console.warn('セーブデータ読み込みスキップ', e);
+    }
   }
 
   function saveWorldState() {
@@ -448,322 +461,268 @@
   loadWorldState();
 
   // ==========================================
-  // 2. 3D世界構築 ＆ 地上カメラ・地下カメラの2台構成
+  // 2. 3D世界構築（地上・地下・ロボット視点の3カメラ＆世界固定）
   // ==========================================
   const container = document.getElementById('canvas-container');
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0d2538);
+  scene.background = new THREE.Color(0x0b1528);
 
-  // ★ カメラ1：地上カメラ（もっと上の位置からキャラを見下ろしてグリグリ観察＆背景に星空が広がる）
-  const groundCamera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 150);
-  // ★ カメラ2：地下カメラ（今の地下アングルのまま、カメラとキャラの間のブロックを最小5×5単位で透過）
-  const undergroundCamera = new THREE.PerspectiveCamera(44, window.innerWidth / window.innerHeight, 0.1, 150);
+  const aspect = window.innerWidth / window.innerHeight;
+  // ① 地上カメラ（上から見下ろす・星空背景も見える）
+  const groundCamera = new THREE.PerspectiveCamera(42, aspect, 0.1, 160);
+  // ② 地下カメラ（地下底を観察する専用ポジション）
+  const undergroundCamera = new THREE.PerspectiveCamera(42, aspect, 0.1, 160);
+  // ③ ロボット視点カメラ（キャラ目線で360°星空・周囲を見回す）
+  const robotCamera = new THREE.PerspectiveCamera(62, aspect, 0.08, 160);
+
   let activeCamera = groundCamera;
+  // manualCameraMode: null(キャラに合わせた自動) | 'ground'(地上固定) | 'underground'(地下固定) | 'robot'(ロボ視点固定)
+  let manualCameraMode = null;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   container.appendChild(renderer.domElement);
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.58);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.62);
   scene.add(ambientLight);
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.54);
-  dirLight.position.set(-5, 14, 4);
+  const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.88);
+  dirLight.position.set(7, 15, 9);
   scene.add(dirLight);
-  const underLight = new THREE.DirectionalLight(0xffedd5, 0.42);
-  underLight.position.set(4, 8, -4);
-  scene.add(underLight);
 
+  // --- 5x5の大地と地下土ブロック層（地下1〜3階） ---
   const terrainGroup = new THREE.Group();
   scene.add(terrainGroup);
   const itemGroup = new THREE.Group();
   scene.add(itemGroup);
 
-  let terrainMeshes = [];
-  const LAYER_H = 0.48;
-
-  function getSurfaceY(lv) {
-    return lv * LAYER_H;
-  }
+  const stepColors = [0x86efac, 0x6ee7b7, 0xfde68a, 0xfcd34d, 0xfbbf24];
+  let terrainBlocksMeta = [];
 
   function rebuildTerrainAndItems() {
     while (terrainGroup.children.length > 0) terrainGroup.remove(terrainGroup.children[0]);
     while (itemGroup.children.length > 0) itemGroup.remove(itemGroup.children[0]);
-    terrainMeshes = [];
+    terrainBlocksMeta = [];
 
-    const blockGeo = new THREE.BoxGeometry(0.95, LAYER_H, 0.95);
+    const blockGeo = new THREE.BoxGeometry(0.95, 0.5, 0.95);
+    const edgeGeo = new THREE.EdgesGeometry(blockGeo);
 
     for (let x = -2; x <= 2; x++) {
       for (let z = -2; z <= 2; z++) {
         const topLv = HEIGHT_MAP[`${x},${z}`] ?? 0;
 
-        // 5×5の各マスごとに、地下底(lv=-4)から表面(topLv)まで1ブロックずつ最小単位で生成
-        for (let lv = -4; lv <= topLv; lv++) {
-          let col = 0xbde8d0;
-          if (lv > 0) {
-            col = 0x9edbbd; // 地上の追加段差
-          } else if (lv === 0) {
-            col = 0xbde8d0; // 緑の地表ブロック
-          } else if (lv === -4) {
-            col = 0x8d6e63; // 地下底（一番下の岩盤）
-          } else if (lv === topLv && lv < 0) {
-            col = 0xefeae6; // 掘られた地下空間の白い床・階段（10:24のスクショと同じ見やすい色）
+        // 地下3階(lv=-3)〜最上段(topLv)までブロックを生成
+        for (let lv = -3; lv <= topLv; lv++) {
+          let colorHex = 0xb9f6ca;
+          if (lv === 0) {
+            colorHex = (lv === topLv) ? 0xb9f6ca : 0x94a3b8;
+          } else if (lv > 0) {
+            colorHex = stepColors[Math.min(lv - 1, 4)];
           } else {
-            col = (lv % 2 === 0) ? 0xa1887f : 0x8d6e63; // 地下の土ブロック
+            // 地下土ブロック層（掘られた床は明るい石タイル色）
+            if (lv === topLv) colorHex = 0xe2e8f0;
+            else if (lv === -1) colorHex = 0xa1887f;
+            else if (lv === -2) colorHex = 0x8d6e63;
+            else colorHex = 0x6d4c41;
           }
 
-          const mat = new THREE.MeshLambertMaterial({
-            color: col,
-            transparent: true,
-            opacity: 1.0
-          });
+          const mat = new THREE.MeshLambertMaterial({ color: colorHex, transparent: true, opacity: 1.0 });
           const mesh = new THREE.Mesh(blockGeo, mat);
-          mesh.position.set(x, (lv - 0.5) * LAYER_H, z);
-          mesh.userData = {
-            gx: x,
-            gz: z,
-            lv: lv,
-            topLv: topLv,
-            isTopSurface: (lv === topLv),
-            isBottomBedrock: (lv === -4),
-            targetOpacity: 1.0
-          };
+          const centerY = (lv - 0.5) * 0.5;
+          mesh.position.set(x, centerY, z);
+
+          const lineMat = new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.28 });
+          const wire = new THREE.LineSegments(edgeGeo, lineMat);
+          mesh.add(wire);
+
           terrainGroup.add(mesh);
-          terrainMeshes.push(mesh);
+          terrainBlocksMeta.push({
+            mesh, mat, lineMat,
+            gx: x, gz: z, lv, centerY,
+            isFloorTile: (lv === topLv)
+          });
         }
       }
     }
 
     WORLD_ITEMS.forEach(it => {
-      const topLv = HEIGHT_MAP[`${it.x},${it.z}`] ?? 0;
-      const surfaceY = getSurfaceY(topLv);
+      const h = (HEIGHT_MAP[`${it.x},${it.z}`] ?? 0) * 0.5;
       let mesh;
       if (it.type === 'apple') {
         mesh = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.40, 0.42), new THREE.MeshLambertMaterial({ color: 0xef6c6c }));
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.40, 0.42), new THREE.MeshLambertMaterial({ color: 0xf87171 }));
         body.position.y = 0.20;
-        const stem = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.1), new THREE.MeshLambertMaterial({ color: 0x66bb6a }));
+        const stem = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.12, 0.10), new THREE.MeshLambertMaterial({ color: 0x4ade80 }));
         stem.position.y = 0.44;
         mesh.add(body); mesh.add(stem);
       } else if (it.type === 'stone') {
-        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.36, 0.42), new THREE.MeshLambertMaterial({ color: 0x94a3b8 }));
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.35, 0.42), new THREE.MeshLambertMaterial({ color: 0x94a3b8 }));
         mesh.position.y = 0.18;
       } else {
-        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.44, 0.34), new THREE.MeshLambertMaterial({ color: 0x4ade80 }));
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.45, 0.32), new THREE.MeshLambertMaterial({ color: 0x34d399 }));
         mesh.position.y = 0.22;
       }
-      mesh.position.set(it.x, surfaceY, it.z);
+      mesh.position.set(it.x, h, it.z);
       itemGroup.add(mesh);
     });
   }
 
-  // --- 丸い海と四隅の白泡 ---
+  // --- 四角い大地を包む丸い海（白い泡粒と波紋） ---
   const seaCanvas = document.createElement('canvas');
   seaCanvas.width = 512; seaCanvas.height = 512;
   const sCtx = seaCanvas.getContext('2d');
-
-  const seaFoamDots = [];
+  const seaBubbles = [];
   for (let i = 0; i < 65; i++) {
     const ang = Math.random() * Math.PI * 2;
-    const dist = 145 + Math.random() * 90;
-    seaFoamDots.push({
+    const dist = 140 + Math.random() * 105;
+    seaBubbles.push({
       x: 256 + Math.cos(ang) * dist,
       y: 256 + Math.sin(ang) * dist,
-      r: 3 + Math.random() * 5.5
+      r: 3 + Math.random() * 7,
+      phase: Math.random() * Math.PI * 2
     });
   }
 
-  function drawSeaCanvas(timeSec) {
+  function drawSeaSurface(t) {
     sCtx.clearRect(0, 0, 512, 512);
-    const rg = sCtx.createRadialGradient(256, 256, 95, 256, 256, 254);
-    rg.addColorStop(0.0, 'rgba(255, 255, 255, 0.96)');
-    rg.addColorStop(0.50, 'rgba(224, 247, 250, 0.92)');
-    rg.addColorStop(0.68, 'rgba(79, 195, 247, 0.88)');
-    rg.addColorStop(0.91, 'rgba(129, 212, 250, 0.92)');
-    rg.addColorStop(0.96, 'rgba(255, 255, 255, 0.98)');
-    rg.addColorStop(1.0, 'rgba(255, 255, 255, 1.0)');
-    sCtx.fillStyle = rg;
+    const radGrad = sCtx.createRadialGradient(256, 256, 80, 256, 256, 256);
+    radGrad.addColorStop(0.0, 'rgba(125, 211, 252, 0.95)');
+    radGrad.addColorStop(0.65, 'rgba(56, 189, 248, 0.92)');
+    radGrad.addColorStop(0.90, 'rgba(186, 230, 253, 0.96)');
+    radGrad.addColorStop(1.0, 'rgba(255, 255, 255, 1.0)');
+    sCtx.fillStyle = radGrad;
     sCtx.fillRect(0, 0, 512, 512);
 
-    sCtx.fillStyle = 'rgba(255, 255, 255, 0.72)';
-    sCtx.fillRect(118, 118, 276, 276);
-
-    sCtx.fillStyle = 'rgba(255, 255, 255, 0.78)';
-    seaFoamDots.forEach((d, idx) => {
-      const pulse = Math.sin(timeSec * 1.8 + idx) * 1.2;
+    seaBubbles.forEach(b => {
+      const alpha = 0.45 + Math.sin(t * 2.0 + b.phase) * 0.25;
+      sCtx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
       sCtx.beginPath();
-      sCtx.arc(d.x, d.y, Math.max(1.5, d.r + pulse), 0, Math.PI * 2);
+      sCtx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
       sCtx.fill();
     });
+
+    sCtx.strokeStyle = 'rgba(255, 255, 255, 0.88)';
+    sCtx.lineWidth = 10 + Math.sin(t * 2.5) * 3;
+    sCtx.strokeRect(138, 138, 236, 236);
   }
-  drawSeaCanvas(0);
+  drawSeaSurface(0);
   const seaTex = new THREE.CanvasTexture(seaCanvas);
-  const seaGeo = new THREE.CircleGeometry(4.45, 64);
+  const seaGeo = new THREE.CircleGeometry(5.1, 64);
   seaGeo.rotateX(-Math.PI / 2);
-  const seaMat = new THREE.MeshBasicMaterial({ map: seaTex, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
+  const seaMat = new THREE.MeshBasicMaterial({ map: seaTex, transparent: true, opacity: 0.95, depthWrite: false });
   const seaMesh = new THREE.Mesh(seaGeo, seaMat);
   seaMesh.position.y = -0.35;
   scene.add(seaMesh);
 
-  // --- 円形滝 ---
+  // --- 上から下へゆったり流れ落ちる円形滝 ---
   const wfCanvas = document.createElement('canvas');
-  wfCanvas.width = 512; wfCanvas.height = 512;
+  wfCanvas.width = 512; wfCanvas.height = 256;
   const wfCtx = wfCanvas.getContext('2d');
-
-  const wfStreaks = [];
-  for (let i = 0; i < 75; i++) {
-    wfStreaks.push({
-      x: Math.random() * 512,
-      y: Math.random() * 512,
-      w: 3 + Math.random() * 3,
-      h: 45 + Math.random() * 85,
-      alpha: 0.35 + Math.random() * 0.55
+  const wfStripes = [];
+  for (let i = 0; i < 42; i++) {
+    wfStripes.push({
+      x: i * 12 + (Math.random() * 4),
+      y: Math.random() * 256,
+      w: 4 + Math.random() * 5,
+      h: 40 + Math.random() * 70,
+      speed: 0.65 + Math.random() * 0.45,
+      alpha: 0.35 + Math.random() * 0.45
     });
   }
   const wfBubbles = [];
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 35; i++) {
     wfBubbles.push({
       x: Math.random() * 512,
-      y: Math.random() * 512,
-      rx: 6 + Math.random() * 10,
+      y: Math.random() * 256,
+      rx: 8 + Math.random() * 14,
       ry: 3 + Math.random() * 4,
-      alpha: 0.4 + Math.random() * 0.45
+      speed: 0.55 + Math.random() * 0.35
     });
   }
 
-  function renderWaterfallTexture(scrollOffset) {
-    const grad = wfCtx.createLinearGradient(0, 0, 0, 512);
-    grad.addColorStop(0.0, '#ffffff');
-    grad.addColorStop(0.06, '#81d4fa');
-    grad.addColorStop(0.45, '#4fc3f7');
-    grad.addColorStop(0.82, '#b3e5fc');
-    grad.addColorStop(1.0, '#ffffff');
-    wfCtx.fillStyle = grad;
-    wfCtx.fillRect(0, 0, 512, 512);
+  function updateWaterfallCanvas() {
+    const g = wfCtx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0.0, '#e0f2fe');
+    g.addColorStop(0.15, '#7dd3fc');
+    g.addColorStop(0.75, '#38bdf8');
+    g.addColorStop(1.0, '#bae6fd');
+    wfCtx.fillStyle = g;
+    wfCtx.fillRect(0, 0, 512, 256);
 
-    wfCtx.fillStyle = 'rgba(41, 182, 246, 0.35)';
-    for (let x = 0; x < 512; x += 16) {
-      wfCtx.fillRect(x, 0, 6, 512);
-    }
-
-    wfStreaks.forEach(s => {
-      const curY = (s.y + scrollOffset) % 560 - 48;
+    wfStripes.forEach(s => {
+      s.y += s.speed;
+      if (s.y > 256) s.y = -s.h;
       wfCtx.fillStyle = `rgba(255, 255, 255, ${s.alpha})`;
-      wfCtx.fillRect(s.x, curY, s.w, s.h);
+      wfCtx.fillRect(s.x, s.y, s.w, s.h);
     });
 
     wfBubbles.forEach(b => {
-      const curY = (b.y + scrollOffset * 0.85) % 540 - 20;
-      wfCtx.fillStyle = `rgba(255, 255, 255, ${b.alpha})`;
+      b.y += b.speed;
+      if (b.y > 256) b.y = -10;
+      wfCtx.fillStyle = 'rgba(255, 255, 255, 0.78)';
       wfCtx.beginPath();
-      wfCtx.ellipse(b.x, curY, b.rx, b.ry, 0, 0, Math.PI * 2);
+      wfCtx.ellipse(b.x, b.y, b.rx, b.ry, 0, 0, Math.PI * 2);
       wfCtx.fill();
     });
   }
-  renderWaterfallTexture(0);
+  updateWaterfallCanvas();
   const wfTex = new THREE.CanvasTexture(wfCanvas);
   wfTex.wrapS = THREE.RepeatWrapping;
   wfTex.repeat.set(3, 1);
 
-  const waterfallGeo = new THREE.CylinderGeometry(4.45, 4.45, 6.4, 64, 1, true);
+  const waterfallGeo = new THREE.CylinderGeometry(5.1, 5.2, 6.4, 64, 1, true);
   const waterfallMat = new THREE.MeshBasicMaterial({
-    map: wfTex, transparent: true, opacity: 0.94, side: THREE.DoubleSide
+    map: wfTex, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false
   });
   const waterfallMesh = new THREE.Mesh(waterfallGeo, waterfallMat);
   waterfallMesh.position.y = -3.55;
   scene.add(waterfallMesh);
 
-  const foamRingGeo = new THREE.RingGeometry(3.2, 5.5, 64);
+  // 滝壺の白泡リング・雲海・古代遺跡のカメ
+  const foamRingGeo = new THREE.RingGeometry(3.8, 6.3, 64);
   foamRingGeo.rotateX(-Math.PI / 2);
   const foamRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
   const foamRingMesh = new THREE.Mesh(foamRingGeo, foamRingMat);
-  foamRingMesh.position.y = -6.7;
+  foamRingMesh.position.y = -6.75;
   scene.add(foamRingMesh);
+
+  const mistGeo = new THREE.CircleGeometry(14, 48);
+  mistGeo.rotateX(-Math.PI / 2);
+  const mistMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.78, side: THREE.DoubleSide });
+  const mistMesh = new THREE.Mesh(mistGeo, mistMat);
+  mistMesh.position.y = -6.85;
+  scene.add(mistMesh);
 
   const turtleGroup = new THREE.Group();
   const sandstoneMain = new THREE.MeshLambertMaterial({ color: 0xd6bfa3 });
   const sandstoneDark = new THREE.MeshLambertMaterial({ color: 0xb89f80 });
-  const shellBase = new THREE.Mesh(new THREE.BoxGeometry(5.6, 1.2, 6.4), sandstoneMain);
-  turtleGroup.add(shellBase);
-  const shellMid = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.9, 4.8), sandstoneDark);
-  shellMid.position.y = 0.95;
-  turtleGroup.add(shellMid);
-  const tHead = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 1.8), sandstoneMain);
-  tHead.position.set(0, 0.2, 3.8);
-  turtleGroup.add(tHead);
-  turtleGroup.position.y = -8.8;
+  const ruinAccent = new THREE.MeshLambertMaterial({ color: 0xe7d8c5 });
+  turtleGroup.add(new THREE.Mesh(new THREE.BoxGeometry(6.4, 1.4, 7.4), sandstoneMain));
+  const shellMid = new THREE.Mesh(new THREE.BoxGeometry(5.0, 1.1, 5.8), sandstoneDark);
+  shellMid.position.y = 1.1; turtleGroup.add(shellMid);
+  const shellTop = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.8, 4.0), ruinAccent);
+  shellTop.position.y = 1.9; turtleGroup.add(shellTop);
+  const tHead = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 2.0), sandstoneMain);
+  tHead.position.set(0, 0.2, 4.4); turtleGroup.add(tHead);
+  [[3.8, -0.2, 2.4, 0.3], [-3.8, -0.2, 2.4, -0.3], [3.6, -0.2, -2.4, -0.2], [-3.6, -0.2, -2.4, 0.2]].forEach(fc => {
+    const fl = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.45, 1.5), sandstoneDark);
+    fl.position.set(fc[0], fc[1], fc[2]); fl.rotation.y = fc[3]; turtleGroup.add(fl);
+  });
+  turtleGroup.position.y = -9.2;
   scene.add(turtleGroup);
 
-  // --- 腕付きボクセルロボット ---
-  const robotGroup = new THREE.Group();
-  const legMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.22, 0.18), legMat);
-  legL.position.set(-0.11, 0.11, 0);
-  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.22, 0.18), legMat);
-  legR.position.set(0.11, 0.11, 0);
-  robotGroup.add(legL); robotGroup.add(legR);
-
-  const rBody = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.44, 0.32), new THREE.MeshLambertMaterial({ color: 0x5da9f6 }));
-  rBody.position.y = 0.44;
-  robotGroup.add(rBody);
-
-  const armMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.34, 0.14), armMat);
-  armL.position.set(-0.27, 0.43, 0);
-  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.34, 0.14), armMat);
-  armR.position.set(0.27, 0.43, 0);
-  robotGroup.add(armL); robotGroup.add(armR);
-
-  const rHead = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.42, 0.42), new THREE.MeshLambertMaterial({ color: 0xb3e5fc }));
-  rHead.position.y = 0.87;
-  robotGroup.add(rHead);
-
-  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
-  const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.10, 0.04), eyeMat);
-  eyeL.position.set(-0.10, 0.87, 0.22);
-  const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.10, 0.04), eyeMat);
-  eyeR.position.set(0.10, 0.87, 0.22);
-  robotGroup.add(eyeL); robotGroup.add(eyeR);
-
-  const bulbMesh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.12, 0.13), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
-  bulbMesh.position.y = 1.14;
-  robotGroup.add(bulbMesh);
-  scene.add(robotGroup);
-
-  const targetRobotPos = new THREE.Vector3(0, 0, 0);
-
-  function syncRobot3DPosition(immediate = false) {
-    const gx = ROBOT.pos.x;
-    const gz = ROBOT.pos.z;
-    const subOffsetX = ((ROBOT.pos.sx ?? 2) - 2) * 0.16;
-    const subOffsetZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.16;
-
-    let baseY = 0;
-    if (gx >= -2 && gx <= 2 && gz >= -2 && gz <= 2) {
-      const lv = HEIGHT_MAP[`${gx},${gz}`] ?? 0;
-      baseY = getSurfaceY(lv);
-    } else {
-      baseY = -0.35;
-    }
-    targetRobotPos.set(gx + subOffsetX, baseY, gz + subOffsetZ);
-    if (immediate) {
-      robotGroup.position.copy(targetRobotPos);
-      robotGroup.rotation.y = ROBOT.dirAngle || 0;
-    }
-  }
-
-  // --- 360°全方位の星空 ＆ 星座ライン（上からキャラを見下ろしてグリグリ回したときも背景に綺麗に見える配置） ---
+  // --- 全天球の星空＆4大星座（背景・頭上360°に配置） ---
   const skyGroup = new THREE.Group();
   scene.add(skyGroup);
 
   const starGeo = new THREE.BufferGeometry();
   const starPositions = [];
-  for (let i = 0; i < 650; i++) {
+  for (let i = 0; i < 600; i++) {
     const u = Math.random();
     const v = Math.random();
     const theta = u * 2.0 * Math.PI;
     const phi = Math.acos(2.0 * v - 1.0);
-    const r = 32;
+    const r = 46;
     starPositions.push(
       r * Math.sin(phi) * Math.cos(theta),
       r * Math.cos(phi),
@@ -771,288 +730,306 @@
     );
   }
   starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
-  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.38, transparent: true, opacity: 0.85 });
+  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.45, transparent: true, opacity: 0.75 });
   const starPoints = new THREE.Points(starGeo, starMat);
   skyGroup.add(starPoints);
 
-  // 上からキャラを見下ろしたときの背景（水平〜斜め下方向を含む全周）にも星座が見えるよう配置
-  const constellationGroup = new THREE.Group();
-  const constLineMat = new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.55 });
-  const constStarMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
-
-  function addConstellation(pts) {
-    for (let i = 0; i < pts.length - 1; i++) {
-      const g = new THREE.BufferGeometry().setFromPoints([pts[i], pts[i + 1]]);
-      constellationGroup.add(new THREE.Line(g, constLineMat));
-    }
-    pts.forEach(p => {
-      const s = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), constStarMat);
-      s.position.copy(p);
-      constellationGroup.add(s);
-    });
+  function createConstellationLabel(text) {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 64;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+    ctx.strokeStyle = 'rgba(125, 211, 252, 0.85)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(8, 8, 240, 48);
+    ctx.fillRect(8, 8, 240, 48);
+    ctx.fillStyle = '#bae6fd';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 32);
+    const tex = new THREE.CanvasTexture(c);
+    const spMat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.9 });
+    const sp = new THREE.Sprite(spMat);
+    sp.scale.set(6.5, 1.65, 1);
+    return sp;
   }
-  // 北・東・南・西の背景に星座を配置（上から見下ろして回した時に背景を流れる）
-  addConstellation([
-    new THREE.Vector3(-4, 2, -26),
-    new THREE.Vector3(0, 0, -26),
-    new THREE.Vector3(4, -2, -26),
-    new THREE.Vector3(0, 4, -25)
-  ]);
-  addConstellation([
-    new THREE.Vector3(25, 3, -4),
-    new THREE.Vector3(25, 0, 0),
-    new THREE.Vector3(25, -3, 4),
-    new THREE.Vector3(24, -5, 8)
-  ]);
-  addConstellation([
-    new THREE.Vector3(-25, 4, 3),
-    new THREE.Vector3(-25, 1, -1),
-    new THREE.Vector3(-24, -2, -5)
-  ]);
-  skyGroup.add(constellationGroup);
+
+  function addConstellation(name, pts, labelPos) {
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.72 });
+    const pGeo = new THREE.BufferGeometry().setFromPoints(pts.map(p => new THREE.Vector3(p[0], p[1], p[2])));
+    skyGroup.add(new THREE.Line(pGeo, lineMat));
+    const nodeMat = new THREE.PointsMaterial({ color: 0xfde047, size: 0.85 });
+    skyGroup.add(new THREE.Points(pGeo, nodeMat));
+    const lbl = createConstellationLabel(name);
+    lbl.position.set(labelPos[0], labelPos[1], labelPos[2]);
+    skyGroup.add(lbl);
+  }
+
+  // ロボット視点でも地上カメラでも見やすい位置に星座を配置
+  addConstellation('🦢 はくちょう座', [[0,24,-22], [0,18,-26], [0,11,-30], [-7,18,-26], [7,18,-26]], [0, 8, -30]);
+  addConstellation('👑 カシオペア座', [[-26,18,0], [-24,14,5], [-26,16,10], [-24,13,15], [-26,17,20]], [-26, 9, 10]);
+  addConstellation('🥄 北斗七星', [[26,20,-8], [26,17,-3], [25,15,2], [24,12,6], [24,8,10], [27,7,14], [27,11,11]], [26, 4, 5]);
+  addConstellation('🏹 オリオン座', [[-5,20,26], [5,20,26], [-2,14,28], [0,14,28], [2,14,28], [-5,8,26], [5,8,26]], [0, 4, 28]);
+
+  // --- 腕のついた可愛いボクセルロボット ---
+  const robotGroup = new THREE.Group();
+  const rBody = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.50, 0.34), new THREE.MeshLambertMaterial({ color: 0x38bdf8 }));
+  rBody.position.y = 0.37;
+  robotGroup.add(rBody);
+
+  const rHead = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.42, 0.40), new THREE.MeshLambertMaterial({ color: 0xbae6fd }));
+  rHead.position.y = 0.83;
+  robotGroup.add(rHead);
+
+  const darkMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
+  const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.05), darkMat);
+  eyeL.position.set(-0.10, 0.84, 0.20);
+  const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.05), darkMat);
+  eyeR.position.set(0.10, 0.84, 0.20);
+  robotGroup.add(eyeL); robotGroup.add(eyeR);
+
+  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 0.14), darkMat);
+  armL.position.set(-0.31, 0.38, 0);
+  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 0.14), darkMat);
+  armR.position.set(0.31, 0.38, 0);
+  robotGroup.add(armL); robotGroup.add(armR);
+
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.16), darkMat);
+  legL.position.set(-0.12, 0.08, 0);
+  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.16), darkMat);
+  legR.position.set(0.12, 0.08, 0);
+  robotGroup.add(legL); robotGroup.add(legR);
+
+  const bulbMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.14), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+  bulbMesh.position.y = 1.11;
+  robotGroup.add(bulbMesh);
+  scene.add(robotGroup);
+
+  function syncRobot3DPosition() {
+    const gx = ROBOT.pos.x;
+    const gz = ROBOT.pos.z;
+    const subOffsetX = ((ROBOT.pos.sx ?? 2) - 2) * 0.16;
+    const subOffsetZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.16;
+
+    let baseY = 0;
+    if (gx >= -2 && gx <= 2 && gz >= -2 && gz <= 2) {
+      baseY = (HEIGHT_MAP[`${gx},${gz}`] ?? 0) * 0.5;
+    } else {
+      baseY = -0.35;
+    }
+    robotGroup.position.set(gx + subOffsetX, baseY, gz + subOffsetZ);
+    robotGroup.rotation.y = ROBOT.rotY || 0;
+  }
+
+  function getRobotHeightLevel() {
+    const { x, z } = ROBOT.pos;
+    if (x < -2 || x > 2 || z < -2 || z > 2) return -99; // 海
+    return HEIGHT_MAP[`${x},${z}`] ?? 0;
+  }
+
+  // 現在有効なカメラモードを返す ('ground' | 'underground' | 'robot')
+  function getEffectiveCameraMode() {
+    if (manualCameraMode === 'ground') return 'ground';
+    if (manualCameraMode === 'underground') return 'underground';
+    if (manualCameraMode === 'robot') return 'robot';
+    const h = getRobotHeightLevel();
+    return (h < 0 && h !== -99) ? 'underground' : 'ground';
+  }
 
   // ==========================================
-  // 3. 地上カメラ・地下カメラの制御 ＆ 最小単位(5×5)ブロック透過
+  // 3. 3つのカメラ（🌌地上・⛏️地下・🤖ロボ視点）と最小単位透過ルール
   // ==========================================
-  // ★ 地上カメラ専用状態：もっと上の位置（phi = 1.05）からキャラを見下ろしてグリグリ観察・距離感そのまま
-  const groundCamState = {
-    targetTheta: 0.72,
-    targetPhi: 1.05,     // 上空からキャラを見下ろす角度（滝の横に落ちない高い位置）
-    targetRadius: 11.2,  // キャラとの心地よい距離感を維持
-    theta: 0.72,
-    phi: 1.05,
-    radius: 11.2,
-    focus: new THREE.Vector3(0, 0.35, 0)
-  };
-
-  // ★ 地下カメラ専用状態：10:24のスクショと同じ見やすい地下観察アングル
-  const underCamState = {
-    targetTheta: 0.72,
-    targetPhi: 1.06,
-    targetRadius: 9.8,
-    theta: 0.72,
-    phi: 1.06,
-    radius: 9.8,
-    focus: new THREE.Vector3(-0.8, -1.1, -0.8)
-  };
-
-  // cameraOverride: null（キャラに合わせたカメラワーク） / 'ground'（地上ボタンON） / 'underground'（地下ボタンON）
-  let cameraOverride = null;
+  let camTheta = Math.PI / 4; // 水平角（360°制限なし）
+  let camPhi = 1.05;          // 上下角
+  let camRadius = 12.6;
   let isDragging = false;
   let prevPointer = { x: 0, y: 0 };
 
-  const raycaster = new THREE.Raycaster();
-
-  function getEffectiveCameraMode() {
-    if (cameraOverride === 'ground') return 'ground';
-    if (cameraOverride === 'underground') return 'underground';
-    const curH = getRobotHeightLevel();
-    return (curH < 0 && curH > -90) ? 'underground' : 'ground';
-  }
-
-  // ★ ボタンクリック処理：
-  // 1回クリックで「押された状態（ON）」になり、もう片方はOFF（同時押し不可）。
-  // もう一度同じボタンをクリックしたらOFFになり、「キャラに合わせたカメラワーク」に戻る！
-  function toggleCameraButton(mode) {
-    if (cameraOverride === mode) {
-      cameraOverride = null;
-      showToast('🤖 キャラに合わせたカメラワークに戻したよ！');
-    } else {
-      cameraOverride = mode;
-      if (mode === 'ground') {
-        groundCamState.targetPhi = 1.05; // 上からキャラを見下ろす位置
-        showToast('🌌 地上カメラON（もう一度押すとキャラ追従に戻るよ）');
-      } else {
-        underCamState.targetPhi = 1.06;
-        showToast('⛏️ 地下カメラON（もう一度押すとキャラ追従に戻るよ）');
-      }
-    }
-    syncCameraButtonsUI();
-    updateEnvironmentAndUI();
-  }
-
   function syncCameraButtonsUI() {
-    const groundBtn = document.getElementById('cam-ground-btn');
-    const underBtn = document.getElementById('cam-under-btn');
-    if (!groundBtn || !underBtn) return;
-
-    // 同時押しは不可：cameraOverride と一致する方だけが .pressed（ON表示）になる
-    groundBtn.classList.toggle('pressed', cameraOverride === 'ground');
-    underBtn.classList.toggle('pressed', cameraOverride === 'underground');
+    const gBtn = document.getElementById('cam-ground-btn');
+    const uBtn = document.getElementById('cam-ug-btn');
+    const rBtn = document.getElementById('cam-fpv-btn');
+    gBtn.classList.toggle('cam-active', manualCameraMode === 'ground');
+    uBtn.classList.toggle('cam-active', manualCameraMode === 'underground');
+    rBtn.classList.toggle('cam-active', manualCameraMode === 'robot');
   }
 
-  function updateDualCamerasAndTransparency() {
-    const curH = getRobotHeightLevel();
-    const isRobotUnderground = (curH < 0 && curH > -90);
-    const effectiveMode = getEffectiveCameraMode();
-    const isUndergroundView = (effectiveMode === 'underground');
+  // 最小単位（5x5の1マス単位）でのブロック透過＆出現制御
+  function updateTransparencyAndOcclusion() {
+    const mode = getEffectiveCameraMode();
 
-    // ----------------------------------------------------
-    // 【カメラ1：地上カメラ (groundCamera)】
-    // カメラ位置はもっと上！キャラとの距離感を保ったまま上から見下ろす位置でグリグリ回せる
-    // ----------------------------------------------------
-    // phiの上限を 1.24 に制限することで、絶対に滝の横や地下へ落ちず、常に緑の地面より上から見下ろす
-    groundCamState.targetPhi = Math.max(0.38, Math.min(1.24, groundCamState.targetPhi));
-    groundCamState.targetRadius = Math.max(7.5, Math.min(17.0, groundCamState.targetRadius));
-
-    groundCamState.theta += (groundCamState.targetTheta - groundCamState.theta) * 0.22;
-    groundCamState.phi += (groundCamState.targetPhi - groundCamState.phi) * 0.22;
-    groundCamState.radius += (groundCamState.targetRadius - groundCamState.radius) * 0.22;
-
-    // キャラが地上にいる時はキャラの位置を追従（距離感を保つ）。キャラが地下にいる時に地上ボタンを押した場合は地上中央を見る
-    const gTargetX = !isRobotUnderground ? (robotGroup.position.x * 0.65) : 0;
-    const gTargetY = !isRobotUnderground ? Math.max(0.2, robotGroup.position.y + 0.3) : 0.25;
-    const gTargetZ = !isRobotUnderground ? (robotGroup.position.z * 0.65) : 0;
-
-    groundCamState.focus.x += (gTargetX - groundCamState.focus.x) * 0.22;
-    groundCamState.focus.y += (gTargetY - groundCamState.focus.y) * 0.22;
-    groundCamState.focus.z += (gTargetZ - groundCamState.focus.z) * 0.22;
-
-    groundCamera.position.set(
-      groundCamState.focus.x + groundCamState.radius * Math.sin(groundCamState.phi) * Math.sin(groundCamState.theta),
-      groundCamState.focus.y + groundCamState.radius * Math.cos(groundCamState.phi),
-      groundCamState.focus.z + groundCamState.radius * Math.sin(groundCamState.phi) * Math.cos(groundCamState.theta)
-    );
-    groundCamera.lookAt(groundCamState.focus);
-
-    // ----------------------------------------------------
-    // 【カメラ2：地下カメラ (undergroundCamera)】
-    // 10:24のスクショと同じ見やすい地下観察アングル
-    // ----------------------------------------------------
-    underCamState.targetPhi = Math.max(0.38, Math.min(1.48, underCamState.targetPhi));
-    underCamState.targetRadius = Math.max(6.5, Math.min(16.5, underCamState.targetRadius));
-
-    underCamState.theta += (underCamState.targetTheta - underCamState.theta) * 0.22;
-    underCamState.phi += (underCamState.targetPhi - underCamState.phi) * 0.22;
-    underCamState.radius += (underCamState.targetRadius - underCamState.radius) * 0.22;
-
-    const uTargetX = isRobotUnderground ? (robotGroup.position.x * 0.75) : -1.0;
-    const uTargetY = isRobotUnderground ? Math.min(-0.8, robotGroup.position.y + 0.2) : -1.15;
-    const uTargetZ = isRobotUnderground ? (robotGroup.position.z * 0.75) : -1.0;
-
-    underCamState.focus.x += (uTargetX - underCamState.focus.x) * 0.22;
-    underCamState.focus.y += (uTargetY - underCamState.focus.y) * 0.22;
-    underCamState.focus.z += (uTargetZ - underCamState.focus.z) * 0.22;
-
-    undergroundCamera.position.set(
-      underCamState.focus.x + underCamState.radius * Math.sin(underCamState.phi) * Math.sin(underCamState.theta),
-      underCamState.focus.y + underCamState.radius * Math.cos(underCamState.phi),
-      underCamState.focus.z + underCamState.radius * Math.sin(underCamState.phi) * Math.cos(underCamState.theta)
-    );
-    undergroundCamera.lookAt(underCamState.focus);
-
-    activeCamera = isUndergroundView ? undergroundCamera : groundCamera;
-
-    // ----------------------------------------------------
-    // 【地上モード：ブロックの透過禁止（緑の地面も滝も100%不透明）】
-    // 【地下モード：滝は透過そのまま ＋ カメラとキャラの間のブロックを5×5最小単位で透過＆出現】
-    // ----------------------------------------------------
-    if (!isUndergroundView) {
-      // ★ 地上モード：滝・海・すべての地面ブロックを一切透過しない！
-      waterfallMat.opacity += (0.94 - waterfallMat.opacity) * 0.25;
-      waterfallMat.depthWrite = true;
-      seaMat.opacity += (0.95 - seaMat.opacity) * 0.25;
-      seaMat.depthWrite = true;
-      foamRingMat.opacity += (0.85 - foamRingMat.opacity) * 0.25;
-
-      for (let i = 0; i < terrainMeshes.length; i++) {
-        const m = terrainMeshes[i];
-        m.userData.targetOpacity = 1.0;
-        m.material.opacity += (1.0 - m.material.opacity) * 0.25;
-        m.material.depthWrite = true;
-      }
+    // 地上カメラ、またはロボット視点のときはブロックも滝も一切透過禁止（100%不透明）
+    if (mode === 'ground' || mode === 'robot') {
+      waterfallMat.opacity = 0.92;
+      seaMat.opacity = 0.95;
+      terrainBlocksMeta.forEach(b => {
+        b.mat.opacity = 1.0;
+        b.lineMat.opacity = 0.28;
+      });
       return;
     }
 
-    // ★ 地下モード：滝と海の透過はそのまま維持
-    waterfallMat.opacity += (0.12 - waterfallMat.opacity) * 0.22;
-    waterfallMat.depthWrite = false;
-    seaMat.opacity += (0.18 - seaMat.opacity) * 0.22;
-    seaMat.depthWrite = false;
-    foamRingMat.opacity += (0.12 - foamRingMat.opacity) * 0.22;
-
-    // 観察の中心ターゲット（キャラが地下にいるときはキャラ位置、地上にいるときは地下空間の中心）
-    const targetCenter = isRobotUnderground
-      ? new THREE.Vector3(robotGroup.position.x, robotGroup.position.y + 0.45, robotGroup.position.z)
-      : new THREE.Vector3(-1.2, -1.1, -1.2);
+    // 地下モード時：滝を透過させ、カメラとターゲットの間にあるブロックだけを最小単位で透過
+    waterfallMat.opacity = 0.14;
+    seaMat.opacity = 0.25;
 
     const camPos = undergroundCamera.position;
-    const camToTarget3D = new THREE.Vector3().subVectors(targetCenter, camPos);
-    const distCamToTarget = camToTarget3D.length();
-    const dirCamToTarget = camToTarget3D.clone().normalize();
+    const h = getRobotHeightLevel();
+    const focusX = (h < 0 && h !== -99) ? robotGroup.position.x : 0;
+    const focusY = (h < 0 && h !== -99) ? (robotGroup.position.y + 0.4) : -1.2;
+    const focusZ = (h < 0 && h !== -99) ? robotGroup.position.z : 0;
 
-    // カメラがターゲットから見てどの水平方向（XZ）にあるかの単位ベクトル
-    const camHorizVec = new THREE.Vector2(camPos.x - targetCenter.x, camPos.z - targetCenter.z);
-    if (camHorizVec.lengthSq() > 0.0001) camHorizVec.normalize();
+    const dirX = camPos.x - focusX;
+    const dirZ = camPos.z - focusZ;
+    const lenXZ = Math.hypot(dirX, dirZ) || 1;
+    const nx = dirX / lenXZ;
+    const nz = dirZ / lenXZ;
 
-    // 5×5の各ブロック（最小単位）ごとに、カメラアングルに合わせて「透過」と「出現（不透明）」を判定
-    for (let i = 0; i < terrainMeshes.length; i++) {
-      const m = terrainMeshes[i];
-      const { gx, gz, lv, isTopSurface, isBottomBedrock } = m.userData;
-
-      // 1. まず基本状態としてすべてのブロックを「出現（不透明 1.0）」にセット
-      m.userData.targetOpacity = 1.0;
-
-      // 2. 地下底（一番下の岩盤 lv === -4）や、掘られた地下室の白い床（lv < 0 && isTopSurface）、
-      //    およびキャラが立っている真下の足場ブロックは常に「出現（不透明 1.0）」させる
-      const isRoboStandingColumn = (isRobotUnderground && gx === ROBOT.pos.x && gz === ROBOT.pos.z && lv <= (HEIGHT_MAP[`${gx},${gz}`] ?? 0));
-      if (isBottomBedrock || (lv < 0 && isTopSurface) || isRoboStandingColumn) {
-        m.userData.targetOpacity = 1.0;
-        continue;
+    terrainBlocksMeta.forEach(b => {
+      // ロボットが乗っている床や掘られた階段の床面はくっきり残す
+      if (b.isFloorTile && b.lv < 0) {
+        b.mat.opacity = 1.0;
+        b.lineMat.opacity = 0.35;
+        return;
       }
 
-      // 3. ブロックが「カメラとキャラ（地下空間）の間」にあるかを最小1ブロック単位で計算
-      const blockToTargetHoriz = new THREE.Vector2(gx - targetCenter.x, gz - targetCenter.z);
-      // カメラ側（手前側）にある度合い（正の値ならターゲットよりカメラ側、負ならターゲットの奥側）
-      const frontDot = blockToTargetHoriz.dot(camHorizVec);
-      // 視線ラインからの横ズレ距離
-      const sideDist = Math.abs(blockToTargetHoriz.x * (-camHorizVec.y) + blockToTargetHoriz.y * camHorizVec.x);
+      const relX = b.gx - focusX;
+      const relZ = b.gz - focusZ;
+      const dotFront = relX * nx + relZ * nz; // 正ならカメラ手前側、負なら奥側
+      const perpDist = Math.abs(-relX * nz + relZ * nx);
 
-      // カメラからターゲットへ向かう3D空間内で、手前側（frontDot > -0.35）かつ視界幅（sideDist < 2.2）に入る上層ブロックを透過！
-      // カメラをグリグリ回して奥側（frontDot <= -0.35）や外側へ回ったブロックは即座に 1.0（出現）に戻る！
-      if (frontDot > -0.35 && sideDist < 2.15 && m.position.y > targetCenter.y - 0.35) {
-        m.userData.targetOpacity = 0.12;
-      }
+      // カメラとキャラの間（手前側）にあるブロックを最小単位（1ブロックごと）で透過し、奥に回れば出現させる
+      const isBetweenCamAndTarget = (dotFront > -0.35 && perpDist < 1.85) || (b.centerY > focusY + 0.3 && dotFront > -0.8);
 
-      // 4. さらに3D視線レーザーに直撃する手前ブロックを確実に透過
-      const camToBlock = new THREE.Vector3().subVectors(m.position, camPos);
-      const proj = camToBlock.dot(dirCamToTarget);
-      if (proj > 0.3 && proj < distCamToTarget - 0.15) {
-        const closestPt = camPos.clone().addScaledVector(dirCamToTarget, proj);
-        if (closestPt.distanceTo(m.position) < 0.95) {
-          m.userData.targetOpacity = 0.10;
-        }
-      }
-    }
-
-    // レイキャストによるピンポイント透過（キャラの頭・胸・足への視線を遮る1ブロックを透過）
-    const checkHeights = [0.15, 0.5, 0.85];
-    checkHeights.forEach(hOffset => {
-      const pt = new THREE.Vector3(targetCenter.x, targetCenter.y - 0.45 + hOffset, targetCenter.z);
-      const dir = new THREE.Vector3().subVectors(pt, camPos).normalize();
-      const dist = camPos.distanceTo(pt);
-      raycaster.set(camPos, dir);
-      const hits = raycaster.intersectObjects(terrainMeshes, false);
-      for (let k = 0; k < hits.length; k++) {
-        if (hits[k].distance < dist - 0.15) {
-          const hitMesh = hits[k].object;
-          const isFloor = hitMesh.userData.isBottomBedrock || (hitMesh.userData.lv < 0 && hitMesh.userData.isTopSurface);
-          if (!isFloor) {
-            hitMesh.userData.targetOpacity = 0.08;
-          }
-        }
+      if (isBetweenCamAndTarget) {
+        b.mat.opacity = 0.15;
+        b.lineMat.opacity = 0.06;
+      } else {
+        b.mat.opacity = 1.0;
+        b.lineMat.opacity = 0.28;
       }
     });
-
-    // 各ブロックの透明度を滑らかに反映（透過したブロックは奥が透け、出現したブロックはくっきり不透明になる）
-    for (let i = 0; i < terrainMeshes.length; i++) {
-      const m = terrainMeshes[i];
-      m.material.opacity += (m.userData.targetOpacity - m.material.opacity) * 0.25;
-      m.material.depthWrite = (m.material.opacity > 0.85);
-    }
   }
 
-  // スワイプ操作：現在アクティブな方のカメラ（地上 or 地下）をグリグリ回す
+  function updateAllCamerasTransform() {
+    camRadius = Math.max(7.5, Math.min(20.0, camRadius));
+    const mode = getEffectiveCameraMode();
+    const statusPanel = document.getElementById('status-panel');
+
+    if (mode === 'robot') {
+      // ③ ロボット視点（一人称360°プラネタリウム＆周囲観察）
+      robotGroup.visible = false; // 自分の頭が視界を遮らないように非表示
+      camPhi = Math.max(0.18, Math.min(2.45, camPhi));
+
+      const eyeX = robotGroup.position.x;
+      const eyeY = robotGroup.position.y + 0.92;
+      const eyeZ = robotGroup.position.z;
+      robotCamera.position.set(eyeX, eyeY, eyeZ);
+
+      // スワイプで東西南北360°〜真上の星空まで自由に見回せる
+      const lookDist = 20;
+      const lx = eyeX - lookDist * Math.sin(camPhi) * Math.sin(camTheta);
+      const ly = eyeY - lookDist * Math.cos(camPhi);
+      const lz = eyeZ - lookDist * Math.sin(camPhi) * Math.cos(camTheta);
+      robotCamera.lookAt(lx, ly, lz);
+
+      // 上の星空を見上げたときはゲージ枠を自動で隠す
+      if (camPhi > 1.55) {
+        statusPanel.classList.add('sky-hidden');
+      } else {
+        statusPanel.classList.remove('sky-hidden');
+      }
+      activeCamera = robotCamera;
+    } else if (mode === 'ground') {
+      // ① 地上カメラ（上からキャラを見下ろす位置で360°グリグリ）
+      robotGroup.visible = true;
+      statusPanel.classList.remove('sky-hidden');
+
+      const groundPhi = Math.max(0.50, Math.min(1.22, camPhi));
+      const h = getRobotHeightLevel();
+      const isManualGround = (manualCameraMode === 'ground');
+
+      const targetX = isManualGround ? 0 : robotGroup.position.x * 0.65;
+      const targetY = isManualGround ? 0.15 : Math.max(0, h * 0.5) + 0.35;
+      const targetZ = isManualGround ? 0 : robotGroup.position.z * 0.65;
+
+      const gx = targetX + camRadius * Math.sin(groundPhi) * Math.sin(camTheta);
+      const gy = targetY + camRadius * Math.cos(groundPhi);
+      const gz = targetZ + camRadius * Math.sin(groundPhi) * Math.cos(camTheta);
+
+      groundCamera.position.set(gx, gy, gz);
+      groundCamera.lookAt(targetX, targetY, targetZ);
+      activeCamera = groundCamera;
+    } else {
+      // ② 地下カメラ（地下底がよく観察できる専用ポジション）
+      robotGroup.visible = true;
+      statusPanel.classList.remove('sky-hidden');
+
+      const ugPhi = Math.max(0.70, Math.min(1.32, camPhi));
+      const h = getRobotHeightLevel();
+      const isRobotUnderground = (h < 0 && h !== -99);
+
+      const ugTargetX = isRobotUnderground ? robotGroup.position.x * 0.5 : 0;
+      const ugTargetY = isRobotUnderground ? (robotGroup.position.y + 0.25) : -1.25;
+      const ugTargetZ = isRobotUnderground ? robotGroup.position.z * 0.5 : 0;
+      const ugDist = camRadius * 0.86;
+
+      const ux = ugTargetX + ugDist * Math.sin(ugPhi) * Math.sin(camTheta);
+      const uy = ugTargetY + ugDist * Math.cos(ugPhi);
+      const uz = ugTargetZ + ugDist * Math.sin(ugPhi) * Math.cos(camTheta);
+
+      undergroundCamera.position.set(ux, uy, uz);
+      undergroundCamera.lookAt(ugTargetX, ugTargetY, ugTargetZ);
+      activeCamera = undergroundCamera;
+    }
+
+    syncCameraButtonsUI();
+    updateTransparencyAndOcclusion();
+  }
+
+  // 右側のカメラボタン3つ（🌌・⛏️・🤖）：排他ON/OFF切り替え（もう一度押すとキャラ追従オートへ戻る）
+  document.getElementById('cam-ground-btn').onclick = () => {
+    if (manualCameraMode === 'ground') {
+      manualCameraMode = null;
+      showToast('🤖 キャラに合わせたカメラに戻したよ！');
+    } else {
+      manualCameraMode = 'ground';
+      camPhi = 1.02;
+      showToast('🌌 地上カメラON（上から見下ろし・透過なし）');
+    }
+    updateAllCamerasTransform();
+    updateEnvironmentAndUI();
+  };
+
+  document.getElementById('cam-ug-btn').onclick = () => {
+    if (manualCameraMode === 'underground') {
+      manualCameraMode = null;
+      showToast('🤖 キャラに合わせたカメラに戻したよ！');
+    } else {
+      manualCameraMode = 'underground';
+      camPhi = 1.08;
+      showToast('⛏️ 地下カメラON（手前のブロックと滝を透過）');
+    }
+    updateAllCamerasTransform();
+    updateEnvironmentAndUI();
+  };
+
+  document.getElementById('cam-fpv-btn').onclick = () => {
+    if (manualCameraMode === 'robot') {
+      manualCameraMode = null;
+      camPhi = 1.05;
+      showToast('🤖 キャラに合わせた外カメラに戻したよ！');
+    } else {
+      manualCameraMode = 'robot';
+      camPhi = 1.65; // 少し上向きで星空がすぐ見える角度からスタート
+      showToast('🤖 ロボット視点ON！指で360°星空を見回せるよ！');
+    }
+    updateAllCamerasTransform();
+    updateEnvironmentAndUI();
+  };
+
+  // スマホ・マウスのスワイプ操作
   const domElem = renderer.domElement;
   domElem.addEventListener('pointerdown', (e) => {
     isDragging = true;
@@ -1065,39 +1042,29 @@
     const dy = e.clientY - prevPointer.y;
     prevPointer.x = e.clientX;
     prevPointer.y = e.clientY;
-
-    const mode = getEffectiveCameraMode();
-    if (mode === 'underground') {
-      underCamState.targetTheta -= dx * 0.0085;
-      underCamState.targetPhi += dy * 0.0085;
-    } else {
-      groundCamState.targetTheta -= dx * 0.0085;
-      groundCamState.targetPhi += dy * 0.0085;
-    }
+    camTheta -= dx * 0.0085;
+    camPhi += dy * 0.0075;
+    updateAllCamerasTransform();
   });
   window.addEventListener('pointerup', () => { isDragging = false; });
-  window.addEventListener('pointercancel', () => { isDragging = false; });
   domElem.addEventListener('wheel', (e) => {
-    const mode = getEffectiveCameraMode();
-    if (mode === 'underground') {
-      underCamState.targetRadius += e.deltaY * 0.01;
-    } else {
-      groundCamState.targetRadius += e.deltaY * 0.01;
-    }
+    camRadius += e.deltaY * 0.01;
+    updateAllCamerasTransform();
   }, { passive: true });
 
   // ==========================================
   // 4. 時間帯・星空・UIの更新
   // ==========================================
-  function getRobotHeightLevel() {
-    const { x, z } = ROBOT.pos;
-    if (x < -2 || x > 2 || z < -2 || z > 2) return -99;
-    return HEIGHT_MAP[`${x},${z}`] ?? 0;
+  function formatHeightText(h) {
+    if (h === -99) return '海の白波';
+    if (h < 0) return `地下${Math.abs(h)}階`;
+    return `地上${h}段目`;
   }
 
   function updateEnvironmentAndUI() {
     const st = life.getState();
     const hLevel = getRobotHeightLevel();
+    const effCam = getEffectiveCameraMode();
 
     document.getElementById('val-stamina').innerText = st.stamina;
     document.getElementById('bar-stamina').style.width = st.stamina + '%';
@@ -1110,27 +1077,31 @@
     document.getElementById('ui-days').innerText = `🌱 ${GAME_DAY}日目`;
 
     let timeLabel = '☀️ 朝';
-    let skyHex = 0x0d2538;
-    let starOpacity = 0.75;
+    let skyHex = 0x0b1528;
+    let starOpacity = 0.65;
 
     if (TIME_STEP < 4) {
-      timeLabel = '☀️ 朝'; skyHex = 0x0d2538; starOpacity = 0.70;
+      timeLabel = '☀️ 朝'; skyHex = 0x0f1d36; starOpacity = 0.55;
     } else if (TIME_STEP < 9) {
-      timeLabel = '🌤️ 昼'; skyHex = 0x12324a; starOpacity = 0.55;
+      timeLabel = '🌤️ 昼'; skyHex = 0x152c52; starOpacity = 0.45;
     } else if (TIME_STEP < 13) {
-      timeLabel = '🌇 夕方'; skyHex = 0x241b35; starOpacity = 0.85;
+      timeLabel = '🌇 夕方'; skyHex = 0x1e1638; starOpacity = 0.78;
     } else if (TIME_STEP < 17) {
-      timeLabel = '🌙 夜'; skyHex = 0x071320; starOpacity = 1.0;
+      timeLabel = '🌙 夜'; skyHex = 0x070d19; starOpacity = 0.95;
     } else {
-      timeLabel = '🌌 深淵'; skyHex = 0x040911; starOpacity = 1.0;
+      timeLabel = '🌌 深淵'; skyHex = 0x030712; starOpacity = 1.0;
     }
 
-    starMat.opacity = starOpacity;
+    if (hLevel >= 3 || effCam === 'robot') {
+      starOpacity = Math.min(1.0, starOpacity + 0.25);
+    }
+
     scene.background.setHex(skyHex);
+    starMat.opacity = starOpacity;
     document.getElementById('ui-time').innerText = timeLabel;
 
     let moodStr = '😊 あんしん・まんぷく';
-    if (hLevel < 0 && hLevel > -90) moodStr = '⛏️ 地下たんけん中';
+    if (hLevel < 0 && hLevel !== -99) moodStr = '⛏️ 地下たんけん中';
     else if (hLevel === 5) moodStr = '🌟 星の聖域・うっとり';
     else if (hLevel >= 3) moodStr = '🔭 星見の展望台';
     else if (st.mode === 'STARVING') moodStr = '😵 はらぺこピンチ';
@@ -1138,24 +1109,68 @@
     else if (st.mode === 'BORED') moodStr = '😐 たいくつ';
     document.getElementById('ui-mood').innerText = moodStr;
 
-    const placeStr = hLevel === -99
-      ? '🌊海の白波'
-      : (hLevel < 0 ? `地下${Math.abs(hLevel)}階` : `地上${hLevel}段目`);
-
-    let camLabel = '';
-    if (cameraOverride === 'ground') {
-      camLabel = `📌地上カメラ固定中（${placeStr}）`;
-    } else if (cameraOverride === 'underground') {
-      camLabel = `📌地下カメラ固定中（${placeStr}）`;
-    } else {
-      camLabel = `🤖自動カメラ・${placeStr}`;
-    }
-    document.getElementById('history-loc').innerText = camLabel;
+    let camBadge = '🤖自動カメラ';
+    if (manualCameraMode === 'ground') camBadge = '🌌地上カメラON';
+    else if (manualCameraMode === 'underground') camBadge = '⛏️地下カメラON';
+    else if (manualCameraMode === 'robot') camBadge = '🤖ロボ視点ON';
+    document.getElementById('history-loc').innerText = `${camBadge}・${formatHeightText(hLevel)}`;
   }
 
   // ==========================================
-  // 5. アルゴンさん物理＆AI思考アクション
+  // 5. AI通信最優先（gemini-3.8-flash）＋アルゴンさん物理エンジン
   // ==========================================
+  async function askAIForDecision(validDirs, curH) {
+    const aiType = safeStorage.getItem('ai_type') || 'gemini';
+    if (aiType === 'none') return null;
+
+    const dirNames = validDirs.map(d => d.name).join('、');
+    const itemsStr = WORLD_ITEMS.map(it => `${it.type}(${it.x},${it.z})`).join(', ') || 'なし';
+    const prompt = `あなたは5x5の浮島と地下空間で暮らす自律ロボット「ロボ${ROBOT.gen}ごう」です。
+現在位置: (${ROBOT.pos.x}, ${ROBOT.pos.z}) 高さ:${formatHeightText(curH)}
+ステータス: たいりょく=${life.stamina}, おなか=${life.energy}, ごきげん=${life.mental}
+島にあるアイテム: ${itemsStr}
+移動できる方角: [${dirNames}]
+以下のJSON形式のみで次の行動と小学生向けの可愛い気持ち（1〜2文）を出力してください:
+{"action":"東 または 西 または 南 または 北 または 掘る または 休む", "thought":"ロボの気持ち"}`;
+
+    try {
+      if (aiType === 'gemini') {
+        const key = safeStorage.getItem('api_gemini');
+        if (!key) return null;
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: 'application/json' }
+          })
+        });
+        const data = await res.json();
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (rawText) return JSON.parse(rawText);
+      } else if (aiType === 'groq') {
+        const key = safeStorage.getItem('api_groq');
+        if (!key) return null;
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [{ role: 'user', content: prompt }],
+            response_format: { type: 'json_object' },
+            max_tokens: 160
+          })
+        });
+        const data = await res.json();
+        const rawText = data.choices?.[0]?.message?.content;
+        if (rawText) return JSON.parse(rawText);
+      }
+    } catch (e) {
+      console.warn('AI通信フォールバック:', e);
+    }
+    return null;
+  }
+
   async function executeTurn() {
     const btn = document.getElementById('btn-action');
     btn.disabled = true;
@@ -1170,13 +1185,11 @@
     }
 
     const curH = getRobotHeightLevel();
-    const isNight = TIME_STEP >= 13;
-
     const dirs = [
-      { name: '東', dx: 1, dz: 0, angle: Math.PI / 2 },
-      { name: '西', dx: -1, dz: 0, angle: -Math.PI / 2 },
-      { name: '南', dx: 0, dz: 1, angle: 0 },
-      { name: '北', dx: 0, dz: -1, angle: Math.PI }
+      { name: '東', dx: 1, dz: 0, rot: Math.PI / 2 },
+      { name: '西', dx: -1, dz: 0, rot: -Math.PI / 2 },
+      { name: '南', dx: 0, dz: 1, rot: 0 },
+      { name: '北', dx: 0, dz: -1, rot: Math.PI }
     ];
 
     let thoughtText = '';
@@ -1187,86 +1200,103 @@
       ROBOT.pos.z = Math.max(-2, Math.min(2, ROBOT.pos.z));
       ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
       life.stamina -= 10;
-      actionLabel = '白波に押し戻されて陸へ帰還';
-      thoughtText = 'わわっ！海の白い波に押し戻されて大地に戻ったよ！';
+      actionLabel = '🌊 白波に押し戻されて陸へ帰還';
+      thoughtText = 'わわっ！海の白い波がすごく強くて、内陸のほうへ押し戻されたよ！';
     } else {
-      let bestDir = null;
       const validDirs = dirs.filter(d => {
         const nx = ROBOT.pos.x + d.dx;
         const nz = ROBOT.pos.z + d.dz;
         if (nx < -2 || nx > 2 || nz < -2 || nz > 2) return ROBOT.speed === 5;
         const nextH = HEIGHT_MAP[`${nx},${nz}`] ?? 0;
-        return (nextH - curH) <= 1 && (curH - nextH) <= 2;
+        return (nextH - curH) <= 1;
       });
 
-      const appleTarget = WORLD_ITEMS.find(it => it.type === 'apple');
-      if (appleTarget && (life.energy <= 65 || Math.random() < 0.6)) {
-        validDirs.sort((a, b) => {
-          const distA = Math.abs((ROBOT.pos.x + a.dx) - appleTarget.x) + Math.abs((ROBOT.pos.z + a.dz) - appleTarget.z);
-          const distB = Math.abs((ROBOT.pos.x + b.dx) - appleTarget.x) + Math.abs((ROBOT.pos.z + b.dz) - appleTarget.z);
-          return distA - distB;
-        });
-        bestDir = validDirs[0];
-      } else if (validDirs.length > 0) {
-        bestDir = validDirs[Math.floor(Math.random() * validDirs.length)];
+      // AI通信で判断を取得（通信最優先）
+      const aiDecision = await askAIForDecision(validDirs, curH);
+
+      let chosenDir = null;
+      let wantDig = false;
+      let wantRest = false;
+
+      if (aiDecision && aiDecision.action) {
+        if (aiDecision.action.includes('休')) wantRest = true;
+        else if (aiDecision.action.includes('掘') && curH > -3) wantDig = true;
+        else {
+          chosenDir = validDirs.find(d => aiDecision.action.includes(d.name)) || null;
+        }
       }
 
-      const canDigHere = (curH > -3 && Math.random() < 0.18 && life.stamina > 35);
+      // AI未設定時または移動先未定時の本能判断
+      if (!wantRest && !wantDig && !chosenDir) {
+        if (life.stamina <= 25) {
+          wantRest = true;
+        } else if (Math.random() < 0.18 && curH > -3 && life.stamina > 45) {
+          wantDig = true;
+        } else {
+          const appleTarget = WORLD_ITEMS.find(it => it.type === 'apple');
+          if (appleTarget && validDirs.length > 0) {
+            validDirs.sort((a, b) => {
+              const distA = Math.abs((ROBOT.pos.x + a.dx) - appleTarget.x) + Math.abs((ROBOT.pos.z + a.dz) - appleTarget.z);
+              const distB = Math.abs((ROBOT.pos.x + b.dx) - appleTarget.x) + Math.abs((ROBOT.pos.z + b.dz) - appleTarget.z);
+              return distA - distB;
+            });
+            chosenDir = validDirs[0];
+          } else if (validDirs.length > 0) {
+            chosenDir = validDirs[Math.floor(Math.random() * validDirs.length)];
+          }
+        }
+      }
 
-      if (life.stamina <= 25) {
-        life.stamina += (isNight || curH < 0 || curH === 5) ? 45 : 30;
+      if (wantRest) {
+        life.stamina += 35;
         life.energy -= 5;
         life.mental += 10;
-        actionLabel = 'その場でひとやすみ';
-        thoughtText = curH < 0
-          ? `地下${Math.abs(curH)}階のひみつ空間でひとやすみ！静かで落ち着くなぁ。`
-          : 'ここでひとやすみして、たいりょくを回復するよ！';
-      } else if (canDigHere) {
-        const key = `${ROBOT.pos.x},${ROBOT.pos.z}`;
-        HEIGHT_MAP[key] = curH - 1;
-        const afterH = HEIGHT_MAP[key];
+        actionLabel = '💤 その場でひとやすみ';
+        thoughtText = aiDecision?.thought || (curH < 0
+          ? `地下${Math.abs(curH)}階のひみつ空間でひとやすみ。ひんやりして落ち着くなぁ。`
+          : 'ちょっと疲れたから、ここでひとやすみして体力を回復するよ！');
+      } else if (wantDig) {
+        const k = `${ROBOT.pos.x},${ROBOT.pos.z}`;
+        HEIGHT_MAP[k] = curH - 1;
         life.stamina -= 10;
-        life.mental += 15;
-        actionLabel = `⛏️ 土を掘って「${afterH < 0 ? '地下' + Math.abs(afterH) + '階' : afterH + '段目'}」にした！`;
-        thoughtText = afterH < 0
-          ? `ザクザクッ！足元の土を掘って、地下${Math.abs(afterH)}階の空間を広げたよ！`
-          : '足元のブロックを1段掘って平らにしたよ！';
-        DIARY_LOGS.push(`⛏️ ${GAME_DAY}日目：土を掘って地下空間を開拓した！`);
-      } else if (bestDir) {
+        life.mental += 12;
+        if (BAG.length < 10) BAG.push('stone');
+        const afterH = HEIGHT_MAP[k];
+        actionLabel = `⛏️ 足元を掘って${formatHeightText(afterH)}へ！`;
+        thoughtText = aiDecision?.thought || `ザクザクッ！足元の土を掘って${formatHeightText(afterH)}の地下空間を広げたよ！`;
+        DIARY_LOGS.push(`⛏️ ${GAME_DAY}日目：${formatHeightText(afterH)}へ穴を掘って探検した！`);
+      } else if (chosenDir) {
         const prevH = curH;
-        ROBOT.pos.x += bestDir.dx;
-        ROBOT.pos.z += bestDir.dz;
+        ROBOT.pos.x += chosenDir.dx;
+        ROBOT.pos.z += chosenDir.dz;
         ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
-        ROBOT.dirAngle = bestDir.angle;
+        ROBOT.rotY = chosenDir.rot;
 
         if (ROBOT.speed === 5) {
-          ROBOT.pos.sx = Math.max(0, Math.min(4, 2 + bestDir.dx * 2));
-          ROBOT.pos.sz = Math.max(0, Math.min(4, 2 + bestDir.dz * 2));
+          ROBOT.pos.sx = Math.max(0, Math.min(4, 2 + chosenDir.dx * 2));
+          ROBOT.pos.sz = Math.max(0, Math.min(4, 2 + chosenDir.dz * 2));
         }
 
         const newH = getRobotHeightLevel();
-        life.energy -= 8;
-        life.stamina -= (isNight && newH >= 0 && newH < 3) ? 14 : 8;
+        life.energy -= 7;
+        life.stamina -= 8;
 
-        if (newH < 0) {
-          actionLabel = `${bestDir.name}の地下${Math.abs(newH)}階へ潜った`;
-          thoughtText = prevH >= 0
-            ? `階段をおりて地下${Math.abs(newH)}階に潜ったよ！手前のブロックが透けて中がよく見えるね！`
-            : `地下${Math.abs(newH)}階をトコトコ探検しているよ！`;
-        } else if (prevH < 0 && newH >= 0) {
-          actionLabel = `地下から地上へ出た！`;
-          thoughtText = '地下の階段を登って、星空と緑の大地が広がる地上へ出てきたよ！';
+        if (newH < 0 && newH !== -99) {
+          life.mental += 10;
+          actionLabel = `⛏️ ${chosenDir.name}へ進んで地下${Math.abs(newH)}階へ！`;
+          thoughtText = aiDecision?.thought || `地下${Math.abs(newH)}階の空間に潜ったよ！手前のブロックが透けて中がよく見えるね！`;
         } else if (newH > prevH) {
           life.mental += 10;
-          actionLabel = `${bestDir.name}へ1段登った（${newH}段目）`;
-          thoughtText = `よいしょっ！${bestDir.name}の段差にピョンと登ったよ！`;
+          actionLabel = `👟 ${chosenDir.name}へ1段登った（${formatHeightText(newH)}）`;
+          thoughtText = aiDecision?.thought || `よいしょっ！${chosenDir.name}へ1段登って${formatHeightText(newH)}に来たよ！`;
         } else {
-          actionLabel = `${bestDir.name}へトコトコ歩いた`;
-          thoughtText = `${bestDir.name}を向いて歩いたよ。まわりを丸い海と滝が囲んでいてきれいだなあ。`;
+          actionLabel = `👟 ${chosenDir.name}へトコトコ歩いた`;
+          thoughtText = aiDecision?.thought || `${chosenDir.name}のマスへ歩いたよ。白い波と滝の音が心地いいね！`;
         }
       }
     }
 
+    // 足元のアイテム回収・食事
     const itemIdx = WORLD_ITEMS.findIndex(it => it.x === ROBOT.pos.x && it.z === ROBOT.pos.z);
     if (itemIdx !== -1) {
       const picked = WORLD_ITEMS[itemIdx];
@@ -1274,46 +1304,42 @@
       if (picked.type === 'apple') {
         life.energy += 45;
         life.mental += 15;
-        actionLabel = '🍎 リンゴを食べた！';
-        thoughtText = 'わーい！あまくておいしいリンゴを食べて元気いっぱいだよ！';
-        DIARY_LOGS.push(`🍎 ${GAME_DAY}日目：リンゴを食べて元気になった。`);
+        actionLabel = '🍎 リンゴを見つけて食べた！';
+        thoughtText = 'わーい！甘くておいしいリンゴを食べたよ！おなかがいっぱいになって元気モリモリだぁ！';
+        DIARY_LOGS.push(`🍎 ${GAME_DAY}日目：おいしいリンゴを食べて元気になった。`);
       } else {
         if (BAG.length < 10) BAG.push(picked.type);
         life.mental += 10;
-        actionLabel = 'どうぐをカバンに拾った';
-        thoughtText = '足元のアイテムをカバンにしまったよ！';
+        actionLabel = `🎒 ${picked.type === 'stone' ? '石ブロック' : '草'}をカバンに拾った`;
+        thoughtText = '足元にいいものが落ちていたから、カバンにしまったよ！';
       }
-    }
-
-    const aiType = safeStorage.getItem('ai_type') || 'none';
-    if (aiType === 'groq' || aiType === 'gemini') {
-      const customLine = await tryFetchAIComment(aiType, actionLabel, getRobotHeightLevel());
-      if (customLine) thoughtText = customLine;
     }
 
     rebuildTerrainAndItems();
     syncRobot3DPosition();
+    updateAllCamerasTransform();
     updateEnvironmentAndUI();
     saveWorldState();
 
     const afterState = life.getState();
     if (afterState.mode === 'DEAD') {
-      document.getElementById('message-box').innerText = `力尽きて倒れてしまった…。生存日数はリセットされ、次のロボ${ROBOT.gen + 1}ごうが1日目からスタートします。`;
+      document.getElementById('message-box').innerText = `力尽きて倒れてしまった…。記憶を引き継ぎ、次のロボ${ROBOT.gen + 1}ごうが1日目から誕生します！`;
       setTimeout(() => {
         ROBOT.gen += 1;
         ROBOT.pos = { x: 0, z: 0, sx: 2, sz: 2 };
-        ROBOT.dirAngle = 0;
+        ROBOT.rotY = 0;
         GAME_DAY = 1;
         TIME_STEP = 0;
         life = new LifeCore();
-        DIARY_LOGS.push(`📖 ロボ${ROBOT.gen}ごうが1日目として誕生した！`);
+        DIARY_LOGS.push(`📖 ロボ${ROBOT.gen}ごうが1日目から新しく誕生した！`);
         if (WORLD_ITEMS.length === 0) WORLD_ITEMS.push({ type: 'apple', x: 0, z: -1 });
         rebuildTerrainAndItems();
-        syncRobot3DPosition(true);
+        syncRobot3DPosition();
+        updateAllCamerasTransform();
         updateEnvironmentAndUI();
         saveWorldState();
         btn.disabled = false;
-      }, 2200);
+      }, 2000);
       return;
     }
 
@@ -1323,93 +1349,67 @@
       document.getElementById('ai-status').innerText = '💤 待機中';
       bulbMesh.material.color.setHex(0xfacc15);
       btn.disabled = false;
-    }, 320);
-  }
-
-  async function tryFetchAIComment(aiType, actionLabel, hLevel) {
-    try {
-      const locDesc = hLevel < 0 ? `地下${Math.abs(hLevel)}階の秘密空間` : `地上${hLevel}段目`;
-      const prompt = `あなたは世界の果ての小さな浮島で暮らす可愛いロボット「ロボ${ROBOT.gen}ごう」です。生存${GAME_DAY}日目、現在の場所は${locDesc}、今の行動は「${actionLabel}」です。小学生にも親しみやすい可愛い1〜2文で今の気持ちを話してください。`;
-      if (aiType === 'groq') {
-        const key = safeStorage.getItem('api_groq');
-        if (!key) return null;
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [{ role: 'user', content: prompt }],
-            max_tokens: 120
-          })
-        });
-        const data = await res.json();
-        return data.choices?.[0]?.message?.content?.trim() || null;
-      } else if (aiType === 'gemini') {
-        const key = safeStorage.getItem('api_gemini');
-        if (!key) return null;
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
-        const data = await res.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
-      }
-    } catch (e) {
-      return null;
-    }
-    return null;
+    }, 300);
   }
 
   // ==========================================
   // 6. 扇状メニュー・手帳・ガチャ・設定操作
   // ==========================================
-  const fanContainer = document.getElementById('fan-menu-container');
-  document.getElementById('fan-main-btn').onclick = () => {
-    fanContainer.classList.toggle('open');
+  const fanWrapper = document.getElementById('fan-menu-wrapper');
+  document.getElementById('plus-main-btn').onclick = () => {
+    fanWrapper.classList.toggle('open');
   };
+  function closeFanMenu() {
+    fanWrapper.classList.remove('open');
+  }
 
-  function fanAction(type) {
-    fanContainer.classList.remove('open');
-    const key = `${ROBOT.pos.x},${ROBOT.pos.z}`;
-    if (type === 'apple') {
-      const rx = Math.floor(Math.random() * 5) - 2;
-      const rz = Math.floor(Math.random() * 5) - 2;
-      WORLD_ITEMS.push({ type: 'apple', x: rx, z: rz });
-      rebuildTerrainAndItems();
-      saveWorldState();
-      showToast('🍎 島にリンゴを置いたよ！');
-    } else if (type === 'step') {
-      const cur = HEIGHT_MAP[key] ?? 0;
-      if (cur >= 5) {
-        showToast('ここはすでに最高峰（5段目）だよ！');
-        return;
-      }
-      HEIGHT_MAP[key] = cur + 1;
-      rebuildTerrainAndItems();
-      syncRobot3DPosition();
-      updateEnvironmentAndUI();
-      saveWorldState();
-      const nextLv = cur + 1;
-      showToast(`🪨 足元にブロックを積んで「${nextLv < 0 ? '地下' + Math.abs(nextLv) + '階' : nextLv + '段目'}」にしたよ！`);
-    } else if (type === 'dig') {
-      const cur = HEIGHT_MAP[key] ?? 0;
-      if (cur <= -3) {
-        showToast('これ以上深くは掘れないよ（地下3階が底だよ）！');
-        return;
-      }
-      HEIGHT_MAP[key] = cur - 1;
-      rebuildTerrainAndItems();
-      syncRobot3DPosition();
-      updateEnvironmentAndUI();
-      saveWorldState();
-      const nextLv = cur - 1;
-      showToast(`⛏️ 足元の土を掘って「${nextLv < 0 ? '地下' + Math.abs(nextLv) + '階' : nextLv + '段目'}」にしたよ！`);
-    } else if (type === 'gacha') {
-      openModal('modal-gacha');
-    } else if (type === 'diary') {
-      openModal('modal-diary');
+  function quickDropApple() {
+    WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z });
+    rebuildTerrainAndItems();
+    updateAllCamerasTransform();
+    saveWorldState();
+    closeFanMenu();
+    showToast('🍎 足元にリンゴを置いたよ！');
+  }
+
+  function quickStackBlock() {
+    const { x, z } = ROBOT.pos;
+    if (x < -2 || x > 2 || z < -2 || z > 2) return;
+    const key = `${x},${z}`;
+    const cur = HEIGHT_MAP[key] ?? 0;
+    if (cur >= 5) {
+      showToast('ここはすでに最高峰（地上5段目）だよ！');
+      closeFanMenu();
+      return;
     }
+    HEIGHT_MAP[key] = cur + 1;
+    rebuildTerrainAndItems();
+    syncRobot3DPosition();
+    updateAllCamerasTransform();
+    updateEnvironmentAndUI();
+    saveWorldState();
+    closeFanMenu();
+    showToast(`🪨 ブロックを1段積んで「${formatHeightText(cur + 1)}」にしたよ！`);
+  }
+
+  function quickDigBlock() {
+    const { x, z } = ROBOT.pos;
+    if (x < -2 || x > 2 || z < -2 || z > 2) return;
+    const key = `${x},${z}`;
+    const cur = HEIGHT_MAP[key] ?? 0;
+    if (cur <= -3) {
+      showToast('これ以上深くは掘れないよ（地下3階が底です）！');
+      closeFanMenu();
+      return;
+    }
+    HEIGHT_MAP[key] = cur - 1;
+    rebuildTerrainAndItems();
+    syncRobot3DPosition();
+    updateAllCamerasTransform();
+    updateEnvironmentAndUI();
+    saveWorldState();
+    closeFanMenu();
+    showToast(`⛏️ 地面を1段掘って「${formatHeightText(cur - 1)}」にしたよ！`);
   }
 
   function openModal(id) {
@@ -1426,9 +1426,8 @@
 
   function renderDiaryModal() {
     const h = getRobotHeightLevel();
-    const hText = h < 0 ? `地下${Math.abs(h)}階` : `地上${h}段目`;
     document.getElementById('diary-robo-name').innerText = `🤖 ロボ${ROBOT.gen}ごう（生存 ${GAME_DAY}日目）`;
-    document.getElementById('diary-robo-height').innerText = `現在の高さ：${hText} / 速度：${ROBOT.speed}`;
+    document.getElementById('diary-robo-height').innerText = `現在の場所：${formatHeightText(h)} / 移動速度：${ROBOT.speed}`;
 
     const grid = document.getElementById('bag-grid');
     grid.innerHTML = '';
@@ -1439,9 +1438,7 @@
       if (item === 'apple') slot.innerText = '🍎';
       else if (item === 'stone') slot.innerText = '🪨';
       else if (item === 'grass') slot.innerText = '🌿';
-      if (item) {
-        slot.onclick = () => useBagItem(i);
-      }
+      if (item) slot.onclick = () => useBagItem(i);
       grid.appendChild(slot);
     }
 
@@ -1460,7 +1457,7 @@
       }
       HEIGHT_MAP[key] = cur + 1;
       BAG.splice(index, 1);
-      showToast(`足元にブロックを積んだよ！`);
+      showToast(`足元にブロックを積んで「${formatHeightText(cur + 1)}」にしたよ！`);
     } else if (item === 'apple') {
       WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z });
       BAG.splice(index, 1);
@@ -1468,6 +1465,7 @@
     }
     rebuildTerrainAndItems();
     syncRobot3DPosition();
+    updateAllCamerasTransform();
     updateEnvironmentAndUI();
     saveWorldState();
     renderDiaryModal();
@@ -1480,8 +1478,8 @@
   document.getElementById('btn-spin').onclick = () => {
     const pool = [
       { type: 'apple', icon: '🍎', name: 'おいしいリンゴ（島に配置！）' },
-      { type: 'stone', icon: '🪨', name: '土・石ブロック（カバンに追加！）' },
-      { type: 'grass', icon: '🌿', name: '草ブロック（カバンに追加！）' }
+      { type: 'stone', icon: '🪨', name: '段差ブロック（カバンに追加！）' },
+      { type: 'grass', icon: '🌿', name: '星見の草ブロック（カバンに追加！）' }
     ];
     const picked = pool[Math.floor(Math.random() * pool.length)];
     const rx = Math.floor(Math.random() * 5) - 2;
@@ -1497,6 +1495,7 @@
     document.getElementById('gacha-result-text').innerText = `${picked.icon} ${picked.name}`;
     rebuildTerrainAndItems();
     syncRobot3DPosition();
+    updateAllCamerasTransform();
     updateEnvironmentAndUI();
     saveWorldState();
     showToast(`${picked.icon} ゲット！ごきげんアップ！`);
@@ -1504,17 +1503,17 @@
 
   function saveSettings() {
     safeStorage.setItem('ai_type', document.getElementById('setting-ai-type').value);
-    safeStorage.setItem('api_groq', document.getElementById('setting-groq-key').value.trim());
     safeStorage.setItem('api_gemini', document.getElementById('setting-gemini-key').value.trim());
+    safeStorage.setItem('api_groq', document.getElementById('setting-groq-key').value.trim());
     ROBOT.speed = Number(document.getElementById('setting-speed').value) || 3;
     saveWorldState();
     closeModal('modal-settings');
     showToast('⚙️ 設定を保存したよ！');
   }
 
-  document.getElementById('setting-ai-type').value = safeStorage.getItem('ai_type') || 'none';
-  document.getElementById('setting-groq-key').value = safeStorage.getItem('api_groq') || '';
+  document.getElementById('setting-ai-type').value = safeStorage.getItem('ai_type') || 'gemini';
   document.getElementById('setting-gemini-key').value = safeStorage.getItem('api_gemini') || '';
+  document.getElementById('setting-groq-key').value = safeStorage.getItem('api_groq') || '';
   document.getElementById('setting-speed').value = String(ROBOT.speed || 3);
 
   function showToast(msg) {
@@ -1524,53 +1523,56 @@
     setTimeout(() => { t.style.opacity = '0'; }, 2200);
   }
 
+  // 初回構築
   rebuildTerrainAndItems();
-  syncRobot3DPosition(true);
-  syncCameraButtonsUI();
+  syncRobot3DPosition();
+  updateAllCamerasTransform();
   updateEnvironmentAndUI();
 
   // ==========================================
   // 7. メインアニメーションループ
   // ==========================================
   const clock = new THREE.Clock();
-  let wfScrollY = 0;
+  let waveTick = 0;
 
   function animate() {
     requestAnimationFrame(animate);
     const t = clock.getElapsedTime();
 
-    robotGroup.position.lerp(targetRobotPos, 0.22);
-    const targetRotY = ROBOT.dirAngle || 0;
-    let diffRot = targetRotY - robotGroup.rotation.y;
-    while (diffRot < -Math.PI) diffRot += Math.PI * 2;
-    while (diffRot > Math.PI) diffRot -= Math.PI * 2;
-    robotGroup.rotation.y += diffRot * 0.22;
-
-    updateDualCamerasAndTransparency();
-
-    wfScrollY = (wfScrollY + 0.9) % 512;
-    renderWaterfallTexture(wfScrollY);
+    updateWaterfallCanvas();
     wfTex.needsUpdate = true;
 
-    drawSeaCanvas(t);
-    seaTex.needsUpdate = true;
+    waveTick += 0.02;
+    if (Math.floor(waveTick * 10) % 2 === 0) {
+      drawSeaSurface(t);
+      seaTex.needsUpdate = true;
+    }
 
-    turtleGroup.position.y = -8.8 + Math.sin(t * 0.7) * 0.15;
-    skyGroup.rotation.y += 0.0005;
+    const foamScale = 1 + Math.sin(t * 2.2) * 0.025;
+    foamRingMesh.scale.set(foamScale, foamScale, 1);
+
+    turtleGroup.position.y = -9.2 + Math.sin(t * 0.7) * 0.18;
+    turtleGroup.rotation.y = Math.sin(t * 0.25) * 0.06;
+
+    skyGroup.rotation.y += 0.0003;
+
+    rBody.scale.y = 1 + Math.sin(t * 4) * 0.03;
+    rHead.position.y = 0.83 + Math.sin(t * 4) * 0.02;
 
     renderer.render(scene, activeCamera);
   }
   animate();
 
   window.addEventListener('resize', () => {
-    const aspect = window.innerWidth / window.innerHeight;
-    groundCamera.aspect = aspect;
+    const a = window.innerWidth / window.innerHeight;
+    groundCamera.aspect = a;
     groundCamera.updateProjectionMatrix();
-    undergroundCamera.aspect = aspect;
+    undergroundCamera.aspect = a;
     undergroundCamera.updateProjectionMatrix();
+    robotCamera.aspect = a;
+    robotCamera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 </script>
 </body>
 </html>
-```
