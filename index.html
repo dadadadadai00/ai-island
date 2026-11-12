@@ -246,7 +246,7 @@
     <span>💭 ロボのきもち・心のさけび</span>
     <div class="ai-badge" id="ai-status">💤 待機中</div>
   </div>
-  <div id="message-box">ここは世界の果て。四角い大地のまわりを丸い海が包み込んで、白波を立てているよ！右のカメラボタンで地上・地下・ロボ目線を切り替えられるよ！</div>
+  <div id="message-box">ここは世界の果て。四角い大地のまわりを丸い海が包み込んで、白波を立てているよ！地下カメラにすると5×5の細かいブロックごとにスルスル透けて見えるよ！</div>
   <div class="action-history">
     <span class="history-tag" id="history-action">👟 やった事 待機中</span>
     <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖自動カメラ・地上0段目</span>
@@ -380,11 +380,13 @@
 
   // HEIGHT_MAP: -3(地下3階) 〜 0(平地) 〜 +5(地上5段目)
   let HEIGHT_MAP = {};
+  // CHIP_MAP: キャラが砕いたマスを5×5分割で記録（将来の地上物の部分破壊・掘削にも対応）
+  let CHIP_MAP = {};
+
   function initDefaultMap() {
     for (let x = -2; x <= 2; x++) {
       for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
     }
-    // 北西エリアに地下へ降りられる階段と地下空間を初期配置
     HEIGHT_MAP['-1,-2'] = -1;
     HEIGHT_MAP['-2,-2'] = -2;
     HEIGHT_MAP['-2,-1'] = -2;
@@ -428,6 +430,7 @@
           }
         }
       }
+      if (d.chipMap && typeof d.chipMap === 'object') CHIP_MAP = d.chipMap;
       if (Array.isArray(d.items)) WORLD_ITEMS = d.items;
       if (Array.isArray(d.bag)) BAG = d.bag;
       if (Array.isArray(d.logs) && d.logs.length > 0) DIARY_LOGS = d.logs;
@@ -443,6 +446,7 @@
       life: life.exportSave(),
       robot: ROBOT,
       heightMap: HEIGHT_MAP,
+      chipMap: CHIP_MAP,
       items: WORLD_ITEMS,
       bag: BAG,
       logs: DIARY_LOGS.slice(-15),
@@ -460,7 +464,7 @@
   loadWorldState();
 
   // ==========================================
-  // 2. 3D世界構築（スマホ高速化対応）
+  // 2. 3D世界構築（地下5×5分割一括描画＆省エネ自動ブレーキ）
   // ==========================================
   const container = document.getElementById('canvas-container');
   const scene = new THREE.Scene();
@@ -485,8 +489,16 @@
   dirLight.position.set(7, 15, 9);
   scene.add(dirLight);
 
-  // --- ブロック共通ジオメトリと軽量枠線テクスチャ（LineSegmentsを廃止して負荷を半減） ---
-  const sharedBlockGeo = new THREE.BoxGeometry(0.95, 0.5, 0.95);
+  // 省エネ自動ブレーキ用タイマー（操作時・行動時は3秒間60fpsで滑らかに動かす）
+  let activeUntilTime = performance.now() + 3500;
+  function wakeUpRenderer(durationMs = 2600) {
+    activeUntilTime = Math.max(activeUntilTime, performance.now() + durationMs);
+  }
+
+  // --- 地上用：1マス＝1ブロックのジオメトリ＆枠線テクスチャ ---
+  const sharedFullBlockGeo = new THREE.BoxGeometry(0.95, 0.5, 0.95);
+  const fullBlockEdgeGeo = new THREE.EdgesGeometry(sharedFullBlockGeo);
+
   const blockEdgeCanvas = document.createElement('canvas');
   blockEdgeCanvas.width = 64; blockEdgeCanvas.height = 64;
   const bCtx = blockEdgeCanvas.getContext('2d');
@@ -497,58 +509,153 @@
   bCtx.strokeRect(2, 2, 60, 60);
   const sharedBlockTex = new THREE.CanvasTexture(blockEdgeCanvas);
 
-  const terrainGroup = new THREE.Group();
-  scene.add(terrainGroup);
+  // --- 地下＆掘削用：1マスを5×5（25個）に分割した小ブロック一括描画（InstancedMesh） ---
+  const MAX_SUB_INSTANCES = 3200;
+  const subVoxelGeo = new THREE.BoxGeometry(0.184, 0.492, 0.184);
+
+  // ① 不透明な小ブロック用（奥側・地上モード時）
+  const opaqueSubMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const opaqueSubMesh = new THREE.InstancedMesh(subVoxelGeo, opaqueSubMat, MAX_SUB_INSTANCES);
+  opaqueSubMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(opaqueSubMesh);
+
+  // ② すりガラス半透明の小ブロック用（地下モードでカメラとキャラの間に入った小ブロック）
+  const glassSubMat = new THREE.MeshLambertMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.15,
+    depthWrite: false
+  });
+  const glassSubMesh = new THREE.InstancedMesh(subVoxelGeo, glassSubMat, MAX_SUB_INSTANCES);
+  glassSubMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(glassSubMesh);
+
+  const zeroMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+  const tempMatrix = new THREE.Matrix4();
+  const tempColor = new THREE.Color();
+
+  // 地下の「1マス＝1ブロック」の外枠輪郭がうっすらわかるライングループ
+  const macroOutlineGroup = new THREE.Group();
+  scene.add(macroOutlineGroup);
+  const macroOutlineMat = new THREE.LineBasicMaterial({
+    color: 0x94a3b8,
+    transparent: true,
+    opacity: 0.24,
+    depthWrite: false
+  });
+
+  // 地上の1マス＝1ブロック用グループ
+  const groundBlocksGroup = new THREE.Group();
+  scene.add(groundBlocksGroup);
   const itemGroup = new THREE.Group();
   scene.add(itemGroup);
 
   const stepColors = [0x86efac, 0x6ee7b7, 0xfde68a, 0xfcd34d, 0xfbbf24];
-  let terrainBlocksMeta = [];
+  let groundBlocksMeta = [];
+  let subVoxelsMeta = [];
 
   function rebuildTerrainAndItems() {
-    terrainBlocksMeta.forEach(b => b.mat.dispose());
-    while (terrainGroup.children.length > 0) terrainGroup.remove(terrainGroup.children[0]);
+    // 地上1マスブロックのクリア
+    groundBlocksMeta.forEach(b => b.mat.dispose());
+    while (groundBlocksGroup.children.length > 0) groundBlocksGroup.remove(groundBlocksGroup.children[0]);
+    while (macroOutlineGroup.children.length > 0) macroOutlineGroup.remove(macroOutlineGroup.children[0]);
     while (itemGroup.children.length > 0) itemGroup.remove(itemGroup.children[0]);
-    terrainBlocksMeta = [];
+
+    groundBlocksMeta = [];
+    subVoxelsMeta = [];
+
+    let subIdx = 0;
 
     for (let x = -2; x <= 2; x++) {
       for (let z = -2; z <= 2; z++) {
         const topLv = HEIGHT_MAP[`${x},${z}`] ?? 0;
 
         for (let lv = -3; lv <= topLv; lv++) {
-          let colorHex = 0xb9f6ca;
-          if (lv === 0) {
-            colorHex = (lv === topLv) ? 0xb9f6ca : 0x94a3b8;
-          } else if (lv > 0) {
-            colorHex = stepColors[Math.min(lv - 1, 4)];
-          } else {
-            if (lv === topLv) colorHex = 0xe2e8f0;
-            else if (lv === -1) colorHex = 0xa1887f;
-            else if (lv === -2) colorHex = 0x8d6e63;
-            else colorHex = 0x6d4c41;
-          }
-
-          // 普段は transparent: false にしてスマホの描画負荷を大幅に下げる
-          const mat = new THREE.MeshLambertMaterial({
-            color: colorHex,
-            map: sharedBlockTex,
-            transparent: false,
-            opacity: 1.0
-          });
-          const mesh = new THREE.Mesh(sharedBlockGeo, mat);
           const centerY = (lv - 0.5) * 0.5;
-          mesh.position.set(x, centerY, z);
+          const isFloorTile = (lv === topLv);
+          const chipKey = `${x},${z},${lv}`;
+          const chippedSet = CHIP_MAP[chipKey] || null;
 
-          terrainGroup.add(mesh);
-          terrainBlocksMeta.push({
-            mesh, mat,
-            gx: x, gz: z, lv, centerY,
-            isFloorTile: (lv === topLv)
-          });
+          // 地上（lv >= 0）で、かつ砕かれていないブロックは「1マス＝1ブロック」で配置
+          if (lv >= 0 && !chippedSet) {
+            let colorHex = 0xb9f6ca;
+            if (lv === 0) {
+              colorHex = isFloorTile ? 0xb9f6ca : 0x94a3b8;
+            } else {
+              colorHex = stepColors[Math.min(lv - 1, 4)];
+            }
+            const mat = new THREE.MeshLambertMaterial({
+              color: colorHex,
+              map: sharedBlockTex,
+              transparent: false,
+              opacity: 1.0
+            });
+            const mesh = new THREE.Mesh(sharedFullBlockGeo, mat);
+            mesh.position.set(x, centerY, z);
+            groundBlocksGroup.add(mesh);
+
+            groundBlocksMeta.push({
+              mesh, mat, gx: x, gz: z, lv, centerY, isFloorTile
+            });
+          } else {
+            // 地下層（lv < 0）またはキャラが5×5で砕いたブロックは「5×5＝25個の小ブロック」に分割！
+            // さらに「1マス＝1ブロック」の大きな区切りがうっすらわかる外枠線を追加
+            const outlineWire = new THREE.LineSegments(fullBlockEdgeGeo, macroOutlineMat);
+            outlineWire.position.set(x, centerY, z);
+            macroOutlineGroup.add(outlineWire);
+
+            let baseColorHex = 0x6d4c41;
+            if (lv >= 0) {
+              baseColorHex = (lv === 0) ? 0xb9f6ca : stepColors[Math.min(lv - 1, 4)];
+            } else if (isFloorTile) {
+              baseColorHex = 0xe2e8f0; // 掘られた地下の床タイル
+            } else if (lv === -1) {
+              baseColorHex = 0xa1887f;
+            } else if (lv === -2) {
+              baseColorHex = 0x8d6e63;
+            } else {
+              baseColorHex = 0x6d4c41;
+            }
+
+            for (let sx = 0; sx < 5; sx++) {
+              for (let sz = 0; sz < 5; sz++) {
+                if (chippedSet && chippedSet[`${sx},${sz}`]) continue;
+                if (subIdx >= MAX_SUB_INSTANCES) break;
+
+                const wx = x + (sx - 2) * 0.19;
+                const wz = z + (sz - 2) * 0.19;
+
+                // 5×5の粒感がわずかにわかる自然な色味差
+                const shade = ((sx + sz) % 2 === 0) ? 1.0 : 0.94;
+                tempColor.setHex(baseColorHex).multiplyScalar(shade);
+
+                opaqueSubMesh.setColorAt(subIdx, tempColor);
+                glassSubMesh.setColorAt(subIdx, tempColor);
+
+                const fullMat = new THREE.Matrix4().makeTranslation(wx, centerY, wz);
+                subVoxelsMeta.push({
+                  idx: subIdx,
+                  gx: x, gz: z,
+                  sx, sz,
+                  wx, wz,
+                  lv, centerY,
+                  isFloorTile,
+                  fullMat
+                });
+                subIdx++;
+              }
+            }
+          }
         }
       }
     }
 
+    opaqueSubMesh.count = subIdx;
+    glassSubMesh.count = subIdx;
+    if (opaqueSubMesh.instanceColor) opaqueSubMesh.instanceColor.needsUpdate = true;
+    if (glassSubMesh.instanceColor) glassSubMesh.instanceColor.needsUpdate = true;
+
+    // リンゴ・石・草アイテムの配置
     WORLD_ITEMS.forEach(it => {
       const h = (HEIGHT_MAP[`${it.x},${it.z}`] ?? 0) * 0.5;
       let mesh;
@@ -571,7 +678,7 @@
     });
   }
 
-  // --- 四角い大地を包む丸い海（初回1回だけ描画してGPU負荷ゼロに最適化） ---
+  // --- 四角い大地を包む丸い海（軽量テクスチャ） ---
   const seaCanvas = document.createElement('canvas');
   seaCanvas.width = 256; seaCanvas.height = 256;
   const sCtx = seaCanvas.getContext('2d');
@@ -607,7 +714,7 @@
   seaMesh.position.y = -0.35;
   scene.add(seaMesh);
 
-  // --- 上から下へゆったり流れ落ちる円形滝（UVスクロール方式でスマホ負荷ゼロ） ---
+  // --- 上から下へゆったり流れ落ちる円形滝（UVスクロール方式） ---
   const wfCanvas = document.createElement('canvas');
   wfCanvas.width = 256; wfCanvas.height = 256;
   const wfCtx = wfCanvas.getContext('2d');
@@ -615,7 +722,6 @@
     wfCtx.fillStyle = '#58c4f6';
     wfCtx.fillRect(0, 0, 256, 256);
 
-    // シームレスにつながる水色と白の縦ストライプ
     for (let i = 0; i < 36; i++) {
       const x = (i * 7) % 256;
       const y = (i * 37) % 256;
@@ -626,7 +732,6 @@
       if (y + h > 256) wfCtx.fillRect(x, y - 256, w, h);
     }
 
-    // シームレスな横長白泡
     wfCtx.fillStyle = 'rgba(255, 255, 255, 0.82)';
     for (let i = 0; i < 28; i++) {
       const bx = (i * 29 + 11) % 240 + 8;
@@ -691,7 +796,7 @@
 
   const starGeo = new THREE.BufferGeometry();
   const starPositions = [];
-  for (let i = 0; i < 450; i++) {
+  for (let i = 0; i < 420; i++) {
     const u = Math.random();
     const v = Math.random();
     const theta = u * 2.0 * Math.PI;
@@ -782,8 +887,8 @@
   function syncRobot3DPosition() {
     const gx = ROBOT.pos.x;
     const gz = ROBOT.pos.z;
-    const subOffsetX = ((ROBOT.pos.sx ?? 2) - 2) * 0.16;
-    const subOffsetZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.16;
+    const subOffsetX = ((ROBOT.pos.sx ?? 2) - 2) * 0.19;
+    const subOffsetZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.19;
 
     let baseY = 0;
     if (gx >= -2 && gx <= 2 && gz >= -2 && gz <= 2) {
@@ -810,7 +915,7 @@
   }
 
   // ==========================================
-  // 3. 3つのカメラと最小単位透過ルール（負荷軽減版）
+  // 3. 3つのカメラと「地下5×5小ブロックすりガラス透過＋地上1マス透過」
   // ==========================================
   let camTheta = Math.PI / 4;
   let camPhi = 1.05;
@@ -825,37 +930,50 @@
     document.getElementById('cam-fpv-btn').classList.toggle('cam-active', manualCameraMode === 'robot');
   }
 
-  function setBlockOpacity(b, targetAlpha) {
+  function setGroundBlockOpacity(b, targetAlpha) {
     const wantTransparent = targetAlpha < 0.99;
     if (b.mat.transparent !== wantTransparent) {
       b.mat.transparent = wantTransparent;
+      b.mat.depthWrite = !wantTransparent;
       b.mat.needsUpdate = true;
     }
     b.mat.opacity = targetAlpha;
   }
 
+  // 指でグリグリ回した時、地下は「5×5の小ブロックごと」にすりガラス透過＆出現し、地上は「1マス単位」で透過する
   function updateTransparencyAndOcclusion() {
     const mode = getEffectiveCameraMode();
 
-    // 地上カメラ・ロボット視点はブロックも滝も透過禁止（100%不透明）
+    // 地上カメラ・ロボット視点はすべて100%不透明（透過禁止）
     if (mode === 'ground' || mode === 'robot') {
       waterfallMat.opacity = 0.92;
       seaMat.opacity = 0.95;
-      for (let i = 0; i < terrainBlocksMeta.length; i++) {
-        setBlockOpacity(terrainBlocksMeta[i], 1.0);
+      macroOutlineGroup.visible = false;
+
+      for (let i = 0; i < groundBlocksMeta.length; i++) {
+        setGroundBlockOpacity(groundBlocksMeta[i], 1.0);
       }
+      for (let i = 0; i < subVoxelsMeta.length; i++) {
+        const sv = subVoxelsMeta[i];
+        opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+        glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+      }
+      opaqueSubMesh.instanceMatrix.needsUpdate = true;
+      glassSubMesh.instanceMatrix.needsUpdate = true;
       return;
     }
 
-    // 地下モード時：滝を透過し、カメラとキャラの間にあるブロックだけを1マス単位で透過
-    waterfallMat.opacity = 0.14;
-    seaMat.opacity = 0.25;
+    // 地下モード時：滝と海がうっすら見え、1マス＝1ブロックの輪郭もうっすら表示
+    waterfallMat.opacity = 0.16;
+    seaMat.opacity = 0.24;
+    macroOutlineGroup.visible = true;
 
     const camPos = undergroundCamera.position;
     const h = getRobotHeightLevel();
-    const focusX = (h < 0 && h !== -99) ? robotGroup.position.x : 0;
-    const focusY = (h < 0 && h !== -99) ? (robotGroup.position.y + 0.4) : -1.2;
-    const focusZ = (h < 0 && h !== -99) ? robotGroup.position.z : 0;
+    const isRobotUnderground = (h < 0 && h !== -99);
+    const focusX = isRobotUnderground ? robotGroup.position.x : 0;
+    const focusY = isRobotUnderground ? (robotGroup.position.y + 0.35) : -1.15;
+    const focusZ = isRobotUnderground ? robotGroup.position.z : 0;
 
     const dirX = camPos.x - focusX;
     const dirZ = camPos.z - focusZ;
@@ -863,21 +981,50 @@
     const nx = dirX / lenXZ;
     const nz = dirZ / lenXZ;
 
-    for (let i = 0; i < terrainBlocksMeta.length; i++) {
-      const b = terrainBlocksMeta[i];
-      if (b.isFloorTile && b.lv < 0) {
-        setBlockOpacity(b, 1.0);
-        continue;
-      }
-
+    // 1. 地上ブロック（lv >= 0）は「1マス＝1ブロック単位」でカメラ手前側をうっすら透過
+    for (let i = 0; i < groundBlocksMeta.length; i++) {
+      const b = groundBlocksMeta[i];
       const relX = b.gx - focusX;
       const relZ = b.gz - focusZ;
       const dotFront = relX * nx + relZ * nz;
       const perpDist = Math.abs(-relX * nz + relZ * nx);
 
-      const isBetweenCamAndTarget = (dotFront > -0.35 && perpDist < 1.85) || (b.centerY > focusY + 0.3 && dotFront > -0.8);
-      setBlockOpacity(b, isBetweenCamAndTarget ? 0.16 : 1.0);
+      // カメラの手前側または真上を覆う1マスブロックをすりガラス透過
+      const isFrontGround = (dotFront > -0.45 && perpDist < 1.95);
+      setGroundBlockOpacity(b, isFrontGround ? 0.18 : 1.0);
     }
+
+    // 2. 地下ブロック（5×5分割）は「1/5の小ブロック単位」でスルスルとすりガラス透過＆出現！
+    for (let i = 0; i < subVoxelsMeta.length; i++) {
+      const sv = subVoxelsMeta[i];
+
+      // 掘られた地下の床面タイルはロボットの足場としてくっきり残す
+      if (sv.isFloorTile && sv.lv < 0) {
+        opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+        glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+        continue;
+      }
+
+      // 小ブロック1個ずつの精密座標 (wx, wz) でカメラとの位置関係を計算
+      const relX = sv.wx - focusX;
+      const relZ = sv.wz - focusZ;
+      const dotFront = relX * nx + relZ * nz;       // 正ならカメラ手前側、負なら奥側
+      const perpDist = Math.abs(-relX * nz + relZ * nx); // 視線からの横ズレ距離
+
+      // 指でグリグリ回すと、視線の手前に入った小ブロックから5分の1刻みですりガラスになり、奥へ抜けると元の色に出現
+      const isSubVoxelInFront = (dotFront > -0.15 && perpDist < 1.55) || (sv.centerY > focusY + 0.25 && dotFront > -0.55 && perpDist < 1.85);
+
+      if (isSubVoxelInFront) {
+        opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+        glassSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+      } else {
+        opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+        glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+      }
+    }
+
+    opaqueSubMesh.instanceMatrix.needsUpdate = true;
+    glassSubMesh.instanceMatrix.needsUpdate = true;
   }
 
   function updateAllCamerasTransform() {
@@ -950,6 +1097,7 @@
   }
 
   document.getElementById('cam-ground-btn').onclick = () => {
+    wakeUpRenderer();
     if (manualCameraMode === 'ground') {
       manualCameraMode = null;
       showToast('🤖 キャラに合わせたカメラに戻したよ！');
@@ -963,19 +1111,21 @@
   };
 
   document.getElementById('cam-ug-btn').onclick = () => {
+    wakeUpRenderer();
     if (manualCameraMode === 'underground') {
       manualCameraMode = null;
       showToast('🤖 キャラに合わせたカメラに戻したよ！');
     } else {
       manualCameraMode = 'underground';
       camPhi = 1.08;
-      showToast('⛏️ 地下カメラON（手前のブロックと滝を透過）');
+      showToast('⛏️ 地下カメラON（5×5小ブロックすりガラス透過）');
     }
     cameraDirty = true;
     updateEnvironmentAndUI();
   };
 
   document.getElementById('cam-fpv-btn').onclick = () => {
+    wakeUpRenderer();
     if (manualCameraMode === 'robot') {
       manualCameraMode = null;
       camPhi = 1.05;
@@ -989,12 +1139,12 @@
     updateEnvironmentAndUI();
   };
 
-  // スワイプ時は角度の数値だけを更新し、重い計算はアニメーションループ側で1フレーム1回だけ実行
   const domElem = renderer.domElement;
   domElem.addEventListener('pointerdown', (e) => {
     isDragging = true;
     prevPointer.x = e.clientX;
     prevPointer.y = e.clientY;
+    wakeUpRenderer();
   }, { passive: true });
 
   window.addEventListener('pointermove', (e) => {
@@ -1006,6 +1156,7 @@
     camTheta -= dx * 0.0085;
     camPhi += dy * 0.0075;
     cameraDirty = true;
+    wakeUpRenderer();
   }, { passive: true });
 
   window.addEventListener('pointerup', () => { isDragging = false; }, { passive: true });
@@ -1013,6 +1164,7 @@
   domElem.addEventListener('wheel', (e) => {
     camRadius += e.deltaY * 0.01;
     cameraDirty = true;
+    wakeUpRenderer();
   }, { passive: true });
 
   // ==========================================
@@ -1135,6 +1287,7 @@
   }
 
   async function executeTurn() {
+    wakeUpRenderer(4000);
     const btn = document.getElementById('btn-action');
     btn.disabled = true;
     document.getElementById('ai-status').innerText = '⚡ 思考中...';
@@ -1245,7 +1398,7 @@
         if (newH < 0 && newH !== -99) {
           life.mental += 10;
           actionLabel = `⛏️ ${chosenDir.name}へ進んで地下${Math.abs(newH)}階へ！`;
-          thoughtText = aiDecision?.thought || `地下${Math.abs(newH)}階の空間に潜ったよ！手前のブロックが透けて中がよく見えるね！`;
+          thoughtText = aiDecision?.thought || `地下${Math.abs(newH)}階に潜ったよ！指でカメラを回すと5×5の小ブロックがスルスル透けて見えるね！`;
         } else if (newH > prevH) {
           life.mental += 10;
           actionLabel = `👟 ${chosenDir.name}へ1段登った（${formatHeightText(newH)}）`;
@@ -1317,6 +1470,7 @@
   // ==========================================
   const fanWrapper = document.getElementById('fan-menu-wrapper');
   document.getElementById('plus-main-btn').onclick = () => {
+    wakeUpRenderer();
     fanWrapper.classList.toggle('open');
   };
   function closeFanMenu() {
@@ -1324,6 +1478,7 @@
   }
 
   function quickDropApple() {
+    wakeUpRenderer();
     WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z });
     rebuildTerrainAndItems();
     cameraDirty = true;
@@ -1333,6 +1488,7 @@
   }
 
   function quickStackBlock() {
+    wakeUpRenderer();
     const { x, z } = ROBOT.pos;
     if (x < -2 || x > 2 || z < -2 || z > 2) return;
     const key = `${x},${z}`;
@@ -1353,6 +1509,7 @@
   }
 
   function quickDigBlock() {
+    wakeUpRenderer();
     const { x, z } = ROBOT.pos;
     if (x < -2 || x > 2 || z < -2 || z > 2) return;
     const key = `${x},${z}`;
@@ -1373,12 +1530,14 @@
   }
 
   function openModal(id) {
+    wakeUpRenderer();
     if (id === 'modal-diary') renderDiaryModal();
     const el = document.getElementById(id);
     el.style.display = 'flex';
     el.classList.add('active');
   }
   function closeModal(id) {
+    wakeUpRenderer();
     const el = document.getElementById(id);
     el.classList.remove('active');
     el.style.display = 'none';
@@ -1406,6 +1565,7 @@
   }
 
   function useBagItem(index) {
+    wakeUpRenderer();
     const item = BAG[index];
     if (!item) return;
     const key = `${ROBOT.pos.x},${ROBOT.pos.z}`;
@@ -1436,6 +1596,7 @@
   document.getElementById('btn-action').onclick = executeTurn;
 
   document.getElementById('btn-spin').onclick = () => {
+    wakeUpRenderer();
     const pool = [
       { type: 'apple', icon: '🍎', name: 'おいしいリンゴ（島に配置！）' },
       { type: 'stone', icon: '🪨', name: '段差ブロック（カバンに追加！）' },
@@ -1490,24 +1651,31 @@
   updateEnvironmentAndUI();
 
   // ==========================================
-  // 7. メインアニメーションループ（超軽量化）
+  // 7. メインアニメーションループ（省エネ自動ブレーキ搭載）
   // ==========================================
   const clock = new THREE.Clock();
+  let lastRenderTime = 0;
 
-  function animate() {
+  function animate(now) {
     requestAnimationFrame(animate);
+
+    // 省エネ自動ブレーキ：指で触っている時・行動中は60fps、放置中は約15fps（64ms間隔）に抑えてスマホの発熱を防止
+    const isHighPerf = isDragging || cameraDirty || (now < activeUntilTime);
+    if (!isHighPerf && (now - lastRenderTime < 64)) {
+      return;
+    }
+    lastRenderTime = now;
+
     const t = clock.getElapsedTime();
 
-    // カメラが動いた時だけ座標とブロック透過を計算する
     if (cameraDirty) {
       updateAllCamerasTransform();
       cameraDirty = false;
     }
 
-    // 滝：絵を描き直さず位置だけずらすことでスマホでも超なめらかに上から下へ流れる
-    wfTex.offset.y += 0.0028;
+    // 滝のUVスクロール（待機中も速度が一定になるよう時間連動）
+    wfTex.offset.y = (t * 0.17) % 1.0;
 
-    // 海と滝壺のゆったりした呼吸
     const seaPulse = 1 + Math.sin(t * 1.8) * 0.006;
     seaMesh.scale.set(seaPulse, 1, seaPulse);
 
@@ -1517,14 +1685,14 @@
     turtleGroup.position.y = -9.2 + Math.sin(t * 0.7) * 0.18;
     turtleGroup.rotation.y = Math.sin(t * 0.25) * 0.06;
 
-    skyGroup.rotation.y += 0.0003;
+    skyGroup.rotation.y = t * 0.015;
 
     rBody.scale.y = 1 + Math.sin(t * 4) * 0.03;
     rHead.position.y = 0.83 + Math.sin(t * 4) * 0.02;
 
     renderer.render(scene, activeCamera);
   }
-  animate();
+  requestAnimationFrame(animate);
 
   window.addEventListener('resize', () => {
     const a = window.innerWidth / window.innerHeight;
@@ -1536,6 +1704,7 @@
     robotCamera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
     cameraDirty = true;
+    wakeUpRenderer();
   });
 </script>
 </body>
