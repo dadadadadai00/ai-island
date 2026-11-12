@@ -311,8 +311,8 @@
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   container.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-  const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.88);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.72));
+  const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.82);
   dirLight.position.set(7, 15, 9);
   scene.add(dirLight);
 
@@ -330,24 +330,28 @@
   const sharedBlockTex = new THREE.CanvasTexture(blockEdgeCanvas);
 
   const MAX_SUB_INSTANCES = 3200;
-  const subVoxelGeo = new THREE.BoxGeometry(0.20, 0.50, 0.20);
+  const subVoxelGeo = new THREE.BoxGeometry(0.201, 0.501, 0.201);
 
-  const opaqueSubMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-  const opaqueSubMesh = new THREE.InstancedMesh(subVoxelGeo, opaqueSubMat, MAX_SUB_INSTANCES);
+  // 分割線なし・完全消去時は MeshBasicMaterial を使って側面ごとの明暗縦縞（ノコギリ状の分割筋）を完全にゼロにする
+  const flatOpaqueSubMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const shadedOpaqueSubMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const opaqueSubMesh = new THREE.InstancedMesh(subVoxelGeo, flatOpaqueSubMat, MAX_SUB_INSTANCES);
   opaqueSubMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   opaqueSubMesh.renderOrder = 0;
   scene.add(opaqueSubMesh);
 
-  // 分割線なし時にすりガラス内側の壁の重なり線を消す深度プリパス
   const glassDepthMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, depthTest: true });
   const glassDepthMesh = new THREE.InstancedMesh(subVoxelGeo, glassDepthMat, MAX_SUB_INSTANCES);
   glassDepthMesh.renderOrder = 9;
   scene.add(glassDepthMesh);
 
-  const glassSubMat = new THREE.MeshLambertMaterial({
-    color: 0xffffff, transparent: true, opacity: 0.26, depthWrite: false, depthTest: true, depthFunc: THREE.LessEqualDepth
+  const flatGlassSubMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff, transparent: true, opacity: 0.24, depthWrite: false, depthTest: true, depthFunc: THREE.LessEqualDepth
   });
-  const glassSubMesh = new THREE.InstancedMesh(subVoxelGeo, glassSubMat, MAX_SUB_INSTANCES);
+  const shadedGlassSubMat = new THREE.MeshLambertMaterial({
+    color: 0xffffff, transparent: true, opacity: 0.16, depthWrite: false, depthTest: true, depthFunc: THREE.LessDepth
+  });
+  const glassSubMesh = new THREE.InstancedMesh(subVoxelGeo, flatGlassSubMat, MAX_SUB_INSTANCES);
   glassSubMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   glassSubMesh.renderOrder = 10;
   glassDepthMesh.instanceMatrix = glassSubMesh.instanceMatrix;
@@ -377,9 +381,9 @@
     groundBlocksMeta = []; subVoxelsMeta = [];
 
     const showLines = (CAM_VISUAL_STYLE === 'glass_line');
-    glassSubMat.depthFunc = showLines ? THREE.LessDepth : THREE.LessEqualDepth;
-    glassSubMat.opacity = showLines ? 0.16 : 0.26;
-    glassSubMat.needsUpdate = true;
+    // ①線なし・③完全消去の時はフラット材質にして、5×5小ブロックの側面に縦縞が一切出ないようにする
+    opaqueSubMesh.material = showLines ? shadedOpaqueSubMat : flatOpaqueSubMat;
+    glassSubMesh.material = showLines ? shadedGlassSubMat : flatGlassSubMat;
 
     let subIdx = 0;
     for (let x = -2; x <= 2; x++) {
@@ -390,8 +394,13 @@
           const isFloorTile = (lv === topLv);
           const chippedSet = CHIP_MAP[`${x},${z},${lv}`] || null;
 
-          if (lv >= 0 && !chippedSet) {
-            const colorHex = (lv === 0) ? (isFloorTile ? 0xb9f6ca : 0x94a3b8) : stepColors[Math.min(lv - 1, 4)];
+          // 地上ブロック（lv>=0）および「掘られた地下の白い床タイル（isFloorTile）」はつなぎ目のない1マス箱で描画
+          if ((lv >= 0 || isFloorTile) && !chippedSet) {
+            let colorHex = 0xb9f6ca;
+            if (lv < 0) colorHex = 0xf1f5f9; // 地下の白い床タイル（分割筋ゼロでパキッと表示）
+            else if (lv === 0) colorHex = isFloorTile ? 0xb9f6ca : 0x94a3b8;
+            else colorHex = stepColors[Math.min(lv - 1, 4)];
+
             const mat = new THREE.MeshLambertMaterial({ color: colorHex, map: showLines ? sharedBlockTex : null, transparent: false, opacity: 1.0 });
             const mesh = new THREE.Mesh(sharedFullBlockGeo, mat);
             mesh.position.set(x, centerY, z);
@@ -407,36 +416,36 @@
             depthMesh.visible = false;
             groundBlocksGroup.add(depthMesh);
 
-            groundBlocksMeta.push({ mesh, mat, depthMesh, depthMat, gx: x, gz: z, lv, centerY, isFloorTile });
+            groundBlocksMeta.push({ mesh, mat, depthMesh, depthMat, gx: x, gz: z, lv, centerY, isFloorTile, topLv });
           } else {
+            // 地下の土ブロック（1マス＝5×5の25分割構造を維持）
             if (showLines) {
               const outlineWire = new THREE.LineSegments(fullBlockEdgeGeo, macroOutlineMat);
               outlineWire.position.set(x, centerY, z);
               macroOutlineGroup.add(outlineWire);
             }
-            let baseColorHex = 0x6d4c41;
-            if (lv >= 0) baseColorHex = (lv === 0) ? 0xb9f6ca : stepColors[Math.min(lv - 1, 4)];
-            else if (isFloorTile) baseColorHex = 0xe2e8f0;
-            else if (lv === -1) baseColorHex = 0xa1887f;
+            let baseColorHex = 0x795548;
+            if (lv === -1) baseColorHex = 0xa1887f;
             else if (lv === -2) baseColorHex = 0x8d6e63;
+            else baseColorHex = 0x6d4c41;
 
             for (let sx = 0; sx < 5; sx++) {
               for (let sz = 0; sz < 5; sz++) {
                 if (chippedSet && chippedSet[`${sx},${sz}`]) continue;
                 if (subIdx >= MAX_SUB_INSTANCES) break;
                 const wx = x + (sx - 2) * 0.20, wz = z + (sz - 2) * 0.20;
-                const shade = showLines ? (((sx + sz) % 2 === 0) ? 1.0 : 0.91) : 1.0;
+                const shade = showLines ? (((sx + sz) % 2 === 0) ? 1.0 : 0.90) : 1.0;
                 tempColor.setHex(baseColorHex).multiplyScalar(shade);
                 opaqueSubMesh.setColorAt(subIdx, tempColor);
                 glassSubMesh.setColorAt(subIdx, tempColor);
 
                 const fullMat = new THREE.Matrix4();
                 if (showLines) {
-                  fullMat.compose(new THREE.Vector3(wx, centerY, wz), new THREE.Quaternion(), new THREE.Vector3(0.90, 0.96, 0.90));
+                  fullMat.compose(new THREE.Vector3(wx, centerY, wz), new THREE.Quaternion(), new THREE.Vector3(0.88, 0.95, 0.88));
                 } else {
                   fullMat.makeTranslation(wx, centerY, wz);
                 }
-                subVoxelsMeta.push({ idx: subIdx, gx: x, gz: z, sx, sz, wx, wz, lv, centerY, isFloorTile, fullMat });
+                subVoxelsMeta.push({ idx: subIdx, gx: x, gz: z, sx, sz, wx, wz, lv, centerY, isFloorTile, topLv, fullMat });
                 subIdx++;
               }
             }
@@ -472,7 +481,7 @@
     });
   }
 
-  // 海テクスチャ
+  // 海テクスチャ（島の真下5×5エリアをくり抜いて、地下に水色のモヤがかからないようにする！）
   const seaCanvas = document.createElement('canvas');
   seaCanvas.width = 256; seaCanvas.height = 256;
   const sCtx = seaCanvas.getContext('2d');
@@ -487,11 +496,13 @@
     const ang = (i / 55) * Math.PI * 2 + (i % 3) * 0.4, dist = 74 + (i * 17 % 50);
     sCtx.beginPath(); sCtx.arc(128 + Math.cos(ang) * dist, 128 + Math.sin(ang) * dist, 2 + (i % 4) * 1.3, 0, Math.PI * 2); sCtx.fill();
   }
-  sCtx.strokeStyle = 'rgba(255,255,255,0.9)'; sCtx.lineWidth = 6; sCtx.strokeRect(69, 69, 118, 118);
+  // 島の5×5マスの内側は透明にくり抜いて地下視界を100%クリアにする
+  sCtx.clearRect(70, 70, 116, 116);
+  sCtx.strokeStyle = 'rgba(255,255,255,0.92)'; sCtx.lineWidth = 6; sCtx.strokeRect(69, 69, 118, 118);
 
   const seaGeo = new THREE.CircleGeometry(5.1, 48); seaGeo.rotateX(-Math.PI / 2);
   const seaMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(seaCanvas), transparent: true, opacity: 0.95, depthWrite: false });
-  const seaMesh = new THREE.Mesh(seaGeo, seaMat); seaMesh.position.y = -0.35; seaMesh.renderOrder = 1;
+  const seaMesh = new THREE.Mesh(seaGeo, seaMat); seaMesh.position.y = -0.35;
   scene.add(seaMesh);
 
   // 滝テクスチャ
@@ -512,7 +523,7 @@
   wfTex.wrapS = THREE.RepeatWrapping; wfTex.wrapT = THREE.RepeatWrapping; wfTex.repeat.set(3, 1.5);
   const waterfallMat = new THREE.MeshBasicMaterial({ map: wfTex, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false });
   const waterfallMesh = new THREE.Mesh(new THREE.CylinderGeometry(5.1, 5.2, 6.4, 48, 1, true), waterfallMat);
-  waterfallMesh.position.y = -3.55; waterfallMesh.renderOrder = 1;
+  waterfallMesh.position.y = -3.55;
   scene.add(waterfallMesh);
 
   const foamRingGeo = new THREE.RingGeometry(3.8, 6.3, 48); foamRingGeo.rotateX(-Math.PI / 2);
@@ -534,7 +545,6 @@
   });
   turtleGroup.position.y = -9.2; scene.add(turtleGroup);
 
-  // 星空・4大星座
   const skyGroup = new THREE.Group(); scene.add(skyGroup);
   const starGeo = new THREE.BufferGeometry(), starPos = [];
   for (let i = 0; i < 420; i++) {
@@ -562,7 +572,6 @@
   addConstellation('🥄 北斗七星', [[26,20,-8],[26,17,-3],[25,15,2],[24,12,6],[24,8,10],[27,7,14],[27,11,11]], [26,4,5]);
   addConstellation('🏹 オリオン座', [[-5,20,26],[5,20,26],[-2,14,28],[0,14,28],[2,14,28],[-5,8,26],[5,8,26]], [0,4,28]);
 
-  // ロボット
   const robotGroup = new THREE.Group();
   const rBody = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.50, 0.34), new THREE.MeshLambertMaterial({ color: 0x38bdf8 })); rBody.position.y = 0.37; robotGroup.add(rBody);
   const rHead = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.42, 0.40), new THREE.MeshLambertMaterial({ color: 0xbae6fd })); rHead.position.y = 0.83; robotGroup.add(rHead);
@@ -599,6 +608,11 @@
   }
 
   function applyGroundBlockState(b, isFrontInUnderground) {
+    // 地下の白い床タイル（lv < 0 && isFloorTile）はロボットの足場なので常に100%くっきり表示
+    if (b.lv < 0 && b.isFloorTile) {
+      b.mesh.visible = true; b.mesh.renderOrder = 0; b.depthMesh.visible = false;
+      return;
+    }
     const showLines = (CAM_VISUAL_STYLE === 'glass_line');
     if (!isFrontInUnderground) {
       b.mesh.visible = true; b.mesh.renderOrder = 0; b.depthMesh.visible = false;
@@ -614,7 +628,7 @@
       b.depthMesh.visible = !showLines;
       if (!b.mat.transparent) { b.mat.transparent = true; b.mat.depthWrite = false; b.mat.needsUpdate = true; }
       b.mat.depthFunc = showLines ? THREE.LessDepth : THREE.LessEqualDepth;
-      b.mat.opacity = showLines ? 0.18 : 0.24;
+      b.mat.opacity = showLines ? 0.16 : 0.22;
     }
   }
 
@@ -623,6 +637,7 @@
     const showLines = (CAM_VISUAL_STYLE === 'glass_line');
 
     if (mode === 'ground' || mode === 'robot') {
+      if (waterfallMat.side !== THREE.DoubleSide) { waterfallMat.side = THREE.DoubleSide; waterfallMat.needsUpdate = true; }
       waterfallMat.opacity = 0.92; seaMat.opacity = 0.95;
       macroOutlineGroup.visible = false; glassDepthMesh.visible = false; glassSubMesh.visible = false;
       for (let i = 0; i < groundBlocksMeta.length; i++) applyGroundBlockState(groundBlocksMeta[i], false);
@@ -631,7 +646,11 @@
       return;
     }
 
-    waterfallMat.opacity = 0.16; seaMat.opacity = 0.24;
+    // 地下モード時：手前側の滝がカメラの前にかぶって白く濁るのを防ぐため、BackSide（島の奥側の滝だけ表示）に切り替える！
+    if (waterfallMat.side !== THREE.BackSide) { waterfallMat.side = THREE.BackSide; waterfallMat.needsUpdate = true; }
+    waterfallMat.opacity = 0.32;
+    seaMat.opacity = 0.25;
+
     macroOutlineGroup.visible = showLines;
     const useFrostedGlass = (CAM_VISUAL_STYLE !== 'hide');
     glassSubMesh.visible = useFrostedGlass;
@@ -641,29 +660,30 @@
     const h = getRobotHeightLevel();
     const isUG = (h < 0 && h !== -99);
     const focusX = isUG ? robotGroup.position.x : 0;
-    const focusY = isUG ? (robotGroup.position.y + 0.35) : -1.15;
     const focusZ = isUG ? robotGroup.position.z : 0;
 
     const dirX = camPos.x - focusX, dirZ = camPos.z - focusZ;
     const lenXZ = Math.hypot(dirX, dirZ) || 1;
     const nx = dirX / lenXZ, nz = dirZ / lenXZ;
 
+    // 1. 地上ブロック（lv >= 0）の手前判定
     for (let i = 0; i < groundBlocksMeta.length; i++) {
-      const b = groundBlocksMeta[i], relX = b.gx - focusX, relZ = b.gz - focusZ;
+      const b = groundBlocksMeta[i];
+      if (b.lv < 0) { applyGroundBlockState(b, false); continue; }
+      const relX = b.gx - focusX, relZ = b.gz - focusZ;
       const dotFront = relX * nx + relZ * nz, perpDist = Math.abs(-relX * nz + relZ * nx);
-      applyGroundBlockState(b, dotFront > -0.45 && perpDist < 1.95);
+      // 地下を見やすくするため、カメラの手前側にある地上ブロックを広く透過／消去
+      const isFrontGround = (dotFront > -0.75 && perpDist < 2.35);
+      applyGroundBlockState(b, isFrontGround);
     }
 
+    // 2. 地下の5×5分割小ブロックの手前判定＆出現判定
     for (let i = 0; i < subVoxelsMeta.length; i++) {
       const sv = subVoxelsMeta[i];
-      if (sv.isFloorTile && sv.lv < 0) {
-        opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
-        if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
-        continue;
-      }
       const relX = sv.wx - focusX, relZ = sv.wz - focusZ;
       const dotFront = relX * nx + relZ * nz, perpDist = Math.abs(-relX * nz + relZ * nx);
-      const inFront = (dotFront > -0.15 && perpDist < 1.55) || (sv.centerY > focusY + 0.25 && dotFront > -0.55 && perpDist < 1.85);
+      const inFront = (dotFront > -0.35 && perpDist < 2.15);
+
       if (inFront) {
         opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
         if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, sv.fullMat);
