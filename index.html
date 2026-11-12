@@ -7,192 +7,74 @@
   <title>ボクセルAI自律思考水槽</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background-color: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
-
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
     #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; display: block; touch-action: none; }
-
-    /* 上部ステータス枠 */
-    #status-panel {
-      position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
-      width: 94%; max-width: 420px; background: rgba(255, 255, 255, 0.96);
-      border-radius: 18px; box-shadow: 0 4px 18px rgba(0,0,0,0.28);
-      padding: 10px 12px; z-index: 10;
-      transition: opacity 0.3s ease, transform 0.3s ease;
-    }
-    #status-panel.sky-hidden {
-      opacity: 0; pointer-events: none; transform: translate(-50%, -20px);
-    }
-
+    #status-panel { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); width: 94%; max-width: 420px; background: rgba(255,255,255,0.96); border-radius: 18px; box-shadow: 0 4px 18px rgba(0,0,0,0.28); padding: 10px 12px; z-index: 10; transition: opacity 0.3s, transform 0.3s; }
+    #status-panel.sky-hidden { opacity: 0; pointer-events: none; transform: translate(-50%, -20px); }
     .gauge-container { display: flex; justify-content: space-between; gap: 6px; }
-    .gauge-box {
-      flex: 1; background: #f8fafc; border: 1px solid #e2e8f0;
-      border-radius: 10px; padding: 5px 6px; text-align: center;
-    }
+    .gauge-box { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 5px 6px; text-align: center; }
     .gauge-title { font-size: 11px; font-weight: 800; color: #334155; margin-bottom: 4px; white-space: nowrap; }
     .gauge-bar-bg { width: 100%; height: 6px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
-    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.35s ease; }
-
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.35s; }
     #bar-stamina { background: #ef4444; }
     #bar-life { background: #eab308; }
     #bar-mental { background: #10b981; }
-
-    .robot-status-row {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-top: 8px; padding-top: 6px; border-top: 1px solid #f1f5f9;
-      gap: 4px; flex-wrap: nowrap;
-    }
+    .robot-status-row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 6px; border-top: 1px solid #f1f5f9; gap: 4px; flex-wrap: nowrap; }
     .status-left-group { display: flex; align-items: center; gap: 5px; flex-shrink: 1; min-width: 0; }
     .status-right-group { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
-
     .robot-id-tag { font-size: 11px; font-weight: 900; color: #334155; white-space: nowrap; }
-    .badge {
-      font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px;
-      display: inline-flex; align-items: center; justify-content: center; gap: 2px; white-space: nowrap;
-    }
+    .badge { font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px; display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
     .badge-days { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
     .badge-time { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
     .badge-mood { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
-    .btn-icon {
-      width: 26px; height: 26px; border-radius: 50%; background: #f1f5f9;
-      display: flex; justify-content: center; align-items: center;
-      font-size: 14px; cursor: pointer; border: 1px solid #cbd5e1; flex-shrink: 0;
-    }
-
-    /* 右側の縦並びアイコン列（📖・🌌・⛏️・🤖） */
-    #side-icon-column {
-      position: fixed; top: 122px; right: 14px;
-      display: flex; flex-direction: column; gap: 10px; z-index: 12;
-    }
-    .side-circle-btn {
-      width: 46px; height: 46px; background: rgba(255,255,255,0.96); border-radius: 50%;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex;
-      justify-content: center; align-items: center; font-size: 21px; cursor: pointer;
-      border: 2.5px solid #e2e8f0; position: relative;
-      transition: transform 0.18s ease, background-color 0.18s, border-color 0.18s;
-    }
+    .btn-icon { width: 26px; height: 26px; border-radius: 50%; background: #f1f5f9; display: flex; justify-content: center; align-items: center; font-size: 14px; cursor: pointer; border: 1px solid #cbd5e1; flex-shrink: 0; }
+    #side-icon-column { position: fixed; top: 122px; right: 14px; display: flex; flex-direction: column; gap: 10px; z-index: 12; }
+    .side-circle-btn { width: 46px; height: 46px; background: rgba(255,255,255,0.96); border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex; justify-content: center; align-items: center; font-size: 21px; cursor: pointer; border: 2.5px solid #e2e8f0; position: relative; transition: transform 0.18s, background-color 0.18s, border-color 0.18s; }
     .side-circle-btn:active { transform: scale(0.92); }
-
-    .side-circle-btn.cam-active {
-      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-      border-color: #fde047;
-      box-shadow: 0 0 0 3px rgba(253, 224, 71, 0.55), 0 6px 14px rgba(29, 78, 216, 0.5);
-      transform: scale(1.08);
-    }
-    .side-circle-btn.cam-active::after {
-      content: 'ON';
-      position: absolute; bottom: -5px; right: -4px;
-      background: #ef4444; color: #ffffff;
-      font-size: 9px; font-weight: 900; padding: 1px 5px;
-      border-radius: 999px; border: 1.5px solid #ffffff;
-      line-height: 1.1; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    }
-
-    /* 中央下部の「＋」と扇状メニュー */
-    #fan-menu-wrapper {
-      position: fixed; bottom: 206px; left: 50%; transform: translateX(-50%);
-      width: 50px; height: 50px; z-index: 15;
-    }
-    #plus-main-btn {
-      width: 50px; height: 50px; border-radius: 50%;
-      background: rgba(255,255,255,0.98); border: 2px solid #e2e8f0;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.28);
-      display: flex; justify-content: center; align-items: center;
-      font-size: 28px; font-weight: bold; color: #334155; cursor: pointer;
-      position: relative; z-index: 2;
-      transition: transform 0.22s ease, background-color 0.22s ease;
-    }
-    #fan-menu-wrapper.open #plus-main-btn {
-      transform: rotate(45deg); background: #f1f5f9;
-    }
-    .fan-item {
-      position: absolute; top: 4px; left: 4px;
-      width: 42px; height: 42px; border-radius: 50%;
-      background: rgba(255,255,255,0.98); border: 2px solid #cbd5e1;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.22);
-      display: flex; flex-direction: column; justify-content: center; align-items: center;
-      font-size: 18px; cursor: pointer;
-      opacity: 0; pointer-events: none; transform: translate(0, 0) scale(0.4);
-      transition: transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
-      z-index: 1;
-    }
-    .fan-label {
-      position: absolute; bottom: -16px; font-size: 9px; font-weight: 900;
-      color: #ffffff; background: rgba(15,23,42,0.85); padding: 1px 5px;
-      border-radius: 6px; white-space: nowrap; pointer-events: none;
-    }
+    .side-circle-btn.cam-active { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-color: #fde047; box-shadow: 0 0 0 3px rgba(253,224,71,0.55), 0 6px 14px rgba(29,78,216,0.5); transform: scale(1.08); }
+    .side-circle-btn.cam-active::after { content: 'ON'; position: absolute; bottom: -5px; right: -4px; background: #ef4444; color: #fff; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 999px; border: 1.5px solid #fff; line-height: 1.1; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+    #fan-menu-wrapper { position: fixed; bottom: 206px; left: 50%; transform: translateX(-50%); width: 50px; height: 50px; z-index: 15; }
+    #plus-main-btn { width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.98); border: 2px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.28); display: flex; justify-content: center; align-items: center; font-size: 28px; font-weight: bold; color: #334155; cursor: pointer; position: relative; z-index: 2; transition: transform 0.22s, background-color 0.22s; }
+    #fan-menu-wrapper.open #plus-main-btn { transform: rotate(45deg); background: #f1f5f9; }
+    .fan-item { position: absolute; top: 4px; left: 4px; width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,0.98); border: 2px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.22); display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 18px; cursor: pointer; opacity: 0; pointer-events: none; transform: translate(0,0) scale(0.4); transition: transform 0.26s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s; z-index: 1; }
+    .fan-label { position: absolute; bottom: -16px; font-size: 9px; font-weight: 900; color: #fff; background: rgba(15,23,42,0.85); padding: 1px 5px; border-radius: 6px; white-space: nowrap; pointer-events: none; }
     #fan-menu-wrapper.open .fan-item { opacity: 1; pointer-events: auto; }
     #fan-menu-wrapper.open .fan-item:nth-child(1) { transform: translate(-102px, -36px) scale(1); }
     #fan-menu-wrapper.open .fan-item:nth-child(2) { transform: translate(-54px, -74px) scale(1); }
     #fan-menu-wrapper.open .fan-item:nth-child(3) { transform: translate(0px, -90px) scale(1); }
     #fan-menu-wrapper.open .fan-item:nth-child(4) { transform: translate(54px, -74px) scale(1); }
     #fan-menu-wrapper.open .fan-item:nth-child(5) { transform: translate(102px, -36px) scale(1); }
-
-    /* 下部パネル */
-    #bottom-panel {
-      position: fixed; bottom: 0; left: 0; width: 100%;
-      background: rgba(255,255,255,0.98); border-top-left-radius: 20px; border-top-right-radius: 20px;
-      box-shadow: 0 -4px 20px rgba(0,0,0,0.2); padding: 12px 15px 14px; z-index: 10;
-      display: flex; flex-direction: column; gap: 8px;
-    }
+    #bottom-panel { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.98); border-top-left-radius: 20px; border-top-right-radius: 20px; box-shadow: 0 -4px 20px rgba(0,0,0,0.2); padding: 12px 15px 14px; z-index: 10; display: flex; flex-direction: column; gap: 8px; }
     .panel-header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 800; color: #475569; }
     .ai-badge { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: bold; }
-    #message-box {
-      background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
-      padding: 8px 10px; font-size: 13px; font-weight: 600; color: #1e293b;
-      height: 64px; overflow-y: auto; line-height: 1.45;
-    }
+    #message-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 600; color: #1e293b; height: 64px; overflow-y: auto; line-height: 1.45; }
     .action-history { font-size: 11px; color: #64748b; display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
     .history-tag { background: #f1f5f9; padding: 2px 8px; border-radius: 8px; color: #334155; }
-    .btn-think {
-      background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%); color: white; border: none; border-radius: 12px;
-      padding: 12px; font-size: 15px; font-weight: 900; text-align: center;
-      box-shadow: 0 4px 0 #2563eb; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px;
-    }
+    .btn-think { background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%); color: #fff; border: none; border-radius: 12px; padding: 12px; font-size: 15px; font-weight: 900; text-align: center; box-shadow: 0 4px 0 #2563eb; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; }
     .btn-think:active { transform: translateY(3px); box-shadow: 0 1px 0 #2563eb; }
     .btn-think:disabled { opacity: 0.6; pointer-events: none; }
-
-    #toast {
-      position: fixed; top: 82px; left: 50%; transform: translateX(-50%);
-      background: rgba(15,23,42,0.92); color: white; padding: 8px 16px;
-      border-radius: 20px; font-size: 12px; font-weight: bold;
-      opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 100; white-space: nowrap;
-    }
-
-    /* モーダル（初期状態は必ず display: none;） */
-    .modal-overlay {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(15,23,42,0.75); z-index: 50;
-      display: none; justify-content: center; align-items: center;
-    }
+    #toast { position: fixed; top: 82px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,0.92); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 100; white-space: nowrap; }
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.75); z-index: 50; display: none; justify-content: center; align-items: center; }
     .modal-overlay.active { display: flex; }
-    .modal-content {
-      background: white; width: 92%; max-width: 370px; max-height: 82vh;
-      border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 12px;
-      box-shadow: 0 12px 28px rgba(0,0,0,0.35); position: relative; overflow-y: auto;
-    }
-    .modal-close {
-      position: absolute; top: 14px; right: 16px; font-size: 20px; font-weight: bold; color: #94a3b8; cursor: pointer;
-    }
+    .modal-content { background: #fff; width: 92%; max-width: 370px; max-height: 82vh; border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); position: relative; overflow-y: auto; }
+    .modal-close { position: absolute; top: 14px; right: 16px; font-size: 20px; font-weight: bold; color: #94a3b8; cursor: pointer; }
     .modal-title { font-size: 15px; font-weight: 900; color: #1e293b; display: flex; align-items: center; gap: 6px; }
-
     .bag-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: #f8fafc; padding: 8px; border-radius: 10px; border: 1px solid #e2e8f0; }
-    .bag-slot { aspect-ratio: 1; background: white; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 20px; cursor: pointer; }
+    .bag-slot { aspect-ratio: 1; background: #fff; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 20px; cursor: pointer; }
     .bag-slot.filled { border: 1px solid #93c5fd; background: #eff6ff; }
-
     .setting-group { display: flex; flex-direction: column; gap: 4px; }
     .setting-label { font-size: 12px; font-weight: bold; color: #475569; }
     .setting-input { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 12px; }
-    .btn-primary { background: #3b82f6; color: white; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
-    .btn-pink { background: #ec4899; color: white; border: none; padding: 11px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
+    .btn-primary { background: #3b82f6; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
+    .btn-pink { background: #ec4899; color: #fff; border: none; padding: 11px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
     .btn-sub { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
-    .btn-danger { background: #ef4848; color: white; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
+    .btn-danger { background: #ef4848; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
   </style>
 </head>
 <body>
 
 <div id="canvas-container"></div>
 
-<!-- 上部ステータス枠 -->
 <div id="status-panel">
   <div class="gauge-container">
     <div class="gauge-box">
@@ -221,7 +103,6 @@
   </div>
 </div>
 
-<!-- 右側の縦並びアイコン列（📖手帳・🌌地上カメラ・⛏️地下カメラ・🤖ロボット視点） -->
 <div id="side-icon-column">
   <div class="side-circle-btn" id="diary-btn" title="ロボット手帳">📖</div>
   <div class="side-circle-btn" id="cam-ground-btn" title="地上カメラ">🌌</div>
@@ -229,7 +110,6 @@
   <div class="side-circle-btn" id="cam-fpv-btn" title="ロボット視点カメラ">🤖</div>
 </div>
 
-<!-- 中央下部の「＋」扇状メニュー -->
 <div id="fan-menu-wrapper">
   <div class="fan-item" onclick="quickDropApple()">🍎<span class="fan-label">リンゴ</span></div>
   <div class="fan-item" onclick="quickStackBlock()">🪨<span class="fan-label">1段積む</span></div>
@@ -239,7 +119,6 @@
   <div id="plus-main-btn" title="メニューを開く">＋</div>
 </div>
 
-<!-- 下部メッセージ＆思考ボタン -->
 <div id="bottom-panel">
   <div class="panel-header">
     <span>💭 ロボのきもち・心のさけび</span>
@@ -248,14 +127,13 @@
   <div id="message-box">ここは世界の果て。右のカメラボタンで地上・地下・ロボ目線を切り替えられるよ！⚙️設定から地下ブロックの透け方も3段階で選べるよ！</div>
   <div class="action-history">
     <span class="history-tag" id="history-action">👟 やった事 待機中</span>
-    <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖自動カメラ・地上0段目</span>
+    <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従カメラ・地上0段目</span>
   </div>
   <button class="btn-think" id="btn-action">⚡ 今すぐ考える</button>
 </div>
 
 <div id="toast">💾 データを保存したよ</div>
 
-<!-- モーダル1: ロボット手帳 -->
 <div class="modal-overlay" id="modal-diary" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-diary')">✕</div>
@@ -270,14 +148,11 @@
     <div style="font-size:12px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ」（タップで足元に使う）</div>
     <div class="bag-grid" id="bag-grid"></div>
     <div style="font-size:12px; font-weight:bold; color:#475569;">📝 世代のきろく・思い出</div>
-    <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; font-size:11.5px; color:#334155; max-height:110px; overflow-y:auto; line-height:1.4;">
-      まだ記録はありません。行動するとここに思い出が刻まれます。
-    </div>
+    <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; font-size:11.5px; color:#334155; max-height:110px; overflow-y:auto; line-height:1.4;"></div>
     <button class="btn-sub" onclick="closeModal('modal-diary')">閉じる</button>
   </div>
 </div>
 
-<!-- モーダル2: パステル・ガチャガチャ -->
 <div class="modal-overlay" id="modal-gacha" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-gacha')">✕</div>
@@ -285,16 +160,12 @@
     <div style="text-align:center; padding:6px 0;">
       <svg width="110" height="145" viewBox="0 0 120 160">
         <circle cx="60" cy="52" r="44" fill="#f0f9ff" stroke="#f472b6" stroke-width="4"/>
-        <circle cx="45" cy="62" r="12" fill="#fde047"/>
-        <circle cx="72" cy="65" r="12" fill="#c084fc"/>
-        <circle cx="58" cy="44" r="12" fill="#6ee7b7"/>
+        <circle cx="45" cy="62" r="12" fill="#fde047"/><circle cx="72" cy="65" r="12" fill="#c084fc"/><circle cx="58" cy="44" r="12" fill="#6ee7b7"/>
         <path d="M22 92 L98 92 L90 152 L30 152 Z" fill="#f472b6" stroke="#db2777" stroke-width="3"/>
-        <circle cx="60" cy="114" r="12" fill="#ffffff" stroke="#db2777" stroke-width="3"/>
+        <circle cx="60" cy="114" r="12" fill="#fff" stroke="#db2777" stroke-width="3"/>
         <rect x="46" y="132" width="28" height="14" rx="4" fill="#9d174d"/>
       </svg>
-      <div id="gacha-result-text" style="font-size:13px; font-weight:800; color:#be185d; min-height:20px; margin-top:4px;">
-        🍎・🪨(段差ブロック)・🌿 がランダムに出るよ！
-      </div>
+      <div id="gacha-result-text" style="font-size:13px; font-weight:800; color:#be185d; min-height:20px; margin-top:4px;">🍎・🪨(段差ブロック)・🌿 がランダムに出るよ！</div>
     </div>
     <div style="display:flex; gap:8px;">
       <button class="btn-pink" id="btn-spin">スタート</button>
@@ -303,7 +174,6 @@
   </div>
 </div>
 
-<!-- モーダル3: 設定（3段階カメラ切り替え搭載） -->
 <div class="modal-overlay" id="modal-settings" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-settings')">✕</div>
@@ -347,9 +217,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-  // ==========================================
-  // 1. セーブストレージ＆生命コア（LifeCore）
-  // ==========================================
   const safeStorage = {
     getItem(k) { try { return localStorage.getItem(k); } catch(e) { return null; } },
     setItem(k, v) { try { localStorage.setItem(k, v); } catch(e) {} },
@@ -379,43 +246,19 @@
     exportSave() { return { energy: this.energy, stamina: this.stamina, mental: this.mental }; }
   }
 
-  let life = new LifeCore();
-  let GAME_DAY = 1;
-  let TIME_STEP = 0;
+  let life = new LifeCore(), GAME_DAY = 1, TIME_STEP = 0;
   let BAG = ['stone', 'apple', 'stone', 'grass'];
   let DIARY_LOGS = ['🌱 1日目：世界の果ての島に降り立ったよ！'];
-
-  // 3段階のカメラ透過・分割線モード（デフォルトは 'glass_noline'：分割線なし・すりガラス透過）
   let CAM_VISUAL_STYLE = safeStorage.getItem('cam_visual_style') || 'glass_noline';
+  let HEIGHT_MAP = {}, CHIP_MAP = {};
 
-  // HEIGHT_MAP: -3(地下3階) 〜 0(平地) 〜 +5(地上5段目)
-  let HEIGHT_MAP = {};
-  // CHIP_MAP: 1マス＝1ブロックの5×5分割構造で砕かれたカケラを記録
-  let CHIP_MAP = {};
+  for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
+  HEIGHT_MAP['-1,-2'] = -1; HEIGHT_MAP['-2,-2'] = -2; HEIGHT_MAP['-2,-1'] = -2; HEIGHT_MAP['-2,0'] = -3;
 
-  function initDefaultMap() {
-    for (let x = -2; x <= 2; x++) {
-      for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
-    }
-    HEIGHT_MAP['-1,-2'] = -1;
-    HEIGHT_MAP['-2,-2'] = -2;
-    HEIGHT_MAP['-2,-1'] = -2;
-    HEIGHT_MAP['-2,0']  = -3;
-  }
-  initDefaultMap();
+  let ROBOT = { gen: 1, pos: { x: 0, z: 0, sx: 2, sz: 2 }, rotY: 0, speed: 3 };
+  let WORLD_ITEMS = [{ type: 'apple', x: 0, z: -1 }, { type: 'apple', x: -2, z: 0 }];
 
-  let ROBOT = {
-    gen: 1,
-    pos: { x: 0, z: 0, sx: 2, sz: 2 },
-    rotY: 0,
-    speed: 3
-  };
-  let WORLD_ITEMS = [
-    { type: 'apple', x: 0, z: -1 },
-    { type: 'apple', x: -2, z: 0 }
-  ];
-
-  function loadWorldState() {
+  (function loadWorldState() {
     try {
       const raw = safeStorage.getItem('island_game_save_v10');
       if (!raw) return;
@@ -430,52 +273,29 @@
         ROBOT.rotY = Number.isFinite(d.robot.rotY) ? d.robot.rotY : 0;
         ROBOT.speed = Number(d.robot.speed) || 3;
       }
-      if (d.heightMap && typeof d.heightMap === 'object') {
-        for (let x = -2; x <= 2; x++) {
-          for (let z = -2; z <= 2; z++) {
-            const k = `${x},${z}`;
-            if (d.heightMap[k] !== undefined) {
-              HEIGHT_MAP[k] = Math.max(-3, Math.min(5, Number(d.heightMap[k]) || 0));
-            }
-          }
+      if (d.heightMap) {
+        for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
+          const k = `${x},${z}`;
+          if (d.heightMap[k] !== undefined) HEIGHT_MAP[k] = Math.max(-3, Math.min(5, Number(d.heightMap[k]) || 0));
         }
       }
-      if (d.chipMap && typeof d.chipMap === 'object') CHIP_MAP = d.chipMap;
+      if (d.chipMap) CHIP_MAP = d.chipMap;
       if (Array.isArray(d.items)) WORLD_ITEMS = d.items;
       if (Array.isArray(d.bag)) BAG = d.bag;
-      if (Array.isArray(d.logs) && d.logs.length > 0) DIARY_LOGS = d.logs;
+      if (Array.isArray(d.logs) && d.logs.length) DIARY_LOGS = d.logs;
       GAME_DAY = Math.max(1, Number(d.day) || 1);
       TIME_STEP = Math.max(0, Math.min(19, Number(d.time) || 0));
-    } catch (e) {
-      console.warn('セーブデータ読み込みスキップ', e);
-    }
-  }
+    } catch (e) {}
+  })();
 
   function saveWorldState() {
-    const data = {
-      life: life.exportSave(),
-      robot: ROBOT,
-      heightMap: HEIGHT_MAP,
-      chipMap: CHIP_MAP,
-      items: WORLD_ITEMS,
-      bag: BAG,
-      logs: DIARY_LOGS.slice(-15),
-      day: GAME_DAY,
-      time: TIME_STEP
-    };
-    safeStorage.setItem('island_game_save_v10', JSON.stringify(data));
+    safeStorage.setItem('island_game_save_v10', JSON.stringify({
+      life: life.exportSave(), robot: ROBOT, heightMap: HEIGHT_MAP, chipMap: CHIP_MAP,
+      items: WORLD_ITEMS, bag: BAG, logs: DIARY_LOGS.slice(-15), day: GAME_DAY, time: TIME_STEP
+    }));
   }
+  function resetGameDirectly() { safeStorage.removeItem('island_game_save_v10'); location.reload(); }
 
-  function resetGameDirectly() {
-    safeStorage.removeItem('island_game_save_v10');
-    location.reload();
-  }
-
-  loadWorldState();
-
-  // ==========================================
-  // 2. 3D世界構築（5×5分割構造＋分割線完全ゼロ対応）
-  // ==========================================
   const container = document.getElementById('canvas-container');
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b1528);
@@ -484,156 +304,101 @@
   const groundCamera = new THREE.PerspectiveCamera(42, aspect, 0.1, 160);
   const undergroundCamera = new THREE.PerspectiveCamera(42, aspect, 0.1, 160);
   const robotCamera = new THREE.PerspectiveCamera(62, aspect, 0.08, 160);
-
-  let activeCamera = groundCamera;
-  let manualCameraMode = null;
+  let activeCamera = groundCamera, manualCameraMode = null;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   container.appendChild(renderer.domElement);
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
-  scene.add(ambientLight);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
   const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.88);
   dirLight.position.set(7, 15, 9);
   scene.add(dirLight);
 
   let activeUntilTime = performance.now() + 3500;
-  function wakeUpRenderer(durationMs = 2600) {
-    activeUntilTime = Math.max(activeUntilTime, performance.now() + durationMs);
-  }
+  function wakeUpRenderer(ms = 2600) { activeUntilTime = Math.max(activeUntilTime, performance.now() + ms); }
 
-  // --- 地上用：1マス＝1ブロックのジオメトリ（隙間なし 1.0 × 0.5 × 1.0） ---
   const sharedFullBlockGeo = new THREE.BoxGeometry(1.0, 0.5, 1.0);
   const fullBlockEdgeGeo = new THREE.EdgesGeometry(sharedFullBlockGeo);
 
-  // 「② 分割線あり」を選んだときだけ使う枠線テクスチャ
   const blockEdgeCanvas = document.createElement('canvas');
   blockEdgeCanvas.width = 64; blockEdgeCanvas.height = 64;
   const bCtx = blockEdgeCanvas.getContext('2d');
-  bCtx.fillStyle = '#ffffff';
-  bCtx.fillRect(0, 0, 64, 64);
-  bCtx.strokeStyle = 'rgba(0, 0, 0, 0.18)';
-  bCtx.lineWidth = 4;
-  bCtx.strokeRect(2, 2, 60, 60);
+  bCtx.fillStyle = '#fff'; bCtx.fillRect(0, 0, 64, 64);
+  bCtx.strokeStyle = 'rgba(0,0,0,0.20)'; bCtx.lineWidth = 4; bCtx.strokeRect(2, 2, 60, 60);
   const sharedBlockTex = new THREE.CanvasTexture(blockEdgeCanvas);
 
-  // --- 地下＆掘削用：1マスを5×5（25個）に分割した小ブロック（0.20 × 0.50 × 0.20 で隙間ゼロ！） ---
   const MAX_SUB_INSTANCES = 3200;
   const subVoxelGeo = new THREE.BoxGeometry(0.20, 0.50, 0.20);
 
-  // ① 不透明な小ブロック用（奥側・床面・地上モード用）
   const opaqueSubMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
   const opaqueSubMesh = new THREE.InstancedMesh(subVoxelGeo, opaqueSubMat, MAX_SUB_INSTANCES);
   opaqueSubMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   opaqueSubMesh.renderOrder = 0;
   scene.add(opaqueSubMesh);
 
-  // ② すりガラス半透明の内側線消し用（深度プリパス：手前の表面だけを描画して内側の5×5壁の重なり線を完全に消す）
-  const glassDepthMat = new THREE.MeshBasicMaterial({
-    colorWrite: false,
-    depthWrite: true,
-    depthTest: true
-  });
+  // 分割線なし時にすりガラス内側の壁の重なり線を消す深度プリパス
+  const glassDepthMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, depthTest: true });
   const glassDepthMesh = new THREE.InstancedMesh(subVoxelGeo, glassDepthMat, MAX_SUB_INSTANCES);
-  glassDepthMesh.instanceMatrix = opaqueSubMesh.instanceMatrix; // 後でglassSubMeshと共有
   glassDepthMesh.renderOrder = 9;
   scene.add(glassDepthMesh);
 
-  // ③ すりガラス半透明の小ブロック本体
   const glassSubMat = new THREE.MeshLambertMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.24,
-    depthWrite: false,
-    depthTest: true,
-    depthFunc: THREE.LessEqualDepth
+    color: 0xffffff, transparent: true, opacity: 0.26, depthWrite: false, depthTest: true, depthFunc: THREE.LessEqualDepth
   });
   const glassSubMesh = new THREE.InstancedMesh(subVoxelGeo, glassSubMat, MAX_SUB_INSTANCES);
   glassSubMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   glassSubMesh.renderOrder = 10;
-  // glassDepthMesh と同じ行列データを共有（CPU負荷ゼロで内側の重なり線をカット）
   glassDepthMesh.instanceMatrix = glassSubMesh.instanceMatrix;
   scene.add(glassSubMesh);
 
   const zeroMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
   const tempColor = new THREE.Color();
 
-  // 「② 分割線あり（glass_line）」を選んだ時だけ表示する1マス枠線グループ
   const macroOutlineGroup = new THREE.Group();
   macroOutlineGroup.visible = false;
   scene.add(macroOutlineGroup);
-  const macroOutlineMat = new THREE.LineBasicMaterial({
-    color: 0x64748b,
-    transparent: true,
-    opacity: 0.35,
-    depthWrite: false
-  });
+  const macroOutlineMat = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.35, depthWrite: false });
 
-  // 地上の1マス＝1ブロック用グループ（不透明・深度プリパス・半透明）
   const groundBlocksGroup = new THREE.Group();
   scene.add(groundBlocksGroup);
   const itemGroup = new THREE.Group();
   scene.add(itemGroup);
 
   const stepColors = [0x86efac, 0x6ee7b7, 0xfde68a, 0xfcd34d, 0xfbbf24];
-  let groundBlocksMeta = [];
-  let subVoxelsMeta = [];
+  let groundBlocksMeta = [], subVoxelsMeta = [];
 
   function rebuildTerrainAndItems() {
-    groundBlocksMeta.forEach(b => {
-      b.mat.dispose();
-      b.depthMat.dispose();
-    });
-    while (groundBlocksGroup.children.length > 0) groundBlocksGroup.remove(groundBlocksGroup.children[0]);
-    while (macroOutlineGroup.children.length > 0) macroOutlineGroup.remove(macroOutlineGroup.children[0]);
-    while (itemGroup.children.length > 0) itemGroup.remove(itemGroup.children[0]);
-
-    groundBlocksMeta = [];
-    subVoxelsMeta = [];
+    groundBlocksMeta.forEach(b => { b.mat.dispose(); b.depthMat.dispose(); });
+    while (groundBlocksGroup.children.length) groundBlocksGroup.remove(groundBlocksGroup.children[0]);
+    while (macroOutlineGroup.children.length) macroOutlineGroup.remove(macroOutlineGroup.children[0]);
+    while (itemGroup.children.length) itemGroup.remove(itemGroup.children[0]);
+    groundBlocksMeta = []; subVoxelsMeta = [];
 
     const showLines = (CAM_VISUAL_STYLE === 'glass_line');
-    // 「分割線あり」の時だけ内側の壁も見える設定にし、「分割線なし」の時は一番手前の表面だけ描いて内側の縦線を完全に消す
     glassSubMat.depthFunc = showLines ? THREE.LessDepth : THREE.LessEqualDepth;
-    glassSubMat.opacity = showLines ? 0.15 : 0.26;
+    glassSubMat.opacity = showLines ? 0.16 : 0.26;
     glassSubMat.needsUpdate = true;
 
     let subIdx = 0;
-
     for (let x = -2; x <= 2; x++) {
       for (let z = -2; z <= 2; z++) {
         const topLv = HEIGHT_MAP[`${x},${z}`] ?? 0;
-
         for (let lv = -3; lv <= topLv; lv++) {
           const centerY = (lv - 0.5) * 0.5;
           const isFloorTile = (lv === topLv);
-          const chipKey = `${x},${z},${lv}`;
-          const chippedSet = CHIP_MAP[chipKey] || null;
+          const chippedSet = CHIP_MAP[`${x},${z},${lv}`] || null;
 
-          // 地上（lv >= 0）で砕かれていないブロックは1マス＝1ブロック
           if (lv >= 0 && !chippedSet) {
-            let colorHex = 0xb9f6ca;
-            if (lv === 0) {
-              colorHex = isFloorTile ? 0xb9f6ca : 0x94a3b8;
-            } else {
-              colorHex = stepColors[Math.min(lv - 1, 4)];
-            }
-            const mat = new THREE.MeshLambertMaterial({
-              color: colorHex,
-              map: showLines ? sharedBlockTex : null,
-              transparent: false,
-              opacity: 1.0
-            });
+            const colorHex = (lv === 0) ? (isFloorTile ? 0xb9f6ca : 0x94a3b8) : stepColors[Math.min(lv - 1, 4)];
+            const mat = new THREE.MeshLambertMaterial({ color: colorHex, map: showLines ? sharedBlockTex : null, transparent: false, opacity: 1.0 });
             const mesh = new THREE.Mesh(sharedFullBlockGeo, mat);
             mesh.position.set(x, centerY, z);
-            // 「分割線あり」の時だけ隙間をつくり、「分割線なし」の時は1.0でピタッとくっつけて線を消す
             const gScale = showLines ? 0.95 : 1.0;
             mesh.scale.set(gScale, 1.0, gScale);
-            mesh.renderOrder = 0;
             groundBlocksGroup.add(mesh);
 
-            // 半透明時に隣のブロックとの境目の縦線を消すための深度メッシュ
             const depthMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, depthTest: true });
             const depthMesh = new THREE.Mesh(sharedFullBlockGeo, depthMat);
             depthMesh.position.set(x, centerY, z);
@@ -642,68 +407,36 @@
             depthMesh.visible = false;
             groundBlocksGroup.add(depthMesh);
 
-            groundBlocksMeta.push({
-              mesh, mat, depthMesh, depthMat, gx: x, gz: z, lv, centerY, isFloorTile
-            });
+            groundBlocksMeta.push({ mesh, mat, depthMesh, depthMat, gx: x, gz: z, lv, centerY, isFloorTile });
           } else {
-            // 地下層（lv < 0）または5×5分割で削られたブロックは「5×5＝25個の小ブロック」構造を維持
             if (showLines) {
               const outlineWire = new THREE.LineSegments(fullBlockEdgeGeo, macroOutlineMat);
               outlineWire.position.set(x, centerY, z);
               macroOutlineGroup.add(outlineWire);
             }
-
             let baseColorHex = 0x6d4c41;
-            if (lv >= 0) {
-              baseColorHex = (lv === 0) ? 0xb9f6ca : stepColors[Math.min(lv - 1, 4)];
-            } else if (isFloorTile) {
-              baseColorHex = 0xe2e8f0;
-            } else if (lv === -1) {
-              baseColorHex = 0xa1887f;
-            } else if (lv === -2) {
-              baseColorHex = 0x8d6e63;
-            } else {
-              baseColorHex = 0x6d4c41;
-            }
+            if (lv >= 0) baseColorHex = (lv === 0) ? 0xb9f6ca : stepColors[Math.min(lv - 1, 4)];
+            else if (isFloorTile) baseColorHex = 0xe2e8f0;
+            else if (lv === -1) baseColorHex = 0xa1887f;
+            else if (lv === -2) baseColorHex = 0x8d6e63;
 
             for (let sx = 0; sx < 5; sx++) {
               for (let sz = 0; sz < 5; sz++) {
                 if (chippedSet && chippedSet[`${sx},${sz}`]) continue;
                 if (subIdx >= MAX_SUB_INSTANCES) break;
-
-                // 0.20刻みで配置（5個×0.20＝1.00マスぴったり）
-                const wx = x + (sx - 2) * 0.20;
-                const wz = z + (sz - 2) * 0.20;
-
-                // 「分割線なし」の時は色差ゼロ（1.0）にして白い床や茶色の土の5×5マス目模様を完全に消す！
-                const shade = showLines ? (((sx + sz) % 2 === 0) ? 1.0 : 0.92) : 1.0;
+                const wx = x + (sx - 2) * 0.20, wz = z + (sz - 2) * 0.20;
+                const shade = showLines ? (((sx + sz) % 2 === 0) ? 1.0 : 0.91) : 1.0;
                 tempColor.setHex(baseColorHex).multiplyScalar(shade);
-
                 opaqueSubMesh.setColorAt(subIdx, tempColor);
                 glassSubMesh.setColorAt(subIdx, tempColor);
 
                 const fullMat = new THREE.Matrix4();
                 if (showLines) {
-                  // 「分割線あり」の時だけわずかな隙間を入れて5×5の線を見せる
-                  fullMat.compose(
-                    new THREE.Vector3(wx, centerY, wz),
-                    new THREE.Quaternion(),
-                    new THREE.Vector3(0.91, 0.96, 0.91)
-                  );
+                  fullMat.compose(new THREE.Vector3(wx, centerY, wz), new THREE.Quaternion(), new THREE.Vector3(0.90, 0.96, 0.90));
                 } else {
-                  // 「分割線なし」の時は隙間ゼロ（1.0, 1.0, 1.0）でつなぎ目の線を完全に消す
                   fullMat.makeTranslation(wx, centerY, wz);
                 }
-
-                subVoxelsMeta.push({
-                  idx: subIdx,
-                  gx: x, gz: z,
-                  sx, sz,
-                  wx, wz,
-                  lv, centerY,
-                  isFloorTile,
-                  fullMat
-                });
+                subVoxelsMeta.push({ idx: subIdx, gx: x, gz: z, sx, sz, wx, wz, lv, centerY, isFloorTile, fullMat });
                 subIdx++;
               }
             }
@@ -711,7 +444,6 @@
         }
       }
     }
-
     opaqueSubMesh.count = subIdx;
     glassDepthMesh.count = subIdx;
     glassSubMesh.count = subIdx;
@@ -740,254 +472,125 @@
     });
   }
 
-  // --- 四角い大地を包む丸い海 ---
+  // 海テクスチャ
   const seaCanvas = document.createElement('canvas');
   seaCanvas.width = 256; seaCanvas.height = 256;
   const sCtx = seaCanvas.getContext('2d');
-  (function initSeaTexture() {
-    const radGrad = sCtx.createRadialGradient(128, 128, 40, 128, 128, 128);
-    radGrad.addColorStop(0.0, 'rgba(125, 211, 252, 0.95)');
-    radGrad.addColorStop(0.65, 'rgba(56, 189, 248, 0.92)');
-    radGrad.addColorStop(0.90, 'rgba(186, 230, 253, 0.96)');
-    radGrad.addColorStop(1.0, 'rgba(255, 255, 255, 1.0)');
-    sCtx.fillStyle = radGrad;
-    sCtx.fillRect(0, 0, 256, 256);
+  const radGrad = sCtx.createRadialGradient(128, 128, 40, 128, 128, 128);
+  radGrad.addColorStop(0.0, 'rgba(125,211,252,0.95)');
+  radGrad.addColorStop(0.65, 'rgba(56,189,248,0.92)');
+  radGrad.addColorStop(0.90, 'rgba(186,230,253,0.96)');
+  radGrad.addColorStop(1.0, 'rgba(255,255,255,1.0)');
+  sCtx.fillStyle = radGrad; sCtx.fillRect(0, 0, 256, 256);
+  sCtx.fillStyle = 'rgba(255,255,255,0.72)';
+  for (let i = 0; i < 55; i++) {
+    const ang = (i / 55) * Math.PI * 2 + (i % 3) * 0.4, dist = 74 + (i * 17 % 50);
+    sCtx.beginPath(); sCtx.arc(128 + Math.cos(ang) * dist, 128 + Math.sin(ang) * dist, 2 + (i % 4) * 1.3, 0, Math.PI * 2); sCtx.fill();
+  }
+  sCtx.strokeStyle = 'rgba(255,255,255,0.9)'; sCtx.lineWidth = 6; sCtx.strokeRect(69, 69, 118, 118);
 
-    sCtx.fillStyle = 'rgba(255, 255, 255, 0.72)';
-    for (let i = 0; i < 55; i++) {
-      const ang = (i / 55) * Math.PI * 2 + (i % 3) * 0.4;
-      const dist = 74 + (i * 17 % 50);
-      const r = 2 + (i % 4) * 1.3;
-      sCtx.beginPath();
-      sCtx.arc(128 + Math.cos(ang) * dist, 128 + Math.sin(ang) * dist, r, 0, Math.PI * 2);
-      sCtx.fill();
-    }
-
-    sCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-    sCtx.lineWidth = 6;
-    sCtx.strokeRect(69, 69, 118, 118);
-  })();
-
-  const seaTex = new THREE.CanvasTexture(seaCanvas);
-  const seaGeo = new THREE.CircleGeometry(5.1, 48);
-  seaGeo.rotateX(-Math.PI / 2);
-  const seaMat = new THREE.MeshBasicMaterial({ map: seaTex, transparent: true, opacity: 0.95, depthWrite: false });
-  const seaMesh = new THREE.Mesh(seaGeo, seaMat);
-  seaMesh.position.y = -0.35;
-  seaMesh.renderOrder = 1;
+  const seaGeo = new THREE.CircleGeometry(5.1, 48); seaGeo.rotateX(-Math.PI / 2);
+  const seaMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(seaCanvas), transparent: true, opacity: 0.95, depthWrite: false });
+  const seaMesh = new THREE.Mesh(seaGeo, seaMat); seaMesh.position.y = -0.35; seaMesh.renderOrder = 1;
   scene.add(seaMesh);
 
-  // --- 上から下へゆったり流れ落ちる円形滝 ---
+  // 滝テクスチャ
   const wfCanvas = document.createElement('canvas');
   wfCanvas.width = 256; wfCanvas.height = 256;
   const wfCtx = wfCanvas.getContext('2d');
-  (function initWaterfallTexture() {
-    wfCtx.fillStyle = '#58c4f6';
-    wfCtx.fillRect(0, 0, 256, 256);
-
-    for (let i = 0; i < 36; i++) {
-      const x = (i * 7) % 256;
-      const y = (i * 37) % 256;
-      const w = 3 + (i % 3) * 2;
-      const h = 45 + (i % 4) * 22;
-      wfCtx.fillStyle = i % 2 === 0 ? 'rgba(255, 255, 255, 0.55)' : 'rgba(224, 242, 254, 0.45)';
-      wfCtx.fillRect(x, y, w, h);
-      if (y + h > 256) wfCtx.fillRect(x, y - 256, w, h);
-    }
-
-    wfCtx.fillStyle = 'rgba(255, 255, 255, 0.82)';
-    for (let i = 0; i < 28; i++) {
-      const bx = (i * 29 + 11) % 240 + 8;
-      const by = (i * 43 + 7) % 240 + 8;
-      const rx = 6 + (i % 4) * 3;
-      const ry = 2.5 + (i % 2) * 1.5;
-      wfCtx.beginPath();
-      wfCtx.ellipse(bx, by, rx, ry, 0, 0, Math.PI * 2);
-      wfCtx.fill();
-    }
-  })();
-
+  wfCtx.fillStyle = '#58c4f6'; wfCtx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 36; i++) {
+    const x = (i * 7) % 256, y = (i * 37) % 256, w = 3 + (i % 3) * 2, h = 45 + (i % 4) * 22;
+    wfCtx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.55)' : 'rgba(224,242,254,0.45)';
+    wfCtx.fillRect(x, y, w, h); if (y + h > 256) wfCtx.fillRect(x, y - 256, w, h);
+  }
+  wfCtx.fillStyle = 'rgba(255,255,255,0.82)';
+  for (let i = 0; i < 28; i++) {
+    wfCtx.beginPath(); wfCtx.ellipse((i * 29 + 11) % 240 + 8, (i * 43 + 7) % 240 + 8, 6 + (i % 4) * 3, 2.5 + (i % 2) * 1.5, 0, 0, Math.PI * 2); wfCtx.fill();
+  }
   const wfTex = new THREE.CanvasTexture(wfCanvas);
-  wfTex.wrapS = THREE.RepeatWrapping;
-  wfTex.wrapT = THREE.RepeatWrapping;
-  wfTex.repeat.set(3, 1.5);
-
-  const waterfallGeo = new THREE.CylinderGeometry(5.1, 5.2, 6.4, 48, 1, true);
-  const waterfallMat = new THREE.MeshBasicMaterial({
-    map: wfTex, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false
-  });
-  const waterfallMesh = new THREE.Mesh(waterfallGeo, waterfallMat);
-  waterfallMesh.position.y = -3.55;
-  waterfallMesh.renderOrder = 1;
+  wfTex.wrapS = THREE.RepeatWrapping; wfTex.wrapT = THREE.RepeatWrapping; wfTex.repeat.set(3, 1.5);
+  const waterfallMat = new THREE.MeshBasicMaterial({ map: wfTex, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false });
+  const waterfallMesh = new THREE.Mesh(new THREE.CylinderGeometry(5.1, 5.2, 6.4, 48, 1, true), waterfallMat);
+  waterfallMesh.position.y = -3.55; waterfallMesh.renderOrder = 1;
   scene.add(waterfallMesh);
 
-  // 滝壺の白泡リング・雲海・古代遺跡のカメ
-  const foamRingGeo = new THREE.RingGeometry(3.8, 6.3, 48);
-  foamRingGeo.rotateX(-Math.PI / 2);
-  const foamRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
-  const foamRingMesh = new THREE.Mesh(foamRingGeo, foamRingMat);
-  foamRingMesh.position.y = -6.75;
-  scene.add(foamRingMesh);
+  const foamRingGeo = new THREE.RingGeometry(3.8, 6.3, 48); foamRingGeo.rotateX(-Math.PI / 2);
+  const foamRingMesh = new THREE.Mesh(foamRingGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
+  foamRingMesh.position.y = -6.75; scene.add(foamRingMesh);
 
-  const mistGeo = new THREE.CircleGeometry(14, 36);
-  mistGeo.rotateX(-Math.PI / 2);
-  const mistMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.78, side: THREE.DoubleSide });
-  const mistMesh = new THREE.Mesh(mistGeo, mistMat);
-  mistMesh.position.y = -6.85;
-  scene.add(mistMesh);
+  const mistGeo = new THREE.CircleGeometry(14, 36); mistGeo.rotateX(-Math.PI / 2);
+  const mistMesh = new THREE.Mesh(mistGeo, new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.78, side: THREE.DoubleSide }));
+  mistMesh.position.y = -6.85; scene.add(mistMesh);
 
   const turtleGroup = new THREE.Group();
-  const sandstoneMain = new THREE.MeshLambertMaterial({ color: 0xd6bfa3 });
-  const sandstoneDark = new THREE.MeshLambertMaterial({ color: 0xb89f80 });
-  const ruinAccent = new THREE.MeshLambertMaterial({ color: 0xe7d8c5 });
-  turtleGroup.add(new THREE.Mesh(new THREE.BoxGeometry(6.4, 1.4, 7.4), sandstoneMain));
-  const shellMid = new THREE.Mesh(new THREE.BoxGeometry(5.0, 1.1, 5.8), sandstoneDark);
-  shellMid.position.y = 1.1; turtleGroup.add(shellMid);
-  const shellTop = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.8, 4.0), ruinAccent);
-  shellTop.position.y = 1.9; turtleGroup.add(shellTop);
-  const tHead = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 2.0), sandstoneMain);
-  tHead.position.set(0, 0.2, 4.4); turtleGroup.add(tHead);
-  [[3.8, -0.2, 2.4, 0.3], [-3.8, -0.2, 2.4, -0.3], [3.6, -0.2, -2.4, -0.2], [-3.6, -0.2, -2.4, 0.2]].forEach(fc => {
-    const fl = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.45, 1.5), sandstoneDark);
-    fl.position.set(fc[0], fc[1], fc[2]); fl.rotation.y = fc[3]; turtleGroup.add(fl);
+  const sMain = new THREE.MeshLambertMaterial({ color: 0xd6bfa3 }), sDark = new THREE.MeshLambertMaterial({ color: 0xb89f80 }), sAcc = new THREE.MeshLambertMaterial({ color: 0xe7d8c5 });
+  turtleGroup.add(new THREE.Mesh(new THREE.BoxGeometry(6.4, 1.4, 7.4), sMain));
+  const shMid = new THREE.Mesh(new THREE.BoxGeometry(5.0, 1.1, 5.8), sDark); shMid.position.y = 1.1; turtleGroup.add(shMid);
+  const shTop = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.8, 4.0), sAcc); shTop.position.y = 1.9; turtleGroup.add(shTop);
+  const tHead = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 2.0), sMain); tHead.position.set(0, 0.2, 4.4); turtleGroup.add(tHead);
+  [[3.8,-0.2,2.4,0.3],[-3.8,-0.2,2.4,-0.3],[3.6,-0.2,-2.4,-0.2],[-3.6,-0.2,-2.4,0.2]].forEach(fc => {
+    const fl = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.45, 1.5), sDark); fl.position.set(fc[0], fc[1], fc[2]); fl.rotation.y = fc[3]; turtleGroup.add(fl);
   });
-  turtleGroup.position.y = -9.2;
-  scene.add(turtleGroup);
+  turtleGroup.position.y = -9.2; scene.add(turtleGroup);
 
-  // --- 全天球の星空＆4大星座 ---
-  const skyGroup = new THREE.Group();
-  scene.add(skyGroup);
-
-  const starGeo = new THREE.BufferGeometry();
-  const starPositions = [];
+  // 星空・4大星座
+  const skyGroup = new THREE.Group(); scene.add(skyGroup);
+  const starGeo = new THREE.BufferGeometry(), starPos = [];
   for (let i = 0; i < 420; i++) {
-    const u = Math.random();
-    const v = Math.random();
-    const theta = u * 2.0 * Math.PI;
-    const phi = Math.acos(2.0 * v - 1.0);
-    const r = 46;
-    starPositions.push(
-      r * Math.sin(phi) * Math.cos(theta),
-      r * Math.cos(phi),
-      r * Math.sin(phi) * Math.sin(theta)
-    );
+    const theta = Math.random() * 2 * Math.PI, phi = Math.acos(2 * Math.random() - 1), r = 46;
+    starPos.push(r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
   }
-  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
   const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.45, transparent: true, opacity: 0.75 });
-  const starPoints = new THREE.Points(starGeo, starMat);
-  skyGroup.add(starPoints);
-
-  function createConstellationLabel(text) {
-    const c = document.createElement('canvas');
-    c.width = 256; c.height = 64;
-    const ctx = c.getContext('2d');
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
-    ctx.strokeStyle = 'rgba(125, 211, 252, 0.85)';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(8, 8, 240, 48);
-    ctx.fillRect(8, 8, 240, 48);
-    ctx.fillStyle = '#bae6fd';
-    ctx.font = 'bold 24px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, 128, 32);
-    const tex = new THREE.CanvasTexture(c);
-    const spMat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.9 });
-    const sp = new THREE.Sprite(spMat);
-    sp.scale.set(6.5, 1.65, 1);
-    return sp;
-  }
+  skyGroup.add(new THREE.Points(starGeo, starMat));
 
   function addConstellation(name, pts, labelPos) {
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.72 });
     const pGeo = new THREE.BufferGeometry().setFromPoints(pts.map(p => new THREE.Vector3(p[0], p[1], p[2])));
-    skyGroup.add(new THREE.Line(pGeo, lineMat));
-    const nodeMat = new THREE.PointsMaterial({ color: 0xfde047, size: 0.85 });
-    skyGroup.add(new THREE.Points(pGeo, nodeMat));
-    const lbl = createConstellationLabel(name);
-    lbl.position.set(labelPos[0], labelPos[1], labelPos[2]);
-    skyGroup.add(lbl);
+    skyGroup.add(new THREE.Line(pGeo, new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.72 })));
+    skyGroup.add(new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0xfde047, size: 0.85 })));
+    const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(15,23,42,0.78)'; ctx.strokeStyle = 'rgba(125,211,252,0.85)'; ctx.lineWidth = 3;
+    ctx.strokeRect(8, 8, 240, 48); ctx.fillRect(8, 8, 240, 48);
+    ctx.fillStyle = '#bae6fd'; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(name, 128, 32);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, opacity: 0.9 }));
+    sp.scale.set(6.5, 1.65, 1); sp.position.set(labelPos[0], labelPos[1], labelPos[2]); skyGroup.add(sp);
   }
+  addConstellation('🦢 はくちょう座', [[0,24,-22],[0,18,-26],[0,11,-30],[-7,18,-26],[7,18,-26]], [0,8,-30]);
+  addConstellation('👑 カシオペア座', [[-26,18,0],[-24,14,5],[-26,16,10],[-24,13,15],[-26,17,20]], [-26,9,10]);
+  addConstellation('🥄 北斗七星', [[26,20,-8],[26,17,-3],[25,15,2],[24,12,6],[24,8,10],[27,7,14],[27,11,11]], [26,4,5]);
+  addConstellation('🏹 オリオン座', [[-5,20,26],[5,20,26],[-2,14,28],[0,14,28],[2,14,28],[-5,8,26],[5,8,26]], [0,4,28]);
 
-  addConstellation('🦢 はくちょう座', [[0,24,-22], [0,18,-26], [0,11,-30], [-7,18,-26], [7,18,-26]], [0, 8, -30]);
-  addConstellation('👑 カシオペア座', [[-26,18,0], [-24,14,5], [-26,16,10], [-24,13,15], [-26,17,20]], [-26, 9, 10]);
-  addConstellation('🥄 北斗七星', [[26,20,-8], [26,17,-3], [25,15,2], [24,12,6], [24,8,10], [27,7,14], [27,11,11]], [26, 4, 5]);
-  addConstellation('🏹 オリオン座', [[-5,20,26], [5,20,26], [-2,14,28], [0,14,28], [2,14,28], [-5,8,26], [5,8,26]], [0, 4, 28]);
-
-  // --- 腕のついた可愛いボクセルロボット ---
+  // ロボット
   const robotGroup = new THREE.Group();
-  const rBody = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.50, 0.34), new THREE.MeshLambertMaterial({ color: 0x38bdf8 }));
-  rBody.position.y = 0.37;
-  robotGroup.add(rBody);
-
-  const rHead = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.42, 0.40), new THREE.MeshLambertMaterial({ color: 0xbae6fd }));
-  rHead.position.y = 0.83;
-  robotGroup.add(rHead);
-
+  const rBody = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.50, 0.34), new THREE.MeshLambertMaterial({ color: 0x38bdf8 })); rBody.position.y = 0.37; robotGroup.add(rBody);
+  const rHead = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.42, 0.40), new THREE.MeshLambertMaterial({ color: 0xbae6fd })); rHead.position.y = 0.83; robotGroup.add(rHead);
   const darkMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
-  const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.05), darkMat);
-  eyeL.position.set(-0.10, 0.84, 0.20);
-  const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.05), darkMat);
-  eyeR.position.set(0.10, 0.84, 0.20);
-  robotGroup.add(eyeL); robotGroup.add(eyeR);
-
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 0.14), darkMat);
-  armL.position.set(-0.31, 0.38, 0);
-  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 0.14), darkMat);
-  armR.position.set(0.31, 0.38, 0);
-  robotGroup.add(armL); robotGroup.add(armR);
-
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.16), darkMat);
-  legL.position.set(-0.12, 0.08, 0);
-  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.16), darkMat);
-  legR.position.set(0.12, 0.08, 0);
-  robotGroup.add(legL); robotGroup.add(legR);
-
-  const bulbMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.14), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
-  bulbMesh.position.y = 1.11;
-  robotGroup.add(bulbMesh);
-  robotGroup.renderOrder = 0;
+  [[-0.10,0.84,0.20,0.07,0.11,0.05],[0.10,0.84,0.20,0.07,0.11,0.05],[-0.31,0.38,0,0.12,0.36,0.14],[0.31,0.38,0,0.12,0.36,0.14],[-0.12,0.08,0,0.14,0.16,0.16],[0.12,0.08,0,0.14,0.16,0.16]].forEach(p => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(p[3], p[4], p[5]), darkMat); m.position.set(p[0], p[1], p[2]); robotGroup.add(m);
+  });
+  const bulbMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.14), new THREE.MeshBasicMaterial({ color: 0xfacc15 })); bulbMesh.position.y = 1.11; robotGroup.add(bulbMesh);
   scene.add(robotGroup);
 
   function syncRobot3DPosition() {
-    const gx = ROBOT.pos.x;
-    const gz = ROBOT.pos.z;
-    const subOffsetX = ((ROBOT.pos.sx ?? 2) - 2) * 0.20;
-    const subOffsetZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.20;
-
-    let baseY = 0;
-    if (gx >= -2 && gx <= 2 && gz >= -2 && gz <= 2) {
-      baseY = (HEIGHT_MAP[`${gx},${gz}`] ?? 0) * 0.5;
-    } else {
-      baseY = -0.35;
-    }
-    robotGroup.position.set(gx + subOffsetX, baseY, gz + subOffsetZ);
+    const gx = ROBOT.pos.x, gz = ROBOT.pos.z;
+    const subX = ((ROBOT.pos.sx ?? 2) - 2) * 0.20, subZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.20;
+    const baseY = (gx >= -2 && gx <= 2 && gz >= -2 && gz <= 2) ? (HEIGHT_MAP[`${gx},${gz}`] ?? 0) * 0.5 : -0.35;
+    robotGroup.position.set(gx + subX, baseY, gz + subZ);
     robotGroup.rotation.y = ROBOT.rotY || 0;
   }
-
   function getRobotHeightLevel() {
     const { x, z } = ROBOT.pos;
-    if (x < -2 || x > 2 || z < -2 || z > 2) return -99;
-    return HEIGHT_MAP[`${x},${z}`] ?? 0;
+    return (x < -2 || x > 2 || z < -2 || z > 2) ? -99 : (HEIGHT_MAP[`${x},${z}`] ?? 0);
   }
-
   function getEffectiveCameraMode() {
-    if (manualCameraMode === 'ground') return 'ground';
-    if (manualCameraMode === 'underground') return 'underground';
-    if (manualCameraMode === 'robot') return 'robot';
+    if (manualCameraMode) return manualCameraMode;
     const h = getRobotHeightLevel();
     return (h < 0 && h !== -99) ? 'underground' : 'ground';
   }
 
-  // ==========================================
-  // 3. 3段階カメラ設定（分割線なし・分割線あり・完全消去＆出現）の制御
-  // ==========================================
-  let camTheta = Math.PI / 4;
-  let camPhi = 1.05;
-  let camRadius = 12.6;
-  let isDragging = false;
-  let prevPointer = { x: 0, y: 0 };
-  let cameraDirty = true;
+  let camTheta = Math.PI / 4, camPhi = 1.05, camRadius = 12.6, isDragging = false, prevPointer = { x: 0, y: 0 }, cameraDirty = true;
 
   function syncCameraButtonsUI() {
     document.getElementById('cam-ground-btn').classList.toggle('cam-active', manualCameraMode === 'ground');
@@ -997,34 +600,19 @@
 
   function applyGroundBlockState(b, isFrontInUnderground) {
     const showLines = (CAM_VISUAL_STYLE === 'glass_line');
-
     if (!isFrontInUnderground) {
-      b.mesh.visible = true;
-      b.mesh.renderOrder = 0;
-      b.depthMesh.visible = false;
+      b.mesh.visible = true; b.mesh.renderOrder = 0; b.depthMesh.visible = false;
       if (b.mat.transparent) {
-        b.mat.transparent = false;
-        b.mat.depthWrite = true;
-        b.mat.depthFunc = THREE.LessEqualDepth;
-        b.mat.opacity = 1.0;
-        b.mat.needsUpdate = true;
+        b.mat.transparent = false; b.mat.depthWrite = true; b.mat.depthFunc = THREE.LessEqualDepth; b.mat.opacity = 1.0; b.mat.needsUpdate = true;
       }
       return;
     }
-
     if (CAM_VISUAL_STYLE === 'hide') {
-      b.mesh.visible = false;
-      b.depthMesh.visible = false;
+      b.mesh.visible = false; b.depthMesh.visible = false;
     } else {
-      b.mesh.visible = true;
-      b.mesh.renderOrder = 10;
-      // 「分割線なし」の時は深度プリパスを有効にして隣の緑ブロックとの境目の縦線も消す
+      b.mesh.visible = true; b.mesh.renderOrder = 10;
       b.depthMesh.visible = !showLines;
-      if (!b.mat.transparent) {
-        b.mat.transparent = true;
-        b.mat.depthWrite = false;
-        b.mat.needsUpdate = true;
-      }
+      if (!b.mat.transparent) { b.mat.transparent = true; b.mat.depthWrite = false; b.mat.needsUpdate = true; }
       b.mat.depthFunc = showLines ? THREE.LessDepth : THREE.LessEqualDepth;
       b.mat.opacity = showLines ? 0.18 : 0.24;
     }
@@ -1034,78 +622,49 @@
     const mode = getEffectiveCameraMode();
     const showLines = (CAM_VISUAL_STYLE === 'glass_line');
 
-    // 【A】地上カメラON・キャラ視点ON・キャラ追従（地上時）：透過禁止（100%くっきり不透明）
     if (mode === 'ground' || mode === 'robot') {
-      waterfallMat.opacity = 0.92;
-      seaMat.opacity = 0.95;
-      macroOutlineGroup.visible = false;
-      glassDepthMesh.visible = false;
-      glassSubMesh.visible = false;
-
-      for (let i = 0; i < groundBlocksMeta.length; i++) {
-        applyGroundBlockState(groundBlocksMeta[i], false);
-      }
-      for (let i = 0; i < subVoxelsMeta.length; i++) {
-        const sv = subVoxelsMeta[i];
-        opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
-      }
+      waterfallMat.opacity = 0.92; seaMat.opacity = 0.95;
+      macroOutlineGroup.visible = false; glassDepthMesh.visible = false; glassSubMesh.visible = false;
+      for (let i = 0; i < groundBlocksMeta.length; i++) applyGroundBlockState(groundBlocksMeta[i], false);
+      for (let i = 0; i < subVoxelsMeta.length; i++) opaqueSubMesh.setMatrixAt(subVoxelsMeta[i].idx, subVoxelsMeta[i].fullMat);
       opaqueSubMesh.instanceMatrix.needsUpdate = true;
       return;
     }
 
-    // 【B】地下カメラON・キャラ追従（地下時）：3段階設定（glass_noline / glass_line / hide）を反映！
-    waterfallMat.opacity = 0.16;
-    seaMat.opacity = 0.24;
-
+    waterfallMat.opacity = 0.16; seaMat.opacity = 0.24;
     macroOutlineGroup.visible = showLines;
     const useFrostedGlass = (CAM_VISUAL_STYLE !== 'hide');
     glassSubMesh.visible = useFrostedGlass;
-    // 「① 分割線なし」の時は深度プリパスをONにして半透明小ブロックの内側の縦線を完全に消す
     glassDepthMesh.visible = (CAM_VISUAL_STYLE === 'glass_noline');
 
     const camPos = undergroundCamera.position;
     const h = getRobotHeightLevel();
-    const isRobotUnderground = (h < 0 && h !== -99);
-    const focusX = isRobotUnderground ? robotGroup.position.x : 0;
-    const focusY = isRobotUnderground ? (robotGroup.position.y + 0.35) : -1.15;
-    const focusZ = isRobotUnderground ? robotGroup.position.z : 0;
+    const isUG = (h < 0 && h !== -99);
+    const focusX = isUG ? robotGroup.position.x : 0;
+    const focusY = isUG ? (robotGroup.position.y + 0.35) : -1.15;
+    const focusZ = isUG ? robotGroup.position.z : 0;
 
-    const dirX = camPos.x - focusX;
-    const dirZ = camPos.z - focusZ;
+    const dirX = camPos.x - focusX, dirZ = camPos.z - focusZ;
     const lenXZ = Math.hypot(dirX, dirZ) || 1;
-    const nx = dirX / lenXZ;
-    const nz = dirZ / lenXZ;
+    const nx = dirX / lenXZ, nz = dirZ / lenXZ;
 
-    // 1. 地上ブロック（1マス単位）の手前判定
     for (let i = 0; i < groundBlocksMeta.length; i++) {
-      const b = groundBlocksMeta[i];
-      const relX = b.gx - focusX;
-      const relZ = b.gz - focusZ;
-      const dotFront = relX * nx + relZ * nz;
-      const perpDist = Math.abs(-relX * nz + relZ * nx);
-
-      const isFrontGround = (dotFront > -0.45 && perpDist < 1.95);
-      applyGroundBlockState(b, isFrontGround);
+      const b = groundBlocksMeta[i], relX = b.gx - focusX, relZ = b.gz - focusZ;
+      const dotFront = relX * nx + relZ * nz, perpDist = Math.abs(-relX * nz + relZ * nx);
+      applyGroundBlockState(b, dotFront > -0.45 && perpDist < 1.95);
     }
 
-    // 2. 地下ブロック（5×5分割の小ブロック単位）の手前判定＆出現判定
     for (let i = 0; i < subVoxelsMeta.length; i++) {
       const sv = subVoxelsMeta[i];
-
       if (sv.isFloorTile && sv.lv < 0) {
         opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
         if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
         continue;
       }
-
-      const relX = sv.wx - focusX;
-      const relZ = sv.wz - focusZ;
-      const dotFront = relX * nx + relZ * nz;
-      const perpDist = Math.abs(-relX * nz + relZ * nx);
-
-      const isSubVoxelInFront = (dotFront > -0.15 && perpDist < 1.55) || (sv.centerY > focusY + 0.25 && dotFront > -0.55 && perpDist < 1.85);
-
-      if (isSubVoxelInFront) {
+      const relX = sv.wx - focusX, relZ = sv.wz - focusZ;
+      const dotFront = relX * nx + relZ * nz, perpDist = Math.abs(-relX * nz + relZ * nx);
+      const inFront = (dotFront > -0.15 && perpDist < 1.55) || (sv.centerY > focusY + 0.25 && dotFront > -0.55 && perpDist < 1.85);
+      if (inFront) {
         opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
         if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, sv.fullMat);
       } else {
@@ -1113,76 +672,37 @@
         if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
       }
     }
-
     opaqueSubMesh.instanceMatrix.needsUpdate = true;
     if (useFrostedGlass) glassSubMesh.instanceMatrix.needsUpdate = true;
   }
 
   function updateAllCamerasTransform() {
     camRadius = Math.max(7.5, Math.min(20.0, camRadius));
-    const mode = getEffectiveCameraMode();
-    const statusPanel = document.getElementById('status-panel');
+    const mode = getEffectiveCameraMode(), statusPanel = document.getElementById('status-panel');
 
     if (mode === 'robot') {
       robotGroup.visible = false;
       camPhi = Math.max(0.18, Math.min(2.45, camPhi));
-
-      const eyeX = robotGroup.position.x;
-      const eyeY = robotGroup.position.y + 0.92;
-      const eyeZ = robotGroup.position.z;
+      const eyeX = robotGroup.position.x, eyeY = robotGroup.position.y + 0.92, eyeZ = robotGroup.position.z;
       robotCamera.position.set(eyeX, eyeY, eyeZ);
-
-      const lookDist = 20;
-      const lx = eyeX - lookDist * Math.sin(camPhi) * Math.sin(camTheta);
-      const ly = eyeY - lookDist * Math.cos(camPhi);
-      const lz = eyeZ - lookDist * Math.sin(camPhi) * Math.cos(camTheta);
-      robotCamera.lookAt(lx, ly, lz);
-
-      if (camPhi > 1.55) statusPanel.classList.add('sky-hidden');
-      else statusPanel.classList.remove('sky-hidden');
-
+      robotCamera.lookAt(eyeX - 20 * Math.sin(camPhi) * Math.sin(camTheta), eyeY - 20 * Math.cos(camPhi), eyeZ - 20 * Math.sin(camPhi) * Math.cos(camTheta));
+      statusPanel.classList.toggle('sky-hidden', camPhi > 1.55);
       activeCamera = robotCamera;
     } else if (mode === 'ground') {
-      robotGroup.visible = true;
-      statusPanel.classList.remove('sky-hidden');
-
-      const groundPhi = Math.max(0.50, Math.min(1.22, camPhi));
-      const h = getRobotHeightLevel();
-      const isManualGround = (manualCameraMode === 'ground');
-
-      const targetX = isManualGround ? 0 : robotGroup.position.x * 0.65;
-      const targetY = isManualGround ? 0.15 : Math.max(0, h * 0.5) + 0.35;
-      const targetZ = isManualGround ? 0 : robotGroup.position.z * 0.65;
-
-      const gx = targetX + camRadius * Math.sin(groundPhi) * Math.sin(camTheta);
-      const gy = targetY + camRadius * Math.cos(groundPhi);
-      const gz = targetZ + camRadius * Math.sin(groundPhi) * Math.cos(camTheta);
-
-      groundCamera.position.set(gx, gy, gz);
-      groundCamera.lookAt(targetX, targetY, targetZ);
+      robotGroup.visible = true; statusPanel.classList.remove('sky-hidden');
+      const gPhi = Math.max(0.50, Math.min(1.22, camPhi)), h = getRobotHeightLevel(), isMan = (manualCameraMode === 'ground');
+      const tx = isMan ? 0 : robotGroup.position.x * 0.65, ty = isMan ? 0.15 : Math.max(0, h * 0.5) + 0.35, tz = isMan ? 0 : robotGroup.position.z * 0.65;
+      groundCamera.position.set(tx + camRadius * Math.sin(gPhi) * Math.sin(camTheta), ty + camRadius * Math.cos(gPhi), tz + camRadius * Math.sin(gPhi) * Math.cos(camTheta));
+      groundCamera.lookAt(tx, ty, tz);
       activeCamera = groundCamera;
     } else {
-      robotGroup.visible = true;
-      statusPanel.classList.remove('sky-hidden');
-
-      const ugPhi = Math.max(0.70, Math.min(1.32, camPhi));
-      const h = getRobotHeightLevel();
-      const isRobotUnderground = (h < 0 && h !== -99);
-
-      const ugTargetX = isRobotUnderground ? robotGroup.position.x * 0.5 : 0;
-      const ugTargetY = isRobotUnderground ? (robotGroup.position.y + 0.25) : -1.25;
-      const ugTargetZ = isRobotUnderground ? robotGroup.position.z * 0.5 : 0;
-      const ugDist = camRadius * 0.86;
-
-      const ux = ugTargetX + ugDist * Math.sin(ugPhi) * Math.sin(camTheta);
-      const uy = ugTargetY + ugDist * Math.cos(ugPhi);
-      const uz = ugTargetZ + ugDist * Math.sin(ugPhi) * Math.cos(camTheta);
-
-      undergroundCamera.position.set(ux, uy, uz);
-      undergroundCamera.lookAt(ugTargetX, ugTargetY, ugTargetZ);
+      robotGroup.visible = true; statusPanel.classList.remove('sky-hidden');
+      const uPhi = Math.max(0.70, Math.min(1.32, camPhi)), h = getRobotHeightLevel(), isUG = (h < 0 && h !== -99);
+      const ux = isUG ? robotGroup.position.x * 0.5 : 0, uy = isUG ? (robotGroup.position.y + 0.25) : -1.25, uz = isUG ? robotGroup.position.z * 0.5 : 0, d = camRadius * 0.86;
+      undergroundCamera.position.set(ux + d * Math.sin(uPhi) * Math.sin(camTheta), uy + d * Math.cos(uPhi), uz + d * Math.sin(uPhi) * Math.cos(camTheta));
+      undergroundCamera.lookAt(ux, uy, uz);
       activeCamera = undergroundCamera;
     }
-
     syncCameraButtonsUI();
     updateTransparencyAndOcclusion();
   }
@@ -1195,121 +715,57 @@
 
   document.getElementById('cam-ground-btn').onclick = () => {
     wakeUpRenderer();
-    if (manualCameraMode === 'ground') {
-      manualCameraMode = null;
-      showToast(`🤖 キャラ追従カメラに戻したよ（${getStyleShortName()}）`);
-    } else {
-      manualCameraMode = 'ground';
-      camPhi = 1.02;
-      showToast('🌌 地上カメラON（上から見下ろし・透過なし）');
-    }
-    cameraDirty = true;
-    updateEnvironmentAndUI();
+    manualCameraMode = (manualCameraMode === 'ground') ? null : 'ground';
+    if (manualCameraMode) camPhi = 1.02;
+    showToast(manualCameraMode ? '🌌 地上カメラON（上から見下ろし・透過なし）' : `🤖 キャラ追従カメラに戻したよ（${getStyleShortName()}）`);
+    cameraDirty = true; updateEnvironmentAndUI();
   };
-
   document.getElementById('cam-ug-btn').onclick = () => {
     wakeUpRenderer();
-    if (manualCameraMode === 'underground') {
-      manualCameraMode = null;
-      showToast(`🤖 キャラ追従カメラに戻したよ（${getStyleShortName()}）`);
-    } else {
-      manualCameraMode = 'underground';
-      camPhi = 1.08;
-      showToast(`⛏️ 地下カメラON（5×5・${getStyleShortName()}）`);
-    }
-    cameraDirty = true;
-    updateEnvironmentAndUI();
+    manualCameraMode = (manualCameraMode === 'underground') ? null : 'underground';
+    if (manualCameraMode) camPhi = 1.08;
+    showToast(manualCameraMode ? `⛏️ 地下カメラON（5×5・${getStyleShortName()}）` : `🤖 キャラ追従カメラに戻したよ（${getStyleShortName()}）`);
+    cameraDirty = true; updateEnvironmentAndUI();
   };
-
   document.getElementById('cam-fpv-btn').onclick = () => {
     wakeUpRenderer();
-    if (manualCameraMode === 'robot') {
-      manualCameraMode = null;
-      camPhi = 1.05;
-      showToast(`🤖 キャラ追従カメラに戻したよ（${getStyleShortName()}）`);
-    } else {
-      manualCameraMode = 'robot';
-      camPhi = 1.65;
-      showToast('🤖 ロボット視点ON！指で360°星空を見回せるよ！');
-    }
-    cameraDirty = true;
-    updateEnvironmentAndUI();
+    manualCameraMode = (manualCameraMode === 'robot') ? null : 'robot';
+    camPhi = manualCameraMode ? 1.65 : 1.05;
+    showToast(manualCameraMode ? '🤖 ロボット視点ON！指で360°星空を見回せるよ！' : `🤖 キャラ追従カメラに戻したよ（${getStyleShortName()}）`);
+    cameraDirty = true; updateEnvironmentAndUI();
   };
 
   const domElem = renderer.domElement;
-  domElem.addEventListener('pointerdown', (e) => {
-    isDragging = true;
-    prevPointer.x = e.clientX;
-    prevPointer.y = e.clientY;
-    wakeUpRenderer();
-  }, { passive: true });
-
-  window.addEventListener('pointermove', (e) => {
+  domElem.addEventListener('pointerdown', e => { isDragging = true; prevPointer.x = e.clientX; prevPointer.y = e.clientY; wakeUpRenderer(); }, { passive: true });
+  window.addEventListener('pointermove', e => {
     if (!isDragging) return;
-    const dx = e.clientX - prevPointer.x;
-    const dy = e.clientY - prevPointer.y;
-    prevPointer.x = e.clientX;
-    prevPointer.y = e.clientY;
-    camTheta -= dx * 0.0085;
-    camPhi += dy * 0.0075;
-    cameraDirty = true;
-    wakeUpRenderer();
+    camTheta -= (e.clientX - prevPointer.x) * 0.0085;
+    camPhi += (e.clientY - prevPointer.y) * 0.0075;
+    prevPointer.x = e.clientX; prevPointer.y = e.clientY;
+    cameraDirty = true; wakeUpRenderer();
   }, { passive: true });
-
   window.addEventListener('pointerup', () => { isDragging = false; }, { passive: true });
   window.addEventListener('pointercancel', () => { isDragging = false; }, { passive: true });
-  domElem.addEventListener('wheel', (e) => {
-    camRadius += e.deltaY * 0.01;
-    cameraDirty = true;
-    wakeUpRenderer();
-  }, { passive: true });
+  domElem.addEventListener('wheel', e => { camRadius += e.deltaY * 0.01; cameraDirty = true; wakeUpRenderer(); }, { passive: true });
 
-  // ==========================================
-  // 4. 時間帯・星空・UIの更新
-  // ==========================================
-  function formatHeightText(h) {
-    if (h === -99) return '海の白波';
-    if (h < 0) return `地下${Math.abs(h)}階`;
-    return `地上${h}段目`;
-  }
+  function formatHeightText(h) { return h === -99 ? '海の白波' : (h < 0 ? `地下${Math.abs(h)}階` : `地上${h}段目`); }
 
   function updateEnvironmentAndUI() {
-    const st = life.getState();
-    const hLevel = getRobotHeightLevel();
-    const effCam = getEffectiveCameraMode();
-
-    document.getElementById('val-stamina').innerText = st.stamina;
-    document.getElementById('bar-stamina').style.width = st.stamina + '%';
-    document.getElementById('val-life').innerText = st.energy;
-    document.getElementById('bar-life').style.width = st.energy + '%';
-    document.getElementById('val-mental').innerText = st.mental;
-    document.getElementById('bar-mental').style.width = st.mental + '%';
-
+    const st = life.getState(), hLevel = getRobotHeightLevel(), effCam = getEffectiveCameraMode();
+    document.getElementById('val-stamina').innerText = st.stamina; document.getElementById('bar-stamina').style.width = st.stamina + '%';
+    document.getElementById('val-life').innerText = st.energy; document.getElementById('bar-life').style.width = st.energy + '%';
+    document.getElementById('val-mental').innerText = st.mental; document.getElementById('bar-mental').style.width = st.mental + '%';
     document.getElementById('ui-robot-id').innerText = `🤖 ロボ${ROBOT.gen}ごう`;
     document.getElementById('ui-days').innerText = `🌱 ${GAME_DAY}日目`;
 
-    let timeLabel = '☀️ 朝';
-    let skyHex = 0x0b1528;
-    let starOpacity = 0.65;
+    let timeLabel = '☀️ 朝', skyHex = 0x0f1d36, starOpacity = 0.55;
+    if (TIME_STEP >= 17) { timeLabel = '🌌 深淵'; skyHex = 0x030712; starOpacity = 1.0; }
+    else if (TIME_STEP >= 13) { timeLabel = '🌙 夜'; skyHex = 0x070d19; starOpacity = 0.95; }
+    else if (TIME_STEP >= 9) { timeLabel = '🌇 夕方'; skyHex = 0x1e1638; starOpacity = 0.78; }
+    else if (TIME_STEP >= 4) { timeLabel = '🌤️ 昼'; skyHex = 0x152c52; starOpacity = 0.45; }
+    if (hLevel >= 3 || effCam === 'robot') starOpacity = Math.min(1.0, starOpacity + 0.25);
 
-    if (TIME_STEP < 4) {
-      timeLabel = '☀️ 朝'; skyHex = 0x0f1d36; starOpacity = 0.55;
-    } else if (TIME_STEP < 9) {
-      timeLabel = '🌤️ 昼'; skyHex = 0x152c52; starOpacity = 0.45;
-    } else if (TIME_STEP < 13) {
-      timeLabel = '🌇 夕方'; skyHex = 0x1e1638; starOpacity = 0.78;
-    } else if (TIME_STEP < 17) {
-      timeLabel = '🌙 夜'; skyHex = 0x070d19; starOpacity = 0.95;
-    } else {
-      timeLabel = '🌌 深淵'; skyHex = 0x030712; starOpacity = 1.0;
-    }
-
-    if (hLevel >= 3 || effCam === 'robot') {
-      starOpacity = Math.min(1.0, starOpacity + 0.25);
-    }
-
-    scene.background.setHex(skyHex);
-    starMat.opacity = starOpacity;
+    scene.background.setHex(skyHex); starMat.opacity = starOpacity;
     document.getElementById('ui-time').innerText = timeLabel;
 
     let moodStr = '😊 あんしん・まんぷく';
@@ -1321,184 +777,110 @@
     else if (st.mode === 'BORED') moodStr = '😐 たいくつ';
     document.getElementById('ui-mood').innerText = moodStr;
 
-    let camBadge = '🤖追従カメラ';
-    if (manualCameraMode === 'ground') camBadge = '🌌地上カメラON';
-    else if (manualCameraMode === 'underground') camBadge = '⛏️地下カメラON';
-    else if (manualCameraMode === 'robot') camBadge = '🤖ロボ視点ON';
+    const camBadge = manualCameraMode === 'ground' ? '🌌地上カメラON' : (manualCameraMode === 'underground' ? '⛏️地下カメラON' : (manualCameraMode === 'robot' ? '🤖ロボ視点ON' : '🤖追従カメラ'));
     document.getElementById('history-loc').innerText = `${camBadge}(${getStyleShortName()})・${formatHeightText(hLevel)}`;
   }
 
-  // ==========================================
-  // 5. AI通信最優先（gemini-3.8-flash）＋アルゴンさん物理エンジン
-  // ==========================================
   async function askAIForDecision(validDirs, curH) {
     const aiType = safeStorage.getItem('ai_type') || 'gemini';
     if (aiType === 'none') return null;
-
     const dirNames = validDirs.map(d => d.name).join('、');
     const itemsStr = WORLD_ITEMS.map(it => `${it.type}(${it.x},${it.z})`).join(', ') || 'なし';
-    const prompt = `あなたは5x5の浮島と地下空間で暮らす自律ロボット「ロボ${ROBOT.gen}ごう」です。
-現在位置: (${ROBOT.pos.x}, ${ROBOT.pos.z}) 高さ:${formatHeightText(curH)}
-ステータス: たいりょく=${life.stamina}, おなか=${life.energy}, ごきげん=${life.mental}
-島にあるアイテム: ${itemsStr}
-移動できる方角: [${dirNames}]
-以下のJSON形式のみで次の行動と小学生向けの可愛い気持ち（1〜2文）を出力してください:
-{"action":"東 または 西 または 南 または 北 または 掘る または 休む", "thought":"ロボの気持ち"}`;
-
+    const prompt = `あなたは5x5の浮島と地下空間で暮らす自律ロボット「ロボ${ROBOT.gen}ごう」です。現在位置:(${ROBOT.pos.x},${ROBOT.pos.z}) 高さ:${formatHeightText(curH)} ステータス:たいりょく=${life.stamina},おなか=${life.energy},ごきげん=${life.mental} アイテム:${itemsStr} 移動可能:[${dirNames}] JSON形式のみで次の行動と小学生向けの可愛い気持ち(1〜2文)を出力してください:{"action":"東 または 西 または 南 または 北 または 掘る または 休む","thought":"気持ち"}`;
     try {
       if (aiType === 'gemini') {
         const key = safeStorage.getItem('api_gemini');
         if (!key) return null;
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: 'application/json' }
-          })
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } })
         });
         const data = await res.json();
-        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (rawText) return JSON.parse(rawText);
+        const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (raw) return JSON.parse(raw);
       } else if (aiType === 'groq') {
         const key = safeStorage.getItem('api_groq');
         if (!key) return null;
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [{ role: 'user', content: prompt }],
-            response_format: { type: 'json_object' },
-            max_tokens: 160
-          })
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+          body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' }, max_tokens: 160 })
         });
         const data = await res.json();
-        const rawText = data.choices?.[0]?.message?.content;
-        if (rawText) return JSON.parse(rawText);
+        const raw = data.choices?.[0]?.message?.content;
+        if (raw) return JSON.parse(raw);
       }
-    } catch (e) {
-      console.warn('AI通信フォールバック:', e);
-    }
+    } catch (e) {}
     return null;
   }
 
   async function executeTurn() {
     wakeUpRenderer(4000);
-    const btn = document.getElementById('btn-action');
-    btn.disabled = true;
+    const btn = document.getElementById('btn-action'); btn.disabled = true;
     document.getElementById('ai-status').innerText = '⚡ 思考中...';
     bulbMesh.material.color.setHex(0xf87171);
 
-    TIME_STEP++;
-    if (TIME_STEP >= 20) {
-      TIME_STEP = 0;
-      GAME_DAY++;
-      DIARY_LOGS.push(`🌅 ${GAME_DAY}日目の朝を迎えたよ！`);
-    }
+    if (++TIME_STEP >= 20) { TIME_STEP = 0; GAME_DAY++; DIARY_LOGS.push(`🌅 ${GAME_DAY}日目の朝を迎えたよ！`); }
 
     const curH = getRobotHeightLevel();
     const dirs = [
-      { name: '東', dx: 1, dz: 0, rot: Math.PI / 2 },
-      { name: '西', dx: -1, dz: 0, rot: -Math.PI / 2 },
-      { name: '南', dx: 0, dz: 1, rot: 0 },
-      { name: '北', dx: 0, dz: -1, rot: Math.PI }
+      { name: '東', dx: 1, dz: 0, rot: Math.PI / 2 }, { name: '西', dx: -1, dz: 0, rot: -Math.PI / 2 },
+      { name: '南', dx: 0, dz: 1, rot: 0 }, { name: '北', dx: 0, dz: -1, rot: Math.PI }
     ];
-
-    let thoughtText = '';
-    let actionLabel = '';
+    let thoughtText = '', actionLabel = '';
 
     if (curH === -99) {
-      ROBOT.pos.x = Math.max(-2, Math.min(2, ROBOT.pos.x));
-      ROBOT.pos.z = Math.max(-2, Math.min(2, ROBOT.pos.z));
-      ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
-      life.stamina -= 10;
-      actionLabel = '🌊 白波に押し戻されて陸へ帰還';
-      thoughtText = 'わわっ！海の白い波がすごく強くて、内陸のほうへ押し戻されたよ！';
+      ROBOT.pos.x = Math.max(-2, Math.min(2, ROBOT.pos.x)); ROBOT.pos.z = Math.max(-2, Math.min(2, ROBOT.pos.z));
+      ROBOT.pos.sx = 2; ROBOT.pos.sz = 2; life.stamina -= 10;
+      actionLabel = '🌊 白波に押し戻されて陸へ帰還'; thoughtText = 'わわっ！海の白い波がすごく強くて、内陸のほうへ押し戻されたよ！';
     } else {
       const validDirs = dirs.filter(d => {
-        const nx = ROBOT.pos.x + d.dx;
-        const nz = ROBOT.pos.z + d.dz;
+        const nx = ROBOT.pos.x + d.dx, nz = ROBOT.pos.z + d.dz;
         if (nx < -2 || nx > 2 || nz < -2 || nz > 2) return ROBOT.speed === 5;
-        const nextH = HEIGHT_MAP[`${nx},${nz}`] ?? 0;
-        return (nextH - curH) <= 1;
+        return ((HEIGHT_MAP[`${nx},${nz}`] ?? 0) - curH) <= 1;
       });
-
       const aiDecision = await askAIForDecision(validDirs, curH);
-
-      let chosenDir = null;
-      let wantDig = false;
-      let wantRest = false;
+      let chosenDir = null, wantDig = false, wantRest = false;
 
       if (aiDecision && aiDecision.action) {
         if (aiDecision.action.includes('休')) wantRest = true;
         else if (aiDecision.action.includes('掘') && curH > -3) wantDig = true;
-        else {
-          chosenDir = validDirs.find(d => aiDecision.action.includes(d.name)) || null;
-        }
+        else chosenDir = validDirs.find(d => aiDecision.action.includes(d.name)) || null;
       }
-
       if (!wantRest && !wantDig && !chosenDir) {
-        if (life.stamina <= 25) {
-          wantRest = true;
-        } else if (Math.random() < 0.18 && curH > -3 && life.stamina > 45) {
-          wantDig = true;
-        } else {
-          const appleTarget = WORLD_ITEMS.find(it => it.type === 'apple');
-          if (appleTarget && validDirs.length > 0) {
-            validDirs.sort((a, b) => {
-              const distA = Math.abs((ROBOT.pos.x + a.dx) - appleTarget.x) + Math.abs((ROBOT.pos.z + a.dz) - appleTarget.z);
-              const distB = Math.abs((ROBOT.pos.x + b.dx) - appleTarget.x) + Math.abs((ROBOT.pos.z + b.dz) - appleTarget.z);
-              return distA - distB;
-            });
+        if (life.stamina <= 25) wantRest = true;
+        else if (Math.random() < 0.18 && curH > -3 && life.stamina > 45) wantDig = true;
+        else {
+          const apple = WORLD_ITEMS.find(it => it.type === 'apple');
+          if (apple && validDirs.length) {
+            validDirs.sort((a, b) => (Math.abs(ROBOT.pos.x + a.dx - apple.x) + Math.abs(ROBOT.pos.z + a.dz - apple.z)) - (Math.abs(ROBOT.pos.x + b.dx - apple.x) + Math.abs(ROBOT.pos.z + b.dz - apple.z)));
             chosenDir = validDirs[0];
-          } else if (validDirs.length > 0) {
-            chosenDir = validDirs[Math.floor(Math.random() * validDirs.length)];
-          }
+          } else if (validDirs.length) chosenDir = validDirs[Math.floor(Math.random() * validDirs.length)];
         }
       }
 
       if (wantRest) {
-        life.stamina += 35;
-        life.energy -= 5;
-        life.mental += 10;
+        life.stamina += 35; life.energy -= 5; life.mental += 10;
         actionLabel = '💤 その場でひとやすみ';
-        thoughtText = aiDecision?.thought || (curH < 0
-          ? `地下${Math.abs(curH)}階のひみつ空間でひとやすみ。ひんやりして落ち着くなぁ。`
-          : 'ちょっと疲れたから、ここでひとやすみして体力を回復するよ！');
+        thoughtText = aiDecision?.thought || (curH < 0 ? `地下${Math.abs(curH)}階のひみつ空間でひとやすみ。落ち着くなぁ。` : 'ちょっと疲れたから、ここでひとやすみして体力を回復するよ！');
       } else if (wantDig) {
-        const k = `${ROBOT.pos.x},${ROBOT.pos.z}`;
-        HEIGHT_MAP[k] = curH - 1;
-        life.stamina -= 10;
-        life.mental += 12;
-        if (BAG.length < 10) BAG.push('stone');
-        const afterH = HEIGHT_MAP[k];
-        actionLabel = `⛏️ 足元を掘って${formatHeightText(afterH)}へ！`;
-        thoughtText = aiDecision?.thought || `ザクザクッ！足元の土を掘って${formatHeightText(afterH)}の地下空間を広げたよ！`;
-        DIARY_LOGS.push(`⛏️ ${GAME_DAY}日目：${formatHeightText(afterH)}へ穴を掘って探検した！`);
+        const k = `${ROBOT.pos.x},${ROBOT.pos.z}`; HEIGHT_MAP[k] = curH - 1;
+        life.stamina -= 10; life.mental += 12; if (BAG.length < 10) BAG.push('stone');
+        actionLabel = `⛏️ 足元を掘って${formatHeightText(HEIGHT_MAP[k])}へ！`;
+        thoughtText = aiDecision?.thought || `ザクザクッ！足元の土を掘って${formatHeightText(HEIGHT_MAP[k])}の地下空間を広げたよ！`;
+        DIARY_LOGS.push(`⛏️ ${GAME_DAY}日目：${formatHeightText(HEIGHT_MAP[k])}へ穴を掘って探検した！`);
       } else if (chosenDir) {
         const prevH = curH;
-        ROBOT.pos.x += chosenDir.dx;
-        ROBOT.pos.z += chosenDir.dz;
-        ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
+        ROBOT.pos.x += chosenDir.dx; ROBOT.pos.z += chosenDir.dz;
+        ROBOT.pos.sx = ROBOT.speed === 5 ? Math.max(0, Math.min(4, 2 + chosenDir.dx * 2)) : 2;
+        ROBOT.pos.sz = ROBOT.speed === 5 ? Math.max(0, Math.min(4, 2 + chosenDir.dz * 2)) : 2;
         ROBOT.rotY = chosenDir.rot;
-
-        if (ROBOT.speed === 5) {
-          ROBOT.pos.sx = Math.max(0, Math.min(4, 2 + chosenDir.dx * 2));
-          ROBOT.pos.sz = Math.max(0, Math.min(4, 2 + chosenDir.dz * 2));
-        }
-
         const newH = getRobotHeightLevel();
-        life.energy -= 7;
-        life.stamina -= 8;
-
+        life.energy -= 7; life.stamina -= 8;
         if (newH < 0 && newH !== -99) {
-          life.mental += 10;
-          actionLabel = `⛏️ ${chosenDir.name}へ進んで地下${Math.abs(newH)}階へ！`;
+          life.mental += 10; actionLabel = `⛏️ ${chosenDir.name}へ進んで地下${Math.abs(newH)}階へ！`;
           thoughtText = aiDecision?.thought || `地下${Math.abs(newH)}階に潜ったよ！指でカメラを回すと5×5の小ブロックが動いて中がよく見えるね！`;
         } else if (newH > prevH) {
-          life.mental += 10;
-          actionLabel = `👟 ${chosenDir.name}へ1段登った（${formatHeightText(newH)}）`;
+          life.mental += 10; actionLabel = `👟 ${chosenDir.name}へ1段登った（${formatHeightText(newH)}）`;
           thoughtText = aiDecision?.thought || `よいしょっ！${chosenDir.name}へ1段登って${formatHeightText(newH)}に来たよ！`;
         } else {
           actionLabel = `👟 ${chosenDir.name}へトコトコ歩いた`;
@@ -1509,46 +891,26 @@
 
     const itemIdx = WORLD_ITEMS.findIndex(it => it.x === ROBOT.pos.x && it.z === ROBOT.pos.z);
     if (itemIdx !== -1) {
-      const picked = WORLD_ITEMS[itemIdx];
-      WORLD_ITEMS.splice(itemIdx, 1);
+      const picked = WORLD_ITEMS.splice(itemIdx, 1)[0];
       if (picked.type === 'apple') {
-        life.energy += 45;
-        life.mental += 15;
-        actionLabel = '🍎 リンゴを見つけて食べた！';
-        thoughtText = 'わーい！甘くておいしいリンゴを食べたよ！おなかがいっぱいになって元気モリモリだぁ！';
+        life.energy += 45; life.mental += 15;
+        actionLabel = '🍎 リンゴを見つけて食べた！'; thoughtText = 'わーい！甘くておいしいリンゴを食べたよ！おなかがいっぱいで元気モリモリだぁ！';
         DIARY_LOGS.push(`🍎 ${GAME_DAY}日目：おいしいリンゴを食べて元気になった。`);
       } else {
-        if (BAG.length < 10) BAG.push(picked.type);
-        life.mental += 10;
-        actionLabel = `🎒 ${picked.type === 'stone' ? '石ブロック' : '草'}をカバンに拾った`;
-        thoughtText = '足元にいいものが落ちていたから、カバンにしまったよ！';
+        if (BAG.length < 10) BAG.push(picked.type); life.mental += 10;
+        actionLabel = `🎒 ${picked.type === 'stone' ? '石ブロック' : '草'}をカバンに拾った`; thoughtText = '足元にいいものが落ちていたから、カバンにしまったよ！';
       }
     }
 
-    rebuildTerrainAndItems();
-    syncRobot3DPosition();
-    cameraDirty = true;
-    updateEnvironmentAndUI();
-    saveWorldState();
+    rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState();
 
-    const afterState = life.getState();
-    if (afterState.mode === 'DEAD') {
+    if (life.getState().mode === 'DEAD') {
       document.getElementById('message-box').innerText = `力尽きて倒れてしまった…。記憶を引き継ぎ、次のロボ${ROBOT.gen + 1}ごうが1日目から誕生します！`;
       setTimeout(() => {
-        ROBOT.gen += 1;
-        ROBOT.pos = { x: 0, z: 0, sx: 2, sz: 2 };
-        ROBOT.rotY = 0;
-        GAME_DAY = 1;
-        TIME_STEP = 0;
-        life = new LifeCore();
+        ROBOT.gen += 1; ROBOT.pos = { x: 0, z: 0, sx: 2, sz: 2 }; ROBOT.rotY = 0; GAME_DAY = 1; TIME_STEP = 0; life = new LifeCore();
         DIARY_LOGS.push(`📖 ロボ${ROBOT.gen}ごうが1日目から新しく誕生した！`);
-        if (WORLD_ITEMS.length === 0) WORLD_ITEMS.push({ type: 'apple', x: 0, z: -1 });
-        rebuildTerrainAndItems();
-        syncRobot3DPosition();
-        cameraDirty = true;
-        updateEnvironmentAndUI();
-        saveWorldState();
-        btn.disabled = false;
+        if (!WORLD_ITEMS.length) WORLD_ITEMS.push({ type: 'apple', x: 0, z: -1 });
+        rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); btn.disabled = false;
       }, 2000);
       return;
     }
@@ -1557,138 +919,68 @@
       document.getElementById('history-action').innerText = actionLabel;
       document.getElementById('message-box').innerText = thoughtText;
       document.getElementById('ai-status').innerText = '💤 待機中';
-      bulbMesh.material.color.setHex(0xfacc15);
-      btn.disabled = false;
+      bulbMesh.material.color.setHex(0xfacc15); btn.disabled = false;
     }, 300);
   }
 
-  // ==========================================
-  // 6. 扇状メニュー・手帳・ガチャ・設定操作
-  // ==========================================
   const fanWrapper = document.getElementById('fan-menu-wrapper');
-  document.getElementById('plus-main-btn').onclick = () => {
-    wakeUpRenderer();
-    fanWrapper.classList.toggle('open');
-  };
-  function closeFanMenu() {
-    fanWrapper.classList.remove('open');
-  }
+  document.getElementById('plus-main-btn').onclick = () => { wakeUpRenderer(); fanWrapper.classList.toggle('open'); };
+  function closeFanMenu() { fanWrapper.classList.remove('open'); }
 
   function quickDropApple() {
-    wakeUpRenderer();
-    WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z });
-    rebuildTerrainAndItems();
-    cameraDirty = true;
-    saveWorldState();
-    closeFanMenu();
-    showToast('🍎 足元にリンゴを置いたよ！');
+    wakeUpRenderer(); WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z });
+    rebuildTerrainAndItems(); cameraDirty = true; saveWorldState(); closeFanMenu(); showToast('🍎 足元にリンゴを置いたよ！');
   }
-
   function quickStackBlock() {
-    wakeUpRenderer();
-    const { x, z } = ROBOT.pos;
-    if (x < -2 || x > 2 || z < -2 || z > 2) return;
-    const key = `${x},${z}`;
-    const cur = HEIGHT_MAP[key] ?? 0;
-    if (cur >= 5) {
-      showToast('ここはすでに最高峰（地上5段目）だよ！');
-      closeFanMenu();
-      return;
-    }
-    HEIGHT_MAP[key] = cur + 1;
-    rebuildTerrainAndItems();
-    syncRobot3DPosition();
-    cameraDirty = true;
-    updateEnvironmentAndUI();
-    saveWorldState();
-    closeFanMenu();
+    wakeUpRenderer(); const { x, z } = ROBOT.pos; if (x < -2 || x > 2 || z < -2 || z > 2) return;
+    const key = `${x},${z}`, cur = HEIGHT_MAP[key] ?? 0;
+    if (cur >= 5) { showToast('ここはすでに最高峰（地上5段目）だよ！'); closeFanMenu(); return; }
+    HEIGHT_MAP[key] = cur + 1; rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
     showToast(`🪨 ブロックを1段積んで「${formatHeightText(cur + 1)}」にしたよ！`);
   }
-
   function quickDigBlock() {
-    wakeUpRenderer();
-    const { x, z } = ROBOT.pos;
-    if (x < -2 || x > 2 || z < -2 || z > 2) return;
-    const key = `${x},${z}`;
-    const cur = HEIGHT_MAP[key] ?? 0;
-    if (cur <= -3) {
-      showToast('これ以上深くは掘れないよ（地下3階が底です）！');
-      closeFanMenu();
-      return;
-    }
-    HEIGHT_MAP[key] = cur - 1;
-    rebuildTerrainAndItems();
-    syncRobot3DPosition();
-    cameraDirty = true;
-    updateEnvironmentAndUI();
-    saveWorldState();
-    closeFanMenu();
+    wakeUpRenderer(); const { x, z } = ROBOT.pos; if (x < -2 || x > 2 || z < -2 || z > 2) return;
+    const key = `${x},${z}`, cur = HEIGHT_MAP[key] ?? 0;
+    if (cur <= -3) { showToast('これ以上深くは掘れないよ（地下3階が底です）！'); closeFanMenu(); return; }
+    HEIGHT_MAP[key] = cur - 1; rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
     showToast(`⛏️ 地面を1段掘って「${formatHeightText(cur - 1)}」にしたよ！`);
   }
 
   function openModal(id) {
     wakeUpRenderer();
     if (id === 'modal-diary') renderDiaryModal();
-    if (id === 'modal-settings') {
-      document.getElementById('setting-cam-style').value = CAM_VISUAL_STYLE;
-    }
-    const el = document.getElementById(id);
-    el.style.display = 'flex';
-    el.classList.add('active');
+    if (id === 'modal-settings') document.getElementById('setting-cam-style').value = CAM_VISUAL_STYLE;
+    const el = document.getElementById(id); el.style.display = 'flex'; el.classList.add('active');
   }
   function closeModal(id) {
-    wakeUpRenderer();
-    const el = document.getElementById(id);
-    el.classList.remove('active');
-    el.style.display = 'none';
+    wakeUpRenderer(); const el = document.getElementById(id); el.classList.remove('active'); el.style.display = 'none';
   }
 
   function renderDiaryModal() {
-    const h = getRobotHeightLevel();
     document.getElementById('diary-robo-name').innerText = `🤖 ロボ${ROBOT.gen}ごう（生存 ${GAME_DAY}日目）`;
-    document.getElementById('diary-robo-height').innerText = `現在の場所：${formatHeightText(h)} / 移動速度：${ROBOT.speed}`;
-
-    const grid = document.getElementById('bag-grid');
-    grid.innerHTML = '';
+    document.getElementById('diary-robo-height').innerText = `現在の場所：${formatHeightText(getRobotHeightLevel())} / 移動速度：${ROBOT.speed}`;
+    const grid = document.getElementById('bag-grid'); grid.innerHTML = '';
     for (let i = 0; i < 10; i++) {
-      const slot = document.createElement('div');
-      const item = BAG[i];
+      const slot = document.createElement('div'), item = BAG[i];
       slot.className = 'bag-slot' + (item ? ' filled' : '');
-      if (item === 'apple') slot.innerText = '🍎';
-      else if (item === 'stone') slot.innerText = '🪨';
-      else if (item === 'grass') slot.innerText = '🌿';
+      slot.innerText = item === 'apple' ? '🍎' : (item === 'stone' ? '🪨' : (item === 'grass' ? '🌿' : ''));
       if (item) slot.onclick = () => useBagItem(i);
       grid.appendChild(slot);
     }
-
     document.getElementById('diary-logs').innerHTML = DIARY_LOGS.slice().reverse().map(l => `<div>・${l}</div>`).join('');
   }
 
   function useBagItem(index) {
-    wakeUpRenderer();
-    const item = BAG[index];
-    if (!item) return;
+    wakeUpRenderer(); const item = BAG[index]; if (!item) return;
     const key = `${ROBOT.pos.x},${ROBOT.pos.z}`;
     if (item === 'stone' || item === 'grass') {
       const cur = HEIGHT_MAP[key] ?? 0;
-      if (cur >= 5) {
-        showToast('ここはすでに最高峰（5段目）だよ！');
-        return;
-      }
-      HEIGHT_MAP[key] = cur + 1;
-      BAG.splice(index, 1);
-      showToast(`足元にブロックを積んで「${formatHeightText(cur + 1)}」にしたよ！`);
+      if (cur >= 5) { showToast('ここはすでに最高峰（5段目）だよ！'); return; }
+      HEIGHT_MAP[key] = cur + 1; BAG.splice(index, 1); showToast(`足元にブロックを積んで「${formatHeightText(cur + 1)}」にしたよ！`);
     } else if (item === 'apple') {
-      WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z });
-      BAG.splice(index, 1);
-      showToast('足元に🍎リンゴを置いたよ！');
+      WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z }); BAG.splice(index, 1); showToast('足元に🍎リンゴを置いたよ！');
     }
-    rebuildTerrainAndItems();
-    syncRobot3DPosition();
-    cameraDirty = true;
-    updateEnvironmentAndUI();
-    saveWorldState();
-    renderDiaryModal();
+    rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
   }
 
   document.getElementById('diary-btn').onclick = () => openModal('modal-diary');
@@ -1703,22 +995,11 @@
       { type: 'grass', icon: '🌿', name: '星見の草ブロック（カバンに追加！）' }
     ];
     const picked = pool[Math.floor(Math.random() * pool.length)];
-    const rx = Math.floor(Math.random() * 5) - 2;
-    const rz = Math.floor(Math.random() * 5) - 2;
-
-    if (picked.type === 'apple') {
-      WORLD_ITEMS.push({ type: 'apple', x: rx, z: rz });
-    } else {
-      if (BAG.length < 10) BAG.push(picked.type);
-    }
-
+    if (picked.type === 'apple') WORLD_ITEMS.push({ type: 'apple', x: Math.floor(Math.random() * 5) - 2, z: Math.floor(Math.random() * 5) - 2 });
+    else if (BAG.length < 10) BAG.push(picked.type);
     life.mental = Math.min(100, life.mental + 25);
     document.getElementById('gacha-result-text').innerText = `${picked.icon} ${picked.name}`;
-    rebuildTerrainAndItems();
-    syncRobot3DPosition();
-    cameraDirty = true;
-    updateEnvironmentAndUI();
-    saveWorldState();
+    rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState();
     showToast(`${picked.icon} ゲット！ごきげんアップ！`);
   };
 
@@ -1730,13 +1011,7 @@
     safeStorage.setItem('api_gemini', document.getElementById('setting-gemini-key').value.trim());
     safeStorage.setItem('api_groq', document.getElementById('setting-groq-key').value.trim());
     ROBOT.speed = Number(document.getElementById('setting-speed').value) || 3;
-
-    // 保存ボタンを押した瞬間にブロックの隙間・枠線・透過方式を即座に作り直す
-    rebuildTerrainAndItems();
-    cameraDirty = true;
-    updateAllCamerasTransform();
-    updateEnvironmentAndUI();
-    saveWorldState();
+    rebuildTerrainAndItems(); cameraDirty = true; updateAllCamerasTransform(); updateEnvironmentAndUI(); saveWorldState();
     closeModal('modal-settings');
     showToast(`⚙️ 設定を保存したよ（${getStyleShortName()}）！`);
   }
@@ -1748,55 +1023,28 @@
   document.getElementById('setting-speed').value = String(ROBOT.speed || 3);
 
   function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.innerText = msg;
-    t.style.opacity = '1';
+    const t = document.getElementById('toast'); t.innerText = msg; t.style.opacity = '1';
     setTimeout(() => { t.style.opacity = '0'; }, 2200);
   }
 
-  // 初回構築
-  rebuildTerrainAndItems();
-  syncRobot3DPosition();
-  updateAllCamerasTransform();
-  updateEnvironmentAndUI();
+  rebuildTerrainAndItems(); syncRobot3DPosition(); updateAllCamerasTransform(); updateEnvironmentAndUI();
 
-  // ==========================================
-  // 7. メインアニメーションループ（省エネ自動ブレーキ搭載）
-  // ==========================================
   const clock = new THREE.Clock();
   let lastRenderTime = 0;
 
   function animate(now) {
     requestAnimationFrame(animate);
-
-    const isHighPerf = isDragging || cameraDirty || (now < activeUntilTime);
-    if (!isHighPerf && (now - lastRenderTime < 64)) {
-      return;
-    }
+    if (!isDragging && !cameraDirty && now >= activeUntilTime && (now - lastRenderTime < 64)) return;
     lastRenderTime = now;
-
     const t = clock.getElapsedTime();
 
-    if (cameraDirty) {
-      updateAllCamerasTransform();
-      cameraDirty = false;
-    }
-
+    if (cameraDirty) { updateAllCamerasTransform(); cameraDirty = false; }
     wfTex.offset.y = (t * 0.17) % 1.0;
-
-    const seaPulse = 1 + Math.sin(t * 1.8) * 0.006;
-    seaMesh.scale.set(seaPulse, 1, seaPulse);
-
-    const foamScale = 1 + Math.sin(t * 2.2) * 0.025;
-    foamRingMesh.scale.set(foamScale, foamScale, 1);
-
-    turtleGroup.position.y = -9.2 + Math.sin(t * 0.7) * 0.18;
-    turtleGroup.rotation.y = Math.sin(t * 0.25) * 0.06;
-
+    const seaPulse = 1 + Math.sin(t * 1.8) * 0.006; seaMesh.scale.set(seaPulse, 1, seaPulse);
+    const foamScale = 1 + Math.sin(t * 2.2) * 0.025; foamRingMesh.scale.set(foamScale, foamScale, 1);
+    turtleGroup.position.y = -9.2 + Math.sin(t * 0.7) * 0.18; turtleGroup.rotation.y = Math.sin(t * 0.25) * 0.06;
     skyGroup.rotation.y = t * 0.015;
-
-    rBody.scale.y = 1 + Math.sin(t * 4) * 0.03;
-    rHead.position.y = 0.83 + Math.sin(t * 4) * 0.02;
+    rBody.scale.y = 1 + Math.sin(t * 4) * 0.03; rHead.position.y = 0.83 + Math.sin(t * 4) * 0.02;
 
     renderer.render(scene, activeCamera);
   }
@@ -1804,15 +1052,9 @@
 
   window.addEventListener('resize', () => {
     const a = window.innerWidth / window.innerHeight;
-    groundCamera.aspect = a;
-    groundCamera.updateProjectionMatrix();
-    undergroundCamera.aspect = a;
-    undergroundCamera.updateProjectionMatrix();
-    robotCamera.aspect = a;
-    robotCamera.updateProjectionMatrix();
+    [groundCamera, undergroundCamera, robotCamera].forEach(c => { c.aspect = a; c.updateProjectionMatrix(); });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    cameraDirty = true;
-    wakeUpRenderer();
+    cameraDirty = true; wakeUpRenderer();
   });
 </script>
 </body>
