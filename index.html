@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0b1528">
-  <title>ボクセルAI自律思考水槽 v12</title>
+  <title>ボクセルAI自律思考水槽 v13</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
@@ -97,7 +97,7 @@
       <div class="badge badge-time" id="ui-time">☀️ 朝</div>
     </div>
     <div class="status-right-group">
-      <div class="badge badge-mood" id="ui-mood">😊 空間コアv12</div>
+      <div class="badge badge-mood" id="ui-mood">😊 コアv13</div>
       <button class="btn-icon" id="btn-settings" aria-label="設定">⚙️</button>
     </div>
   </div>
@@ -105,9 +105,9 @@
 
 <div id="side-icon-column">
   <div class="side-circle-btn" id="diary-btn" title="ロボット手帳">📖</div>
-  <div class="side-circle-btn" id="cam-ground-btn" title="地上カメラ">🌌</div>
-  <div class="side-circle-btn" id="cam-ug-btn" title="地下カメラ">⛏️</div>
-  <div class="side-circle-btn" id="cam-fpv-btn" title="ロボット視点カメラ">🤖</div>
+  <div class="side-circle-btn" id="cam-ground-btn" title="外カメラ（地上・全体固定）">🌌</div>
+  <div class="side-circle-btn" id="cam-ug-btn" title="外カメラ（地下・全体固定）">⛏️</div>
+  <div class="side-circle-btn" id="cam-fpv-btn" title="内カメラ（キャラ視点）">🤖</div>
 </div>
 
 <div id="fan-menu-wrapper">
@@ -121,13 +121,13 @@
 
 <div id="bottom-panel">
   <div class="panel-header">
-    <span>💭 ロボのきもち・心のさけび【空間コアv12】</span>
+    <span>💭 ロボのきもち・心のさけび【空間＆カメラコアv13】</span>
     <div class="ai-badge" id="ai-status">💤 待機中</div>
   </div>
-  <div id="message-box">【空間コアv12】白い床と縦長の柱を廃止！地上パステル緑2層＋地下の土3層すべてが本物の5×5×5立方体になったよ！</div>
+  <div id="message-box">【v13完成】地下1層目は5×5の上2段がパステル緑・下3段が乾いた土色、地下2層目からは湿った土色だよ！外カメラ(地上/地下)・追従カメラ・内カメラも切り替えてみてね！</div>
   <div class="action-history">
     <span class="history-tag" id="history-action">👟 やった事 待機中</span>
-    <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従カメラ・地面1層目</span>
+    <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従カメラ・地下1層目</span>
   </div>
   <button class="btn-think" id="btn-action">⚡ 今すぐ考える</button>
 </div>
@@ -142,7 +142,7 @@
       <div style="font-size:36px;">🤖</div>
       <div>
         <div style="font-weight:900; font-size:14px; color:#1e293b;" id="diary-robo-name">ロボ1ごう（生存 1日目）</div>
-        <div style="font-size:11px; color:#64748b;" id="diary-robo-height">現在の高さ：地面1層目 / 速度：3</div>
+        <div style="font-size:11px; color:#64748b;" id="diary-robo-height">現在の場所：地下1層目 / 速度：3</div>
       </div>
     </div>
     <div style="font-size:12px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ」（タップで足元に使う）</div>
@@ -247,48 +247,52 @@
   }
 
   // =========================================================
-  // 空間コア（SpaceCore v12）：全層100%本物の5×5×5小立方体（0.2×0.2×0.2）
-  // 地上部から2層（lv=1, lv=0）はパステルカラーの緑
-  // 地下3層（lv=-1, -2, -3）は土色（2層目から下は少し湿った濃い土色）
-  // ※白い床タイル・縦長の柱・張りぼて箱は完全廃止
+  // 空間コア（SpaceCore v13）：1マス＝1.0×1.0×1.0の完全立方体（内部5×5×5分割）
+  // ・地上空間＆地下1層目（lv >= 0）のブロック内部（5×5×5）：
+  //   上から1・2層目（sy = 4, 3）＝ パステル緑
+  //   上から3〜5層目（sy = 2, 1, 0）＝ 乾いたパステルの土色
+  // ・地下2層目〜地下（lv <= -1）のブロック内部（5×5×5）：
+  //   湿った土色（深くなるほど少し濃い湿った土色）
   // =========================================================
   const SPACE_COLORS = {
-    upperGreen: 0x86efac, // 地上空間（lv >= 1）：パステル緑
-    topGreen:   0xa7f3d0, // 地面1層目（lv = 0）：地上に面するパステル緑（ここまで緑2層）
-    soil1:      0xb58863, // 地下1層目（lv = -1）：乾いた土色
-    soil2:      0x8c5e3c, // 地下2層目（lv = -2）：1層目より少し湿った土色
-    soil3:      0x654127  // 地下3層目（lv = -3）：さらに湿った深い土色
+    pastelGreenTop: 0xa7f3d0, // 5×5の1層目（sy=4）：明るいパステル緑
+    pastelGreenMid: 0x86efac, // 5×5の2層目（sy=3）：パステル緑
+    dryPastelSoil:  0xd4a373, // 5×5の3〜5層目（sy=2,1,0）：乾いたパステルの土色
+    wetSoilLv2:     0x9c6644, // 地下2層目（lv=-1）：少し湿った土色
+    wetSoilLv3:     0x7f5539, // 地下3層目（lv=-2）：湿った土色
+    wetSoilLv4:     0x603813  // 地下4層目・最下部（lv=-3）：深く湿った土色
   };
 
-  function getLayerColorHex(lv) {
-    if (lv >= 1) return SPACE_COLORS.upperGreen;
-    if (lv === 0) return SPACE_COLORS.topGreen;
-    if (lv === -1) return SPACE_COLORS.soil1;
-    if (lv === -2) return SPACE_COLORS.soil2;
-    return SPACE_COLORS.soil3;
+  function getSubVoxelColorHex(lv, sy) {
+    if (lv >= 0) {
+      if (sy === 4) return SPACE_COLORS.pastelGreenTop;
+      if (sy === 3) return SPACE_COLORS.pastelGreenMid;
+      return SPACE_COLORS.dryPastelSoil;
+    }
+    if (lv === -1) return SPACE_COLORS.wetSoilLv2;
+    if (lv === -2) return SPACE_COLORS.wetSoilLv3;
+    return SPACE_COLORS.wetSoilLv4;
   }
 
   let life = new LifeCore(), GAME_DAY = 1, TIME_STEP = 0;
   let BAG = ['stone', 'apple', 'stone', 'grass'];
-  let DIARY_LOGS = ['🌱 1日目：空間コアv12の大地に降り立ったよ！'];
-  // 5×5分割がすぐ確認できるよう初期カメラ設定は「glass_line（詳細5×5×5分割線あり）」
-  let CAM_VISUAL_STYLE = safeStorage.getItem('cam_visual_style_v12') || 'glass_line';
+  let DIARY_LOGS = ['🌱 1日目：空間コアv13の大地に降り立ったよ！'];
+  let CAM_VISUAL_STYLE = safeStorage.getItem('cam_visual_style_v13') || 'glass_line';
   let HEIGHT_MAP = {}, CHIP_MAP = {};
 
   function initDefaultSpaceCore() {
     for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
-    // パステル緑の2層（lv=1 と lv=0）と、地下の土3層（lv=-1, -2, -3）が最初から両方見える立体配置
-    HEIGHT_MAP['1,2']  = 1;  // 地上空間（パステル緑の上層）
-    HEIGHT_MAP['2,2']  = 1;  // 地上空間（パステル緑の上層）
-    HEIGHT_MAP['-1,-2'] = -1; // 緑の蓋を掘り抜いた地下1層目（乾いた土色）
-    HEIGHT_MAP['-2,-2'] = -2; // 地下2層目（少し湿った土色）
-    HEIGHT_MAP['-2,-1'] = -3; // 地下3層目（深く湿った土色）
+    HEIGHT_MAP['1,2']  = 1;   // 地上空間に1段積まれたブロック
+    HEIGHT_MAP['-1,-2'] = -1; // 地下1層目を掘り抜いた縦穴（地下2層目・湿った土色）
+    HEIGHT_MAP['-2,-2'] = -2; // 地下3層目（湿った土色）
+    HEIGHT_MAP['-2,-1'] = -3; // 地下最下部（深く湿った土色）
     CHIP_MAP = {};
-    // (-1,-1,0) の緑ブロックを5×5×5でボロボロ掘削中のサンプル
+    // 5×5×5の「上2段パステル緑・下3段乾いたパステル土色」がすぐ確認できるボロボロ掘削サンプル1箇所
     const sampleChip = {};
     for (let sx = 0; sx < 3; sx++) for (let sz = 0; sz < 3; sz++) {
       sampleChip[`${sx},4,${sz}`] = 1;
       sampleChip[`${sx},3,${sz}`] = 1;
+      if (sx < 2 && sz < 2) sampleChip[`${sx},2,${sz}`] = 1;
     }
     CHIP_MAP['-1,-1,0'] = sampleChip;
   }
@@ -299,7 +303,7 @@
 
   (function loadWorldState() {
     try {
-      const raw = safeStorage.getItem('island_spacecore_v12');
+      const raw = safeStorage.getItem('island_spacecore_v13');
       if (!raw) return;
       const d = JSON.parse(raw);
       if (d.life) life = new LifeCore(d.life);
@@ -328,19 +332,17 @@
   })();
 
   function saveWorldState() {
-    safeStorage.setItem('island_spacecore_v12', JSON.stringify({
+    safeStorage.setItem('island_spacecore_v13', JSON.stringify({
       life: life.exportSave(), robot: ROBOT, heightMap: HEIGHT_MAP, chipMap: CHIP_MAP,
       items: WORLD_ITEMS, bag: BAG, logs: DIARY_LOGS.slice(-15), day: GAME_DAY, time: TIME_STEP
     }));
   }
   function resetGameDirectly() {
+    safeStorage.removeItem('island_spacecore_v13');
     safeStorage.removeItem('island_spacecore_v12');
-    safeStorage.removeItem('island_game_save_v11');
-    safeStorage.removeItem('island_game_save_v10');
     location.reload();
   }
 
-  // 1マス（5×5×5＝125個の真四角な小立方体）を上からボロボロ削る関数
   function crumbleDigAt(gx, gz, count = 42) {
     const k = `${gx},${gz}`;
     const curLv = HEIGHT_MAP[k] ?? 0;
@@ -375,7 +377,6 @@
     return { completedLevel: false, newLv: curLv, leftCount };
   }
 
-  // 指定マスの上面高さ Y を計算（1マス＝1.0×1.0×1.0の完全立方体、lv=0 の上面が y=0.0）
   function getSurfaceYAt(gx, gz) {
     if (gx < -2 || gx > 2 || gz < -2 || gz > 2) return -0.55;
     const topLv = HEIGHT_MAP[`${gx},${gz}`] ?? 0;
@@ -389,7 +390,6 @@
     return (topLv - 1) * 1.0;
   }
 
-  // 空間コアの指定小立方体 (gx, gz, lv, sx, sy, sz) が存在するかどうか
   function hasSubVoxel(gx, gz, lv, sx, sy, sz) {
     if (gx < -2 || gx > 2 || gz < -2 || gz > 2) return false;
     const topLv = HEIGHT_MAP[`${gx},${gz}`] ?? 0;
@@ -399,7 +399,6 @@
     return true;
   }
 
-  // 6方向すべてが他の小立方体に囲まれている「完全な内部」かどうか（表面の皮だけを描画してスマホ発熱を防ぐ）
   function isExposedSubVoxel(gx, gz, lv, sx, sy, sz) {
     const dirs = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
     for (let i = 0; i < 6; i++) {
@@ -408,7 +407,6 @@
       if (nsx < 0) { ngx--; nsx = 4; } else if (nsx > 4) { ngx++; nsx = 0; }
       if (nsz < 0) { ngz--; nsz = 4; } else if (nsz > 4) { ngz++; nsz = 0; }
       if (nsy < 0) { nlv--; nsy = 4; } else if (nsy > 4) { nlv++; nsy = 0; }
-      // 異なる1マスブロック間の境界、または空気に面している小立方体はすべて描画する（カメラで手前ブロックを消した時の断面もこれで100%詰まって見える！）
       if (ngx !== gx || ngz !== gz || nlv !== lv) return true;
       if (!hasSubVoxel(ngx, ngz, nlv, nsx, nsy, nsz)) return true;
     }
@@ -420,17 +418,22 @@
   scene.background = new THREE.Color(0x0b1528);
 
   const aspect = window.innerWidth / window.innerHeight;
-  const groundCamera = new THREE.PerspectiveCamera(42, aspect, 0.1, 160);
-  const undergroundCamera = new THREE.PerspectiveCamera(44, aspect, 0.1, 160);
-  const robotCamera = new THREE.PerspectiveCamera(62, aspect, 0.08, 160);
-  let activeCamera = groundCamera, manualCameraMode = null;
+  // カメラコア：外カメラ（地上・地下）、追従カメラ、内カメラ（キャラ視点）
+  const outerGroundCam = new THREE.PerspectiveCamera(42, aspect, 0.1, 180);
+  const outerUnderCam  = new THREE.PerspectiveCamera(42, aspect, 0.1, 180);
+  const followCam      = new THREE.PerspectiveCamera(42, aspect, 0.1, 180);
+  const innerRobotCam  = new THREE.PerspectiveCamera(64, aspect, 0.08, 180);
+
+  let activeCamera = followCam;
+  // manualCameraMode: null(追従カメラ) | 'ground'(外カメラ・地上固定) | 'underground'(外カメラ・地下固定) | 'robot'(内カメラ・キャラ視点)
+  let manualCameraMode = null;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   container.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.68));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.70));
   const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.85);
   dirLight.position.set(8, 16, 10);
   scene.add(dirLight);
@@ -441,11 +444,9 @@
   let activeUntilTime = performance.now() + 3500;
   function wakeUpRenderer(ms = 2600) { activeUntilTime = Math.max(activeUntilTime, performance.now() + ms); }
 
-  // --- 本物の 0.20 × 0.20 × 0.20 完全立方体ジオメトリ（縦長の柱は一切使わない） ---
   const subCubeGeo = new THREE.BoxGeometry(0.20, 0.20, 0.20);
   const fullCubeEdgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002));
 
-  // 設定②用の小立方体枠線テクスチャ
   const subEdgeCanvas = document.createElement('canvas');
   subEdgeCanvas.width = 64; subEdgeCanvas.height = 64;
   const seCtx = subEdgeCanvas.getContext('2d');
@@ -461,7 +462,6 @@
   opaqueSubMesh.renderOrder = 0;
   scene.add(opaqueSubMesh);
 
-  // 設定①（分割線なし・すりガラス）で半透明の内側線を消す深度プリパス
   const glassDepthMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, depthTest: true });
   const glassDepthMesh = new THREE.InstancedMesh(subCubeGeo, glassDepthMat, MAX_SUB_INSTANCES);
   glassDepthMesh.renderOrder = 9;
@@ -476,7 +476,6 @@
   glassDepthMesh.instanceMatrix = glassSubMesh.instanceMatrix;
   scene.add(glassSubMesh);
 
-  // 設定②で1マス（1.0×1.0×1.0）の立方体境界をくっきり示す外枠グループ
   const macroOutlineGroup = new THREE.Group();
   scene.add(macroOutlineGroup);
   const macroOutlineMat = new THREE.LineBasicMaterial({ color: 0x1e293b, transparent: true, opacity: 0.55 });
@@ -509,7 +508,6 @@
 
         for (let lv = -3; lv <= topLv; lv++) {
           const centerY = lv * 1.0 - 0.5;
-          const baseColorHex = getLayerColorHex(lv);
           const chippedSet = CHIP_MAP[`${x},${z},${lv}`] || null;
           const isChipped = Boolean(chippedSet && Object.keys(chippedSet).length > 0);
 
@@ -519,8 +517,8 @@
             macroOutlineGroup.add(wire);
           }
 
-          // すべての層（地上パステル緑2層＋地下の土3層）を本物の 5×5×5 小立方体（0.2×0.2×0.2）で構築！
           for (let sy = 0; sy < 5; sy++) {
+            const layerColorHex = getSubVoxelColorHex(lv, sy);
             for (let sx = 0; sx < 5; sx++) {
               for (let sz = 0; sz < 5; sz++) {
                 if (isChipped && chippedSet[`${sx},${sy},${sz}`]) continue;
@@ -531,10 +529,9 @@
                 const wy = (lv - 1) * 1.0 + sy * 0.20 + 0.10;
                 const wz = z + (sz - 2) * 0.20;
 
-                // 設定②（線あり）またはボロボロ掘削中のマスは5×5×5の立体粒感を際立たせ、設定①・③の無傷マスは色差ゼロで1マス立方体に密着させる
                 const useChecker = showLines || isChipped;
                 const shade = useChecker ? (((sx + sy + sz) % 2 === 0) ? 1.0 : 0.91) : 1.0;
-                tempColor.setHex(baseColorHex).multiplyScalar(shade);
+                tempColor.setHex(layerColorHex).multiplyScalar(shade);
                 opaqueSubMesh.setColorAt(subIdx, tempColor);
                 glassSubMesh.setColorAt(subIdx, tempColor);
 
@@ -582,7 +579,7 @@
     });
   }
 
-  // 海テクスチャ（5×5島の真下はくり抜き）
+  // 海テクスチャ（5×5島の真下はくり抜いて内カメラで下から夜空を見上げた時に邪魔にならないようにする）
   const seaCanvas = document.createElement('canvas');
   seaCanvas.width = 256; seaCanvas.height = 256;
   const sCtx = seaCanvas.getContext('2d');
@@ -693,13 +690,14 @@
     const { x, z } = ROBOT.pos;
     return (x < -2 || x > 2 || z < -2 || z > 2) ? -99 : (HEIGHT_MAP[`${x},${z}`] ?? 0);
   }
-  function getEffectiveCameraMode() {
-    if (manualCameraMode) return manualCameraMode;
-    const h = getRobotHeightLevel();
-    return (h < 0 && h !== -99) ? 'underground' : 'ground';
-  }
 
-  let camTheta = Math.PI / 4, camPhi = 1.05, camRadius = 12.6, isDragging = false, prevPointer = { x: 0, y: 0 }, cameraDirty = true;
+  // =========================================================
+  // カメラコア（CameraCore v13）：
+  // 1. 外カメラ（地上 'ground' / 地下 'underground'）：全体を見渡す固定カメラ
+  // 2. 追従カメラ（null）：外カメラ・内カメラOFF時にキャラを追従するカメラ
+  // 3. 内カメラ（'robot'）：キャラ視点（掘った縦穴から天を見上げられる）
+  // =========================================================
+  let camTheta = Math.PI / 4, camPhi = 1.05, camRadius = 11.5, isDragging = false, prevPointer = { x: 0, y: 0 }, cameraDirty = true;
 
   function syncCameraButtonsUI() {
     document.getElementById('cam-ground-btn').classList.toggle('cam-active', manualCameraMode === 'ground');
@@ -707,12 +705,11 @@
     document.getElementById('cam-fpv-btn').classList.toggle('cam-active', manualCameraMode === 'robot');
   }
 
-  function updateTransparencyAndOcclusion() {
-    const mode = getEffectiveCameraMode();
+  function updateTransparencyAndOcclusion(isUndergroundView, refCamPos, focusX, focusZ, targetFloorLv) {
     const showLines = (CAM_VISUAL_STYLE === 'glass_line');
     macroOutlineGroup.visible = showLines;
 
-    if (mode === 'ground' || mode === 'robot') {
+    if (!isUndergroundView) {
       waterfallMat.opacity = 0.92; seaMat.opacity = 0.95;
       glassDepthMesh.visible = false; glassSubMesh.visible = false;
       for (let i = 0; i < subVoxelsMeta.length; i++) opaqueSubMesh.setMatrixAt(subVoxelsMeta[i].idx, subVoxelsMeta[i].fullMat);
@@ -720,7 +717,8 @@
       return;
     }
 
-    // 地下カメラモード：緑の層（lv >= 0）は「天井の蓋」としてそのまま残し、カメラ手前の地下土ブロック（lv < 0）だけを透過／消去する
+    // 地下観察時（外カメラ地下 または 追従カメラ地下時）：
+    // 地下1層目（lv >= 0：緑と乾いた土の表層）は「天井の蓋」として残し、カメラ手前の湿った地下土（lv <= -1）だけを透過／消去する
     waterfallMat.opacity = (CAM_VISUAL_STYLE === 'hide') ? 0.10 : 0.16;
     seaMat.opacity = (CAM_VISUAL_STYLE === 'hide') ? 0.14 : 0.22;
 
@@ -728,31 +726,23 @@
     glassSubMesh.visible = useFrostedGlass;
     glassDepthMesh.visible = (CAM_VISUAL_STYLE === 'glass_noline');
 
-    const camPos = undergroundCamera.position;
-    const h = getRobotHeightLevel();
-    const isUG = (h < 0 && h !== -99);
-    const targetFloorLv = isUG ? h : -3;
-    const focusX = isUG ? robotGroup.position.x : -1.0;
-    const focusZ = isUG ? robotGroup.position.z : -1.0;
-
-    const dirX = camPos.x - focusX, dirZ = camPos.z - focusZ;
+    const dirX = refCamPos.x - focusX, dirZ = refCamPos.z - focusZ;
     const lenXZ = Math.hypot(dirX, dirZ) || 1;
     const nx = dirX / lenXZ, nz = dirZ / lenXZ;
 
     for (let i = 0; i < subVoxelsMeta.length; i++) {
       const sv = subVoxelsMeta[i];
-      // パステル緑の層（lv >= 0：天井の蓋）と、地下底の床（lv <= targetFloorLv）は消さずに残す！
+      // 地下1層目以上（lv >= 0：天井の蓋）と、見たい地下底の床（lv <= targetFloorLv）は消さずに残す
       if (sv.lv >= 0 || sv.lv <= targetFloorLv) {
         opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
         if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
         continue;
       }
-      // 設定③（hide）のときは1マス単位（sv.gx, sv.gz）でスパッと消去し、設定①・②では5×5単位ですりガラス透過
       const checkX = (CAM_VISUAL_STYLE === 'hide') ? sv.gx : sv.wx;
       const checkZ = (CAM_VISUAL_STYLE === 'hide') ? sv.gz : sv.wz;
       const relX = checkX - focusX, relZ = checkZ - focusZ;
       const dotFront = relX * nx + relZ * nz, perpDist = Math.abs(-relX * nz + relZ * nx);
-      const inFront = (dotFront > -0.35 && perpDist < 2.25);
+      const inFront = (dotFront > -0.45 && perpDist < 2.65);
 
       if (inFront) {
         opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
@@ -768,46 +758,85 @@
 
   function updateAllCamerasTransform() {
     camRadius = Math.max(7.0, Math.min(20.0, camRadius));
-    const mode = getEffectiveCameraMode(), statusPanel = document.getElementById('status-panel');
+    const statusPanel = document.getElementById('status-panel');
+    const h = getRobotHeightLevel();
+    const isRobotUG = (h < 0 && h !== -99);
 
-    if (mode === 'robot') {
+    if (manualCameraMode === 'robot') {
+      // 【内カメラ】キャラ視点：掘った穴の底から真上（camPhi→π）を見上げると、掘った縦穴から夜空と星座が見える！
       robotGroup.visible = false;
-      camPhi = Math.max(0.18, Math.min(2.45, camPhi));
-      const eyeX = robotGroup.position.x, eyeY = robotGroup.position.y + 0.92, eyeZ = robotGroup.position.z;
-      robotCamera.position.set(eyeX, eyeY, eyeZ);
-      robotCamera.lookAt(eyeX - 20 * Math.sin(camPhi) * Math.sin(camTheta), eyeY - 20 * Math.cos(camPhi), eyeZ - 20 * Math.sin(camPhi) * Math.cos(camTheta));
+      camPhi = Math.max(0.12, Math.min(3.02, camPhi));
+      const eyeX = robotGroup.position.x, eyeY = robotGroup.position.y + 0.88, eyeZ = robotGroup.position.z;
+      innerRobotCam.position.set(eyeX, eyeY, eyeZ);
+      innerRobotCam.lookAt(
+        eyeX - 20 * Math.sin(camPhi) * Math.sin(camTheta),
+        eyeY - 20 * Math.cos(camPhi),
+        eyeZ - 20 * Math.sin(camPhi) * Math.cos(camTheta)
+      );
       statusPanel.classList.toggle('sky-hidden', camPhi > 1.55);
-      activeCamera = robotCamera;
-    } else if (mode === 'ground') {
-      robotGroup.visible = true; statusPanel.classList.remove('sky-hidden');
-      const gPhi = Math.max(0.45, Math.min(1.25, camPhi));
-      const isMan = (manualCameraMode === 'ground');
-      const tx = isMan ? 0 : robotGroup.position.x * 0.65;
-      const ty = isMan ? 0.0 : Math.max(0, robotGroup.position.y) + 0.35;
-      const tz = isMan ? 0 : robotGroup.position.z * 0.65;
-      groundCamera.position.set(tx + camRadius * Math.sin(gPhi) * Math.sin(camTheta), ty + camRadius * Math.cos(gPhi), tz + camRadius * Math.sin(gPhi) * Math.cos(camTheta));
-      groundCamera.lookAt(tx, ty, tz);
-      activeCamera = groundCamera;
+      activeCamera = innerRobotCam;
+      updateTransparencyAndOcclusion(false, innerRobotCam.position, eyeX, eyeZ, -3);
+
+    } else if (manualCameraMode === 'ground') {
+      // 【外カメラ（地上・固定）】キャラを確認でき、天の最頂点と地上全体が見渡せる固定俯瞰カメラ
+      robotGroup.visible = true;
+      statusPanel.classList.remove('sky-hidden');
+      const gPhi = Math.max(0.42, Math.min(1.22, camPhi));
+      const fixedDist = 14.2;
+      const centerTargetY = 0.6; // 地上空間と天頂付近を見渡す固定中心
+      outerGroundCam.position.set(
+        fixedDist * Math.sin(gPhi) * Math.sin(camTheta),
+        centerTargetY + fixedDist * Math.cos(gPhi),
+        fixedDist * Math.sin(gPhi) * Math.cos(camTheta)
+      );
+      outerGroundCam.lookAt(0, centerTargetY, 0);
+      activeCamera = outerGroundCam;
+      updateTransparencyAndOcclusion(false, outerGroundCam.position, 0, 0, -3);
+
+    } else if (manualCameraMode === 'underground') {
+      // 【外カメラ（地下・固定）】キャラと地の最下部（地下底）全体が見渡せる固定カメラ（緑の地下1層目が天井の蓋）
+      robotGroup.visible = true;
+      statusPanel.classList.remove('sky-hidden');
+      const uPhi = Math.max(1.18, Math.min(1.95, camPhi));
+      const fixedUGDist = 12.8;
+      const ugCenterY = -2.2; // 地下全体〜地の最下部（y=-4.0）を見渡す固定中心
+      let camY = ugCenterY + fixedUGDist * Math.cos(uPhi);
+      // 地下外カメラは地面1層目（緑の蓋）より下に位置し、全体と最下部を見渡す
+      camY = Math.max(-4.5, Math.min(-0.92, camY));
+
+      outerUnderCam.position.set(
+        fixedUGDist * Math.sin(uPhi) * Math.sin(camTheta),
+        camY,
+        fixedUGDist * Math.sin(uPhi) * Math.cos(camTheta)
+      );
+      outerUnderCam.lookAt(0, -2.3, 0);
+      activeCamera = outerUnderCam;
+      updateTransparencyAndOcclusion(true, outerUnderCam.position, 0, 0, -3);
+
     } else {
-      // 地下カメラ：緑の地面1層目（y = -1.0〜0.0）より下に位置し、上に持っていくと緑の天井で蓋をされ、掘った縦穴から夜空が見える
-      robotGroup.visible = true; statusPanel.classList.remove('sky-hidden');
-      const uPhi = Math.max(1.22, Math.min(2.15, camPhi));
-      const h = getRobotHeightLevel(), isUG = (h < 0 && h !== -99);
-      const ux = isUG ? robotGroup.position.x * 0.55 : -0.8;
-      const uyTarget = isUG ? (robotGroup.position.y + 0.35) : -2.1;
-      const uz = isUG ? robotGroup.position.z * 0.55 : -0.8;
-      const d = Math.max(6.2, Math.min(11.5, camRadius * 0.72));
+      // 【追従カメラ】外カメラ・内カメラがOFFの時にキャラクターを追従するカメラ
+      robotGroup.visible = true;
+      statusPanel.classList.remove('sky-hidden');
+      const fPhi = Math.max(0.55, Math.min(1.42, camPhi));
+      const followDist = Math.max(6.8, Math.min(12.0, camRadius * 0.78));
+      const tx = robotGroup.position.x;
+      const ty = robotGroup.position.y + 0.45;
+      const tz = robotGroup.position.z;
 
-      let camY = uyTarget + d * Math.cos(uPhi);
-      camY = Math.max(-4.2, Math.min(-0.88, camY));
+      let camY = ty + followDist * Math.cos(fPhi);
+      if (isRobotUG) camY = Math.min(-0.85, camY);
 
-      undergroundCamera.position.set(ux + d * Math.sin(uPhi) * Math.sin(camTheta), camY, uz + d * Math.sin(uPhi) * Math.cos(camTheta));
-      const lookY = camY < -2.3 ? (uyTarget + 1.1) : uyTarget;
-      undergroundCamera.lookAt(ux, lookY, uz);
-      activeCamera = undergroundCamera;
+      followCam.position.set(
+        tx + followDist * Math.sin(fPhi) * Math.sin(camTheta),
+        camY,
+        tz + followDist * Math.sin(fPhi) * Math.cos(camTheta)
+      );
+      followCam.lookAt(tx, ty, tz);
+      activeCamera = followCam;
+      updateTransparencyAndOcclusion(isRobotUG, followCam.position, tx, tz, isRobotUG ? h : -3);
     }
+
     syncCameraButtonsUI();
-    updateTransparencyAndOcclusion();
   }
 
   function getStyleShortName() {
@@ -819,22 +848,22 @@
   document.getElementById('cam-ground-btn').onclick = () => {
     wakeUpRenderer();
     manualCameraMode = (manualCameraMode === 'ground') ? null : 'ground';
-    if (manualCameraMode) camPhi = 0.98;
-    showToast(manualCameraMode ? '🌌 地上カメラON（上から見下ろし）' : `🤖 キャラ追従カメラに戻したよ（${getStyleShortName()}）`);
+    if (manualCameraMode) camPhi = 0.92;
+    showToast(manualCameraMode ? '🌌 外カメラ（地上固定）：天頂と地上全体を見渡すよ' : '🤖 追従カメラ（キャラ追従）に戻したよ');
     cameraDirty = true; updateEnvironmentAndUI();
   };
   document.getElementById('cam-ug-btn').onclick = () => {
     wakeUpRenderer();
     manualCameraMode = (manualCameraMode === 'underground') ? null : 'underground';
-    if (manualCameraMode) camPhi = 1.48;
-    showToast(manualCameraMode ? '⛏️ 地下カメラON（緑の天井蓋＆縦穴から夜空が見えるよ）' : `🤖 キャラ追従カメラに戻したよ（${getStyleShortName()}）`);
+    if (manualCameraMode) camPhi = 1.42;
+    showToast(manualCameraMode ? '⛏️ 外カメラ（地下固定）：キャラと地下最下部全体を見渡すよ' : '🤖 追従カメラ（キャラ追従）に戻したよ');
     cameraDirty = true; updateEnvironmentAndUI();
   };
   document.getElementById('cam-fpv-btn').onclick = () => {
     wakeUpRenderer();
     manualCameraMode = (manualCameraMode === 'robot') ? null : 'robot';
-    camPhi = manualCameraMode ? 1.65 : 1.05;
-    showToast(manualCameraMode ? '🤖 ロボット視点ON！5×5×5の立方体を間近で見回せるよ！' : `🤖 キャラ追従カメラに戻したよ（${getStyleShortName()}）`);
+    camPhi = manualCameraMode ? 1.85 : 1.05;
+    showToast(manualCameraMode ? '🤖 内カメラ（キャラ視点）：掘った穴から天（夜空）も見上げられるよ！' : '🤖 追従カメラ（キャラ追従）に戻したよ');
     cameraDirty = true; updateEnvironmentAndUI();
   };
 
@@ -853,13 +882,13 @@
 
   function formatHeightText(lv) {
     if (lv === -99) return '海の白波';
-    if (lv >= 1) return `地上空間${lv}段目(緑)`;
-    if (lv === 0) return '地面1層目(緑の表層)';
-    return `地下・土${Math.abs(lv)}層目`;
+    if (lv >= 1) return `地上空間+${lv}(緑2層＋乾土3層)`;
+    if (lv === 0) return '地下1層目(緑2層＋乾土3層)';
+    return `地下${Math.abs(lv) + 1}層目(湿った土)`;
   }
 
   function updateEnvironmentAndUI() {
-    const st = life.getState(), hLevel = getRobotHeightLevel(), effCam = getEffectiveCameraMode();
+    const st = life.getState(), hLevel = getRobotHeightLevel();
     document.getElementById('val-stamina').innerText = st.stamina; document.getElementById('bar-stamina').style.width = st.stamina + '%';
     document.getElementById('val-life').innerText = st.energy; document.getElementById('bar-life').style.width = st.energy + '%';
     document.getElementById('val-mental').innerText = st.mental; document.getElementById('bar-mental').style.width = st.mental + '%';
@@ -871,20 +900,20 @@
     else if (TIME_STEP >= 13) { timeLabel = '🌙 夜'; skyHex = 0x070d19; starOpacity = 0.95; }
     else if (TIME_STEP >= 9) { timeLabel = '🌇 夕方'; skyHex = 0x1e1638; starOpacity = 0.78; }
     else if (TIME_STEP >= 4) { timeLabel = '🌤️ 昼'; skyHex = 0x152c52; starOpacity = 0.45; }
-    if (hLevel >= 1 || effCam === 'robot' || effCam === 'underground') starOpacity = Math.min(1.0, starOpacity + 0.25);
+    if (hLevel >= 1 || manualCameraMode === 'robot' || manualCameraMode === 'ground') starOpacity = Math.min(1.0, starOpacity + 0.25);
 
     scene.background.setHex(skyHex); starMat.opacity = starOpacity;
     document.getElementById('ui-time').innerText = timeLabel;
 
-    let moodStr = '😊 空間コアv12';
-    if (hLevel < 0 && hLevel !== -99) moodStr = '⛏️ 地下たんけん中';
-    else if (hLevel >= 1) moodStr = '🔭 緑の上層';
-    else if (st.mode === 'STARVING') moodStr = '😵 はらぺこピンチ';
-    else if (st.mode === 'EXHAUSTED') moodStr = '😴 くたくた・ねむい';
+    let moodStr = '😊 コアv13';
+    if (hLevel < 0 && hLevel !== -99) moodStr = '⛏️ 湿土たんけん';
+    else if (hLevel >= 1) moodStr = '🔭 地上空間';
+    else if (st.mode === 'STARVING') moodStr = '😵 はらぺこ';
+    else if (st.mode === 'EXHAUSTED') moodStr = '😴 くたくた';
     document.getElementById('ui-mood').innerText = moodStr;
 
-    const camBadge = manualCameraMode === 'ground' ? '🌌地上ON' : (manualCameraMode === 'underground' ? '⛏️地下ON' : (manualCameraMode === 'robot' ? '🤖ロボ視点ON' : '🤖追従'));
-    document.getElementById('history-loc').innerText = `${camBadge}(${getStyleShortName()})・${formatHeightText(hLevel)}`;
+    const camBadge = manualCameraMode === 'ground' ? '🌌外カメラ(地上固定)' : (manualCameraMode === 'underground' ? '⛏️外カメラ(地下固定)' : (manualCameraMode === 'robot' ? '🤖内カメラ(視点)' : '🤖追従カメラ'));
+    document.getElementById('history-loc').innerText = `${camBadge}・${formatHeightText(hLevel)}`;
   }
 
   async function askAIForDecision(validDirs, curH) {
@@ -967,7 +996,7 @@
       if (wantRest) {
         life.stamina += 35; life.energy -= 5; life.mental += 10;
         actionLabel = '💤 その場でひとやすみ';
-        thoughtText = aiDecision?.thought || (curH < 0 ? `${formatHeightText(curH)}でひとやすみ。掘った穴から夜空が見えるよ！` : 'ちょっと疲れたから、ここでひとやすみして体力を回復するよ！');
+        thoughtText = aiDecision?.thought || (curH < 0 ? `${formatHeightText(curH)}でひとやすみ。内カメラ(🤖)で上を見ると掘った穴から天が見えるよ！` : 'ちょっと疲れたから、ここでひとやすみして体力を回復するよ！');
       } else if (wantDig) {
         const digRes = crumbleDigAt(ROBOT.pos.x, ROBOT.pos.z, 45);
         life.stamina -= 10; life.mental += 12;
@@ -978,7 +1007,7 @@
           DIARY_LOGS.push(`⛏️ ${GAME_DAY}日目：${formatHeightText(digRes.newLv)}まで穴を掘り抜いた！`);
         } else {
           actionLabel = `⛏️ 5×5×5立方体をボロボロ掘削中（残り${digRes.leftCount}個）`;
-          thoughtText = aiDecision?.thought || `ボロボロッ！足元の立方体を5×5×5の小ブロックごとに削っているよ（あと${digRes.leftCount}個で貫通）！`;
+          thoughtText = aiDecision?.thought || `ボロボロッ！緑2段と乾いた土3段の5×5×5小ブロックを削っているよ（あと${digRes.leftCount}個で貫通）！`;
         }
       } else if (chosenDir) {
         const prevH = curH;
@@ -990,13 +1019,13 @@
         life.energy -= 7; life.stamina -= 8;
         if (newH < 0 && newH !== -99) {
           life.mental += 10; actionLabel = `⛏️ ${chosenDir.name}へ進んで${formatHeightText(newH)}へ！`;
-          thoughtText = aiDecision?.thought || `${formatHeightText(newH)}に入ったよ！湿った土のブロックが5×5×5で並んでいるね！`;
+          thoughtText = aiDecision?.thought || `${formatHeightText(newH)}に入ったよ！内カメラ(🤖)にして上を見上げると掘った穴から夜空が見えるよ！`;
         } else if (newH > prevH) {
           life.mental += 10; actionLabel = `👟 ${chosenDir.name}へ1段登った（${formatHeightText(newH)}）`;
           thoughtText = aiDecision?.thought || `よいしょっ！${chosenDir.name}へ登って${formatHeightText(newH)}に来たよ！`;
         } else {
           actionLabel = `👟 ${chosenDir.name}へトコトコ歩いた`;
-          thoughtText = aiDecision?.thought || `${chosenDir.name}のマスへ歩いたよ。白い波と滝の音が心地いいね！`;
+          thoughtText = aiDecision?.thought || `${chosenDir.name}のマスへ歩いたよ。追従カメラがぼくについてきてくれるね！`;
         }
       }
     }
@@ -1047,7 +1076,7 @@
     wakeUpRenderer(); const { x, z } = ROBOT.pos; if (x < -2 || x > 2 || z < -2 || z > 2) return;
     const key = `${x},${z}`, cur = HEIGHT_MAP[key] ?? 0;
     delete CHIP_MAP[`${x},${z},${cur}`];
-    if (cur >= 1) { showToast('ここはすでに地上空間（緑の上層）だよ！'); closeFanMenu(); return; }
+    if (cur >= 1) { showToast('ここはすでに地上空間の上限だよ！'); closeFanMenu(); return; }
     HEIGHT_MAP[key] = cur + 1; rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
     showToast(`🪨 5×5×5立方体を積んで「${formatHeightText(cur + 1)}」にしたよ！`);
   }
@@ -1055,7 +1084,7 @@
     wakeUpRenderer(); const { x, z } = ROBOT.pos; if (x < -2 || x > 2 || z < -2 || z > 2) return;
     const key = `${x},${z}`, cur = HEIGHT_MAP[key] ?? 0;
     if (cur <= -3 && !CHIP_MAP[`${x},${z},${cur}`]) {
-      showToast('これ以上深くは掘れないよ（地下・土3層目が底です）！'); closeFanMenu(); return;
+      showToast('これ以上深くは掘れないよ（地下最下部が底です）！'); closeFanMenu(); return;
     }
     const res = crumbleDigAt(x, z, 45);
     rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
@@ -1127,7 +1156,7 @@
   function saveSettings() {
     wakeUpRenderer();
     CAM_VISUAL_STYLE = document.getElementById('setting-cam-style').value || 'glass_line';
-    safeStorage.setItem('cam_visual_style_v12', CAM_VISUAL_STYLE);
+    safeStorage.setItem('cam_visual_style_v13', CAM_VISUAL_STYLE);
     safeStorage.setItem('ai_type', document.getElementById('setting-ai-type').value);
     safeStorage.setItem('api_gemini', document.getElementById('setting-gemini-key').value.trim());
     safeStorage.setItem('api_groq', document.getElementById('setting-groq-key').value.trim());
@@ -1173,7 +1202,7 @@
 
   window.addEventListener('resize', () => {
     const a = window.innerWidth / window.innerHeight;
-    [groundCamera, undergroundCamera, robotCamera].forEach(c => { c.aspect = a; c.updateProjectionMatrix(); });
+    [outerGroundCam, outerUnderCam, followCam, innerRobotCam].forEach(c => { c.aspect = a; c.updateProjectionMatrix(); });
     renderer.setSize(window.innerWidth, window.innerHeight);
     cameraDirty = true; wakeUpRenderer();
   });
