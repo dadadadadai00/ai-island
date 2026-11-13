@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0b1528">
-  <title>ボクセルAI自律思考水槽 v13</title>
+  <title>ボクセルAI自律思考水槽 v14</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
@@ -26,7 +26,7 @@
     .badge { font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px; display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
     .badge-days { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
     .badge-time { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
-    .badge-mood { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+    .badge-mood { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; cursor: pointer; }
     .btn-icon { width: 26px; height: 26px; border-radius: 50%; background: #f1f5f9; display: flex; justify-content: center; align-items: center; font-size: 14px; cursor: pointer; border: 1px solid #cbd5e1; flex-shrink: 0; }
     #side-icon-column { position: fixed; top: 122px; right: 14px; display: flex; flex-direction: column; gap: 10px; z-index: 12; }
     .side-circle-btn { width: 46px; height: 46px; background: rgba(255,255,255,0.96); border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex; justify-content: center; align-items: center; font-size: 21px; cursor: pointer; border: 2.5px solid #e2e8f0; position: relative; transition: transform 0.18s, background-color 0.18s, border-color 0.18s; }
@@ -97,14 +97,14 @@
       <div class="badge badge-time" id="ui-time">☀️ 朝</div>
     </div>
     <div class="status-right-group">
-      <div class="badge badge-mood" id="ui-mood">😊 コアv13</div>
+      <div class="badge badge-mood" id="ui-mood" onclick="cycleBodyAndCrawlTest()" title="タップで体格・ほふく切り替え">🚶 標準・立ち</div>
       <button class="btn-icon" id="btn-settings" aria-label="設定">⚙️</button>
     </div>
   </div>
 </div>
 
 <div id="side-icon-column">
-  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳">📖</div>
+  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳・カバン">📖</div>
   <div class="side-circle-btn" id="cam-ground-btn" title="外カメラ（地上・全体固定）">🌌</div>
   <div class="side-circle-btn" id="cam-ug-btn" title="外カメラ（地下・全体固定）">⛏️</div>
   <div class="side-circle-btn" id="cam-fpv-btn" title="内カメラ（キャラ視点）">🤖</div>
@@ -114,20 +114,20 @@
   <div class="fan-item" onclick="quickDropApple()">🍎<span class="fan-label">リンゴ</span></div>
   <div class="fan-item" onclick="quickStackBlock()">🪨<span class="fan-label">1段積む</span></div>
   <div class="fan-item" onclick="openModal('modal-gacha'); closeFanMenu();">🎰<span class="fan-label">ガチャ</span></div>
-  <div class="fan-item" onclick="openModal('modal-diary'); closeFanMenu();">📖<span class="fan-label">カバン</span></div>
-  <div class="fan-item" onclick="quickDigBlock()">⛏️<span class="fan-label">ボロボロ掘る</span></div>
+  <div class="fan-item" onclick="cycleBodyAndCrawlTest(); closeFanMenu();">🐛<span class="fan-label">体格/ほふく</span></div>
+  <div class="fan-item" onclick="quickDiagonalOrFrontDig()">⛏️<span class="fan-label">斜め/前掘り</span></div>
   <div id="plus-main-btn" title="メニューを開く">＋</div>
 </div>
 
 <div id="bottom-panel">
   <div class="panel-header">
-    <span>💭 ロボのきもち・心のさけび【空間＆カメラコアv13】</span>
+    <span>💭 ロボのきもち・心のさけび【v14 斜め掘り＆ほふく前進】</span>
     <div class="ai-badge" id="ai-status">💤 待機中</div>
   </div>
-  <div id="message-box">【v13完成】地下1層目は5×5の上2段がパステル緑・下3段が乾いた土色、地下2層目からは湿った土色だよ！外カメラ(地上/地下)・追従カメラ・内カメラも切り替えてみてね！</div>
+  <div id="message-box">【v14完成】追従カメラの「観察窓（スポット透過）」でアリの巣の中がくっきり！斜め掘りや、天井が低い穴を「ほふく前進」でくぐるテストができるよ！</div>
   <div class="action-history">
     <span class="history-tag" id="history-action">👟 やった事 待機中</span>
-    <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従カメラ・地下1層目</span>
+    <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従(観察窓)・地下1層目</span>
   </div>
   <button class="btn-think" id="btn-action">⚡ 今すぐ考える</button>
 </div>
@@ -137,12 +137,12 @@
 <div class="modal-overlay" id="modal-diary" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-diary')">✕</div>
-    <div class="modal-title">📖 ロボット手帳（ステータス）</div>
+    <div class="modal-title">📖 ロボット手帳（体格・姿勢・カバン）</div>
     <div style="display:flex; align-items:center; gap:12px; background:#f8fafc; padding:10px; border-radius:12px; border:1px solid #e2e8f0;">
       <div style="font-size:36px;">🤖</div>
       <div>
         <div style="font-weight:900; font-size:14px; color:#1e293b;" id="diary-robo-name">ロボ1ごう（生存 1日目）</div>
-        <div style="font-size:11px; color:#64748b;" id="diary-robo-height">現在の場所：地下1層目 / 速度：3</div>
+        <div style="font-size:11px; color:#64748b;" id="diary-robo-height">現在：地下1層目 / 体格：標準 / 姿勢：立ち</div>
       </div>
     </div>
     <div style="font-size:12px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ」（タップで足元に使う）</div>
@@ -177,13 +177,21 @@
 <div class="modal-overlay" id="modal-settings" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-settings')">✕</div>
-    <div class="modal-title">⚙️ システム・頭脳・カメラ設定</div>
+    <div class="modal-title">⚙️ システム・体格・観察窓カメラ設定</div>
     <div class="setting-group">
-      <label class="setting-label">🎥 カメラの5×5×5透過・分割線（3段階切り替え）</label>
+      <label class="setting-label">🎥 追従カメラの観察窓（スポット透過）・分割線</label>
       <select id="setting-cam-style" class="setting-input">
-        <option value="glass_noline">① 分割線なし・すりガラス透過（線ゼロ）</option>
+        <option value="hide">③ 観察窓くっきり消去＋削りかけ＆トンネル強調（推奨）</option>
+        <option value="glass_noline">① 観察窓すりガラス透過（分割線なし）</option>
         <option value="glass_line">② 詳細5×5×5分割線あり・すりガラス透過</option>
-        <option value="hide">③ 1ブロック＝1マスくっきり消去＋5×5×5ボロボロ掘削</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">🐛 キャラの体格テスト（1ブロック内の幅判定）</label>
+      <select id="setting-body-type" class="setting-input">
+        <option value="slim">スリム（幅2マス：細い斜め穴もスイスイ通過）</option>
+        <option value="normal">標準（幅3マス：通常のトンネルを通過）</option>
+        <option value="fat">太っちょ（幅4マス：狭い穴につかえて壁を削り広げる）</option>
       </select>
     </div>
     <div class="setting-group">
@@ -247,20 +255,19 @@
   }
 
   // =========================================================
-  // 空間コア（SpaceCore v13）：1マス＝1.0×1.0×1.0の完全立方体（内部5×5×5分割）
-  // ・地上空間＆地下1層目（lv >= 0）のブロック内部（5×5×5）：
-  //   上から1・2層目（sy = 4, 3）＝ パステル緑
-  //   上から3〜5層目（sy = 2, 1, 0）＝ 乾いたパステルの土色
-  // ・地下2層目〜地下（lv <= -1）のブロック内部（5×5×5）：
-  //   湿った土色（深くなるほど少し濃い湿った土色）
+  // 空間コア（SpaceCore v14）：
+  // ・1ブロック＝1.0×1.0×1.0立方体（内部 5×5×5 小立方体）
+  // ・地上空間＆地下1層目（lv >= 0）：上2段(sy=4,3)＝パステル緑、下3段(sy=2,1,0)＝乾いたパステル土色
+  // ・地下2層目〜地下（lv <= -1）：湿った土色
+  // ・前方掘削・斜め8方向掘り・天井を残した「ほふく前進トンネル」に対応
   // =========================================================
   const SPACE_COLORS = {
-    pastelGreenTop: 0xa7f3d0, // 5×5の1層目（sy=4）：明るいパステル緑
-    pastelGreenMid: 0x86efac, // 5×5の2層目（sy=3）：パステル緑
-    dryPastelSoil:  0xd4a373, // 5×5の3〜5層目（sy=2,1,0）：乾いたパステルの土色
-    wetSoilLv2:     0x9c6644, // 地下2層目（lv=-1）：少し湿った土色
-    wetSoilLv3:     0x7f5539, // 地下3層目（lv=-2）：湿った土色
-    wetSoilLv4:     0x603813  // 地下4層目・最下部（lv=-3）：深く湿った土色
+    pastelGreenTop: 0xa7f3d0,
+    pastelGreenMid: 0x86efac,
+    dryPastelSoil:  0xd4a373,
+    wetSoilLv2:     0x9c6644,
+    wetSoilLv3:     0x7f5539,
+    wetSoilLv4:     0x603813
   };
 
   function getSubVoxelColorHex(lv, sy) {
@@ -274,36 +281,89 @@
     return SPACE_COLORS.wetSoilLv4;
   }
 
+  // キャラ体格スペック（1ブロック＝5×5小マス内の必要幅と立ち/ほふく高さ）
+  const BODY_SPECS = {
+    slim:   { label: 'スリム',   reqWidth: 2, scaleX: 0.72, scaleZ: 0.72, standH: 4, crawlH: 2 },
+    normal: { label: '標準',     reqWidth: 3, scaleX: 1.00, scaleZ: 1.00, standH: 4, crawlH: 2 },
+    fat:    { label: '太っちょ', reqWidth: 4, scaleX: 1.38, scaleZ: 1.32, standH: 4, crawlH: 2 }
+  };
+
+  // 8方向定義（前後左右4方向 ＋ 斜め4方向）
+  const ALL_DIRS = [
+    { name: '北',   dx: 0,  dz: -1, rot: Math.PI,          isDiag: false },
+    { name: '南',   dx: 0,  dz: 1,  rot: 0,                isDiag: false },
+    { name: '東',   dx: 1,  dz: 0,  rot: Math.PI / 2,      isDiag: false },
+    { name: '西',   dx: -1, dz: 0,  rot: -Math.PI / 2,     isDiag: false },
+    { name: '北西(斜め)', dx: -1, dz: -1, rot: -Math.PI * 0.75, isDiag: true },
+    { name: '北東(斜め)', dx: 1,  dz: -1, rot: Math.PI * 0.75,  isDiag: true },
+    { name: '南西(斜め)', dx: -1, dz: 1,  rot: -Math.PI * 0.25, isDiag: true },
+    { name: '南東(斜め)', dx: 1,  dz: 1,  rot: Math.PI * 0.25,  isDiag: true }
+  ];
+
   let life = new LifeCore(), GAME_DAY = 1, TIME_STEP = 0;
   let BAG = ['stone', 'apple', 'stone', 'grass'];
-  let DIARY_LOGS = ['🌱 1日目：空間コアv13の大地に降り立ったよ！'];
-  let CAM_VISUAL_STYLE = safeStorage.getItem('cam_visual_style_v13') || 'glass_line';
+  let DIARY_LOGS = ['🌱 1日目：斜め掘り＆ほふく前進対応の空間コアv14に降り立ったよ！'];
+  // 初期状態は破片チラつきゼロでアリの巣がくっきり見える「hide（観察窓くっきり消去）」
+  let CAM_VISUAL_STYLE = safeStorage.getItem('cam_visual_style_v14') || 'hide';
   let HEIGHT_MAP = {}, CHIP_MAP = {};
+
+  let ROBOT = {
+    gen: 1,
+    pos: { x: 0, z: 0, lv: -1, sx: 2, sz: 2 },
+    rotY: -Math.PI * 0.75,
+    speed: 3,
+    bodyType: 'normal', // 'slim' | 'normal' | 'fat'
+    posture: 'stand'    // 'stand' | 'crawl'（ほふく前進）
+  };
+  let WORLD_ITEMS = [{ type: 'apple', x: -1, z: -1 }, { type: 'apple', x: 1, z: 0 }];
+
+  // 指定ブロックに「天井（上2〜3段）を残して下2〜3段をくり抜いたほふく前進トンネル」を作る補助関数
+  function carveCrawlTunnelBlock(gx, gz, lv, tunnelWidth = 3, tunnelHeight = 2) {
+    const key = `${gx},${gz},${lv}`;
+    if (!CHIP_MAP[key]) CHIP_MAP[key] = {};
+    const startS = Math.floor((5 - tunnelWidth) / 2);
+    const endS = startS + tunnelWidth - 1;
+    for (let sy = 0; sy < tunnelHeight; sy++) {
+      for (let sx = 0; sx < 5; sx++) {
+        for (let sz = 0; sz < 5; sz++) {
+          if ((sx >= startS && sx <= endS) || (sz >= startS && sz <= endS)) {
+            CHIP_MAP[key][`${sx},${sy},${sz}`] = 1;
+          }
+        }
+      }
+    }
+  }
 
   function initDefaultSpaceCore() {
     for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
-    HEIGHT_MAP['1,2']  = 1;   // 地上空間に1段積まれたブロック
-    HEIGHT_MAP['-1,-2'] = -1; // 地下1層目を掘り抜いた縦穴（地下2層目・湿った土色）
-    HEIGHT_MAP['-2,-2'] = -2; // 地下3層目（湿った土色）
-    HEIGHT_MAP['-2,-1'] = -3; // 地下最下部（深く湿った土色）
+    HEIGHT_MAP['1,2']  = 1;   // 地上空間ブロック
+    HEIGHT_MAP['0,0']  = -1;  // 中央：地下1層目を掘り抜いた縦穴（ロボ初期位置）
+    HEIGHT_MAP['-2,-2'] = -2; // 北西奥：斜めトンネルの先にある地下深部
     CHIP_MAP = {};
-    // 5×5×5の「上2段パステル緑・下3段乾いたパステル土色」がすぐ確認できるボロボロ掘削サンプル1箇所
-    const sampleChip = {};
-    for (let sx = 0; sx < 3; sx++) for (let sz = 0; sz < 3; sz++) {
-      sampleChip[`${sx},4,${sz}`] = 1;
-      sampleChip[`${sx},3,${sz}`] = 1;
-      if (sx < 2 && sz < 2) sampleChip[`${sx},2,${sz}`] = 1;
+
+    // 1. 北西 (-1,-1, lv=0) に「天井（緑2段＋乾土1段）を残して下2段だけを斜めに掘り抜いた『ほふく前進トンネル』」を初期配置！
+    carveCrawlTunnelBlock(-1, -1, 0, 3, 2);
+    // 斜め通り抜けができるように角の小ブロックも削る
+    for (let sy = 0; sy < 2; sy++) {
+      CHIP_MAP['-1,-1,0'][`3,${sy},3`] = 1; CHIP_MAP['-1,-1,0'][`4,${sy},4`] = 1;
+      CHIP_MAP['-1,-1,0'][`4,${sy},3`] = 1; CHIP_MAP['-1,-1,0'][`3,${sy},4`] = 1;
+      CHIP_MAP['-1,-1,0'][`0,${sy},0`] = 1; CHIP_MAP['-1,-1,0'][`1,${sy},1`] = 1;
     }
-    CHIP_MAP['-1,-1,0'] = sampleChip;
+
+    // 2. 北 (0,-1, lv=0) に「キャラクターの前からボロボロ削りかけの壁」サンプルを配置！
+    CHIP_MAP['0,-1,0'] = {};
+    for (let sy = 0; sy < 4; sy++) {
+      for (let sx = 1; sx <= 3; sx++) {
+        CHIP_MAP['0,-1,0'][`${sx},${sy},4`] = 1; // 手前1列目
+        if (sy < 3) CHIP_MAP['0,-1,0'][`${sx},${sy},3`] = 1; // 手前2列目
+      }
+    }
   }
   initDefaultSpaceCore();
 
-  let ROBOT = { gen: 1, pos: { x: 0, z: 0, sx: 2, sz: 2 }, rotY: 0, speed: 3 };
-  let WORLD_ITEMS = [{ type: 'apple', x: 0, z: -1 }, { type: 'apple', x: -2, z: -1 }];
-
   (function loadWorldState() {
     try {
-      const raw = safeStorage.getItem('island_spacecore_v13');
+      const raw = safeStorage.getItem('island_spacecore_v14');
       if (!raw) return;
       const d = JSON.parse(raw);
       if (d.life) life = new LifeCore(d.life);
@@ -311,10 +371,13 @@
         ROBOT.gen = Number(d.robot.gen) || 1;
         ROBOT.pos.x = Number.isFinite(d.robot.pos.x) ? d.robot.pos.x : 0;
         ROBOT.pos.z = Number.isFinite(d.robot.pos.z) ? d.robot.pos.z : 0;
+        ROBOT.pos.lv = Number.isFinite(d.robot.pos.lv) ? d.robot.pos.lv : (HEIGHT_MAP[`${ROBOT.pos.x},${ROBOT.pos.z}`] ?? 0);
         ROBOT.pos.sx = Number.isFinite(d.robot.pos.sx) ? d.robot.pos.sx : 2;
         ROBOT.pos.sz = Number.isFinite(d.robot.pos.sz) ? d.robot.pos.sz : 2;
         ROBOT.rotY = Number.isFinite(d.robot.rotY) ? d.robot.rotY : 0;
         ROBOT.speed = Number(d.robot.speed) || 3;
+        ROBOT.bodyType = BODY_SPECS[d.robot.bodyType] ? d.robot.bodyType : 'normal';
+        ROBOT.posture = d.robot.posture === 'crawl' ? 'crawl' : 'stand';
       }
       if (d.heightMap) {
         for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
@@ -332,36 +395,147 @@
   })();
 
   function saveWorldState() {
-    safeStorage.setItem('island_spacecore_v13', JSON.stringify({
+    safeStorage.setItem('island_spacecore_v14', JSON.stringify({
       life: life.exportSave(), robot: ROBOT, heightMap: HEIGHT_MAP, chipMap: CHIP_MAP,
       items: WORLD_ITEMS, bag: BAG, logs: DIARY_LOGS.slice(-15), day: GAME_DAY, time: TIME_STEP
     }));
   }
   function resetGameDirectly() {
+    safeStorage.removeItem('island_spacecore_v14');
     safeStorage.removeItem('island_spacecore_v13');
-    safeStorage.removeItem('island_spacecore_v12');
     location.reload();
   }
 
-  function crumbleDigAt(gx, gz, count = 42) {
-    const k = `${gx},${gz}`;
-    const curLv = HEIGHT_MAP[k] ?? 0;
-    const chipKey = `${gx},${gz},${curLv}`;
+  // =========================================================
+  // 1ブロック単位の「体格・ほふく前進の通り抜け判定」＆「斜め・前方ボロボロ掘削」
+  // =========================================================
+
+  // ブロック (gx, gz, lv) の内部 5×5×5 空間に、どれだけの通路幅(width)と天井高さ(clearanceH)が空いているか計算
+  function evaluateBlockPassage(gx, gz, lv) {
+    if (gx < -2 || gx > 2 || gz < -2 || gz > 2) return { openWidth: 5, openHeight: 5, hasCeiling: false };
+    const topLv = HEIGHT_MAP[`${gx},${gz}`] ?? 0;
+    // その層より上にブロックが存在しない（完全に空が開いている）場合
+    if (lv >= topLv) {
+      return { openWidth: 5, openHeight: 5, hasCeiling: false };
+    }
+    // targetLv = lv + 1 のブロックが頭上・目の前にある場合、その 5×5×5 の削れ具合（トンネル穴）を調べる
+    const blockLv = lv + 1;
+    const chip = CHIP_MAP[`${gx},${gz},${blockLv}`];
+    if (!chip) return { openWidth: 0, openHeight: 0, hasCeiling: true };
+
+    // 下の段 sy=0..4 ごとに、何個分の小ブロックが削られて空洞になっているかチェック
+    let openHeight = 0;
+    let minWidthAtOpenLayers = 5;
+    for (let sy = 0; sy < 5; sy++) {
+      let carvedCount = 0;
+      for (let sx = 0; sx < 5; sx++) {
+        for (let sz = 0; sz < 5; sz++) {
+          if (chip[`${sx},${sy},${sz}`]) carvedCount++;
+        }
+      }
+      // 1段(25個)のうち何列分空いているか（幅換算 0〜5）
+      const approxWidth = Math.min(5, Math.floor(Math.sqrt(carvedCount)));
+      if (approxWidth >= 2) {
+        openHeight = sy + 1;
+        minWidthAtOpenLayers = Math.min(minWidthAtOpenLayers, approxWidth);
+      } else {
+        break;
+      }
+    }
+    const hasCeiling = (openHeight < 5) || (topLv > blockLv);
+    return { openWidth: openHeight > 0 ? minWidthAtOpenLayers : 0, openHeight, hasCeiling };
+  }
+
+  // ロボットが現在地 (x, z, lv) から方向 dir へ移動できるか、立ち/ほふく前進のどちらが必要かを判定
+  function checkMoveAndPosture(gx, gz, curLv, dir) {
+    const nx = gx + dir.dx, nz = gz + dir.dz;
+    if (nx < -2 || nx > 2 || nz < -2 || nz > 2) {
+      return { canMove: ROBOT.speed === 5, posture: 'stand', targetLv: -99, reason: 'sea' };
+    }
+    const spec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.normal;
+    const destTopLv = HEIGHT_MAP[`${nx},${nz}`] ?? 0;
+
+    // 1. まず同じ高さ（または1段下）のトンネルとして通り抜けられるかチェック（ほふく前進トンネル含む）
+    const targetLv = (destTopLv <= curLv) ? destTopLv : curLv;
+    const pass = evaluateBlockPassage(nx, nz, targetLv);
+
+    // 斜め移動の場合は、左右の角ブロックが邪魔していないかも考慮
+    if (pass.openWidth >= spec.reqWidth) {
+      if (!pass.hasCeiling || pass.openHeight >= spec.standH) {
+        return { canMove: true, posture: 'stand', targetLv, reason: 'open' };
+      }
+      if (pass.openHeight >= spec.crawlH) {
+        // 天井が低い（高さ2〜3小マス）が、体格幅が通るので「ほふく前進」でモゾモゾ通り抜け可能！
+        return { canMove: true, posture: 'crawl', targetLv, reason: 'crawl_tunnel' };
+      }
+    }
+
+    // 2. トンネルが空いていない場合、通常の1段登りで上に乗れるかチェック
+    if (!dir.isDiag && (destTopLv - curLv) === 1) {
+      const upperPass = evaluateBlockPassage(nx, nz, destTopLv);
+      if (upperPass.openWidth >= spec.reqWidth && upperPass.openHeight >= spec.standH) {
+        return { canMove: true, posture: 'stand', targetLv: destTopLv, reason: 'climb' };
+      }
+    }
+
+    // 通れない理由を返す（幅不足＝太っちょでつかえた、または未掘削の壁）
+    const blockedReason = (pass.openHeight >= spec.crawlH && pass.openWidth < spec.reqWidth) ? 'too_fat' : 'wall';
+    return { canMove: false, posture: ROBOT.posture, targetLv: curLv, reason: blockedReason };
+  }
+
+  // キャラクターの正面（または斜め前・足元）から奥へ向かって 5×5×5 小ブロックをボロボロ削る関数！
+  function digFromCharacterFront(gx, gz, curLv, dir, crawlMode = false, count = 35) {
+    const tx = gx + (dir ? dir.dx : 0);
+    const tz = gz + (dir ? dir.dz : 0);
+    const targetX = (tx >= -2 && tx <= 2) ? tx : gx;
+    const targetZ = (tz >= -2 && tz <= 2) ? tz : gz;
+    const topLv = HEIGHT_MAP[`${targetX},${targetZ}`] ?? 0;
+    // 目の前に壁ブロックがある場合はその壁の高さ、同じ高さなら足元を掘る
+    const digLv = (targetX !== gx || targetZ !== gz) && topLv > curLv ? (curLv + 1) : topLv;
+    if (digLv <= -3 && !CHIP_MAP[`${targetX},${targetZ},${digLv}`]) {
+      return { completedLevel: false, newLv: digLv, leftCount: 0, isCrawlTunnel: false, targetX, targetZ };
+    }
+
+    const chipKey = `${targetX},${targetZ},${digLv}`;
     if (!CHIP_MAP[chipKey]) CHIP_MAP[chipKey] = {};
 
-    for (let i = 0; i < count; i++) {
-      let candidates = [];
-      for (let sy = 4; sy >= 0; sy--) {
-        for (let sx = 0; sx < 5; sx++) {
-          for (let sz = 0; sz < 5; sz++) {
-            if (!CHIP_MAP[chipKey][`${sx},${sy},${sz}`]) candidates.push([sx, sy, sz]);
-          }
+    const spec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.normal;
+    // ほふく前進トンネル掘りなら下2〜3段(sy=0,1,2)だけを優先して削り、上2段(sy=3,4)を天井として残す！
+    const maxSy = crawlMode ? 2 : 4;
+
+    // キャラクターがいる側（手前）から奥へ向かって順番に並ぶように候補をソート
+    const candidates = [];
+    for (let sy = 0; sy <= maxSy; sy++) {
+      for (let sx = 0; sx < 5; sx++) {
+        for (let sz = 0; sz < 5; sz++) {
+          if (CHIP_MAP[chipKey][`${sx},${sy},${sz}`]) continue;
+          // キャラの位置からの距離が近い順（前から削れる順）
+          const distFromChar = Math.hypot((targetX + (sx - 2) * 0.2) - (gx + ((ROBOT.pos.sx ?? 2) - 2) * 0.2), (targetZ + (sz - 2) * 0.2) - (gz + ((ROBOT.pos.sz ?? 2) - 2) * 0.2));
+          // 斜めや正面の中心ラインを優先
+          const centerBias = Math.abs(sx - 2) + Math.abs(sz - 2) <= spec.reqWidth ? 0 : 0.6;
+          candidates.push({ sx, sy, sz, score: distFromChar + centerBias + (crawlMode ? sy * 0.15 : (4 - sy) * 0.1) });
         }
-        if (candidates.length > 0) break;
       }
-      if (!candidates.length) break;
-      const pick = candidates[Math.floor(Math.random() * candidates.length)];
-      CHIP_MAP[chipKey][`${pick[0]},${pick[1]},${pick[2]}`] = 1;
+    }
+    candidates.sort((a, b) => a.score - b.score);
+
+    const actualCount = Math.min(count, candidates.length);
+    for (let i = 0; i < actualCount; i++) {
+      const c = candidates[i];
+      CHIP_MAP[chipKey][`${c.sx},${c.sy},${c.sz}`] = 1;
+    }
+
+    // 斜め掘りの場合は、現在のマスの角も少し削って斜め通路を繋げる
+    if (dir && dir.isDiag) {
+      const selfChipKey = `${gx},${gz},${digLv}`;
+      if ((HEIGHT_MAP[`${gx},${gz}`] ?? 0) >= digLv) {
+        if (!CHIP_MAP[selfChipKey]) CHIP_MAP[selfChipKey] = {};
+        const cornerSx = dir.dx > 0 ? [3, 4] : [0, 1];
+        const cornerSz = dir.dz > 0 ? [3, 4] : [0, 1];
+        for (let sy = 0; sy <= maxSy; sy++) {
+          cornerSx.forEach(csx => cornerSz.forEach(csz => { CHIP_MAP[selfChipKey][`${csx},${sy},${csz}`] = 1; }));
+        }
+      }
     }
 
     let leftCount = 0;
@@ -369,23 +543,29 @@
       if (!CHIP_MAP[chipKey][`${sx},${sy},${sz}`]) leftCount++;
     }
 
-    if (leftCount <= 8) {
+    // 全体を掘り抜いた場合は1段下げる（ほふくトンネルの場合は天井を残すので下げない）
+    if (!crawlMode && leftCount <= 8) {
       delete CHIP_MAP[chipKey];
-      if (curLv > -3) HEIGHT_MAP[k] = curLv - 1;
-      return { completedLevel: true, newLv: HEIGHT_MAP[k], leftCount: 0 };
+      if (digLv > -3) HEIGHT_MAP[`${targetX},${targetZ}`] = digLv - 1;
+      return { completedLevel: true, newLv: HEIGHT_MAP[`${targetX},${targetZ}`], leftCount: 0, isCrawlTunnel: false, targetX, targetZ };
     }
-    return { completedLevel: false, newLv: curLv, leftCount };
+    const pass = evaluateBlockPassage(targetX, targetZ, digLv - 1);
+    const isCrawlReady = (pass.hasCeiling && pass.openHeight >= 2 && pass.openWidth >= spec.reqWidth);
+    return { completedLevel: false, newLv: digLv, leftCount, isCrawlTunnel: isCrawlReady, targetX, targetZ };
   }
 
-  function getSurfaceYAt(gx, gz) {
+  function getSurfaceYAt(gx, gz, lvOverride = null) {
     if (gx < -2 || gx > 2 || gz < -2 || gz > 2) return -0.55;
     const topLv = HEIGHT_MAP[`${gx},${gz}`] ?? 0;
+    // トンネル内部（topLvより下の層）にいる場合はその層の床の高さを返す
+    if (lvOverride !== null && lvOverride < topLv) {
+      return lvOverride * 1.0;
+    }
     const chip = CHIP_MAP[`${gx},${gz},${topLv}`];
     if (!chip) return topLv * 1.0;
+    // 上面が削られているがトンネルの天井として残っている場合
     for (let sy = 4; sy >= 0; sy--) {
-      for (let sx = 0; sx < 5; sx++) for (let sz = 0; sz < 5; sz++) {
-        if (!chip[`${sx},${sy},${sz}`]) return (topLv - 1) * 1.0 + (sy + 1) * 0.20;
-      }
+      if (!chip[`2,${sy},2`]) return (topLv - 1) * 1.0 + (sy + 1) * 0.20;
     }
     return (topLv - 1) * 1.0;
   }
@@ -418,14 +598,12 @@
   scene.background = new THREE.Color(0x0b1528);
 
   const aspect = window.innerWidth / window.innerHeight;
-  // カメラコア：外カメラ（地上・地下）、追従カメラ、内カメラ（キャラ視点）
   const outerGroundCam = new THREE.PerspectiveCamera(42, aspect, 0.1, 180);
   const outerUnderCam  = new THREE.PerspectiveCamera(42, aspect, 0.1, 180);
   const followCam      = new THREE.PerspectiveCamera(42, aspect, 0.1, 180);
   const innerRobotCam  = new THREE.PerspectiveCamera(64, aspect, 0.08, 180);
 
   let activeCamera = followCam;
-  // manualCameraMode: null(追従カメラ) | 'ground'(外カメラ・地上固定) | 'underground'(外カメラ・地下固定) | 'robot'(内カメラ・キャラ視点)
   let manualCameraMode = null;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -433,11 +611,11 @@
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   container.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.70));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.72));
   const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.85);
   dirLight.position.set(8, 16, 10);
   scene.add(dirLight);
-  const underLight = new THREE.DirectionalLight(0xbae6fd, 0.45);
+  const underLight = new THREE.DirectionalLight(0xbae6fd, 0.48);
   underLight.position.set(-5, -12, -5);
   scene.add(underLight);
 
@@ -468,7 +646,7 @@
   scene.add(glassDepthMesh);
 
   const glassSubMat = new THREE.MeshLambertMaterial({
-    color: 0xffffff, transparent: true, opacity: 0.22, depthWrite: false, depthTest: true, depthFunc: THREE.LessEqualDepth
+    color: 0xffffff, transparent: true, opacity: 0.20, depthWrite: false, depthTest: true, depthFunc: THREE.LessEqualDepth
   });
   const glassSubMesh = new THREE.InstancedMesh(subCubeGeo, glassSubMat, MAX_SUB_INSTANCES);
   glassSubMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -497,7 +675,7 @@
     opaqueSubMat.needsUpdate = true;
     glassSubMat.map = showLines ? subEdgeTex : null;
     glassSubMat.depthFunc = showLines ? THREE.LessDepth : THREE.LessEqualDepth;
-    glassSubMat.opacity = showLines ? 0.18 : 0.25;
+    glassSubMat.opacity = showLines ? 0.18 : 0.22;
     glassSubMat.needsUpdate = true;
 
     let subIdx = 0;
@@ -529,8 +707,9 @@
                 const wy = (lv - 1) * 1.0 + sy * 0.20 + 0.10;
                 const wz = z + (sz - 2) * 0.20;
 
+                // 削りかけのブロック（isChipped）は5×5×5の凹凸が立体的に際立つように軽い明暗をつけ、無傷のブロックは1マス立方体としてピタッと統合
                 const useChecker = showLines || isChipped;
-                const shade = useChecker ? (((sx + sy + sz) % 2 === 0) ? 1.0 : 0.91) : 1.0;
+                const shade = useChecker ? (((sx + sy + sz) % 2 === 0) ? 1.0 : 0.90) : 1.0;
                 tempColor.setHex(layerColorHex).multiplyScalar(shade);
                 opaqueSubMesh.setColorAt(subIdx, tempColor);
                 glassSubMesh.setColorAt(subIdx, tempColor);
@@ -542,7 +721,7 @@
                   fullMat.makeTranslation(wx, wy, wz);
                 }
 
-                subVoxelsMeta.push({ idx: subIdx, gx: x, gz: z, sx, sy, sz, wx, wy, wz, lv, fullMat });
+                subVoxelsMeta.push({ idx: subIdx, gx: x, gz: z, sx, sy, sz, wx, wy, wz, lv, isChipped, fullMat });
                 subIdx++;
               }
             }
@@ -579,7 +758,7 @@
     });
   }
 
-  // 海テクスチャ（5×5島の真下はくり抜いて内カメラで下から夜空を見上げた時に邪魔にならないようにする）
+  // 海テクスチャ
   const seaCanvas = document.createElement('canvas');
   seaCanvas.width = 256; seaCanvas.height = 256;
   const sCtx = seaCanvas.getContext('2d');
@@ -669,35 +848,58 @@
   addConstellation('🥄 北斗七星', [[26,20,-8],[26,17,-3],[25,15,2],[24,12,6],[24,8,10],[27,7,14],[27,11,11]], [26,4,5]);
   addConstellation('🏹 オリオン座', [[-5,20,26],[5,20,26],[-2,14,28],[0,14,28],[2,14,28],[-5,8,26],[5,8,26]], [0,4,28]);
 
+  // ロボット3Dモデル（体格スケール＆ほふく前進アニメーション対応）
   const robotGroup = new THREE.Group();
-  const rBody = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.50, 0.34), new THREE.MeshLambertMaterial({ color: 0x38bdf8 })); rBody.position.y = 0.37; robotGroup.add(rBody);
-  const rHead = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.42, 0.40), new THREE.MeshLambertMaterial({ color: 0xbae6fd })); rHead.position.y = 0.83; robotGroup.add(rHead);
+  const robotPoseGroup = new THREE.Group(); // 立ち・ほふく前進の姿勢回転用
+  robotGroup.add(robotPoseGroup);
+
+  const rBody = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.44, 0.32), new THREE.MeshLambertMaterial({ color: 0x38bdf8 }));
+  rBody.position.y = 0.34; robotPoseGroup.add(rBody);
+  const rHead = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.36, 0.36), new THREE.MeshLambertMaterial({ color: 0xbae6fd }));
+  rHead.position.y = 0.74; robotPoseGroup.add(rHead);
   const darkMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
-  [[-0.10,0.84,0.20,0.07,0.11,0.05],[0.10,0.84,0.20,0.07,0.11,0.05],[-0.31,0.38,0,0.12,0.36,0.14],[0.31,0.38,0,0.12,0.36,0.14],[-0.12,0.08,0,0.14,0.16,0.16],[0.12,0.08,0,0.14,0.16,0.16]].forEach(p => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(p[3], p[4], p[5]), darkMat); m.position.set(p[0], p[1], p[2]); robotGroup.add(m);
+  [[-0.09,0.75,0.18,0.06,0.10,0.05],[0.09,0.75,0.18,0.06,0.10,0.05],[-0.27,0.35,0,0.10,0.32,0.12],[0.27,0.35,0,0.10,0.32,0.12],[-0.11,0.08,0,0.12,0.15,0.14],[0.11,0.08,0,0.12,0.15,0.14]].forEach(p => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(p[3], p[4], p[5]), darkMat); m.position.set(p[0], p[1], p[2]); robotPoseGroup.add(m);
   });
-  const bulbMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.14), new THREE.MeshBasicMaterial({ color: 0xfacc15 })); bulbMesh.position.y = 1.11; robotGroup.add(bulbMesh);
+  const bulbMesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+  bulbMesh.position.y = 0.98; robotPoseGroup.add(bulbMesh);
   scene.add(robotGroup);
 
   function syncRobot3DPosition() {
     const gx = ROBOT.pos.x, gz = ROBOT.pos.z;
     const subX = ((ROBOT.pos.sx ?? 2) - 2) * 0.20, subZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.20;
-    const baseY = getSurfaceYAt(gx, gz);
+    const baseY = getSurfaceYAt(gx, gz, ROBOT.pos.lv);
     robotGroup.position.set(gx + subX, baseY, gz + subZ);
     robotGroup.rotation.y = ROBOT.rotY || 0;
+
+    // 体格（スリム・標準・太っちょ）の横幅スケール反映
+    const spec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.normal;
+    robotPoseGroup.scale.set(spec.scaleX, 1.0, spec.scaleZ);
+
+    // 姿勢（立ち vs ほふく前進）の変形反映（ほふく前進時はうつ伏せになって高さ0.36m＝2小マス分に収まる！）
+    if (ROBOT.posture === 'crawl') {
+      robotPoseGroup.rotation.x = Math.PI / 2;
+      robotPoseGroup.position.set(0, 0.18, -0.35);
+      rHead.rotation.x = -Math.PI / 3; // ほふく前進しながら前を向く
+    } else {
+      robotPoseGroup.rotation.x = 0;
+      robotPoseGroup.position.set(0, 0, 0);
+      rHead.rotation.x = 0;
+    }
   }
+
   function getRobotHeightLevel() {
     const { x, z } = ROBOT.pos;
-    return (x < -2 || x > 2 || z < -2 || z > 2) ? -99 : (HEIGHT_MAP[`${x},${z}`] ?? 0);
+    if (x < -2 || x > 2 || z < -2 || z > 2) return -99;
+    return Number.isFinite(ROBOT.pos.lv) ? ROBOT.pos.lv : (HEIGHT_MAP[`${x},${z}`] ?? 0);
   }
 
   // =========================================================
-  // カメラコア（CameraCore v13）：
-  // 1. 外カメラ（地上 'ground' / 地下 'underground'）：全体を見渡す固定カメラ
-  // 2. 追従カメラ（null）：外カメラ・内カメラOFF時にキャラを追従するカメラ
-  // 3. 内カメラ（'robot'）：キャラ視点（掘った縦穴から天を見上げられる）
+  // カメラコア（CameraCore v14）：
+  // 追従カメラの「観察窓（スポット透過）」で、無傷のブロックは1マス単位で透過し、
+  // 削りかけのブロック・斜めトンネル・ほふく前進する姿はクッキリ浮かび上がらせる！
   // =========================================================
-  let camTheta = Math.PI / 4, camPhi = 1.05, camRadius = 11.5, isDragging = false, prevPointer = { x: 0, y: 0 }, cameraDirty = true;
+  let camTheta = Math.PI / 4, camPhi = 1.02, camRadius = 9.8, isDragging = false, prevPointer = { x: 0, y: 0 }, cameraDirty = true;
 
   function syncCameraButtonsUI() {
     document.getElementById('cam-ground-btn').classList.toggle('cam-active', manualCameraMode === 'ground');
@@ -705,11 +907,11 @@
     document.getElementById('cam-fpv-btn').classList.toggle('cam-active', manualCameraMode === 'robot');
   }
 
-  function updateTransparencyAndOcclusion(isUndergroundView, refCamPos, focusX, focusZ, targetFloorLv) {
+  function updateTransparencyAndOcclusion(modeType, refCamPos, focusX, focusY, focusZ, targetFloorLv) {
     const showLines = (CAM_VISUAL_STYLE === 'glass_line');
     macroOutlineGroup.visible = showLines;
 
-    if (!isUndergroundView) {
+    if (modeType === 'ground_fixed' || modeType === 'robot_fpv') {
       waterfallMat.opacity = 0.92; seaMat.opacity = 0.95;
       glassDepthMesh.visible = false; glassSubMesh.visible = false;
       for (let i = 0; i < subVoxelsMeta.length; i++) opaqueSubMesh.setMatrixAt(subVoxelsMeta[i].idx, subVoxelsMeta[i].fullMat);
@@ -717,10 +919,8 @@
       return;
     }
 
-    // 地下観察時（外カメラ地下 または 追従カメラ地下時）：
-    // 地下1層目（lv >= 0：緑と乾いた土の表層）は「天井の蓋」として残し、カメラ手前の湿った地下土（lv <= -1）だけを透過／消去する
-    waterfallMat.opacity = (CAM_VISUAL_STYLE === 'hide') ? 0.10 : 0.16;
-    seaMat.opacity = (CAM_VISUAL_STYLE === 'hide') ? 0.14 : 0.22;
+    waterfallMat.opacity = (CAM_VISUAL_STYLE === 'hide') ? 0.12 : 0.18;
+    seaMat.opacity = (CAM_VISUAL_STYLE === 'hide') ? 0.15 : 0.22;
 
     const useFrostedGlass = (CAM_VISUAL_STYLE !== 'hide');
     glassSubMesh.visible = useFrostedGlass;
@@ -732,41 +932,84 @@
 
     for (let i = 0; i < subVoxelsMeta.length; i++) {
       const sv = subVoxelsMeta[i];
-      // 地下1層目以上（lv >= 0：天井の蓋）と、見たい地下底の床（lv <= targetFloorLv）は消さずに残す
-      if (sv.lv >= 0 || sv.lv <= targetFloorLv) {
+
+      // 1. キャラクターが立っている床以下（sv.lv <= targetFloorLv）の土台は絶対に消さない
+      if (sv.lv <= targetFloorLv) {
         opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
         if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
         continue;
       }
-      const checkX = (CAM_VISUAL_STYLE === 'hide') ? sv.gx : sv.wx;
-      const checkZ = (CAM_VISUAL_STYLE === 'hide') ? sv.gz : sv.wz;
-      const relX = checkX - focusX, relZ = checkZ - focusZ;
-      const dotFront = relX * nx + relZ * nz, perpDist = Math.abs(-relX * nz + relZ * nx);
-      const inFront = (dotFront > -0.45 && perpDist < 2.65);
 
-      if (inFront) {
-        opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
-        if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+      if (modeType === 'underground_fixed') {
+        // 外カメラ（地下固定）の時は、地下1層目（lv >= 0）を天井の蓋として残し、手前の地下土を1マス単位で透過
+        if (sv.lv >= 0) {
+          opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+          continue;
+        }
+        const relX = sv.gx - focusX, relZ = sv.gz - focusZ;
+        const dotFront = relX * nx + relZ * nz, perpDist = Math.abs(-relX * nz + relZ * nx);
+        const inFront = (dotFront > -0.45 && perpDist < 2.65);
+        if (inFront) {
+          opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+        } else {
+          opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+        }
+        continue;
+      }
+
+      // 2. 【追従カメラ：観察窓（スポット透過）】
+      // 削りかけのブロック（sv.isChipped＝ボロボロ掘削中やほふく前進トンネルの天井）は、
+      // キャラクターの体に直接かぶる真手前の小ブロック以外、できる限り不透明でクッキリ残してアリの巣を見せる！
+      if (sv.isChipped) {
+        const subRelX = sv.wx - focusX, subRelZ = sv.wz - focusZ;
+        const subDotFront = subRelX * nx + subRelZ * nz;
+        const subPerpDist = Math.abs(-subRelX * nz + subRelZ * nx);
+        // ほふく前進トンネルの上蓋がキャラの顔を完全に隠す真手前（幅0.45m以内）だけスポット透過し、トンネルの壁と天井の断面はクッキリ残す！
+        const blockCharDirectly = (subDotFront > 0.15 && subDotFront < 1.15 && subPerpDist < 0.42 && sv.wy > focusY + 0.1);
+        if (blockCharDirectly) {
+          opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+        } else {
+          opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+        }
       } else {
-        opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
-        if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+        // 無傷のブロックは「親の1マス座標 (sv.gx, sv.gz)」単位で観察窓（半径1.65マス以内＆カメラ手前）を判定！
+        // これでカメラをグリグリ回しても5×5の破片チラつきが一切出ず、1ブロック単位で気持ちよく開ける！
+        const relX = sv.gx - focusX, relZ = sv.gz - focusZ;
+        const dotFront = relX * nx + relZ * nz;
+        const perpDist = Math.abs(-relX * nz + relZ * nx);
+        const radialDist = Math.hypot(relX, relZ);
+        const inSpotWindow = (dotFront > -0.15 && perpDist < 1.35 && radialDist < 1.85);
+
+        if (inSpotWindow) {
+          opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+        } else {
+          opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+        }
       }
     }
+
     opaqueSubMesh.instanceMatrix.needsUpdate = true;
     if (useFrostedGlass) glassSubMesh.instanceMatrix.needsUpdate = true;
   }
 
   function updateAllCamerasTransform() {
-    camRadius = Math.max(7.0, Math.min(20.0, camRadius));
+    camRadius = Math.max(6.2, Math.min(20.0, camRadius));
     const statusPanel = document.getElementById('status-panel');
     const h = getRobotHeightLevel();
-    const isRobotUG = (h < 0 && h !== -99);
+    const isRobotUG = (h < 0 && h !== -99) || (ROBOT.posture === 'crawl');
 
     if (manualCameraMode === 'robot') {
-      // 【内カメラ】キャラ視点：掘った穴の底から真上（camPhi→π）を見上げると、掘った縦穴から夜空と星座が見える！
       robotGroup.visible = false;
       camPhi = Math.max(0.12, Math.min(3.02, camPhi));
-      const eyeX = robotGroup.position.x, eyeY = robotGroup.position.y + 0.88, eyeZ = robotGroup.position.z;
+      const eyeH = (ROBOT.posture === 'crawl') ? 0.28 : 0.85;
+      const eyeX = robotGroup.position.x, eyeY = robotGroup.position.y + eyeH, eyeZ = robotGroup.position.z;
       innerRobotCam.position.set(eyeX, eyeY, eyeZ);
       innerRobotCam.lookAt(
         eyeX - 20 * Math.sin(camPhi) * Math.sin(camTheta),
@@ -775,15 +1018,13 @@
       );
       statusPanel.classList.toggle('sky-hidden', camPhi > 1.55);
       activeCamera = innerRobotCam;
-      updateTransparencyAndOcclusion(false, innerRobotCam.position, eyeX, eyeZ, -3);
+      updateTransparencyAndOcclusion('robot_fpv', innerRobotCam.position, eyeX, eyeY, eyeZ, -3);
 
     } else if (manualCameraMode === 'ground') {
-      // 【外カメラ（地上・固定）】キャラを確認でき、天の最頂点と地上全体が見渡せる固定俯瞰カメラ
       robotGroup.visible = true;
       statusPanel.classList.remove('sky-hidden');
       const gPhi = Math.max(0.42, Math.min(1.22, camPhi));
-      const fixedDist = 14.2;
-      const centerTargetY = 0.6; // 地上空間と天頂付近を見渡す固定中心
+      const fixedDist = 14.2, centerTargetY = 0.6;
       outerGroundCam.position.set(
         fixedDist * Math.sin(gPhi) * Math.sin(camTheta),
         centerTargetY + fixedDist * Math.cos(gPhi),
@@ -791,19 +1032,15 @@
       );
       outerGroundCam.lookAt(0, centerTargetY, 0);
       activeCamera = outerGroundCam;
-      updateTransparencyAndOcclusion(false, outerGroundCam.position, 0, 0, -3);
+      updateTransparencyAndOcclusion('ground_fixed', outerGroundCam.position, 0, centerTargetY, 0, -3);
 
     } else if (manualCameraMode === 'underground') {
-      // 【外カメラ（地下・固定）】キャラと地の最下部（地下底）全体が見渡せる固定カメラ（緑の地下1層目が天井の蓋）
       robotGroup.visible = true;
       statusPanel.classList.remove('sky-hidden');
       const uPhi = Math.max(1.18, Math.min(1.95, camPhi));
-      const fixedUGDist = 12.8;
-      const ugCenterY = -2.2; // 地下全体〜地の最下部（y=-4.0）を見渡す固定中心
+      const fixedUGDist = 12.8, ugCenterY = -2.2;
       let camY = ugCenterY + fixedUGDist * Math.cos(uPhi);
-      // 地下外カメラは地面1層目（緑の蓋）より下に位置し、全体と最下部を見渡す
       camY = Math.max(-4.5, Math.min(-0.92, camY));
-
       outerUnderCam.position.set(
         fixedUGDist * Math.sin(uPhi) * Math.sin(camTheta),
         camY,
@@ -811,59 +1048,56 @@
       );
       outerUnderCam.lookAt(0, -2.3, 0);
       activeCamera = outerUnderCam;
-      updateTransparencyAndOcclusion(true, outerUnderCam.position, 0, 0, -3);
+      updateTransparencyAndOcclusion('underground_fixed', outerUnderCam.position, 0, -2.3, 0, -3);
 
     } else {
-      // 【追従カメラ】外カメラ・内カメラがOFFの時にキャラクターを追従するカメラ
+      // 【追従カメラ＋観察窓スポット透過】キャラを中央に捉え、アリの巣の掘削やほふく前進を間近で観察！
       robotGroup.visible = true;
       statusPanel.classList.remove('sky-hidden');
       const fPhi = Math.max(0.55, Math.min(1.42, camPhi));
-      const followDist = Math.max(6.8, Math.min(12.0, camRadius * 0.78));
+      const followDist = Math.max(5.8, Math.min(11.0, camRadius * 0.72));
       const tx = robotGroup.position.x;
-      const ty = robotGroup.position.y + 0.45;
+      const ty = robotGroup.position.y + (ROBOT.posture === 'crawl' ? 0.25 : 0.45);
       const tz = robotGroup.position.z;
-
-      let camY = ty + followDist * Math.cos(fPhi);
-      if (isRobotUG) camY = Math.min(-0.85, camY);
 
       followCam.position.set(
         tx + followDist * Math.sin(fPhi) * Math.sin(camTheta),
-        camY,
+        ty + followDist * Math.cos(fPhi),
         tz + followDist * Math.sin(fPhi) * Math.cos(camTheta)
       );
       followCam.lookAt(tx, ty, tz);
       activeCamera = followCam;
-      updateTransparencyAndOcclusion(isRobotUG, followCam.position, tx, tz, isRobotUG ? h : -3);
+      updateTransparencyAndOcclusion(isRobotUG ? 'follow_spot' : 'ground_fixed', followCam.position, tx, robotGroup.position.y, tz, h);
     }
 
     syncCameraButtonsUI();
   }
 
   function getStyleShortName() {
-    if (CAM_VISUAL_STYLE === 'hide') return '1マス消去＋5×5掘削';
-    if (CAM_VISUAL_STYLE === 'glass_line') return '詳細5×5×5線あり';
-    return 'すりガラス・線なし';
+    if (CAM_VISUAL_STYLE === 'hide') return '観察窓くっきり';
+    if (CAM_VISUAL_STYLE === 'glass_line') return '観察窓＋5×5線';
+    return '観察窓ガラス';
   }
 
   document.getElementById('cam-ground-btn').onclick = () => {
     wakeUpRenderer();
     manualCameraMode = (manualCameraMode === 'ground') ? null : 'ground';
     if (manualCameraMode) camPhi = 0.92;
-    showToast(manualCameraMode ? '🌌 外カメラ（地上固定）：天頂と地上全体を見渡すよ' : '🤖 追従カメラ（キャラ追従）に戻したよ');
+    showToast(manualCameraMode ? '🌌 外カメラ（地上固定）：天頂と地上全体を見渡すよ' : '🤖 追従カメラ（観察窓スポット透過）に戻したよ');
     cameraDirty = true; updateEnvironmentAndUI();
   };
   document.getElementById('cam-ug-btn').onclick = () => {
     wakeUpRenderer();
     manualCameraMode = (manualCameraMode === 'underground') ? null : 'underground';
     if (manualCameraMode) camPhi = 1.42;
-    showToast(manualCameraMode ? '⛏️ 外カメラ（地下固定）：キャラと地下最下部全体を見渡すよ' : '🤖 追従カメラ（キャラ追従）に戻したよ');
+    showToast(manualCameraMode ? '⛏️ 外カメラ（地下固定）：キャラと地下最下部を見渡すよ' : '🤖 追従カメラ（観察窓スポット透過）に戻したよ');
     cameraDirty = true; updateEnvironmentAndUI();
   };
   document.getElementById('cam-fpv-btn').onclick = () => {
     wakeUpRenderer();
     manualCameraMode = (manualCameraMode === 'robot') ? null : 'robot';
-    camPhi = manualCameraMode ? 1.85 : 1.05;
-    showToast(manualCameraMode ? '🤖 内カメラ（キャラ視点）：掘った穴から天（夜空）も見上げられるよ！' : '🤖 追従カメラ（キャラ追従）に戻したよ');
+    camPhi = manualCameraMode ? 1.85 : 1.02;
+    showToast(manualCameraMode ? '🤖 内カメラ（キャラ視点）：ほふく前進目線や穴の上の夜空が見えるよ！' : '🤖 追従カメラ（観察窓スポット透過）に戻したよ');
     cameraDirty = true; updateEnvironmentAndUI();
   };
 
@@ -882,13 +1116,14 @@
 
   function formatHeightText(lv) {
     if (lv === -99) return '海の白波';
-    if (lv >= 1) return `地上空間+${lv}(緑2層＋乾土3層)`;
-    if (lv === 0) return '地下1層目(緑2層＋乾土3層)';
-    return `地下${Math.abs(lv) + 1}層目(湿った土)`;
+    if (lv >= 1) return `地上空間+${lv}`;
+    if (lv === 0) return '地下1層目(緑＋乾土)';
+    return `地下${Math.abs(lv) + 1}層目(湿土)`;
   }
 
   function updateEnvironmentAndUI() {
     const st = life.getState(), hLevel = getRobotHeightLevel();
+    const spec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.normal;
     document.getElementById('val-stamina').innerText = st.stamina; document.getElementById('bar-stamina').style.width = st.stamina + '%';
     document.getElementById('val-life').innerText = st.energy; document.getElementById('bar-life').style.width = st.energy + '%';
     document.getElementById('val-mental').innerText = st.mental; document.getElementById('bar-mental').style.width = st.mental + '%';
@@ -905,23 +1140,20 @@
     scene.background.setHex(skyHex); starMat.opacity = starOpacity;
     document.getElementById('ui-time').innerText = timeLabel;
 
-    let moodStr = '😊 コアv13';
-    if (hLevel < 0 && hLevel !== -99) moodStr = '⛏️ 湿土たんけん';
-    else if (hLevel >= 1) moodStr = '🔭 地上空間';
-    else if (st.mode === 'STARVING') moodStr = '😵 はらぺこ';
-    else if (st.mode === 'EXHAUSTED') moodStr = '😴 くたくた';
-    document.getElementById('ui-mood').innerText = moodStr;
+    const postureIcon = ROBOT.posture === 'crawl' ? '🐛 ほふく前進' : '🚶 立ち';
+    document.getElementById('ui-mood').innerText = `${postureIcon}(${spec.label})`;
 
-    const camBadge = manualCameraMode === 'ground' ? '🌌外カメラ(地上固定)' : (manualCameraMode === 'underground' ? '⛏️外カメラ(地下固定)' : (manualCameraMode === 'robot' ? '🤖内カメラ(視点)' : '🤖追従カメラ'));
+    const camBadge = manualCameraMode === 'ground' ? '🌌外カメラ(地上)' : (manualCameraMode === 'underground' ? '⛏️外カメラ(地下)' : (manualCameraMode === 'robot' ? '🤖内カメラ' : `🤖追従(${getStyleShortName()})`));
     document.getElementById('history-loc').innerText = `${camBadge}・${formatHeightText(hLevel)}`;
   }
 
-  async function askAIForDecision(validDirs, curH) {
+  async function askAIForDecision(validMoves, curH) {
     const aiType = safeStorage.getItem('ai_type') || 'gemini';
     if (aiType === 'none') return null;
-    const dirNames = validDirs.map(d => d.name).join('、');
+    const spec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.normal;
+    const dirNames = validMoves.map(m => `${m.dir.name}${m.check.posture === 'crawl' ? '(ほふく前進)' : ''}`).join('、');
     const itemsStr = WORLD_ITEMS.map(it => `${it.type}(${it.x},${it.z})`).join(', ') || 'なし';
-    const prompt = `あなたは5x5の立方体ボクセル島と地下空間で暮らす自律ロボット「ロボ${ROBOT.gen}ごう」です。現在位置:(${ROBOT.pos.x},${ROBOT.pos.z}) 層:${formatHeightText(curH)} ステータス:たいりょく=${life.stamina},おなか=${life.energy},ごきげん=${life.mental} アイテム:${itemsStr} 移動可能:[${dirNames}] JSON形式のみで次の行動と小学生向けの可愛い気持ち(1〜2文)を出力してください:{"action":"東 または 西 または 南 または 北 または 掘る または 休む","thought":"気持ち"}`;
+    const prompt = `あなたは5x5のアリの巣ボクセル島で暮らす自律ロボット「ロボ${ROBOT.gen}ごう」です。現在位置:(${ROBOT.pos.x},${ROBOT.pos.z}) 層:${formatHeightText(curH)} 体格:${spec.label} 姿勢:${ROBOT.posture === 'crawl' ? 'ほふく前進' : '立ち'} ステータス:たいりょく=${life.stamina},おなか=${life.energy},ごきげん=${life.mental} アイテム:${itemsStr} 移動可能8方向:[${dirNames}] JSON形式のみで次の行動と小学生向けの可愛い気持ち(1〜2文)を出力してください:{"action":"移動可能な方向名 または 斜め掘り または ほふく掘り または 休む","thought":"気持ち"}`;
     try {
       if (aiType === 'gemini') {
         const key = safeStorage.getItem('api_gemini');
@@ -957,75 +1189,107 @@
     if (++TIME_STEP >= 20) { TIME_STEP = 0; GAME_DAY++; DIARY_LOGS.push(`🌅 ${GAME_DAY}日目の朝を迎えたよ！`); }
 
     const curH = getRobotHeightLevel();
-    const dirs = [
-      { name: '東', dx: 1, dz: 0, rot: Math.PI / 2 }, { name: '西', dx: -1, dz: 0, rot: -Math.PI / 2 },
-      { name: '南', dx: 0, dz: 1, rot: 0 }, { name: '北', dx: 0, dz: -1, rot: Math.PI }
-    ];
     let thoughtText = '', actionLabel = '';
 
     if (curH === -99) {
       ROBOT.pos.x = Math.max(-2, Math.min(2, ROBOT.pos.x)); ROBOT.pos.z = Math.max(-2, Math.min(2, ROBOT.pos.z));
-      ROBOT.pos.sx = 2; ROBOT.pos.sz = 2; life.stamina -= 10;
+      ROBOT.pos.lv = HEIGHT_MAP[`${ROBOT.pos.x},${ROBOT.pos.z}`] ?? 0;
+      ROBOT.pos.sx = 2; ROBOT.pos.sz = 2; ROBOT.posture = 'stand'; life.stamina -= 10;
       actionLabel = '🌊 白波に押し戻されて陸へ帰還'; thoughtText = 'わわっ！海の白い波がすごく強くて、内陸のほうへ押し戻されたよ！';
     } else {
-      const validDirs = dirs.filter(d => {
-        const nx = ROBOT.pos.x + d.dx, nz = ROBOT.pos.z + d.dz;
-        if (nx < -2 || nx > 2 || nz < -2 || nz > 2) return ROBOT.speed === 5;
-        return ((HEIGHT_MAP[`${nx},${nz}`] ?? 0) - curH) <= 1;
-      });
-      const aiDecision = await askAIForDecision(validDirs, curH);
-      let chosenDir = null, wantDig = false, wantRest = false;
+      // 8方向（前後左右＋斜め4方向）の通り抜け・ほふく前進判定
+      const moveEvaluations = ALL_DIRS.map(d => ({
+        dir: d,
+        check: checkMoveAndPosture(ROBOT.pos.x, ROBOT.pos.z, curH, d)
+      }));
+      const validMoves = moveEvaluations.filter(m => m.check.canMove);
+      const blockedByFat = moveEvaluations.find(m => m.check.reason === 'too_fat');
+
+      const aiDecision = await askAIForDecision(validMoves, curH);
+      let chosenMove = null, wantDig = false, wantCrawlDig = false, wantRest = false;
 
       if (aiDecision && aiDecision.action) {
         if (aiDecision.action.includes('休')) wantRest = true;
-        else if (aiDecision.action.includes('掘') && curH > -3) wantDig = true;
-        else chosenDir = validDirs.find(d => aiDecision.action.includes(d.name)) || null;
+        else if (aiDecision.action.includes('ほふく掘')) { wantDig = true; wantCrawlDig = true; }
+        else if (aiDecision.action.includes('掘')) wantDig = true;
+        else chosenMove = validMoves.find(m => aiDecision.action.includes(m.dir.name.replace('(斜め)', ''))) || null;
       }
-      if (!wantRest && !wantDig && !chosenDir) {
+
+      if (!wantRest && !wantDig && !chosenMove) {
         if (life.stamina <= 25) wantRest = true;
-        else if (Math.random() < 0.25 && curH > -3 && life.stamina > 40) wantDig = true;
-        else {
+        else if (blockedByFat && Math.random() < 0.65) {
+          // 太っちょで穴につかえた時は、目の前の穴をボロボロ削って広げる！
+          wantDig = true;
+        } else if (Math.random() < 0.35 && curH > -3 && life.stamina > 35) {
+          wantDig = true;
+          wantCrawlDig = (Math.random() < 0.5);
+        } else {
+          // ほふく前進トンネルがあれば優先してくぐってみる、またはリンゴへ向かう
+          const crawlMoves = validMoves.filter(m => m.check.posture === 'crawl');
           const apple = WORLD_ITEMS.find(it => it.type === 'apple');
-          if (apple && validDirs.length) {
-            validDirs.sort((a, b) => (Math.abs(ROBOT.pos.x + a.dx - apple.x) + Math.abs(ROBOT.pos.z + a.dz - apple.z)) - (Math.abs(ROBOT.pos.x + b.dx - apple.x) + Math.abs(ROBOT.pos.z + b.dz - apple.z)));
-            chosenDir = validDirs[0];
-          } else if (validDirs.length) chosenDir = validDirs[Math.floor(Math.random() * validDirs.length)];
+          if (crawlMoves.length > 0 && Math.random() < 0.45) {
+            chosenMove = crawlMoves[Math.floor(Math.random() * crawlMoves.length)];
+          } else if (apple && validMoves.length) {
+            validMoves.sort((a, b) => Math.hypot(ROBOT.pos.x + a.dir.dx - apple.x, ROBOT.pos.z + a.dir.dz - apple.z) - Math.hypot(ROBOT.pos.x + b.dir.dx - apple.x, ROBOT.pos.z + b.dir.dz - apple.z));
+            chosenMove = validMoves[0];
+          } else if (validMoves.length) {
+            chosenMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+          } else {
+            wantDig = true;
+          }
         }
       }
 
       if (wantRest) {
         life.stamina += 35; life.energy -= 5; life.mental += 10;
         actionLabel = '💤 その場でひとやすみ';
-        thoughtText = aiDecision?.thought || (curH < 0 ? `${formatHeightText(curH)}でひとやすみ。内カメラ(🤖)で上を見ると掘った穴から天が見えるよ！` : 'ちょっと疲れたから、ここでひとやすみして体力を回復するよ！');
+        thoughtText = aiDecision?.thought || 'アリの巣のひみつ空間でひとやすみ。観察窓からぼくの様子がよく見えるね！';
       } else if (wantDig) {
-        const digRes = crumbleDigAt(ROBOT.pos.x, ROBOT.pos.z, 45);
-        life.stamina -= 10; life.mental += 12;
+        // 斜め方向を含む8方向から掘る向きを選択
+        const digDir = blockedByFat ? blockedByFat.dir : ALL_DIRS[Math.floor(Math.random() * ALL_DIRS.length)];
+        ROBOT.rotY = digDir.rot;
+        const digRes = digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, digDir, wantCrawlDig, 38);
+        life.stamina -= 9; life.mental += 12;
+
         if (digRes.completedLevel) {
           if (BAG.length < 10) BAG.push('stone');
-          actionLabel = `⛏️ 5×5×5を掘り抜いて${formatHeightText(digRes.newLv)}へ！`;
-          thoughtText = aiDecision?.thought || `ザクザクッ！1マスの立方体を全部掘り抜いて${formatHeightText(digRes.newLv)}が出現したよ！`;
-          DIARY_LOGS.push(`⛏️ ${GAME_DAY}日目：${formatHeightText(digRes.newLv)}まで穴を掘り抜いた！`);
+          if (digRes.targetX === ROBOT.pos.x && digRes.targetZ === ROBOT.pos.z) ROBOT.pos.lv = digRes.newLv;
+          actionLabel = `⛏️ ${digDir.name}を掘り抜いて${formatHeightText(digRes.newLv)}開通！`;
+          thoughtText = aiDecision?.thought || `ザクザクッ！${digDir.name}に向かって前から5×5×5の小ブロックを掘り抜いたよ！`;
+        } else if (digRes.isCrawlTunnel) {
+          actionLabel = `🐛 ${digDir.name}に「ほふく前進トンネル」を開通！`;
+          thoughtText = aiDecision?.thought || `上の緑と土を天井に残して、${digDir.name}にほふく前進でくぐれる低い横穴を掘ったよ！`;
+          DIARY_LOGS.push(`🐛 ${GAME_DAY}日目：${digDir.name}にほふく前進トンネルを掘った！`);
         } else {
-          actionLabel = `⛏️ 5×5×5立方体をボロボロ掘削中（残り${digRes.leftCount}個）`;
-          thoughtText = aiDecision?.thought || `ボロボロッ！緑2段と乾いた土3段の5×5×5小ブロックを削っているよ（あと${digRes.leftCount}個で貫通）！`;
+          actionLabel = `⛏️ ${digDir.name}の土を前からボロボロ掘削中(残${digRes.leftCount})`;
+          thoughtText = aiDecision?.thought || (blockedByFat
+            ? `おなかが太っちょで穴につかえちゃったから、${digDir.name}の壁を前からボロボロ削って広げているよ！`
+            : `${digDir.name}に向かって、ぼくの目の前から5×5×5の土をボロボロ削っているよ！`);
         }
-      } else if (chosenDir) {
-        const prevH = curH;
-        ROBOT.pos.x += chosenDir.dx; ROBOT.pos.z += chosenDir.dz;
-        ROBOT.pos.sx = ROBOT.speed === 5 ? Math.max(0, Math.min(4, 2 + chosenDir.dx * 2)) : 2;
-        ROBOT.pos.sz = ROBOT.speed === 5 ? Math.max(0, Math.min(4, 2 + chosenDir.dz * 2)) : 2;
-        ROBOT.rotY = chosenDir.rot;
-        const newH = getRobotHeightLevel();
-        life.energy -= 7; life.stamina -= 8;
-        if (newH < 0 && newH !== -99) {
-          life.mental += 10; actionLabel = `⛏️ ${chosenDir.name}へ進んで${formatHeightText(newH)}へ！`;
-          thoughtText = aiDecision?.thought || `${formatHeightText(newH)}に入ったよ！内カメラ(🤖)にして上を見上げると掘った穴から夜空が見えるよ！`;
-        } else if (newH > prevH) {
-          life.mental += 10; actionLabel = `👟 ${chosenDir.name}へ1段登った（${formatHeightText(newH)}）`;
-          thoughtText = aiDecision?.thought || `よいしょっ！${chosenDir.name}へ登って${formatHeightText(newH)}に来たよ！`;
+      } else if (chosenMove) {
+        const d = chosenMove.dir;
+        const chk = chosenMove.check;
+        ROBOT.pos.x += d.dx;
+        ROBOT.pos.z += d.dz;
+        ROBOT.pos.lv = chk.targetLv;
+        ROBOT.pos.sx = 2;
+        ROBOT.pos.sz = 2;
+        ROBOT.rotY = d.rot;
+        ROBOT.posture = chk.posture;
+
+        life.energy -= 7; life.stamina -= 8; life.mental += 10;
+        const spec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.normal;
+
+        if (chk.posture === 'crawl') {
+          actionLabel = `🐛 ${d.name}の低い穴を「ほふく前進」で通り抜けた！`;
+          thoughtText = aiDecision?.thought || `天井が低いトンネルだから、体を伏せて「ほふく前進（${spec.label}）」でモゾモゾ通り抜けたよ！`;
+          DIARY_LOGS.push(`🐛 ${GAME_DAY}日目：${d.name}のトンネルをほふく前進でくぐり抜けた！`);
+        } else if (d.isDiag) {
+          actionLabel = `↗️ ${d.name}へ斜め移動した！`;
+          thoughtText = aiDecision?.thought || `アリの巣の斜めルートを通って${d.name}のマスへスイスイ進んだよ！`;
         } else {
-          actionLabel = `👟 ${chosenDir.name}へトコトコ歩いた`;
-          thoughtText = aiDecision?.thought || `${chosenDir.name}のマスへ歩いたよ。追従カメラがぼくについてきてくれるね！`;
+          actionLabel = `👟 ${d.name}へ歩いた（${spec.label}・立ち）`;
+          thoughtText = aiDecision?.thought || `${d.name}のマスへ歩いたよ。追従カメラの観察窓で周りが見やすいね！`;
         }
       }
     }
@@ -1035,11 +1299,13 @@
       const picked = WORLD_ITEMS.splice(itemIdx, 1)[0];
       if (picked.type === 'apple') {
         life.energy += 45; life.mental += 15;
-        actionLabel = '🍎 リンゴを見つけて食べた！'; thoughtText = 'わーい！甘くておいしいリンゴを食べたよ！おなかがいっぱいで元気モリモリだぁ！';
+        actionLabel = '🍎 リンゴを見つけて食べた！';
+        thoughtText = 'わーい！甘くておいしいリンゴを食べたよ！たくさん食べると体格も大きくなるかも！？';
         DIARY_LOGS.push(`🍎 ${GAME_DAY}日目：おいしいリンゴを食べて元気になった。`);
       } else {
         if (BAG.length < 10) BAG.push(picked.type); life.mental += 10;
-        actionLabel = `🎒 ${picked.type === 'stone' ? '石ブロック' : '草'}をカバンに拾った`; thoughtText = '足元にいいものが落ちていたから、カバンにしまったよ！';
+        actionLabel = `🎒 ${picked.type === 'stone' ? '石ブロック' : '草'}をカバンに拾った`;
+        thoughtText = '足元にいいものが落ちていたから、カバンにしまったよ！';
       }
     }
 
@@ -1048,7 +1314,8 @@
     if (life.getState().mode === 'DEAD') {
       document.getElementById('message-box').innerText = `力尽きて倒れてしまった…。記憶を引き継ぎ、次のロボ${ROBOT.gen + 1}ごうが1日目から誕生します！`;
       setTimeout(() => {
-        ROBOT.gen += 1; ROBOT.pos = { x: 0, z: 0, sx: 2, sz: 2 }; ROBOT.rotY = 0; GAME_DAY = 1; TIME_STEP = 0; life = new LifeCore();
+        ROBOT.gen += 1; ROBOT.pos = { x: 0, z: 0, lv: -1, sx: 2, sz: 2 }; ROBOT.rotY = 0; ROBOT.posture = 'stand';
+        GAME_DAY = 1; TIME_STEP = 0; life = new LifeCore();
         DIARY_LOGS.push(`📖 ロボ${ROBOT.gen}ごうが1日目から新しく誕生した！`);
         if (!WORLD_ITEMS.length) WORLD_ITEMS.push({ type: 'apple', x: 0, z: -1 });
         rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); btn.disabled = false;
@@ -1064,6 +1331,55 @@
     }, 300);
   }
 
+  // ワンタップで「体格（スリム・標準・太っちょ）＆ほふく前進トンネル通過」を1ブロック単位でテストできる関数
+  function cycleBodyAndCrawlTest() {
+    wakeUpRenderer();
+    const order = ['normal', 'slim', 'fat'];
+    const nextIdx = (order.indexOf(ROBOT.bodyType) + 1) % order.length;
+    ROBOT.bodyType = order[nextIdx];
+    // 姿勢も立ち⇔ほふく前進を切り替えテストし、目の前にほふくトンネルがなければ自動で掘って見せる
+    ROBOT.posture = (ROBOT.posture === 'stand') ? 'crawl' : 'stand';
+    const spec = BODY_SPECS[ROBOT.bodyType];
+
+    // 現在位置の1ブロックに天井つきのほふくトンネル形状を刻んで、1ブロック単位の通り抜けが視覚的にすぐ確認できるようにする
+    const gx = ROBOT.pos.x, gz = ROBOT.pos.z;
+    const topLv = HEIGHT_MAP[`${gx},${gz}`] ?? 0;
+    if (ROBOT.posture === 'crawl') {
+      carveCrawlTunnelBlock(gx, gz, topLv, spec.reqWidth, 2);
+      ROBOT.pos.lv = topLv - 1;
+    } else {
+      ROBOT.pos.lv = topLv;
+    }
+
+    rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState();
+    const msg = ROBOT.posture === 'crawl'
+      ? `🐛 体格「${spec.label}(幅${spec.reqWidth})」で天井の低い1ブロック穴を「ほふく前進」中！`
+      : `🚶 体格「${spec.label}(幅${spec.reqWidth})」の立ち姿勢に切り替えたよ！`;
+    document.getElementById('message-box').innerText = msg + '（上のバッジや＋ボタンからいつでも切り替えられます）';
+    showToast(msg);
+  }
+
+  // ワンタップで「斜め方向・前方からの5×5×5ボロボロ掘削」を実行する関数
+  function quickDiagonalOrFrontDig() {
+    wakeUpRenderer();
+    const { x, z } = ROBOT.pos;
+    if (x < -2 || x > 2 || z < -2 || z > 2) return;
+    // 現在の向きに一番近い8方向（斜め含む）を取得、または斜め方向へ回転して前から削る
+    const diagDirs = ALL_DIRS.filter(d => d.isDiag);
+    const chosenDir = diagDirs[Math.floor(Math.random() * diagDirs.length)];
+    ROBOT.rotY = chosenDir.rot;
+
+    const curH = getRobotHeightLevel();
+    const res = digFromCharacterFront(x, z, curH, chosenDir, true, 36);
+    rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
+
+    const msg = res.isCrawlTunnel
+      ? `⛏️ ${chosenDir.name}のブロックを前から削って「斜めほふく前進トンネル」を開通したよ！`
+      : `⛏️ ${chosenDir.name}に向かってキャラの目の前から5×5×5小ブロックをボロボロ削ったよ！`;
+    document.getElementById('message-box').innerText = msg;
+    showToast(msg);
+  }
+
   const fanWrapper = document.getElementById('fan-menu-wrapper');
   document.getElementById('plus-main-btn').onclick = () => { wakeUpRenderer(); fanWrapper.classList.toggle('open'); };
   function closeFanMenu() { fanWrapper.classList.remove('open'); }
@@ -1077,28 +1393,18 @@
     const key = `${x},${z}`, cur = HEIGHT_MAP[key] ?? 0;
     delete CHIP_MAP[`${x},${z},${cur}`];
     if (cur >= 1) { showToast('ここはすでに地上空間の上限だよ！'); closeFanMenu(); return; }
-    HEIGHT_MAP[key] = cur + 1; rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
-    showToast(`🪨 5×5×5立方体を積んで「${formatHeightText(cur + 1)}」にしたよ！`);
-  }
-  function quickDigBlock() {
-    wakeUpRenderer(); const { x, z } = ROBOT.pos; if (x < -2 || x > 2 || z < -2 || z > 2) return;
-    const key = `${x},${z}`, cur = HEIGHT_MAP[key] ?? 0;
-    if (cur <= -3 && !CHIP_MAP[`${x},${z},${cur}`]) {
-      showToast('これ以上深くは掘れないよ（地下最下部が底です）！'); closeFanMenu(); return;
-    }
-    const res = crumbleDigAt(x, z, 45);
+    HEIGHT_MAP[key] = cur + 1; ROBOT.pos.lv = cur + 1; ROBOT.posture = 'stand';
     rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
-    if (res.completedLevel) {
-      showToast(`⛏️ 5×5×5を掘り抜いて「${formatHeightText(res.newLv)}」が現れたよ！`);
-    } else {
-      showToast(`⛏️ 5×5×5の小立方体をボロボロ削ったよ（あと${res.leftCount}個で貫通）！`);
-    }
+    showToast(`🪨 5×5×5立方体を積んで「${formatHeightText(cur + 1)}」にしたよ！`);
   }
 
   function openModal(id) {
     wakeUpRenderer();
     if (id === 'modal-diary') renderDiaryModal();
-    if (id === 'modal-settings') document.getElementById('setting-cam-style').value = CAM_VISUAL_STYLE;
+    if (id === 'modal-settings') {
+      document.getElementById('setting-cam-style').value = CAM_VISUAL_STYLE;
+      document.getElementById('setting-body-type').value = ROBOT.bodyType;
+    }
     const el = document.getElementById(id); el.style.display = 'flex'; el.classList.add('active');
   }
   function closeModal(id) {
@@ -1106,8 +1412,9 @@
   }
 
   function renderDiaryModal() {
+    const spec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.normal;
     document.getElementById('diary-robo-name').innerText = `🤖 ロボ${ROBOT.gen}ごう（生存 ${GAME_DAY}日目）`;
-    document.getElementById('diary-robo-height').innerText = `現在の場所：${formatHeightText(getRobotHeightLevel())} / 移動速度：${ROBOT.speed}`;
+    document.getElementById('diary-robo-height').innerText = `現在：${formatHeightText(getRobotHeightLevel())} / 体格：${spec.label}(幅${spec.reqWidth}) / 姿勢：${ROBOT.posture === 'crawl' ? 'ほふく前進' : '立ち'}`;
     const grid = document.getElementById('bag-grid'); grid.innerHTML = '';
     for (let i = 0; i < 10; i++) {
       const slot = document.createElement('div'), item = BAG[i];
@@ -1126,7 +1433,7 @@
       const cur = HEIGHT_MAP[key] ?? 0;
       delete CHIP_MAP[`${ROBOT.pos.x},${ROBOT.pos.z},${cur}`];
       if (cur >= 1) { showToast('ここはすでに上限の高さだよ！'); return; }
-      HEIGHT_MAP[key] = cur + 1; BAG.splice(index, 1); showToast(`足元にブロックを積んで「${formatHeightText(cur + 1)}」にしたよ！`);
+      HEIGHT_MAP[key] = cur + 1; ROBOT.pos.lv = cur + 1; BAG.splice(index, 1); showToast(`足元にブロックを積んで「${formatHeightText(cur + 1)}」にしたよ！`);
     } else if (item === 'apple') {
       WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z }); BAG.splice(index, 1); showToast('足元に🍎リンゴを置いたよ！');
     }
@@ -1155,18 +1462,20 @@
 
   function saveSettings() {
     wakeUpRenderer();
-    CAM_VISUAL_STYLE = document.getElementById('setting-cam-style').value || 'glass_line';
-    safeStorage.setItem('cam_visual_style_v13', CAM_VISUAL_STYLE);
+    CAM_VISUAL_STYLE = document.getElementById('setting-cam-style').value || 'hide';
+    safeStorage.setItem('cam_visual_style_v14', CAM_VISUAL_STYLE);
+    ROBOT.bodyType = document.getElementById('setting-body-type').value || 'normal';
     safeStorage.setItem('ai_type', document.getElementById('setting-ai-type').value);
     safeStorage.setItem('api_gemini', document.getElementById('setting-gemini-key').value.trim());
     safeStorage.setItem('api_groq', document.getElementById('setting-groq-key').value.trim());
     ROBOT.speed = Number(document.getElementById('setting-speed').value) || 3;
-    rebuildTerrainAndItems(); cameraDirty = true; updateAllCamerasTransform(); updateEnvironmentAndUI(); saveWorldState();
+    rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateAllCamerasTransform(); updateEnvironmentAndUI(); saveWorldState();
     closeModal('modal-settings');
-    showToast(`⚙️ 設定を保存したよ（${getStyleShortName()}）！`);
+    showToast(`⚙️ 設定を保存したよ（${getStyleShortName()} / ${BODY_SPECS[ROBOT.bodyType].label}）！`);
   }
 
   document.getElementById('setting-cam-style').value = CAM_VISUAL_STYLE;
+  document.getElementById('setting-body-type').value = ROBOT.bodyType;
   document.getElementById('setting-ai-type').value = safeStorage.getItem('ai_type') || 'gemini';
   document.getElementById('setting-gemini-key').value = safeStorage.getItem('api_gemini') || '';
   document.getElementById('setting-groq-key').value = safeStorage.getItem('api_groq') || '';
@@ -1174,7 +1483,7 @@
 
   function showToast(msg) {
     const t = document.getElementById('toast'); t.innerText = msg; t.style.opacity = '1';
-    setTimeout(() => { t.style.opacity = '0'; }, 2200);
+    setTimeout(() => { t.style.opacity = '0'; }, 2400);
   }
 
   rebuildTerrainAndItems(); syncRobot3DPosition(); updateAllCamerasTransform(); updateEnvironmentAndUI();
@@ -1194,7 +1503,14 @@
     const foamScale = 1 + Math.sin(t * 2.2) * 0.025; foamRingMesh.scale.set(foamScale, foamScale, 1);
     turtleGroup.position.y = -9.4 + Math.sin(t * 0.7) * 0.18; turtleGroup.rotation.y = Math.sin(t * 0.25) * 0.06;
     skyGroup.rotation.y = t * 0.015;
-    rBody.scale.y = 1 + Math.sin(t * 4) * 0.03; rHead.position.y = 0.83 + Math.sin(t * 4) * 0.02;
+
+    if (ROBOT.posture === 'crawl') {
+      // ほふく前進中のモゾモゾ動くアニメーション
+      robotPoseGroup.position.z = -0.35 + Math.sin(t * 6) * 0.03;
+    } else {
+      rBody.scale.y = 1 + Math.sin(t * 4) * 0.03;
+      rHead.position.y = 0.74 + Math.sin(t * 4) * 0.02;
+    }
 
     renderer.render(scene, activeCamera);
   }
