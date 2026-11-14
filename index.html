@@ -224,7 +224,29 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAE7E42I361W4i-I6CD4NEgydMSbAiDDOE",
+    authDomain: "lifecore-5c9bf.firebaseapp.com",
+    projectId: "lifecore-5c9bf",
+    storageBucket: "lifecore-5c9bf.firebasestorage.app",
+    messagingSenderId: "527921811555",
+    appId: "1:527921811555:web:8c31f3a7ede3f700e42856"
+  };
+
+  let firestoreDocRef = null;
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+    firestoreDocRef = db.collection('lifecore_saves').doc('island_spacecore_v15');
+  } catch (e) {
+    console.warn('Firebase init error:', e);
+  }
+
   const safeStorage = {
     getItem(k) { try { return localStorage.getItem(k); } catch(e) { return null; } },
     setItem(k, v) { try { localStorage.setItem(k, v); } catch(e) {} },
@@ -318,10 +340,8 @@
     bodyType: 'normal',
     posture: 'stand'
   };
-  // りんごは削られていない無傷な地面ブロックの上に配置
   let WORLD_ITEMS = [{ type: 'apple', x: -1, z: 1 }, { type: 'apple', x: 1, z: 0 }];
 
-  // 将来の物理水流用：水面（外周の海）に面している小ブロックかどうかを判定する基礎関数
   function isFacingSeaWater(gx, gz, lv, sx, sy, sz) {
     const wy = (lv - 1) * 1.0 + sy * 0.20 + 0.10;
     if (wy > WATER_SURFACE_Y) return false;
@@ -350,13 +370,12 @@
 
   function initDefaultSpaceCore() {
     for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
-    HEIGHT_MAP['1,2']   = 1;  // 地上1段目ブロック
-    HEIGHT_MAP['0,0']   = -1; // 中央：地下1層目を掘り抜いた縦穴（ロボ初期位置：地下2層目の上）
-    HEIGHT_MAP['-2,-2'] = -2; // 北西奥：斜めトンネルの先にある地下深部
+    HEIGHT_MAP['1,2']   = 1;
+    HEIGHT_MAP['0,0']   = -1;
+    HEIGHT_MAP['-2,-2'] = -2;
     CHIP_MAP = {};
     WATER_MAP = {};
 
-    // 北西 (-1,-1, lv=0) に天井を残して下2段だけを斜めに掘り抜いた「ほふく前進トンネル」
     carveCrawlTunnelBlock(-1, -1, 0, 3, 2);
     for (let sy = 0; sy < 2; sy++) {
       CHIP_MAP['-1,-1,0'][`3,${sy},3`] = 1; CHIP_MAP['-1,-1,0'][`4,${sy},4`] = 1;
@@ -364,7 +383,6 @@
       CHIP_MAP['-1,-1,0'][`0,${sy},0`] = 1; CHIP_MAP['-1,-1,0'][`1,${sy},1`] = 1;
     }
 
-    // 北 (0,-1, lv=0) に「キャラクターの前から下3段を削りかけた横穴」サンプル（上面の緑は無傷のまま維持！）
     CHIP_MAP['0,-1,0'] = {};
     for (let sy = 0; sy < 3; sy++) {
       for (let sx = 1; sx <= 3; sx++) {
@@ -375,50 +393,123 @@
   }
   initDefaultSpaceCore();
 
-  (function loadWorldState() {
+  function applyLoadedWorldData(d) {
+    if (!d || typeof d !== 'object') return;
+    if (d.life) life = new LifeCore(d.life);
+    if (d.robot && d.robot.pos) {
+      ROBOT.gen = Number(d.robot.gen) || 1;
+      ROBOT.pos.x = Number.isFinite(d.robot.pos.x) ? d.robot.pos.x : 0;
+      ROBOT.pos.z = Number.isFinite(d.robot.pos.z) ? d.robot.pos.z : 0;
+      ROBOT.pos.lv = Number.isFinite(d.robot.pos.lv) ? d.robot.pos.lv : (HEIGHT_MAP[`${ROBOT.pos.x},${ROBOT.pos.z}`] ?? 0);
+      ROBOT.pos.sx = Number.isFinite(d.robot.pos.sx) ? d.robot.pos.sx : 2;
+      ROBOT.pos.sz = Number.isFinite(d.robot.pos.sz) ? d.robot.pos.sz : 2;
+      ROBOT.rotY = Number.isFinite(d.robot.rotY) ? d.robot.rotY : 0;
+      ROBOT.speed = Number(d.robot.speed) || 3;
+      ROBOT.bodyType = BODY_SPECS[d.robot.bodyType] ? d.robot.bodyType : 'normal';
+      ROBOT.posture = d.robot.posture === 'crawl' ? 'crawl' : 'stand';
+    }
+    if (d.heightMap) {
+      for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
+        const k = `${x},${z}`;
+        if (d.heightMap[k] !== undefined) {
+          HEIGHT_MAP[k] = Math.max(AREA1_MIN_UNDER_LV, Math.min(AREA1_MAX_GROUND_LV, Number(d.heightMap[k]) || 0));
+        }
+      }
+    }
+    if (d.chipMap && typeof d.chipMap === 'object') CHIP_MAP = d.chipMap;
+    if (Array.isArray(d.items)) WORLD_ITEMS = d.items;
+    if (Array.isArray(d.bag)) BAG = d.bag;
+    if (Array.isArray(d.logs) && d.logs.length) DIARY_LOGS = d.logs;
+    GAME_DAY = Math.max(1, Number(d.day) || 1);
+    TIME_STEP = Math.max(0, Math.min(19, Number(d.time) || 0));
+    if (d.lastMessage && typeof d.lastMessage === 'string') {
+      const msgEl = document.getElementById('message-box');
+      if (msgEl) msgEl.innerText = d.lastMessage;
+    }
+    if (d.lastAction && typeof d.lastAction === 'string') {
+      const actEl = document.getElementById('history-action');
+      if (actEl) actEl.innerText = d.lastAction;
+    }
+  }
+
+  (function loadLocalWorldState() {
     try {
       const raw = safeStorage.getItem('island_spacecore_v15');
       if (!raw) return;
-      const d = JSON.parse(raw);
-      if (d.life) life = new LifeCore(d.life);
-      if (d.robot && d.robot.pos) {
-        ROBOT.gen = Number(d.robot.gen) || 1;
-        ROBOT.pos.x = Number.isFinite(d.robot.pos.x) ? d.robot.pos.x : 0;
-        ROBOT.pos.z = Number.isFinite(d.robot.pos.z) ? d.robot.pos.z : 0;
-        ROBOT.pos.lv = Number.isFinite(d.robot.pos.lv) ? d.robot.pos.lv : (HEIGHT_MAP[`${ROBOT.pos.x},${ROBOT.pos.z}`] ?? 0);
-        ROBOT.pos.sx = Number.isFinite(d.robot.pos.sx) ? d.robot.pos.sx : 2;
-        ROBOT.pos.sz = Number.isFinite(d.robot.pos.sz) ? d.robot.pos.sz : 2;
-        ROBOT.rotY = Number.isFinite(d.robot.rotY) ? d.robot.rotY : 0;
-        ROBOT.speed = Number(d.robot.speed) || 3;
-        ROBOT.bodyType = BODY_SPECS[d.robot.bodyType] ? d.robot.bodyType : 'normal';
-        ROBOT.posture = d.robot.posture === 'crawl' ? 'crawl' : 'stand';
-      }
-      if (d.heightMap) {
-        for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
-          const k = `${x},${z}`;
-          if (d.heightMap[k] !== undefined) {
-            HEIGHT_MAP[k] = Math.max(AREA1_MIN_UNDER_LV, Math.min(AREA1_MAX_GROUND_LV, Number(d.heightMap[k]) || 0));
-          }
-        }
-      }
-      if (d.chipMap && typeof d.chipMap === 'object') CHIP_MAP = d.chipMap;
-      if (Array.isArray(d.items)) WORLD_ITEMS = d.items;
-      if (Array.isArray(d.bag)) BAG = d.bag;
-      if (Array.isArray(d.logs) && d.logs.length) DIARY_LOGS = d.logs;
-      GAME_DAY = Math.max(1, Number(d.day) || 1);
-      TIME_STEP = Math.max(0, Math.min(19, Number(d.time) || 0));
+      applyLoadedWorldData(JSON.parse(raw));
     } catch (e) {}
   })();
 
-  function saveWorldState() {
-    safeStorage.setItem('island_spacecore_v15', JSON.stringify({
-      life: life.exportSave(), robot: ROBOT, heightMap: HEIGHT_MAP, chipMap: CHIP_MAP,
-      items: WORLD_ITEMS, bag: BAG, logs: DIARY_LOGS.slice(-15), day: GAME_DAY, time: TIME_STEP
-    }));
+  async function loadCloudWorldState() {
+    if (!firestoreDocRef) return;
+    try {
+      const snap = await firestoreDocRef.get();
+      if (!snap.exists) return;
+      const docData = snap.data();
+      const parsed = docData && docData.stateJson ? JSON.parse(docData.stateJson) : docData;
+      if (parsed) {
+        applyLoadedWorldData(parsed);
+        safeStorage.setItem('island_spacecore_v15', JSON.stringify(parsed));
+        document.getElementById('setting-body-type').value = ROBOT.bodyType;
+        document.getElementById('setting-speed').value = String(ROBOT.speed || 3);
+        wakeUpRenderer(3500);
+        rebuildTerrainAndItems();
+        syncRobot3DPosition();
+        cameraDirty = true;
+        updateAllCamerasTransform();
+        updateEnvironmentAndUI();
+        showToast('☁️ クラウドからデータを自動復元したよ！');
+      }
+    } catch (e) {
+      console.warn('Firestore load error:', e);
+    }
   }
-  function resetGameDirectly() {
+
+  function saveWorldState() {
+    const msgEl = document.getElementById('message-box');
+    const actEl = document.getElementById('history-action');
+    const payload = {
+      life: life.exportSave(),
+      robot: ROBOT,
+      heightMap: HEIGHT_MAP,
+      chipMap: CHIP_MAP,
+      items: WORLD_ITEMS,
+      bag: BAG,
+      logs: DIARY_LOGS.slice(-50),
+      day: GAME_DAY,
+      time: TIME_STEP,
+      lastMessage: msgEl ? msgEl.innerText : '',
+      lastAction: actEl ? actEl.innerText : ''
+    };
+    const jsonStr = JSON.stringify(payload);
+    safeStorage.setItem('island_spacecore_v15', jsonStr);
+
+    if (firestoreDocRef) {
+      firestoreDocRef.set({
+        stateJson: jsonStr,
+        day: GAME_DAY,
+        time: TIME_STEP,
+        life: payload.life,
+        robotGen: ROBOT.gen,
+        lastMessage: payload.lastMessage,
+        logs: payload.logs,
+        updatedAt: Date.now()
+      }).catch(e => {
+        console.warn('Firestore save error:', e);
+      });
+    }
+  }
+
+  async function resetGameDirectly() {
     safeStorage.removeItem('island_spacecore_v15');
     safeStorage.removeItem('island_spacecore_v14');
+    if (firestoreDocRef) {
+      try {
+        await firestoreDocRef.delete();
+      } catch (e) {
+        console.warn('Firestore delete error:', e);
+      }
+    }
     location.reload();
   }
 
@@ -584,8 +675,6 @@
     return false;
   }
 
-  // その小ブロックが「同じ1ブロック内で削られた空間（穴の内壁）」に直接面しているかを判定
-  // これにより、下がトンネルでも無傷な上面（りんごの下など）は勝手に分割模様にならない！
   function isAdjacentToCarvedCavity(chippedSet, sx, sy, sz) {
     if (!chippedSet) return false;
     const dirs = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
@@ -627,7 +716,6 @@
   let activeUntilTime = performance.now() + 3500;
   function wakeUpRenderer(ms = 2600) { activeUntilTime = Math.max(activeUntilTime, performance.now() + ms); }
 
-  // ブロック間の縦隙間を完全に無くすため、0.200 ではなく 0.2025 にして微小に密着させる
   const subCubeGeo = new THREE.BoxGeometry(0.2025, 0.2025, 0.2025);
   const fullCubeEdgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002));
 
@@ -690,7 +778,6 @@
       for (let z = -2; z <= 2; z++) {
         const topLv = HEIGHT_MAP[`${x},${z}`] ?? 0;
 
-        // 第一エリア空間：地下5ブロック（lv = -4）から地上積載ブロック（topLv <= 5）まで描画
         for (let lv = AREA1_MIN_UNDER_LV; lv <= topLv; lv++) {
           const centerY = lv * 1.0 - 0.5;
           const chippedSet = CHIP_MAP[`${x},${z},${lv}`] || null;
@@ -714,8 +801,6 @@
                 const wy = (lv - 1) * 1.0 + sy * 0.20 + 0.10;
                 const wz = z + (sz - 2) * 0.20;
 
-                // 【重要修正】無傷な地表の緑面やりんごの下などが勝手に分割模様にならないよう、
-                // 「設定②（分割線あり）」または「実際に削られた穴の断面に接している内壁」だけ立体陰影をつける！
                 const isCavityWall = isChipped && (sy < 4) && isAdjacentToCarvedCavity(chippedSet, sx, sy, sz);
                 const useChecker = showLines || isCavityWall;
                 const shade = useChecker ? (((sx + sy + sz) % 2 === 0) ? 1.0 : 0.93) : 1.0;
@@ -768,7 +853,6 @@
     });
   }
 
-  // 海テクスチャ（地上カメラから見た島の角・フチの白色線を「土色」に変更＆島5×5サイズに密着！）
   const seaCanvas = document.createElement('canvas');
   seaCanvas.width = 256; seaCanvas.height = 256;
   const sCtx = seaCanvas.getContext('2d');
@@ -783,7 +867,6 @@
     const ang = (i / 55) * Math.PI * 2 + (i % 3) * 0.4, dist = 76 + (i * 17 % 48);
     sCtx.beginPath(); sCtx.arc(128 + Math.cos(ang) * dist, 128 + Math.sin(ang) * dist, 2 + (i % 4) * 1.3, 0, Math.PI * 2); sCtx.fill();
   }
-  // 5×5の島（-2.5〜+2.5）にピタッと合う中央くり抜き＋角の白線を廃止して土色（#9c6644）で縁取り
   sCtx.clearRect(66, 66, 124, 124);
   sCtx.strokeStyle = '#9c6644';
   sCtx.lineWidth = 6;
@@ -794,7 +877,6 @@
   const seaMesh = new THREE.Mesh(seaGeo, seaMat); seaMesh.position.y = WATER_SURFACE_Y;
   scene.add(seaMesh);
 
-  // 滝テクスチャ（地下5ブロック化に合わせて高さを拡張）
   const wfCanvas = document.createElement('canvas');
   wfCanvas.width = 256; wfCanvas.height = 256;
   const wfCtx = wfCanvas.getContext('2d');
@@ -1284,6 +1366,9 @@
           thoughtText = aiDecision?.thought || `${d.name}のマスへ歩いたよ。追従カメラの観察窓で周りが見やすいね！`;
         }
       }
+      if (thoughtText) {
+        DIARY_LOGS.push(`💭 ${GAME_DAY}日目：${thoughtText}`);
+      }
     }
 
     const itemIdx = WORLD_ITEMS.findIndex(it => it.x === ROBOT.pos.x && it.z === ROBOT.pos.z);
@@ -1301,6 +1386,9 @@
       }
     }
 
+    document.getElementById('history-action').innerText = actionLabel;
+    document.getElementById('message-box').innerText = thoughtText;
+
     rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState();
 
     if (life.getState().mode === 'DEAD') {
@@ -1316,8 +1404,6 @@
     }
 
     setTimeout(() => {
-      document.getElementById('history-action').innerText = actionLabel;
-      document.getElementById('message-box').innerText = thoughtText;
       document.getElementById('ai-status').innerText = '💤 待機中';
       bulbMesh.material.color.setHex(0xfacc15); btn.disabled = false;
     }, 300);
@@ -1340,11 +1426,11 @@
       ROBOT.pos.lv = topLv;
     }
 
-    rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState();
     const msg = ROBOT.posture === 'crawl'
       ? `🐛 体格「${spec.label}(幅${spec.reqWidth})」で天井の低い1ブロック穴を「ほふく前進」中！`
       : `🚶 体格「${spec.label}(幅${spec.reqWidth})」の立ち姿勢に切り替えたよ！`;
     document.getElementById('message-box').innerText = msg + '（上のバッジや＋ボタンからいつでも切り替えられます）';
+    rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState();
     showToast(msg);
   }
 
@@ -1358,12 +1444,11 @@
 
     const curH = getRobotHeightLevel();
     const res = digFromCharacterFront(x, z, curH, chosenDir, true, 36);
-    rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
-
     const msg = res.isCrawlTunnel
       ? `⛏️ ${chosenDir.name}のブロックを前から削って「斜めほふく前進トンネル」を開通したよ！`
       : `⛏️ ${chosenDir.name}に向かってキャラの目の前から5×5×5小ブロックをボロボロ削ったよ！`;
     document.getElementById('message-box').innerText = msg;
+    rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
     showToast(msg);
   }
 
@@ -1474,6 +1559,7 @@
   }
 
   rebuildTerrainAndItems(); syncRobot3DPosition(); updateAllCamerasTransform(); updateEnvironmentAndUI();
+  loadCloudWorldState();
 
   const clock = new THREE.Clock();
   let lastRenderTime = 0;
