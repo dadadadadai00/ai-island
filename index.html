@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0b1528">
-  <title>ボクセルAI自律思考水槽 v17</title>
+  <title>ボクセルAI自律思考水槽 v18</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
@@ -121,10 +121,10 @@
 
 <div id="bottom-panel">
   <div class="panel-header">
-    <span>💭 ロボのきもち・心のさけび【v17 広角1ブロック視野＆ほふくズーム】</span>
+    <span>💭 ロボのきもち・心のさけび【v18 カメラ上下スライド完全安定化】</span>
     <div class="ai-badge" id="ai-status">🟩 アルゴン待機中</div>
   </div>
-  <div id="message-box">【v17完成】キャラ視点（🤖）の標準時は「目の前の1ブロック全体＋まわり」が広角でスッキリ見え、ほふく前進やピンチズームで穴にグッと寄れるよ！</div>
+  <div id="message-box">【v18完成】追従カメラや各カメラで上下スライドしたときに引っかかったり動かなくなる現象を完全に直したよ！いつでもグリグリ見回せます！</div>
   <div class="action-history">
     <span class="history-tag" id="history-action">👟 やった事 待機中</span>
     <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従(観察窓)・地下2層目</span>
@@ -277,10 +277,10 @@
   }
 
   // =========================================================
-  // 第一エリア空間（SpaceCore v17）：
+  // 第一エリア空間（SpaceCore v18）：
   // ・地上：上下5ブロック（lv = 1 〜 5）
   // ・地下：上下5ブロック（地表の緑＋乾土ブロック lv = 0 を含め、lv = 0, -1, -2, -3, -4 の計5層）
-  // ・キャラ視点（内カメラ）：標準時は「1ブロック全体＋周囲」がすっぽり入る広角視野、ほふく前進・ズーム時は接近視野
+  // ・カメラ上下スライドの角度蓄積バグ（デッドゾーン）完全解消＆マルチタッチ安全化
   // =========================================================
   const AREA1_MAX_GROUND_LV = 5;
   const AREA1_MIN_UNDER_LV  = -4;
@@ -343,7 +343,7 @@
   let ROBOT = {
     gen: 1,
     pos: { x: 0, z: 0, lv: -1, sx: 2, sz: 2 },
-    rotY: Math.PI, // 初期向き：北（0,-1 の削りかけ横穴ブロックが正面に1ブロック丸ごと見える向き）
+    rotY: Math.PI,
     speed: 3,
     bodyType: 'normal',
     posture: 'stand'
@@ -703,22 +703,36 @@
   const outerGroundCam = new THREE.PerspectiveCamera(42, aspect, 0.1, 180);
   const outerUnderCam  = new THREE.PerspectiveCamera(42, aspect, 0.1, 180);
   const followCam      = new THREE.PerspectiveCamera(42, aspect, 0.1, 180);
-  // キャラ視点（内カメラ）：標準時は「1ブロック全体（緑2段＋土3段）＋周囲」が広角でしっかり収まる初期FOV(102度)
   const innerRobotCam  = new THREE.PerspectiveCamera(102, aspect, 0.04, 180);
 
   let activeCamera = followCam;
   let manualCameraMode = null;
 
-  // キャラ視点（内カメラ 🤖）用の首振りオフセット・上下角度・ズーム倍率（1.0＝標準広角、小さいほどズームイン）
   let fpvYawOffset = 0;
   let fpvPitch = -0.06;
-  let fpvZoomFactor = 1.0; // 1.0(広角:1ブロック全体＋周囲) ⇔ 0.55(ズーム:分割ブロック接近)
+  let fpvZoomFactor = 1.0;
 
   function resetFpvToRobotFront() {
     fpvYawOffset = 0;
-    // 立ち姿勢のときは目の前の1ブロック全体（下段のトンネル穴〜上段の緑まで）が画面中央に収まる角度
     fpvPitch = (ROBOT.posture === 'crawl') ? -0.03 : -0.06;
     fpvZoomFactor = 1.0;
+  }
+
+  // 各カメラモードの上下角度（camPhi）の適正範囲を返す関数（空回り・デッドゾーンを完全に防ぐ）
+  function getCamPhiLimits(mode) {
+    if (mode === 'ground') return { min: 0.30, max: 1.38 };
+    if (mode === 'underground') return { min: 1.05, max: 2.05 };
+    // 追従カメラ（null）：真上からのぞき込む角度(0.22)〜地面すれすれ・少し見上げる角度(1.62)まで広くグリグリ動かせる！
+    return { min: 0.22, max: 1.62 };
+  }
+
+  function clampCamPhiForCurrentMode() {
+    if (manualCameraMode === 'robot') {
+      fpvPitch = Math.max(-1.35, Math.min(1.48, fpvPitch));
+    } else {
+      const lim = getCamPhiLimits(manualCameraMode);
+      camPhi = Math.max(lim.min, Math.min(lim.max, camPhi));
+    }
   }
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -1007,7 +1021,7 @@
     return Number.isFinite(ROBOT.pos.lv) ? ROBOT.pos.lv : (HEIGHT_MAP[`${x},${z}`] ?? 0);
   }
 
-  let camTheta = Math.PI / 4, camPhi = 1.02, camRadius = 9.8, isDragging = false, prevPointer = { x: 0, y: 0 }, cameraDirty = true;
+  let camTheta = Math.PI / 4, camPhi = 0.95, camRadius = 9.8, isDragging = false, prevPointer = { x: 0, y: 0 }, cameraDirty = true;
   let activePointers = new Map();
   let prevPinchDist = null;
 
@@ -1030,10 +1044,6 @@
     }
 
     if (modeType === 'robot_fpv') {
-      // 【キャラ視点（内カメラ）の広角1ブロック視界クリア処理】
-      // 標準時にカメラを少し後ろに引いて「目の前の1ブロック全体＋周囲」を広角で映す際、
-      // 自分が立っているマスの頭上や背後・カメラ直近（半径0.36m以内かつ視線の後ろ側）の小ブロックが視界を邪魔しないように自動消去し、
-      // 目の前にある1ブロック全体（緑2段＋土3段＋削った穴）と周囲のブロックをくっきり見せる！
       waterfallMat.opacity = 0.92; seaMat.opacity = 0.95;
       glassDepthMesh.visible = false; glassSubMesh.visible = false;
       const curGx = ROBOT.pos.x, curGz = ROBOT.pos.z;
@@ -1044,7 +1054,6 @@
         const dz = sv.wz - refCamPos.z;
         const distToEye = Math.hypot(dx, dy, dz);
         const dotLook = dx * lookDirX + dz * lookDirZ;
-        // 自分がいる同じマス(curGx, curGz)の足元より上の天井、またはカメラのすぐ背後・真横で視界を塞ぐ小ブロックだけを消去
         const isSelfCellCeiling = (sv.gx === curGx && sv.gz === curGz && sv.lv > targetFloorLv && ROBOT.posture === 'stand');
         const isTooCloseToLens = (distToEye < 0.34 && (dotLook < 0.18 || sv.wy > focusY + 0.05));
         if (isSelfCellCeiling || isTooCloseToLens) {
@@ -1130,32 +1139,25 @@
   }
 
   function updateAllCamerasTransform() {
-    camRadius = Math.max(6.2, Math.min(20.0, camRadius));
+    camRadius = Math.max(5.5, Math.min(20.0, camRadius));
+    // ここで現在のモードに合わせて camPhi 自体をクランプし、内部数値の空回り（デッドゾーン）を完全にゼロにする！
+    clampCamPhiForCurrentMode();
+
     const statusPanel = document.getElementById('status-panel');
     const h = getRobotHeightLevel();
     const isRobotUG = (h < 0 && h !== -99) || (ROBOT.posture === 'crawl');
 
     if (manualCameraMode === 'robot') {
-      // 【キャラ視点（内カメラ 🤖）：標準時は「1ブロック全体＋周囲」が広角で見え、ほふく前進・ズーム時は接近視野】
       robotGroup.visible = false;
-      fpvPitch = Math.max(-1.35, Math.min(1.48, fpvPitch));
       fpvZoomFactor = Math.max(0.50, Math.min(1.15, fpvZoomFactor));
 
       const isCrawl = (ROBOT.posture === 'crawl');
-      // スマホの縦長画面でも横幅1.0mの1ブロック＋左右の余白がしっかり入るようにアスペクト比を考慮して広角FOVを算出
       const curAspect = window.innerWidth / Math.max(1, window.innerHeight);
       const portraitBoost = curAspect < 0.75 ? 10 : 0;
-      // 標準(立ち)は広角(約100〜108度)、ほふく前進時は穴の中にグッと寄る視野(約72〜78度)、さらにピンチズーム(fpvZoomFactor)を反映
       const baseFov = isCrawl ? (68 + portraitBoost * 0.6) : (98 + portraitBoost);
       innerRobotCam.fov = Math.max(45, Math.min(118, baseFov * fpvZoomFactor));
       innerRobotCam.updateProjectionMatrix();
 
-      // 標準(立ち)のときは：
-      // ・高さ eyeH = 0.52m（目の前の1ブロック 0.0m〜1.0m のちょうど真ん中の高さ！）
-      // ・前後位置 forwardOffset = -0.26m（自分のマスの中心から少し後ろに引いて、目の前の壁まで約0.76mの距離をとる！）
-      // これにより、目の前の1ブロック（緑2段＋土3段＋掘った穴）全体と周囲の空間が1画面に気持ちよく収まる！
-      // ほふく前進のときは：
-      // ・高さ eyeH = 0.22m、前後位置 forwardOffset = +0.06m で低いトンネルの中へグッと入り込む！
       const eyeH = isCrawl ? 0.22 : 0.52;
       const forwardOffset = isCrawl ? 0.06 : (-0.26 * fpvZoomFactor);
       const rot = ROBOT.rotY || 0;
@@ -1182,7 +1184,7 @@
     } else if (manualCameraMode === 'ground') {
       robotGroup.visible = true;
       statusPanel.classList.remove('sky-hidden');
-      const gPhi = Math.max(0.42, Math.min(1.22, camPhi));
+      const gPhi = camPhi;
       const fixedDist = 14.8, centerTargetY = 0.8;
       outerGroundCam.position.set(
         fixedDist * Math.sin(gPhi) * Math.sin(camTheta),
@@ -1196,10 +1198,10 @@
     } else if (manualCameraMode === 'underground') {
       robotGroup.visible = true;
       statusPanel.classList.remove('sky-hidden');
-      const uPhi = Math.max(1.18, Math.min(1.95, camPhi));
+      const uPhi = camPhi;
       const fixedUGDist = 13.5, ugCenterY = -2.6;
       let camY = ugCenterY + fixedUGDist * Math.cos(uPhi);
-      camY = Math.max(-5.2, Math.min(-0.92, camY));
+      camY = Math.max(-6.2, Math.min(-0.65, camY));
       outerUnderCam.position.set(
         fixedUGDist * Math.sin(uPhi) * Math.sin(camTheta),
         camY,
@@ -1210,10 +1212,11 @@
       updateTransparencyAndOcclusion('underground_fixed', outerUnderCam.position, 0, -2.7, 0, AREA1_MIN_UNDER_LV);
 
     } else {
+      // 追従カメラ（観察窓スポット透過）：真上から地面すれすれまで camPhi がダイレクトに反応！
       robotGroup.visible = true;
       statusPanel.classList.remove('sky-hidden');
-      const fPhi = Math.max(0.55, Math.min(1.42, camPhi));
-      const followDist = Math.max(5.8, Math.min(11.0, camRadius * 0.72));
+      const fPhi = camPhi;
+      const followDist = Math.max(4.8, Math.min(12.5, camRadius * 0.72));
       const tx = robotGroup.position.x;
       const ty = robotGroup.position.y + (ROBOT.posture === 'crawl' ? 0.25 : 0.45);
       const tz = robotGroup.position.z;
@@ -1237,42 +1240,58 @@
     return '観察窓ガラス';
   }
 
+  // カメラボタンのON時だけでなく、OFFにして追従カメラに戻した時も必ず気持ちいい基準角度にリセット！
   document.getElementById('cam-ground-btn').onclick = () => {
     wakeUpRenderer();
     manualCameraMode = (manualCameraMode === 'ground') ? null : 'ground';
-    if (manualCameraMode) camPhi = 0.92;
+    camPhi = (manualCameraMode === 'ground') ? 0.88 : 0.95;
+    activePointers.clear(); isDragging = false;
     showToast(manualCameraMode ? '🌌 外カメラ（地上固定）：第一エリア地上空間を見渡すよ' : '🤖 追従カメラ（観察窓スポット透過）に戻したよ');
     cameraDirty = true; updateEnvironmentAndUI();
   };
   document.getElementById('cam-ug-btn').onclick = () => {
     wakeUpRenderer();
     manualCameraMode = (manualCameraMode === 'underground') ? null : 'underground';
-    if (manualCameraMode) camPhi = 1.42;
+    camPhi = (manualCameraMode === 'underground') ? 1.45 : 0.95;
+    activePointers.clear(); isDragging = false;
     showToast(manualCameraMode ? '⛏️ 外カメラ（地下固定）：地下5ブロック全体を見渡すよ' : '🤖 追従カメラ（観察窓スポット透過）に戻したよ');
     cameraDirty = true; updateEnvironmentAndUI();
   };
   document.getElementById('cam-fpv-btn').onclick = () => {
     wakeUpRenderer();
     manualCameraMode = (manualCameraMode === 'robot') ? null : 'robot';
+    activePointers.clear(); isDragging = false;
     if (manualCameraMode === 'robot') {
       resetFpvToRobotFront();
       const dirName = getDirNameFromRot(ROBOT.rotY || 0);
       showToast(`🤖 キャラ視点(広角)：${dirName}の1ブロック全体が見えるよ！2本指でズームもできます`);
     } else {
-      camPhi = 1.02;
+      camPhi = 0.95;
       showToast('🤖 追従カメラ（観察窓スポット透過）に戻したよ');
     }
     cameraDirty = true; updateEnvironmentAndUI();
   };
 
+  // =========================================================
+  // スマホ・PC両対応の確実なカメラタッチ＆ドラッグ制御（ポインター残留ロック防止）
+  // =========================================================
   const domElem = renderer.domElement;
+
   domElem.addEventListener('pointerdown', e => {
+    // プライマリポインター（最初の1本目の指またはマウス左クリック）が新しく触れた時、万が一古いゴミ情報が残っていたら一掃する
+    if (e.isPrimary && activePointers.size > 0) {
+      activePointers.clear();
+      prevPinchDist = null;
+    }
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try { domElem.setPointerCapture(e.pointerId); } catch (err) {}
+
     if (activePointers.size === 1) {
       isDragging = true;
       prevPointer.x = e.clientX;
       prevPointer.y = e.clientY;
-    } else if (activePointers.size === 2) {
+      prevPinchDist = null;
+    } else if (activePointers.size >= 2) {
       isDragging = false;
       const pts = Array.from(activePointers.values());
       prevPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
@@ -1281,10 +1300,13 @@
   }, { passive: true });
 
   window.addEventListener('pointermove', e => {
-    if (activePointers.has(e.pointerId)) {
+    if (!activePointers.has(e.pointerId)) {
+      if (!isDragging) return;
+    } else {
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     }
-    if (activePointers.size === 2) {
+
+    if (activePointers.size >= 2) {
       const pts = Array.from(activePointers.values());
       const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       if (prevPinchDist !== null) {
@@ -1292,7 +1314,7 @@
         if (manualCameraMode === 'robot') {
           fpvZoomFactor = Math.max(0.50, Math.min(1.15, fpvZoomFactor + delta * 0.0025));
         } else {
-          camRadius = Math.max(6.2, Math.min(20.0, camRadius + delta * 0.025));
+          camRadius = Math.max(5.5, Math.min(20.0, camRadius + delta * 0.025));
         }
         cameraDirty = true;
         wakeUpRenderer();
@@ -1300,34 +1322,55 @@
       prevPinchDist = dist;
       return;
     }
+
     if (!isDragging) return;
+
     const dx = e.clientX - prevPointer.x;
     const dy = e.clientY - prevPointer.y;
+    prevPointer.x = e.clientX;
+    prevPointer.y = e.clientY;
+
     if (manualCameraMode === 'robot') {
-      fpvYawOffset -= dx * 0.0075;
-      fpvPitch     += dy * 0.0070;
+      fpvYawOffset -= dx * 0.0078;
+      fpvPitch     += dy * 0.0075;
       fpvPitch = Math.max(-1.35, Math.min(1.48, fpvPitch));
     } else {
-      camTheta -= dx * 0.0085;
-      camPhi   += dy * 0.0075;
+      camTheta -= dx * 0.0090;
+      camPhi   += dy * 0.0085;
+      // スライドしたその場で camPhi を適正範囲にピタッとクランプ！（これで逆向きスライド時に1ミリも遅れず即座に動く！）
+      const lim = getCamPhiLimits(manualCameraMode);
+      camPhi = Math.max(lim.min, Math.min(lim.max, camPhi));
     }
-    prevPointer.x = e.clientX; prevPointer.y = e.clientY;
-    cameraDirty = true; wakeUpRenderer();
+
+    cameraDirty = true;
+    wakeUpRenderer();
   }, { passive: true });
 
   function onPointerUpOrCancel(e) {
     activePointers.delete(e.pointerId);
-    if (activePointers.size < 2) prevPinchDist = null;
-    if (activePointers.size === 0) isDragging = false;
+    try { domElem.releasePointerCapture(e.pointerId); } catch (err) {}
+
+    if (activePointers.size === 1) {
+      // 2本指から1本指に戻ったとき、残っている1本の指の位置からスムーズにドラッグを再開できるようにする
+      const remaining = Array.from(activePointers.values())[0];
+      prevPointer.x = remaining.x;
+      prevPointer.y = remaining.y;
+      isDragging = true;
+      prevPinchDist = null;
+    } else if (activePointers.size === 0) {
+      isDragging = false;
+      prevPinchDist = null;
+    }
   }
   window.addEventListener('pointerup', onPointerUpOrCancel, { passive: true });
   window.addEventListener('pointercancel', onPointerUpOrCancel, { passive: true });
+  window.addEventListener('blur', () => { activePointers.clear(); isDragging = false; prevPinchDist = null; }, { passive: true });
 
   domElem.addEventListener('wheel', e => {
     if (manualCameraMode === 'robot') {
       fpvZoomFactor = Math.max(0.50, Math.min(1.15, fpvZoomFactor + e.deltaY * 0.0008));
     } else {
-      camRadius += e.deltaY * 0.01;
+      camRadius = Math.max(5.5, Math.min(20.0, camRadius + e.deltaY * 0.01));
     }
     cameraDirty = true; wakeUpRenderer();
   }, { passive: true });
@@ -1474,7 +1517,7 @@
       if (wantRest) {
         life.stamina += 35; life.energy -= 5; life.mental += 10;
         actionLabel = '💤 アルゴン：その場でひとやすみ';
-        thoughtText = aiDecision?.thought || 'ふぅ〜、ひとやすみ。広角のキャラ視点なら目の前の1ブロック全体とまわりが広く見渡せるね！';
+        thoughtText = aiDecision?.thought || 'ふぅ〜、ひとやすみ。カメラを上下左右にスライドして、いろんな角度からぼくを見てね！';
       } else if (wantDig) {
         const digDir = blockedByFat ? blockedByFat.dir : ALL_DIRS[Math.floor(Math.random() * ALL_DIRS.length)];
         ROBOT.rotY = digDir.rot;
@@ -1488,7 +1531,7 @@
           thoughtText = aiDecision?.thought || `ザクザクッ！${digDir.name}を向いて、目の前の1ブロックを掘り抜いたよ！`;
         } else if (digRes.isCrawlTunnel) {
           actionLabel = `🐛 ${digDir.name}に「ほふく前進トンネル」を開通！`;
-          thoughtText = aiDecision?.thought || `上の緑と土を天井に残して、${digDir.name}にほふく前進でくぐれる低い横穴を掘ったよ！1ブロック全体と穴がよく見えるね！`;
+          thoughtText = aiDecision?.thought || `上の緑と土を天井に残して、${digDir.name}にほふく前進でくぐれる低い横穴を掘ったよ！`;
           DIARY_LOGS.push(`🐛 ${GAME_DAY}日目：${digDir.name}にほふく前進トンネルを掘った！`);
         } else {
           actionLabel = `⛏️ ${digDir.name}の土を前からボロボロ掘削中(残${digRes.leftCount})`;
@@ -1512,14 +1555,14 @@
 
         if (chk.posture === 'crawl') {
           actionLabel = `🐛 ${d.name}の低い穴を「ほふく前進」で通り抜けた！`;
-          thoughtText = aiDecision?.thought || `天井が低いから体を伏せて「ほふく前進（${spec.label}）」で${d.name}へくぐり抜けたよ！穴の中にグッと近づいた目線だね！`;
+          thoughtText = aiDecision?.thought || `天井が低いから体を伏せて「ほふく前進（${spec.label}）」で${d.name}へくぐり抜けたよ！`;
           DIARY_LOGS.push(`🐛 ${GAME_DAY}日目：${d.name}のトンネルをほふく前進でくぐり抜けた！`);
         } else if (d.isDiag) {
           actionLabel = `↗️ ${d.name}へ斜め移動した！`;
-          thoughtText = aiDecision?.thought || `斜めルートを通って${d.name}へ進んだよ！広角だから1ブロック全体とまわりがよく見えるね！`;
+          thoughtText = aiDecision?.thought || `斜めルートを通って${d.name}へ進んだよ！上下左右にカメラを動かして観察してみてね！`;
         } else {
           actionLabel = `👟 ${d.name}へ歩いた（${spec.label}・立ち）`;
-          thoughtText = aiDecision?.thought || `${d.name}を向いて歩いたよ！標準時は1ブロック全体が広く見渡せて気持ちいいね！`;
+          thoughtText = aiDecision?.thought || `${d.name}を向いて歩いたよ！カメラも引っかからずにスイスイ動かせるね！`;
         }
       }
       if (thoughtText) {
@@ -1641,6 +1684,7 @@
 
   function openModal(id) {
     wakeUpRenderer();
+    activePointers.clear(); isDragging = false;
     if (id === 'modal-diary') renderDiaryModal();
     if (id === 'modal-settings') {
       document.getElementById('setting-cam-style').value = CAM_VISUAL_STYLE;
@@ -1649,7 +1693,9 @@
     const el = document.getElementById(id); el.style.display = 'flex'; el.classList.add('active');
   }
   function closeModal(id) {
-    wakeUpRenderer(); const el = document.getElementById(id); el.classList.remove('active'); el.style.display = 'none';
+    wakeUpRenderer();
+    activePointers.clear(); isDragging = false;
+    const el = document.getElementById(id); el.classList.remove('active'); el.style.display = 'none';
   }
 
   function renderDiaryModal() {
