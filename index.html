@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0b1528">
-  <title>ボクセルAI自律思考水槽 v20</title>
+  <title>ボクセルAI自律思考水槽 v21</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
@@ -129,10 +129,10 @@
 
 <div id="bottom-panel">
   <div class="panel-header">
-    <span>💭 ロボのきもち・心のさけび【v20 1号機：喜怒哀楽＆大きさ3段階】</span>
+    <span>💭 ロボのきもち・心のさけび【v21 カメラ停止時のカクツキ完全解消】</span>
     <div class="ai-badge" id="ai-status">🟩 アルゴン待機中</div>
   </div>
-  <div id="message-box">【v20完成】右の「📖手帳」を開くと、喜怒哀楽（喜・怒・哀・楽）のテストボタンと、大きさ3段階×体型3段階の切り替えボタンがあるよ！</div>
+  <div id="message-box">【v21完成】カメラを止めて観察しているときの微妙なカクツキを完全に解消！喜怒哀楽のジャンプやダンスがずっと滑らかに動くよ！</div>
   <div class="action-history">
     <span class="history-tag" id="history-action">👟 やった事 待機中</span>
     <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従(観察窓)・地下2層目</span>
@@ -324,10 +324,9 @@
   }
 
   // =========================================================
-  // 第一エリア空間（SpaceCore v20）＆ 1号機〜5号機共通ボーン規格：
-  // ・大きさ3段階（大 large = 1.00 [今の最大サイズ]、中 medium = 0.78、小 small = 0.58）
-  // ・体型3段階（太っちょ fat = 最大幅、標準 normal、スリム slim）
-  // ・喜怒哀楽4リアクション（joy:喜, anger:怒, sad:哀, fun:楽 ＋ normal:通常）
+  // 第一エリア空間（SpaceCore v21）＆ カメラ停止時カクツキ完全解消版：
+  // ・64ms間引き（15fps低下）を廃止し、カメラ停止中も常時60fpsで滑らかにアニメーション描画
+  // ・各小ブロックの透過状態をキャッシュ（差分更新）し、微小タッチ揺れによる無駄なGPU転送をゼロ化
   // =========================================================
   const AREA1_MAX_GROUND_LV = 5;
   const AREA1_MIN_UNDER_LV  = -4;
@@ -407,21 +406,18 @@
     }
   }
 
-  // 大きさ3段階スペック（今の大きさが最大の「大」）
   const SIZE_SPECS = {
     large:  { label: '大', scale: 1.00, standH: 4, crawlH: 2 },
     medium: { label: '中', scale: 0.78, standH: 3, crawlH: 2 },
     small:  { label: '小', scale: 0.58, standH: 2, crawlH: 1 }
   };
 
-  // 体型3段階スペック（今のデブっちょを最大幅とした3段階）
   const BODY_SPECS = {
     fat:    { label: '太っちょ', reqWidth: 4, scaleX: 1.35, scaleZ: 1.30 },
     normal: { label: '標準',     reqWidth: 3, scaleX: 1.00, scaleZ: 1.00 },
     slim:   { label: 'スリム',   reqWidth: 2, scaleX: 0.72, scaleZ: 0.72 }
   };
 
-  // 喜怒哀楽スペック（1号機〜5号機まで共通で使えるリアクション定義）
   const EMOTION_SPECS = {
     normal: { label: '通常',   icon: '🙂', bulbHex: 0xfacc15 },
     joy:    { label: '喜ぶ',   icon: '😆', bulbHex: 0xf472b6 },
@@ -438,7 +434,7 @@
     { name: '北西(斜め)', dx: -1, dz: -1, rot: -Math.PI * 0.75, isDiag: true },
     { name: '北東(斜め)', dx: 1,  dz: -1, rot: Math.PI * 0.75,  isDiag: true },
     { name: '南西(斜め)', dx: -1, dz: 1,  rot: -Math.PI * 0.25, isDiag: true },
-    { name: '南東(斜め)', dx: 1,  dz: 1,  rot: Math.PI * 0.25,  isDiag: true }
+    { name: '南東(斜め)', dx: 1,  dz: 1,  rot: -Math.PI * 0.25,  isDiag: true }
   ];
 
   function getDirNameFromRot(rotY) {
@@ -457,15 +453,15 @@
   let HEIGHT_MAP = {}, CHIP_MAP = {}, WATER_MAP = {};
 
   let ROBOT = {
-    unitModel: 1, // 1号機（将来 1〜5号機まで拡張可能）
+    unitModel: 1,
     gen: 1,
     pos: { x: 0, z: 0, lv: -1, sx: 2, sz: 2 },
     rotY: Math.PI,
     speed: 3,
-    sizeLevel: 'large', // 'large'（最大） | 'medium' | 'small'
-    bodyType: 'fat',    // 'fat'（太っちょ・最大幅） | 'normal' | 'slim'
-    posture: 'stand',   // 'stand' | 'crawl'
-    emotion: 'normal'   // 'normal' | 'joy' | 'anger' | 'sad' | 'fun'
+    sizeLevel: 'large',
+    bodyType: 'fat',
+    posture: 'stand',
+    emotion: 'normal'
   };
   let WORLD_ITEMS = [{ type: 'apple', x: -1, z: 1 }, { type: 'apple', x: 1, z: 0 }];
 
@@ -576,7 +572,6 @@
         document.getElementById('setting-size-level').value = ROBOT.sizeLevel;
         document.getElementById('setting-body-type').value = ROBOT.bodyType;
         document.getElementById('setting-speed').value = String(ROBOT.speed || 3);
-        wakeUpRenderer(3500);
         rebuildTerrainAndItems();
         syncRobot3DPosition();
         cameraDirty = true;
@@ -638,7 +633,6 @@
     location.reload();
   }
 
-  // 大きさ（3段階）と体型（3段階）のかけ合わせで、トンネル通過に必要な小ブロック幅と高さを計算
   function getEffectiveClearanceSpecs() {
     const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
     const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
@@ -893,8 +887,9 @@
   underLight.position.set(-5, -14, -5);
   scene.add(underLight);
 
-  let activeUntilTime = performance.now() + 3500;
-  function wakeUpRenderer(ms = 2600) { activeUntilTime = Math.max(activeUntilTime, performance.now() + ms); }
+  function wakeUpRenderer() {
+    // 互換用フック（v21では常時滑らか60fps描画のためコマ落ちなし）
+  }
 
   const subCubeGeo = new THREE.BoxGeometry(0.2025, 0.2025, 0.2025);
   const fullCubeEdgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002));
@@ -997,7 +992,8 @@
                 }
 
                 const isWaterWall = isWaterFacingOuterSubVoxel(x, z, lv, sx, sy, sz);
-                subVoxelsMeta.push({ idx: subIdx, gx: x, gz: z, sx, sy, sz, wx, wy, wz, lv, isChipped, isWaterWall, fullMat });
+                // visState: -1(未初期化), 0(不透明表示), 1(観察窓で非表示orガラス化)
+                subVoxelsMeta.push({ idx: subIdx, gx: x, gz: z, sx, sy, sz, wx, wy, wz, lv, isChipped, isWaterWall, fullMat, visState: -1 });
                 subIdx++;
               }
             }
@@ -1125,13 +1121,9 @@
   addConstellation('🥄 北斗七星', [[26,20,-8],[26,17,-3],[25,15,2],[24,12,6],[24,8,10],[27,7,14],[27,11,11]], [26,4,5]);
   addConstellation('🏹 オリオン座', [[-5,20,26],[5,20,26],[-2,14,28],[0,14,28],[2,14,28],[-5,8,26],[5,8,26]], [0,4,28]);
 
-  // =========================================================
-  // 1号機〜5号機共通の「関節ボーン構造」（大きさ3段階・体型3段階・喜怒哀楽すべて同じ角度計算で動作！）
-  // 元の1号機の見た目・造形・色・パーツサイズを100%維持したまま関節ピボット化
-  // =========================================================
   const robotGroup = new THREE.Group();
-  const robotPoseGroup = new THREE.Group(); // 大きさ×体型のスケールおよび立ち/ほふく姿勢用
-  const robotAnimGroup = new THREE.Group(); // 喜怒哀楽のジャンプ・揺れ・座り込み用
+  const robotPoseGroup = new THREE.Group();
+  const robotAnimGroup = new THREE.Group();
   robotGroup.add(robotPoseGroup);
   robotPoseGroup.add(robotAnimGroup);
 
@@ -1139,7 +1131,6 @@
   rBody.position.y = 0.34;
   robotAnimGroup.add(rBody);
 
-  // 頭ピボット（うなだれ・見上げ・首かしげ用）
   const headPivot = new THREE.Group();
   headPivot.position.set(0, 0.56, 0);
   robotAnimGroup.add(headPivot);
@@ -1161,7 +1152,6 @@
   bulbMesh.position.y = 0.42;
   headPivot.add(bulbMesh);
 
-  // 左腕ピボット（肩の位置 0.50m を中心にバンザイや腕振りができる）
   const leftArmPivot = new THREE.Group();
   leftArmPivot.position.set(-0.27, 0.50, 0);
   const leftArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.32, 0.12), darkMat);
@@ -1169,7 +1159,6 @@
   leftArmPivot.add(leftArmMesh);
   robotAnimGroup.add(leftArmPivot);
 
-  // 右腕ピボット
   const rightArmPivot = new THREE.Group();
   rightArmPivot.position.set(0.27, 0.50, 0);
   const rightArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.32, 0.12), darkMat);
@@ -1177,7 +1166,6 @@
   rightArmPivot.add(rightArmMesh);
   robotAnimGroup.add(rightArmPivot);
 
-  // 左足ピボット（股関節の位置 0.15m を中心に足踏みや座り込みができる）
   const leftLegPivot = new THREE.Group();
   leftLegPivot.position.set(-0.11, 0.15, 0);
   const leftLegMesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 0.14), darkMat);
@@ -1185,7 +1173,6 @@
   leftLegPivot.add(leftLegMesh);
   robotAnimGroup.add(leftLegPivot);
 
-  // 右足ピボット
   const rightLegPivot = new THREE.Group();
   rightLegPivot.position.set(0.11, 0.15, 0);
   const rightLegMesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 0.14), darkMat);
@@ -1202,7 +1189,6 @@
     robotGroup.position.set(gx + subX, baseY, gz + subZ);
     robotGroup.rotation.y = ROBOT.rotY || 0;
 
-    // 大きさ3段階（large=1.0, medium=0.78, small=0.58）× 体型3段階（fat, normal, slim）を掛け合わせて反映！
     const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
     const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
     robotPoseGroup.scale.set(
@@ -1223,9 +1209,7 @@
     bulbMesh.material.color.setHex(eSpec.bulbHex);
   }
 
-  // 1号機〜5号機・全サイズ・全体型で共通動作する「喜怒哀楽ポーズ＆アニメーション更新関数」
   function updateRobotEmotionAnimation(t) {
-    // まず関節を基準位置にリセット
     robotAnimGroup.position.set(0, 0, 0);
     robotAnimGroup.rotation.set(0, 0, 0);
     rBody.scale.set(1, 1, 1);
@@ -1241,7 +1225,6 @@
     rightEyeMesh.rotation.set(0, 0, 0);
 
     if (ROBOT.posture === 'crawl') {
-      // ほふく前進時は顔を上げて手足をモゾモゾ動かす
       headPivot.rotation.x = -Math.PI / 3;
       const crawlWave = Math.sin(t * 7);
       robotAnimGroup.position.y = crawlWave * 0.025;
@@ -1255,7 +1238,6 @@
     const emo = ROBOT.emotion || 'normal';
 
     if (emo === 'joy') {
-      // 😆【喜（よろこび）】：両手を高くバンザイして、ピョンピョン飛び跳ねる！
       const jump = Math.abs(Math.sin(t * 7.5));
       robotAnimGroup.position.y = jump * 0.22;
       robotAnimGroup.rotation.y = Math.sin(t * 3.75) * 0.18;
@@ -1266,12 +1248,10 @@
       leftLegPivot.rotation.x = jump * 0.35;
       rightLegPivot.rotation.x = -jump * 0.35;
       headPivot.rotation.x = -0.15;
-      // ニッコリ細まる目
       leftEyeMesh.scale.set(1.25, 0.38, 1);
       rightEyeMesh.scale.set(1.25, 0.38, 1);
 
     } else if (emo === 'anger') {
-      // 😡【怒（いかり）】：腕を振り上げて高速でジタバタ地団駄を踏み、ぷるぷる震える！
       const stomp = Math.sin(t * 18);
       robotAnimGroup.position.x = Math.sin(t * 35) * 0.022;
       robotAnimGroup.position.y = Math.abs(stomp) * 0.05;
@@ -1284,14 +1264,12 @@
       rightArmPivot.rotation.z = -0.35;
       leftLegPivot.rotation.x = stomp * 0.65;
       rightLegPivot.rotation.x = -stomp * 0.65;
-      // 怒り目（キリッとつり上がる）
       leftEyeMesh.rotation.z = -0.35;
       rightEyeMesh.rotation.z = 0.35;
       leftEyeMesh.scale.set(1.2, 0.75, 1);
       rightEyeMesh.scale.set(1.2, 0.75, 1);
 
     } else if (emo === 'sad') {
-      // 😭【哀（かなしみ）】：ぺたんと座り込んで首と肩をガックリ落とし、しょんぼり揺れる
       robotAnimGroup.position.y = -0.09;
       headPivot.rotation.x = 0.45 + Math.sin(t * 2.5) * 0.06;
       headPivot.rotation.z = Math.sin(t * 1.8) * 0.08;
@@ -1299,17 +1277,14 @@
       leftArmPivot.rotation.z = 0.08;
       rightArmPivot.rotation.x = 0.35;
       rightArmPivot.rotation.z = -0.08;
-      // 足を前に投げ出して座り込む
       leftLegPivot.rotation.x = -1.35;
       rightLegPivot.rotation.x = -1.35;
-      // しょんぼり下がり目
       leftEyeMesh.rotation.z = 0.30;
       rightEyeMesh.rotation.z = -0.30;
       leftEyeMesh.scale.set(1.15, 0.55, 1);
       rightEyeMesh.scale.set(1.15, 0.55, 1);
 
     } else if (emo === 'fun') {
-      // 🎵【楽（たのしみ）】：両手を広げて左右にルンルンステップ＆首振りダンス！
       const beat = Math.sin(t * 6.0);
       const bounce = Math.abs(Math.cos(t * 6.0));
       robotAnimGroup.position.y = bounce * 0.08;
@@ -1325,7 +1300,6 @@
       rightEyeMesh.scale.set(1.1, 1.15, 1);
 
     } else {
-      // 🙂【通常】：穏やかな呼吸アニメーション
       rBody.scale.y = 1 + Math.sin(t * 4) * 0.03;
       headPivot.position.y = 0.56 + Math.sin(t * 4) * 0.018;
       leftArmPivot.rotation.x = Math.sin(t * 2) * 0.06;
@@ -1342,6 +1316,7 @@
   let camTheta = Math.PI / 4, camPhi = 0.95, camRadius = 9.8, isDragging = false, prevPointer = { x: 0, y: 0 }, cameraDirty = true;
   let activePointers = new Map();
   let prevPinchDist = null;
+  let lastAppliedFrostedState = null;
 
   function syncCameraButtonsUI() {
     document.getElementById('cam-ground-btn').classList.toggle('cam-active', manualCameraMode === 'ground');
@@ -1349,16 +1324,40 @@
     document.getElementById('cam-fpv-btn').classList.toggle('cam-active', manualCameraMode === 'robot');
   }
 
+  // 【v21 カクツキ防止・差分更新最適化】
+  // 各小ブロックの透過状態（visState: 0=不透明表示, 1=非表示orガラス透過）を記憶し、
+  // 前回と状態が変わったブロックだけ行列を書き換え、変化があったフレームだけ GPU へ転送（needsUpdate = true）する！
+  function applyVoxelVisState(sv, newState, useFrostedGlass) {
+    if (sv.visState === newState && lastAppliedFrostedState === useFrostedGlass) {
+      return false;
+    }
+    sv.visState = newState;
+    if (newState === 0) {
+      opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+      if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+    } else {
+      opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+      if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+    }
+    return true;
+  }
+
   function updateTransparencyAndOcclusion(modeType, refCamPos, focusX, focusY, focusZ, targetFloorLv, lookDirX = 0, lookDirZ = 0) {
     const showLines = (CAM_VISUAL_STYLE === 'glass_line');
     macroOutlineGroup.visible = showLines;
+
+    let opaqueChanged = false;
+    let glassChanged = false;
 
     if (modeType === 'ground_fixed') {
       waterfallMesh.visible = true; seaMesh.visible = true;
       waterfallMat.opacity = 0.92; seaMat.opacity = 0.95;
       glassDepthMesh.visible = false; glassSubMesh.visible = false;
-      for (let i = 0; i < subVoxelsMeta.length; i++) opaqueSubMesh.setMatrixAt(subVoxelsMeta[i].idx, subVoxelsMeta[i].fullMat);
-      opaqueSubMesh.instanceMatrix.needsUpdate = true;
+      for (let i = 0; i < subVoxelsMeta.length; i++) {
+        if (applyVoxelVisState(subVoxelsMeta[i], 0, false)) opaqueChanged = true;
+      }
+      lastAppliedFrostedState = false;
+      if (opaqueChanged) opaqueSubMesh.instanceMatrix.needsUpdate = true;
       return;
     }
 
@@ -1371,7 +1370,7 @@
       for (let i = 0; i < subVoxelsMeta.length; i++) {
         const sv = subVoxelsMeta[i];
         if (sv.isWaterWall) {
-          opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+          if (applyVoxelVisState(sv, 0, false)) opaqueChanged = true;
           continue;
         }
         const dx = sv.wx - refCamPos.x;
@@ -1381,13 +1380,11 @@
         const dotLook = dx * lookDirX + dz * lookDirZ;
         const isSelfCellCeiling = (sv.gx === curGx && sv.gz === curGz && sv.lv > targetFloorLv && ROBOT.posture === 'stand');
         const isTooCloseToLens = (distToEye < 0.34 && (dotLook < 0.18 || sv.wy > focusY + 0.05));
-        if (isSelfCellCeiling || isTooCloseToLens) {
-          opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
-        } else {
-          opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
-        }
+        const targetState = (isSelfCellCeiling || isTooCloseToLens) ? 1 : 0;
+        if (applyVoxelVisState(sv, targetState, false)) opaqueChanged = true;
       }
-      opaqueSubMesh.instanceMatrix.needsUpdate = true;
+      lastAppliedFrostedState = false;
+      if (opaqueChanged) opaqueSubMesh.instanceMatrix.needsUpdate = true;
       return;
     }
 
@@ -1413,27 +1410,19 @@
       const sv = subVoxelsMeta[i];
 
       if (sv.lv <= targetFloorLv) {
-        opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
-        if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+        if (applyVoxelVisState(sv, 0, useFrostedGlass)) { opaqueChanged = true; glassChanged = true; }
         continue;
       }
 
       if (modeType === 'underground_fixed') {
         if (sv.lv >= 0) {
-          opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
-          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
+          if (applyVoxelVisState(sv, 0, useFrostedGlass)) { opaqueChanged = true; glassChanged = true; }
           continue;
         }
         const relX = sv.gx - focusX, relZ = sv.gz - focusZ;
         const dotFront = relX * nx + relZ * nz, perpDist = Math.abs(-relX * nz + relZ * nx);
         const inFront = (dotFront > -0.45 && perpDist < 2.65);
-        if (inFront) {
-          opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
-          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, sv.fullMat);
-        } else {
-          opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
-          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
-        }
+        if (applyVoxelVisState(sv, inFront ? 1 : 0, useFrostedGlass)) { opaqueChanged = true; glassChanged = true; }
         continue;
       }
 
@@ -1442,32 +1431,20 @@
         const subDotFront = subRelX * nx + subRelZ * nz;
         const subPerpDist = Math.abs(-subRelX * nz + subRelZ * nx);
         const blockCharDirectly = (subDotFront > 0.15 && subDotFront < 1.15 && subPerpDist < 0.42 && sv.wy > focusY + 0.1);
-        if (blockCharDirectly) {
-          opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
-          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, sv.fullMat);
-        } else {
-          opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
-          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
-        }
+        if (applyVoxelVisState(sv, blockCharDirectly ? 1 : 0, useFrostedGlass)) { opaqueChanged = true; glassChanged = true; }
       } else {
         const relX = sv.gx - focusX, relZ = sv.gz - focusZ;
         const dotFront = relX * nx + relZ * nz;
         const perpDist = Math.abs(-relX * nz + relZ * nx);
         const radialDist = Math.hypot(relX, relZ);
         const inSpotWindow = (dotFront > -0.15 && perpDist < 1.35 && radialDist < 1.85);
-
-        if (inSpotWindow) {
-          opaqueSubMesh.setMatrixAt(sv.idx, zeroMatrix);
-          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, sv.fullMat);
-        } else {
-          opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
-          if (useFrostedGlass) glassSubMesh.setMatrixAt(sv.idx, zeroMatrix);
-        }
+        if (applyVoxelVisState(sv, inSpotWindow ? 1 : 0, useFrostedGlass)) { opaqueChanged = true; glassChanged = true; }
       }
     }
 
-    opaqueSubMesh.instanceMatrix.needsUpdate = true;
-    if (useFrostedGlass) glassSubMesh.instanceMatrix.needsUpdate = true;
+    lastAppliedFrostedState = useFrostedGlass;
+    if (opaqueChanged) opaqueSubMesh.instanceMatrix.needsUpdate = true;
+    if (useFrostedGlass && glassChanged) glassSubMesh.instanceMatrix.needsUpdate = true;
   }
 
   function updateAllCamerasTransform() {
@@ -1487,10 +1464,12 @@
       const curAspect = window.innerWidth / Math.max(1, window.innerHeight);
       const portraitBoost = curAspect < 0.75 ? 10 : 0;
       const baseFov = isCrawl ? (68 + portraitBoost * 0.6) : (98 + portraitBoost);
-      innerRobotCam.fov = Math.max(45, Math.min(118, baseFov * fpvZoomFactor));
-      innerRobotCam.updateProjectionMatrix();
+      const nextFov = Math.max(45, Math.min(118, baseFov * fpvZoomFactor));
+      if (Math.abs(innerRobotCam.fov - nextFov) > 0.05) {
+        innerRobotCam.fov = nextFov;
+        innerRobotCam.updateProjectionMatrix();
+      }
 
-      // 大きさ（大・中・小）に合わせて目線の高さも自然に連動
       const eyeH = isCrawl ? (0.22 * sSpec.scale) : (0.52 * sSpec.scale);
       const forwardOffset = isCrawl ? 0.06 : (-0.26 * fpvZoomFactor);
       const rot = ROBOT.rotY || 0;
@@ -1573,7 +1552,6 @@
   }
 
   document.getElementById('cam-ground-btn').onclick = () => {
-    wakeUpRenderer();
     manualCameraMode = (manualCameraMode === 'ground') ? null : 'ground';
     camPhi = (manualCameraMode === 'ground') ? 0.88 : 0.95;
     activePointers.clear(); isDragging = false;
@@ -1581,7 +1559,6 @@
     cameraDirty = true; updateEnvironmentAndUI();
   };
   document.getElementById('cam-ug-btn').onclick = () => {
-    wakeUpRenderer();
     manualCameraMode = (manualCameraMode === 'underground') ? null : 'underground';
     camPhi = (manualCameraMode === 'underground') ? 1.45 : 0.95;
     activePointers.clear(); isDragging = false;
@@ -1589,7 +1566,6 @@
     cameraDirty = true; updateEnvironmentAndUI();
   };
   document.getElementById('cam-fpv-btn').onclick = () => {
-    wakeUpRenderer();
     manualCameraMode = (manualCameraMode === 'robot') ? null : 'robot';
     activePointers.clear(); isDragging = false;
     if (manualCameraMode === 'robot') {
@@ -1623,7 +1599,6 @@
       const pts = Array.from(activePointers.values());
       prevPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
     }
-    wakeUpRenderer();
   }, { passive: true });
 
   window.addEventListener('pointermove', e => {
@@ -1638,15 +1613,19 @@
       const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       if (prevPinchDist !== null) {
         const delta = prevPinchDist - dist;
-        if (manualCameraMode === 'robot') {
-          fpvZoomFactor = Math.max(0.50, Math.min(1.15, fpvZoomFactor + delta * 0.0025));
-        } else {
-          camRadius = Math.max(5.5, Math.min(20.0, camRadius + delta * 0.025));
+        // 微小なタッチノイズ（0.4px未満）は無視してカメラの微振動カクツキを防ぐ
+        if (Math.abs(delta) >= 0.4) {
+          if (manualCameraMode === 'robot') {
+            fpvZoomFactor = Math.max(0.50, Math.min(1.15, fpvZoomFactor + delta * 0.0025));
+          } else {
+            camRadius = Math.max(5.5, Math.min(20.0, camRadius + delta * 0.025));
+          }
+          cameraDirty = true;
+          prevPinchDist = dist;
         }
-        cameraDirty = true;
-        wakeUpRenderer();
+      } else {
+        prevPinchDist = dist;
       }
-      prevPinchDist = dist;
       return;
     }
 
@@ -1654,6 +1633,9 @@
 
     const dx = e.clientX - prevPointer.x;
     const dy = e.clientY - prevPointer.y;
+    // 指を止めているときのスマホ特有の微小タッチブレ（0.35px未満）は無視して不要な再計算を防止
+    if (Math.abs(dx) < 0.35 && Math.abs(dy) < 0.35) return;
+
     prevPointer.x = e.clientX;
     prevPointer.y = e.clientY;
 
@@ -1669,7 +1651,6 @@
     }
 
     cameraDirty = true;
-    wakeUpRenderer();
   }, { passive: true });
 
   function onPointerUpOrCancel(e) {
@@ -1697,7 +1678,7 @@
     } else {
       camRadius = Math.max(5.5, Math.min(20.0, camRadius + e.deltaY * 0.01));
     }
-    cameraDirty = true; wakeUpRenderer();
+    cameraDirty = true;
   }, { passive: true });
 
   function formatHeightText(lv) {
@@ -1787,7 +1768,6 @@
   }
 
   async function executeTurn() {
-    wakeUpRenderer(5500);
     const btn = document.getElementById('btn-action'); btn.disabled = true;
     document.getElementById('ai-status').innerText = '⚡ 思考中...';
     bulbMesh.material.color.setHex(0xf87171);
@@ -1964,16 +1944,12 @@
     }, 300);
   }
 
-  // 【アイデア③：ロボット手帳の喜怒哀楽テストボタン】
-  // ボタンをタップすると自動で手帳が閉じ、カメラに向かって喜怒哀楽の全身リアクションをたっぷり実演！
   function triggerEmotionPreview(emoKey) {
-    wakeUpRenderer(7000);
     ROBOT.emotion = EMOTION_SPECS[emoKey] ? emoKey : 'normal';
     ROBOT.posture = 'stand';
     const topLv = HEIGHT_MAP[`${ROBOT.pos.x},${ROBOT.pos.z}`] ?? 0;
     ROBOT.pos.lv = topLv;
 
-    // 観察しやすいように、現在のカメラの方向へロボがくるっと振り向いてリアクションを見せる！
     if (manualCameraMode !== 'robot') {
       const activeCamPos = activeCamera.position;
       const dx = activeCamPos.x - robotGroup.position.x;
@@ -2000,9 +1976,7 @@
     showToast(`${EMOTION_SPECS[ROBOT.emotion].icon} 1号機が「${EMOTION_SPECS[ROBOT.emotion].label}」のリアクションを実演中！`);
   }
 
-  // 手帳から「大きさ3段階（大・中・小）」をワンタップで切り替え
   function changeRobotSizeFromDiary(sizeKey) {
-    wakeUpRenderer(5000);
     if (!SIZE_SPECS[sizeKey]) return;
     ROBOT.sizeLevel = sizeKey;
     document.getElementById('setting-size-level').value = sizeKey;
@@ -2012,9 +1986,7 @@
     showToast(`📏 大きさを「${sSpec.label}」（体型：${bSpec.label}）に切り替えたよ！`);
   }
 
-  // 手帳から「体型3段階（太っちょ・標準・スリム）」をワンタップで切り替え
   function changeRobotBodyFromDiary(bodyKey) {
-    wakeUpRenderer(5000);
     if (!BODY_SPECS[bodyKey]) return;
     ROBOT.bodyType = bodyKey;
     document.getElementById('setting-body-type').value = bodyKey;
@@ -2025,7 +1997,6 @@
   }
 
   function cycleBodyAndCrawlTest() {
-    wakeUpRenderer(5000);
     const bodyOrder = ['fat', 'normal', 'slim'];
     const nextIdx = (bodyOrder.indexOf(ROBOT.bodyType) + 1) % bodyOrder.length;
     ROBOT.bodyType = bodyOrder[nextIdx];
@@ -2056,7 +2027,6 @@
   }
 
   function quickDiagonalOrFrontDig() {
-    wakeUpRenderer(4500);
     const { x, z } = ROBOT.pos;
     if (x < -2 || x > 2 || z < -2 || z > 2) return;
     const diagDirs = ALL_DIRS.filter(d => d.isDiag);
@@ -2078,15 +2048,15 @@
   }
 
   const fanWrapper = document.getElementById('fan-menu-wrapper');
-  document.getElementById('plus-main-btn').onclick = () => { wakeUpRenderer(); fanWrapper.classList.toggle('open'); };
+  document.getElementById('plus-main-btn').onclick = () => { fanWrapper.classList.toggle('open'); };
   function closeFanMenu() { fanWrapper.classList.remove('open'); }
 
   function quickDropApple() {
-    wakeUpRenderer(); WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z });
+    WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z });
     rebuildTerrainAndItems(); cameraDirty = true; saveWorldState(); closeFanMenu(); showToast('🍎 足元にリンゴを置いたよ！');
   }
   function quickStackBlock() {
-    wakeUpRenderer(); const { x, z } = ROBOT.pos; if (x < -2 || x > 2 || z < -2 || z > 2) return;
+    const { x, z } = ROBOT.pos; if (x < -2 || x > 2 || z < -2 || z > 2) return;
     const key = `${x},${z}`, cur = HEIGHT_MAP[key] ?? 0;
     delete CHIP_MAP[`${x},${z},${cur}`];
     if (cur >= AREA1_MAX_GROUND_LV) { showToast('ここは第一エリアの地上上限（5段目）だよ！'); closeFanMenu(); return; }
@@ -2097,7 +2067,6 @@
   }
 
   function openModal(id) {
-    wakeUpRenderer();
     activePointers.clear(); isDragging = false;
     if (id === 'modal-diary') renderDiaryModal();
     if (id === 'modal-settings') {
@@ -2108,7 +2077,6 @@
     const el = document.getElementById(id); el.style.display = 'flex'; el.classList.add('active');
   }
   function closeModal(id) {
-    wakeUpRenderer();
     activePointers.clear(); isDragging = false;
     const el = document.getElementById(id); el.classList.remove('active'); el.style.display = 'none';
   }
@@ -2148,7 +2116,7 @@
   }
 
   function useBagItem(index) {
-    wakeUpRenderer(); const item = BAG[index]; if (!item) return;
+    const item = BAG[index]; if (!item) return;
     const key = `${ROBOT.pos.x},${ROBOT.pos.z}`;
     if (item === 'stone' || item === 'grass') {
       const cur = HEIGHT_MAP[key] ?? 0;
@@ -2166,7 +2134,6 @@
   document.getElementById('btn-action').onclick = executeTurn;
 
   document.getElementById('btn-spin').onclick = () => {
-    wakeUpRenderer(5000);
     const pool = [
       { type: 'apple', icon: '🍎', name: 'おいしいリンゴ（島に配置！）' },
       { type: 'stone', icon: '🪨', name: '段差ブロック（カバンに追加！）' },
@@ -2183,7 +2150,6 @@
   };
 
   function saveSettings() {
-    wakeUpRenderer(4500);
     CAM_VISUAL_STYLE = document.getElementById('setting-cam-style').value || 'hide';
     safeStorage.setItem('cam_visual_style_v15', CAM_VISUAL_STYLE);
     ROBOT.sizeLevel = document.getElementById('setting-size-level').value || 'large';
@@ -2214,22 +2180,23 @@
   loadCloudWorldState();
 
   const clock = new THREE.Clock();
-  let lastRenderTime = 0;
 
-  function animate(now) {
+  function animate() {
     requestAnimationFrame(animate);
-    if (!isDragging && !cameraDirty && now >= activeUntilTime && (now - lastRenderTime < 64)) return;
-    lastRenderTime = now;
     const t = clock.getElapsedTime();
 
-    if (cameraDirty) { updateAllCamerasTransform(); cameraDirty = false; }
+    if (cameraDirty) {
+      updateAllCamerasTransform();
+      cameraDirty = false;
+    }
+
     wfTex.offset.y = (t * 0.17) % 1.0;
     const seaPulse = 1 + Math.sin(t * 1.8) * 0.006; seaMesh.scale.set(seaPulse, 1, seaPulse);
     const foamScale = 1 + Math.sin(t * 2.2) * 0.025; foamRingMesh.scale.set(foamScale, foamScale, 1);
     turtleGroup.position.y = -10.4 + Math.sin(t * 0.7) * 0.18; turtleGroup.rotation.y = Math.sin(t * 0.25) * 0.06;
     skyGroup.rotation.y = t * 0.015;
 
-    // 1号機の喜怒哀楽・ほふく前進アニメーションを更新
+    // カメラ停止中も常時60fpsで滑らかに1号機の喜怒哀楽・ほふく前進アニメーションを更新
     updateRobotEmotionAnimation(t);
 
     renderer.render(scene, activeCamera);
@@ -2240,7 +2207,7 @@
     const a = window.innerWidth / window.innerHeight;
     [outerGroundCam, outerUnderCam, followCam, innerRobotCam].forEach(c => { c.aspect = a; c.updateProjectionMatrix(); });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    cameraDirty = true; wakeUpRenderer();
+    cameraDirty = true;
   });
 </script>
 </body>
