@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0b1528">
-  <title>ボクセルAI自律思考水槽 v18</title>
+  <title>ボクセルAI自律思考水槽 v19</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
@@ -121,10 +121,10 @@
 
 <div id="bottom-panel">
   <div class="panel-header">
-    <span>💭 ロボのきもち・心のさけび【v18 カメラ上下スライド完全安定化】</span>
+    <span>💭 ロボのきもち・心のさけび【v19 空間コア：外周土壁＆水面ルール】</span>
     <div class="ai-badge" id="ai-status">🟩 アルゴン待機中</div>
   </div>
-  <div id="message-box">【v18完成】追従カメラや各カメラで上下スライドしたときに引っかかったり動かなくなる現象を完全に直したよ！いつでもグリグリ見回せます！</div>
+  <div id="message-box">【v19完成】空間コアに「水面より下（3段目〜地下すべて）の外周は土色の壁で水をせき止めるルール」を追加！外側の水色が透けて見えなくなったよ！</div>
   <div class="action-history">
     <span class="history-tag" id="history-action">👟 やった事 待機中</span>
     <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従(観察窓)・地下2層目</span>
@@ -277,14 +277,17 @@
   }
 
   // =========================================================
-  // 第一エリア空間（SpaceCore v18）：
+  // 第一エリア空間（SpaceCore v19）：
   // ・地上：上下5ブロック（lv = 1 〜 5）
   // ・地下：上下5ブロック（地表の緑＋乾土ブロック lv = 0 を含め、lv = 0, -1, -2, -3, -4 の計5層）
-  // ・カメラ上下スライドの角度蓄積バグ（デッドゾーン）完全解消＆マルチタッチ安全化
+  // ・【空間コアルール】地下1層目（地表 lv = 0）の上2段（sy = 4, 3：パステル緑）は水面（-0.40）より上に出ているので水影響なし。
+  // ・上から3段目（sy = 2：土色）〜地下5層目（lv = -4）までの外周（水に面した分割ブロック）は
+  //   物理法則の水影響を受ける「外周防水土壁」とし、削るまではその階層の土色でしっかり水をせき止め、水色が透けて見えないようにする！
   // =========================================================
   const AREA1_MAX_GROUND_LV = 5;
   const AREA1_MIN_UNDER_LV  = -4;
-  const WATER_SURFACE_Y     = -0.45;
+  // 地表ブロック(lv=0: 高さ -1.00 〜 0.00)の上2段(sy=4,3: -0.40 〜 0.00)が水面より上に出るように、水面高さを -0.40 に厳密設定
+  const WATER_SURFACE_Y     = -0.40;
 
   const SPACE_COLORS = {
     pastelGreenTop: 0xa7f3d0,
@@ -306,6 +309,66 @@
     if (lv === -2) return SPACE_COLORS.wetSoilLv3;
     if (lv === -3) return SPACE_COLORS.wetSoilLv4;
     return SPACE_COLORS.wetSoilLv5;
+  }
+
+  // 【空間コアルール】その分割小ブロックが「水面以下（地下1層目の上から3段目 sy<=2 〜 地下全階層 lv<=-1）かつ島の外周（水に面した面）」かどうかを判定
+  function isWaterFacingOuterSubVoxel(gx, gz, lv, sx, sy, sz) {
+    // 地下1層目(lv=0)の上2段(sy=4,3)や地上(lv>=1)は水面より上なので水影響を受けない
+    if (lv > 0) return false;
+    if (lv === 0 && sy >= 3) return false;
+    // 島の外周4辺に面している一番外側の小ブロック
+    if (gx === -2 && sx === 0) return true;
+    if (gx === 2  && sx === 4) return true;
+    if (gz === -2 && sz === 0) return true;
+    if (gz === 2  && sz === 4) return true;
+    return false;
+  }
+
+  // 外周のブロック（gx=-2, 2 または gz=-2, 2）が丸ごと消えて海の水色が露出してしまわないよう、
+  // 水に面した外周小ブロック（土色壁）を残して内側だけを掘削状態にする空間コア保護関数
+  function enforceOuterWaterWallIntegrity() {
+    for (let x = -2; x <= 2; x++) {
+      for (let z = -2; z <= 2; z++) {
+        const isEdgeCell = (x === -2 || x === 2 || z === -2 || z === 2);
+        if (!isEdgeCell) continue;
+        const k = `${x},${z}`;
+        const curTop = HEIGHT_MAP[k] ?? 0;
+        // 外周セルで HEIGHT_MAP が -1 以下になっていると、lv=0 の外周土壁まで丸ごと消えて海面（水色）が丸見えになるため、
+        // 外周セルの親ブロック高さは 0 以上に保ち、内側の小ブロックだけを削った状態（外周の土色壁は残る状態）に変換する
+        if (curTop < 0) {
+          for (let lv = curTop + 1; lv <= 0; lv++) {
+            const ck = `${x},${z},${lv}`;
+            if (!CHIP_MAP[ck]) CHIP_MAP[ck] = {};
+            for (let sy = 0; sy < 5; sy++) {
+              for (let sx = 0; sx < 5; sx++) {
+                for (let sz = 0; sz < 5; sz++) {
+                  if (!isWaterFacingOuterSubVoxel(x, z, lv, sx, sy, sz)) {
+                    CHIP_MAP[ck][`${sx},${sy},${sz}`] = 1;
+                  } else {
+                    delete CHIP_MAP[ck][`${sx},${sy},${sz}`];
+                  }
+                }
+              }
+            }
+          }
+          HEIGHT_MAP[k] = 0;
+        }
+        // 既存の CHIP_MAP でも、水流入モード実装前は水に面した外周土壁が勝手に消えないように保護
+        for (let lv = AREA1_MIN_UNDER_LV; lv <= 0; lv++) {
+          const ck = `${x},${z},${lv}`;
+          if (!CHIP_MAP[ck]) continue;
+          for (let sy = 0; sy < 5; sy++) {
+            for (let sx = 0; sx < 5; sx++) {
+              for (let sz = 0; sz < 5; sz++) {
+                if (isWaterFacingOuterSubVoxel(x, z, lv, sx, sy, sz)) {
+                  delete CHIP_MAP[ck][`${sx},${sy},${sz}`];
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   const BODY_SPECS = {
@@ -350,16 +413,6 @@
   };
   let WORLD_ITEMS = [{ type: 'apple', x: -1, z: 1 }, { type: 'apple', x: 1, z: 0 }];
 
-  function isFacingSeaWater(gx, gz, lv, sx, sy, sz) {
-    const wy = (lv - 1) * 1.0 + sy * 0.20 + 0.10;
-    if (wy > WATER_SURFACE_Y) return false;
-    if (gx === -2 && sx === 0) return true;
-    if (gx === 2  && sx === 4) return true;
-    if (gz === -2 && sz === 0) return true;
-    if (gz === 2  && sz === 4) return true;
-    return false;
-  }
-
   function carveCrawlTunnelBlock(gx, gz, lv, tunnelWidth = 3, tunnelHeight = 2) {
     const key = `${gx},${gz},${lv}`;
     if (!CHIP_MAP[key]) CHIP_MAP[key] = {};
@@ -368,6 +421,7 @@
     for (let sy = 0; sy < tunnelHeight; sy++) {
       for (let sx = 0; sx < 5; sx++) {
         for (let sz = 0; sz < 5; sz++) {
+          if (isWaterFacingOuterSubVoxel(gx, gz, lv, sx, sy, sz)) continue;
           if ((sx >= startS && sx <= endS) || (sz >= startS && sz <= endS)) {
             CHIP_MAP[key][`${sx},${sy},${sz}`] = 1;
           }
@@ -378,12 +432,12 @@
 
   function initDefaultSpaceCore() {
     for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
-    HEIGHT_MAP['1,2']   = 1;
-    HEIGHT_MAP['0,0']   = -1;
-    HEIGHT_MAP['-2,-2'] = -2;
+    HEIGHT_MAP['1,2'] = 1;
+    HEIGHT_MAP['0,0'] = -1; // 中央(0,0)は内陸なので水に面しておらず、縦穴として開口
     CHIP_MAP = {};
     WATER_MAP = {};
 
+    // 北西 (-1,-1, lv=0) にほふく前進トンネル
     carveCrawlTunnelBlock(-1, -1, 0, 3, 2);
     for (let sy = 0; sy < 2; sy++) {
       CHIP_MAP['-1,-1,0'][`3,${sy},3`] = 1; CHIP_MAP['-1,-1,0'][`4,${sy},4`] = 1;
@@ -391,6 +445,7 @@
       CHIP_MAP['-1,-1,0'][`0,${sy},0`] = 1; CHIP_MAP['-1,-1,0'][`1,${sy},1`] = 1;
     }
 
+    // 北 (0,-1, lv=0) に前から下3段を削りかけた横穴サンプル
     CHIP_MAP['0,-1,0'] = {};
     for (let sy = 0; sy < 3; sy++) {
       for (let sx = 1; sx <= 3; sx++) {
@@ -398,6 +453,7 @@
         if (sy < 2) CHIP_MAP['0,-1,0'][`${sx},${sy},3`] = 1;
       }
     }
+    enforceOuterWaterWallIntegrity();
   }
   initDefaultSpaceCore();
 
@@ -425,6 +481,9 @@
       }
     }
     if (d.chipMap && typeof d.chipMap === 'object') CHIP_MAP = d.chipMap;
+    // 旧セーブデータで外周(-2,-2など)が欠けて水色が見えていた場合も、自動で外周の土色防水壁を復元！
+    enforceOuterWaterWallIntegrity();
+
     if (Array.isArray(d.items)) WORLD_ITEMS = d.items;
     if (Array.isArray(d.bag)) BAG = d.bag;
     if (Array.isArray(d.logs) && d.logs.length) DIARY_LOGS = d.logs;
@@ -474,6 +533,7 @@
   }
 
   function saveWorldState() {
+    enforceOuterWaterWallIntegrity();
     const msgEl = document.getElementById('message-box');
     const actEl = document.getElementById('history-action');
     const payload = {
@@ -605,6 +665,8 @@
       for (let sx = 0; sx < 5; sx++) {
         for (let sz = 0; sz < 5; sz++) {
           if (CHIP_MAP[chipKey][`${sx},${sy},${sz}`]) continue;
+          // 【空間コアルール】水に面した外周3段目以下の土色小ブロックは、水をせき止める外壁として保護する
+          if (isWaterFacingOuterSubVoxel(targetX, targetZ, digLv, sx, sy, sz)) continue;
           const distFromChar = Math.hypot((targetX + (sx - 2) * 0.2) - (gx + ((ROBOT.pos.sx ?? 2) - 2) * 0.2), (targetZ + (sz - 2) * 0.2) - (gz + ((ROBOT.pos.sz ?? 2) - 2) * 0.2));
           const centerBias = Math.abs(sx - 2) + Math.abs(sz - 2) <= spec.reqWidth ? 0 : 0.6;
           candidates.push({ sx, sy, sz, score: distFromChar + centerBias + (crawlMode ? sy * 0.15 : (4 - sy) * 0.1) });
@@ -626,24 +688,41 @@
         const cornerSx = dir.dx > 0 ? [3, 4] : [0, 1];
         const cornerSz = dir.dz > 0 ? [3, 4] : [0, 1];
         for (let sy = 0; sy <= maxSy; sy++) {
-          cornerSx.forEach(csx => cornerSz.forEach(csz => { CHIP_MAP[selfChipKey][`${csx},${sy},${csz}`] = 1; }));
+          cornerSx.forEach(csx => cornerSz.forEach(csz => {
+            if (!isWaterFacingOuterSubVoxel(gx, gz, digLv, csx, sy, csz)) {
+              CHIP_MAP[selfChipKey][`${csx},${sy},${csz}`] = 1;
+            }
+          }));
         }
       }
     }
 
-    let leftCount = 0;
+    let leftInnerCount = 0;
     for (let sy = 0; sy < 5; sy++) for (let sx = 0; sx < 5; sx++) for (let sz = 0; sz < 5; sz++) {
-      if (!CHIP_MAP[chipKey][`${sx},${sy},${sz}`]) leftCount++;
+      if (isWaterFacingOuterSubVoxel(targetX, targetZ, digLv, sx, sy, sz)) continue;
+      if (!CHIP_MAP[chipKey][`${sx},${sy},${sz}`]) leftInnerCount++;
     }
 
-    if (!crawlMode && leftCount <= 8) {
-      delete CHIP_MAP[chipKey];
-      if (digLv > AREA1_MIN_UNDER_LV) HEIGHT_MAP[`${targetX},${targetZ}`] = digLv - 1;
-      return { completedLevel: true, newLv: HEIGHT_MAP[`${targetX},${targetZ}`], leftCount: 0, isCrawlTunnel: false, targetX, targetZ };
+    const isEdgeCell = (targetX === -2 || targetX === 2 || targetZ === -2 || targetZ === 2);
+
+    // 内陸のセルなら従来通り HEIGHT_MAP を1段下げ、外周セルなら水に面した土壁を残すために CHIP_MAP で内側だけ掘り抜く
+    if (!crawlMode && leftInnerCount <= 8) {
+      if (!isEdgeCell || digLv > 0) {
+        delete CHIP_MAP[chipKey];
+        if (digLv > AREA1_MIN_UNDER_LV) HEIGHT_MAP[`${targetX},${targetZ}`] = digLv - 1;
+        return { completedLevel: true, newLv: HEIGHT_MAP[`${targetX},${targetZ}`], leftCount: 0, isCrawlTunnel: false, targetX, targetZ };
+      } else {
+        for (let sy = 0; sy < 5; sy++) for (let sx = 0; sx < 5; sx++) for (let sz = 0; sz < 5; sz++) {
+          if (!isWaterFacingOuterSubVoxel(targetX, targetZ, digLv, sx, sy, sz)) {
+            CHIP_MAP[chipKey][`${sx},${sy},${sz}`] = 1;
+          }
+        }
+        return { completedLevel: true, newLv: digLv - 1, leftCount: 0, isCrawlTunnel: false, targetX, targetZ };
+      }
     }
     const pass = evaluateBlockPassage(targetX, targetZ, digLv - 1);
     const isCrawlReady = (pass.hasCeiling && pass.openHeight >= 2 && pass.openWidth >= spec.reqWidth);
-    return { completedLevel: false, newLv: digLv, leftCount, isCrawlTunnel: isCrawlReady, targetX, targetZ };
+    return { completedLevel: false, newLv: digLv, leftCount: leftInnerCount, isCrawlTunnel: isCrawlReady, targetX, targetZ };
   }
 
   function getSurfaceYAt(gx, gz, lvOverride = null) {
@@ -718,11 +797,9 @@
     fpvZoomFactor = 1.0;
   }
 
-  // 各カメラモードの上下角度（camPhi）の適正範囲を返す関数（空回り・デッドゾーンを完全に防ぐ）
   function getCamPhiLimits(mode) {
     if (mode === 'ground') return { min: 0.30, max: 1.38 };
     if (mode === 'underground') return { min: 1.05, max: 2.05 };
-    // 追従カメラ（null）：真上からのぞき込む角度(0.22)〜地面すれすれ・少し見上げる角度(1.62)まで広くグリグリ動かせる！
     return { min: 0.22, max: 1.62 };
   }
 
@@ -851,7 +928,8 @@
                   fullMat.makeTranslation(wx, wy, wz);
                 }
 
-                subVoxelsMeta.push({ idx: subIdx, gx: x, gz: z, sx, sy, sz, wx, wy, wz, lv, isChipped, fullMat });
+                const isWaterWall = isWaterFacingOuterSubVoxel(x, z, lv, sx, sy, sz);
+                subVoxelsMeta.push({ idx: subIdx, gx: x, gz: z, sx, sy, sz, wx, wy, wz, lv, isChipped, isWaterWall, fullMat });
                 subIdx++;
               }
             }
@@ -888,6 +966,7 @@
     });
   }
 
+  // 海メッシュ（5×5の島の外周 2.5m より外側にだけ海面が存在するように RingGeometry 相当のくり抜きを行い、島の内部に水色が絶対に入り込まないようにする！）
   const seaCanvas = document.createElement('canvas');
   seaCanvas.width = 256; seaCanvas.height = 256;
   const sCtx = seaCanvas.getContext('2d');
@@ -902,14 +981,17 @@
     const ang = (i / 55) * Math.PI * 2 + (i % 3) * 0.4, dist = 76 + (i * 17 % 48);
     sCtx.beginPath(); sCtx.arc(128 + Math.cos(ang) * dist, 128 + Math.sin(ang) * dist, 2 + (i % 4) * 1.3, 0, Math.PI * 2); sCtx.fill();
   }
-  sCtx.clearRect(66, 66, 124, 124);
-  sCtx.strokeStyle = '#9c6644';
-  sCtx.lineWidth = 6;
+  // 島（-2.5〜+2.5）の領域を完全に透明くり抜き＋外周のフチは3段目の土色（#d4a373）で統一
+  sCtx.clearRect(65, 65, 126, 126);
+  sCtx.strokeStyle = '#d4a373';
+  sCtx.lineWidth = 5;
   sCtx.strokeRect(65, 65, 126, 126);
 
   const seaGeo = new THREE.CircleGeometry(5.1, 48); seaGeo.rotateX(-Math.PI / 2);
   const seaMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(seaCanvas), transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide });
-  const seaMesh = new THREE.Mesh(seaGeo, seaMat); seaMesh.position.y = WATER_SURFACE_Y;
+  const seaMesh = new THREE.Mesh(seaGeo, seaMat);
+  // 水面の高さは地表ブロックの上から2段目(緑)と3段目(土色)の境目（-0.40）にピタッと配置！
+  seaMesh.position.y = WATER_SURFACE_Y;
   scene.add(seaMesh);
 
   const wfCanvas = document.createElement('canvas');
@@ -928,8 +1010,8 @@
   const wfTex = new THREE.CanvasTexture(wfCanvas);
   wfTex.wrapS = THREE.RepeatWrapping; wfTex.wrapT = THREE.RepeatWrapping; wfTex.repeat.set(3, 1.5);
   const waterfallMat = new THREE.MeshBasicMaterial({ map: wfTex, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false });
-  const waterfallMesh = new THREE.Mesh(new THREE.CylinderGeometry(5.1, 5.2, 7.4, 48, 1, true), waterfallMat);
-  waterfallMesh.position.y = -4.15;
+  const waterfallMesh = new THREE.Mesh(new THREE.CylinderGeometry(5.1, 5.2, 7.45, 48, 1, true), waterfallMat);
+  waterfallMesh.position.y = -4.125;
   scene.add(waterfallMesh);
 
   const foamRingGeo = new THREE.RingGeometry(3.8, 6.3, 48); foamRingGeo.rotateX(-Math.PI / 2);
@@ -1036,6 +1118,7 @@
     macroOutlineGroup.visible = showLines;
 
     if (modeType === 'ground_fixed') {
+      waterfallMesh.visible = true; seaMesh.visible = true;
       waterfallMat.opacity = 0.92; seaMat.opacity = 0.95;
       glassDepthMesh.visible = false; glassSubMesh.visible = false;
       for (let i = 0; i < subVoxelsMeta.length; i++) opaqueSubMesh.setMatrixAt(subVoxelsMeta[i].idx, subVoxelsMeta[i].fullMat);
@@ -1044,11 +1127,19 @@
     }
 
     if (modeType === 'robot_fpv') {
-      waterfallMat.opacity = 0.92; seaMat.opacity = 0.95;
+      // 【キャラ視点（内カメラ）】：地下にいるときは外周の土色壁が水をせき止めているため、外の海・滝の水色が透けて見えないように非表示にする！
+      const inUndergroundFpv = (targetFloorLv < 0 || ROBOT.posture === 'crawl');
+      waterfallMesh.visible = !inUndergroundFpv;
+      seaMesh.visible = !inUndergroundFpv;
       glassDepthMesh.visible = false; glassSubMesh.visible = false;
       const curGx = ROBOT.pos.x, curGz = ROBOT.pos.z;
       for (let i = 0; i < subVoxelsMeta.length; i++) {
         const sv = subVoxelsMeta[i];
+        // 水に面した外周の土色防水壁（sv.isWaterWall）は絶対に消さず、土色の壁として表示する！
+        if (sv.isWaterWall) {
+          opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
+          continue;
+        }
         const dx = sv.wx - refCamPos.x;
         const dy = sv.wy - refCamPos.y;
         const dz = sv.wz - refCamPos.z;
@@ -1066,8 +1157,16 @@
       return;
     }
 
-    waterfallMat.opacity = (CAM_VISUAL_STYLE === 'hide') ? 0.12 : 0.18;
-    seaMat.opacity = (CAM_VISUAL_STYLE === 'hide') ? 0.15 : 0.22;
+    // 追従カメラ（地下観察窓）のときは、観察窓の奥や外側に海や滝の「水色」が見えてしまわないよう、海・滝を非表示にし、外周の土壁も維持する
+    if (modeType === 'follow_spot') {
+      waterfallMesh.visible = false;
+      seaMesh.visible = false;
+    } else {
+      waterfallMesh.visible = true;
+      seaMesh.visible = true;
+      waterfallMat.opacity = (CAM_VISUAL_STYLE === 'hide') ? 0.12 : 0.18;
+      seaMat.opacity = (CAM_VISUAL_STYLE === 'hide') ? 0.15 : 0.22;
+    }
 
     const useFrostedGlass = (CAM_VISUAL_STYLE !== 'hide');
     glassSubMesh.visible = useFrostedGlass;
@@ -1140,7 +1239,6 @@
 
   function updateAllCamerasTransform() {
     camRadius = Math.max(5.5, Math.min(20.0, camRadius));
-    // ここで現在のモードに合わせて camPhi 自体をクランプし、内部数値の空回り（デッドゾーン）を完全にゼロにする！
     clampCamPhiForCurrentMode();
 
     const statusPanel = document.getElementById('status-panel');
@@ -1212,7 +1310,6 @@
       updateTransparencyAndOcclusion('underground_fixed', outerUnderCam.position, 0, -2.7, 0, AREA1_MIN_UNDER_LV);
 
     } else {
-      // 追従カメラ（観察窓スポット透過）：真上から地面すれすれまで camPhi がダイレクトに反応！
       robotGroup.visible = true;
       statusPanel.classList.remove('sky-hidden');
       const fPhi = camPhi;
@@ -1240,7 +1337,6 @@
     return '観察窓ガラス';
   }
 
-  // カメラボタンのON時だけでなく、OFFにして追従カメラに戻した時も必ず気持ちいい基準角度にリセット！
   document.getElementById('cam-ground-btn').onclick = () => {
     wakeUpRenderer();
     manualCameraMode = (manualCameraMode === 'ground') ? null : 'ground';
@@ -1272,13 +1368,9 @@
     cameraDirty = true; updateEnvironmentAndUI();
   };
 
-  // =========================================================
-  // スマホ・PC両対応の確実なカメラタッチ＆ドラッグ制御（ポインター残留ロック防止）
-  // =========================================================
   const domElem = renderer.domElement;
 
   domElem.addEventListener('pointerdown', e => {
-    // プライマリポインター（最初の1本目の指またはマウス左クリック）が新しく触れた時、万が一古いゴミ情報が残っていたら一掃する
     if (e.isPrimary && activePointers.size > 0) {
       activePointers.clear();
       prevPinchDist = null;
@@ -1337,7 +1429,6 @@
     } else {
       camTheta -= dx * 0.0090;
       camPhi   += dy * 0.0085;
-      // スライドしたその場で camPhi を適正範囲にピタッとクランプ！（これで逆向きスライド時に1ミリも遅れず即座に動く！）
       const lim = getCamPhiLimits(manualCameraMode);
       camPhi = Math.max(lim.min, Math.min(lim.max, camPhi));
     }
@@ -1351,7 +1442,6 @@
     try { domElem.releasePointerCapture(e.pointerId); } catch (err) {}
 
     if (activePointers.size === 1) {
-      // 2本指から1本指に戻ったとき、残っている1本の指の位置からスムーズにドラッグを再開できるようにする
       const remaining = Array.from(activePointers.values())[0];
       prevPointer.x = remaining.x;
       prevPointer.y = remaining.y;
@@ -1517,7 +1607,7 @@
       if (wantRest) {
         life.stamina += 35; life.energy -= 5; life.mental += 10;
         actionLabel = '💤 アルゴン：その場でひとやすみ';
-        thoughtText = aiDecision?.thought || 'ふぅ〜、ひとやすみ。カメラを上下左右にスライドして、いろんな角度からぼくを見てね！';
+        thoughtText = aiDecision?.thought || 'ふぅ〜、ひとやすみ。外周の土の壁が海の水をしっかりせき止めてくれているね！';
       } else if (wantDig) {
         const digDir = blockedByFat ? blockedByFat.dir : ALL_DIRS[Math.floor(Math.random() * ALL_DIRS.length)];
         ROBOT.rotY = digDir.rot;
@@ -1528,7 +1618,7 @@
           if (BAG.length < 10) BAG.push('stone');
           if (digRes.targetX === ROBOT.pos.x && digRes.targetZ === ROBOT.pos.z) ROBOT.pos.lv = digRes.newLv;
           actionLabel = `⛏️ ${digDir.name}を掘り抜いて${formatHeightText(digRes.newLv)}開通！`;
-          thoughtText = aiDecision?.thought || `ザクザクッ！${digDir.name}を向いて、目の前の1ブロックを掘り抜いたよ！`;
+          thoughtText = aiDecision?.thought || `ザクザクッ！${digDir.name}を向いて、外周の土壁を残しながら1ブロック掘り抜いたよ！`;
         } else if (digRes.isCrawlTunnel) {
           actionLabel = `🐛 ${digDir.name}に「ほふく前進トンネル」を開通！`;
           thoughtText = aiDecision?.thought || `上の緑と土を天井に残して、${digDir.name}にほふく前進でくぐれる低い横穴を掘ったよ！`;
@@ -1559,7 +1649,7 @@
           DIARY_LOGS.push(`🐛 ${GAME_DAY}日目：${d.name}のトンネルをほふく前進でくぐり抜けた！`);
         } else if (d.isDiag) {
           actionLabel = `↗️ ${d.name}へ斜め移動した！`;
-          thoughtText = aiDecision?.thought || `斜めルートを通って${d.name}へ進んだよ！上下左右にカメラを動かして観察してみてね！`;
+          thoughtText = aiDecision?.thought || `斜めルートを通って${d.name}へ進んだよ！外周も土色の壁でしっかり守られているね！`;
         } else {
           actionLabel = `👟 ${d.name}へ歩いた（${spec.label}・立ち）`;
           thoughtText = aiDecision?.thought || `${d.name}を向いて歩いたよ！カメラも引っかからずにスイスイ動かせるね！`;
