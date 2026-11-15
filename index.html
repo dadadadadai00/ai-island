@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0b1528">
-  <title>ボクセルAI自律思考水槽 v23</title>
+  <title>ボクセルAI自律思考水槽 v24</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
@@ -56,30 +56,35 @@
     #toast { position: fixed; top: 82px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,0.92); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 100; white-space: nowrap; }
     .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.75); z-index: 50; display: none; justify-content: center; align-items: center; }
     .modal-overlay.active { display: flex; }
-    .modal-content { background: #fff; width: 94%; max-width: 400px; max-height: 90vh; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); position: relative; overflow-y: auto; }
-    .modal-close { position: absolute; top: 12px; right: 15px; font-size: 20px; font-weight: bold; color: #94a3b8; cursor: pointer; z-index: 10;}
-    .modal-title { font-size: 15px; font-weight: 900; color: #1e293b; display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
-    .emotion-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 4px; }
-    .emo-btn { border: 2px solid #e2e8f0; border-radius: 10px; padding: 6px 4px; font-size: 11px; font-weight: 900; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; background: #f8fafc; color: #1e293b; transition: transform 0.12s; }
-    .emo-btn:active { transform: scale(0.94); }
-    .emo-btn.active { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
-    .emo-icon { font-size: 20px; line-height: 1.1; }
-    .emo-category { font-size: 11.5px; font-weight: 800; color: #be185d; margin-top: 2px; }
+    .modal-content { background: #fff; width: 94%; max-width: 410px; max-height: 88vh; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); position: relative; overflow-y: auto; }
+    .modal-close { position: absolute; top: 12px; right: 15px; font-size: 20px; font-weight: bold; color: #94a3b8; cursor: pointer; z-index: 10; }
+    .modal-title { font-size: 15px; font-weight: 900; color: #1e293b; display: flex; align-items: center; gap: 6px; }
     .spec-switch-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
-    .spec-switch-row-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
     .spec-chip { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 6px 4px; font-size: 11px; font-weight: 800; text-align: center; background: #f8fafc; color: #475569; cursor: pointer; }
     .spec-chip.active { background: #fef9c3; border-color: #eab308; color: #854d0e; }
-    .spec-chip.rig-active { background: #dcfce7; border-color: #16a34a; color: #166534; }
     .bag-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: #f8fafc; padding: 8px; border-radius: 10px; border: 1px solid #e2e8f0; }
     .bag-slot { aspect-ratio: 1; background: #fff; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 22px; cursor: pointer; }
     .bag-slot.filled { border: 1px solid #93c5fd; background: #eff6ff; }
     .setting-group { display: flex; flex-direction: column; gap: 4px; }
     .setting-label { font-size: 12px; font-weight: bold; color: #475569; }
     .setting-input { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 12px; }
-    .btn-primary { background: #3b82f6; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
+    .btn-primary { background: #3b82f6; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: 900; cursor: pointer; width: 100%; }
+    .btn-accent { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: #fff; border: none; padding: 11px; border-radius: 12px; font-weight: 900; font-size: 13px; cursor: pointer; width: 100%; box-shadow: 0 3px 10px rgba(109,40,217,0.3); }
     .btn-pink { background: #ec4899; color: #fff; border: none; padding: 11px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
-    .btn-sub { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 9px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
+    .btn-sub { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; width: 100%; }
     .btn-danger { background: #ef4848; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
+    /* キャラ基本表現ページ（タブ＋縦列20種リスト＋確定/キャンセルフッター） */
+    .rig-tab-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #f1f5f9; padding: 4px; border-radius: 12px; }
+    .rig-tab-btn { padding: 8px 6px; border-radius: 9px; font-size: 12px; font-weight: 900; text-align: center; cursor: pointer; color: #64748b; border: 2px solid transparent; transition: all 0.15s; }
+    .rig-tab-btn.active { background: #fff; color: #1d4ed8; border-color: #3b82f6; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+    .expr-list-container { display: flex; flex-direction: column; gap: 6px; max-height: 48vh; overflow-y: auto; padding: 4px 2px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
+    .expr-row { display: flex; align-items: center; gap: 6px; background: #f8fafc; padding: 5px; border-radius: 10px; border: 1.5px solid #e2e8f0; }
+    .expr-row.selected { border-color: #3b82f6; background: #eff6ff; }
+    .expr-left-btn { width: 118px; flex-shrink: 0; display: flex; align-items: center; gap: 5px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 6px 6px; cursor: pointer; font-size: 11px; font-weight: 900; color: #1e293b; text-align: left; }
+    .expr-row.selected .expr-left-btn { border-color: #2563eb; background: #dbeafe; color: #1e3a8a; }
+    .expr-icon { font-size: 17px; flex-shrink: 0; }
+    .expr-right-input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 11px; color: #334155; background: #fff; }
+    .modal-footer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 4px; }
   </style>
 </head>
 <body>
@@ -103,19 +108,19 @@
   </div>
   <div class="robot-status-row">
     <div class="status-left-group">
-      <div class="robot-id-tag" id="ui-robot-id">🦴 1号機(本格骨・Lv3)</div>
+      <div class="robot-id-tag" id="ui-robot-id">🎲箱型・1号機</div>
       <div class="badge badge-days" id="ui-days">🌱 1日目</div>
       <div class="badge badge-time" id="ui-time">☀️ 朝</div>
     </div>
     <div class="status-right-group">
-      <div class="badge badge-mood" id="ui-mood" onclick="cycleBodyAndCrawlTest()" title="タップで姿勢・体型切り替え">🙂 大・太っちょ</div>
+      <div class="badge badge-mood" id="ui-mood" onclick="cycleBodyAndCrawlTest()" title="タップで姿勢・体型切り替え">🙂通常(大・太っちょ)</div>
       <button class="btn-icon" id="btn-settings" aria-label="設定">⚙️</button>
     </div>
   </div>
 </div>
 
 <div id="side-icon-column">
-  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳（本格骨組み比較・喜怒哀楽・レイヤー合成）">📖</div>
+  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳（カバン・日記・体格）">📖</div>
   <div class="side-circle-btn" id="cam-ground-btn" title="外カメラ（地上・全体固定）">🌌</div>
   <div class="side-circle-btn" id="cam-ug-btn" title="外カメラ（地下・全体固定）">⛏️</div>
   <div class="side-circle-btn" id="cam-fpv-btn" title="内カメラ（キャラ視点・1ブロック広角＆ほふくズーム）">🤖</div>
@@ -132,10 +137,10 @@
 
 <div id="bottom-panel">
   <div class="panel-header">
-    <span>💭 ロボのきもち・心のさけび【v23 本格3D骨組み＆レイヤー合成復元】</span>
+    <span>💭 ロボのきもち・心のさけび【v24 4大コア＆基本表現20種】</span>
     <div class="ai-badge" id="ai-status">🟩 アルゴン待機中</div>
   </div>
-  <div id="message-box">【v23完成】過去チャットから「本格3D骨組み（腰・胸・首・肩・ひじ・手ソケット・股関節・ひざ・足首）」と「レイヤー合成」「動きの成長」を完全復元！📖手帳でサイコロ型と比較できるよ！</div>
+  <div id="message-box">【v24完成】📖手帳をスッキリ整理し、⚙️設定の中に「🎭キャラ基本表現（20種類＋連想ワード調整）」を追加！🎲サイコロ箱型と🦴マッチ棒3D骨組みを切り替えて確定できるよ！</div>
   <div class="action-history">
     <span class="history-tag" id="history-action">👟 やった事 待機中</span>
     <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従(観察窓)・地下2層目</span>
@@ -145,57 +150,20 @@
 
 <div id="toast">💾 データを保存したよ</div>
 
+<!-- 📖 ロボット手帳モーダル（スッキリ整理：ステータス・大きさ/体型・カバン・日記のみ） -->
 <div class="modal-overlay" id="modal-diary" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-diary')">✕</div>
-    <div class="modal-title">📖 1号機の手帳（骨組み比較・レイヤー合成）</div>
-    <div style="display:flex; align-items:center; gap:10px; background:#f8fafc; padding:8px 10px; border-radius:12px; border:1px solid #e2e8f0;">
-      <div style="font-size:32px;" id="diary-emo-icon">🦴</div>
+    <div class="modal-title">📖 1号機の手帳（体格・カバン・きろく）</div>
+    <div style="display:flex; align-items:center; gap:10px; background:#f8fafc; padding:10px; border-radius:12px; border:1px solid #e2e8f0;">
+      <div style="font-size:34px;" id="diary-emo-icon">🙂</div>
       <div>
-        <div style="font-weight:900; font-size:13.5px; color:#1e293b;" id="diary-robo-name">1号機（本格3D骨組み・成長Lv3）</div>
+        <div style="font-weight:900; font-size:13.5px; color:#1e293b;" id="diary-robo-name">1号機（🎲サイコロ箱型・生存 1日目）</div>
         <div style="font-size:11px; color:#64748b;" id="diary-robo-height">現在：地下2層目 / 大きさ：大 / 体型：太っちょ</div>
       </div>
     </div>
 
-    <div style="font-size:11.5px; font-weight:800; color:#166534;">🦴 キャラ構造の比較切り替え（いつでも見比べ可能！）</div>
-    <div class="spec-switch-row-2">
-      <div class="spec-chip" id="rig-chip-articulated" onclick="changeRigTypeFromDiary('articulated')">🦴 本格3D骨組み(14関節)</div>
-      <div class="spec-chip" id="rig-chip-box" onclick="changeRigTypeFromDiary('box')">🎲 サイコロ箱型(シンプル)</div>
-    </div>
-
-    <div style="font-size:11.5px; font-weight:800; color:#0369a1;">🌱 経験値による動きの成長度（データ駆動パラメータ）</div>
-    <div class="spec-switch-row">
-      <div class="spec-chip" id="growth-chip-1" onclick="changeGrowthLvFromDiary(1)">Lv.1 ヨチヨチ</div>
-      <div class="spec-chip" id="growth-chip-3" onclick="changeGrowthLvFromDiary(3)">Lv.3 標準</div>
-      <div class="spec-chip" id="growth-chip-5" onclick="changeGrowthLvFromDiary(5)">Lv.5 達人(滑らか)</div>
-    </div>
-
-    <div class="emo-category">🎭 感情・基本ポーズ（体幹レイヤー：押すと閉じて実演！）</div>
-    <div class="emotion-grid">
-      <button class="emo-btn" id="emo-btn-normal" onclick="triggerEmotionPreview('normal')"><span class="emo-icon">🙂</span><span>通常</span></button>
-      <button class="emo-btn" id="emo-btn-fear" onclick="triggerEmotionPreview('fear')"><span class="emo-icon">😰</span><span>怖がる</span></button>
-      <button class="emo-btn" id="emo-btn-shiver" onclick="triggerEmotionPreview('shiver')"><span class="emo-icon">🥶</span><span>震える</span></button>
-      <button class="emo-btn" id="emo-btn-hot" onclick="triggerEmotionPreview('hot')"><span class="emo-icon">🥵</span><span>暑がる</span></button>
-      <button class="emo-btn" id="emo-btn-joy" onclick="triggerEmotionPreview('joy')"><span class="emo-icon">😆</span><span>喜ぶ</span></button>
-      <button class="emo-btn" id="emo-btn-anger" onclick="triggerEmotionPreview('anger')"><span class="emo-icon">😡</span><span>怒る</span></button>
-      <button class="emo-btn" id="emo-btn-sad" onclick="triggerEmotionPreview('sad')"><span class="emo-icon">😭</span><span>悲しむ</span></button>
-      <button class="emo-btn" id="emo-btn-fun" onclick="triggerEmotionPreview('fun')"><span class="emo-icon">🎵</span><span>楽しむ</span></button>
-    </div>
-
-    <div class="emo-category">🎬 需要ポーズ ＆ 腕レイヤー合成（振る・拾う共通パターン）</div>
-    <div class="emotion-grid">
-      <button class="emo-btn" id="emo-btn-think" onclick="triggerEmotionPreview('think')"><span class="emo-icon">💡</span><span>考える</span></button>
-      <button class="emo-btn" id="emo-btn-surprise" onclick="triggerEmotionPreview('surprise')"><span class="emo-icon">😲</span><span>驚く</span></button>
-      <button class="emo-btn" id="emo-btn-wave" onclick="triggerEmotionPreview('wave')"><span class="emo-icon">👋</span><span>挨拶</span></button>
-      <button class="emo-btn" id="emo-btn-sleep" onclick="triggerEmotionPreview('sleep')"><span class="emo-icon">💤</span><span>居眠り</span></button>
-    </div>
-    <div class="spec-switch-row">
-      <div class="spec-chip" id="act-chip-none" onclick="triggerActionLayerPreview('none')">🚫 腕アクションなし</div>
-      <div class="spec-chip" id="act-chip-swing" onclick="triggerActionLayerPreview('swing')">⛏️ 振る(掘る/釣る/剣)</div>
-      <div class="spec-chip" id="act-chip-pickup" onclick="triggerActionLayerPreview('pickup')">🤲 拾う(しゃがむ)</div>
-    </div>
-
-    <div style="font-size:11.5px; font-weight:800; color:#0f766e;">📏 大きさ3段階 × 🐛 体型3段階（服・道具ソケット自動追従）</div>
+    <div style="font-size:11.5px; font-weight:800; color:#0f766e;">📏 大きさ3段階 × 🐛 体型3段階</div>
     <div class="spec-switch-row">
       <div class="spec-chip" id="size-chip-large" onclick="changeRobotSizeFromDiary('large')">大（最大）</div>
       <div class="spec-chip" id="size-chip-medium" onclick="changeRobotSizeFromDiary('medium')">中サイズ</div>
@@ -210,11 +178,12 @@
     <div style="font-size:12px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ」（タップで足元に使う）</div>
     <div class="bag-grid" id="bag-grid"></div>
     <div style="font-size:12px; font-weight:bold; color:#475569;">📝 世代のきろく・思い出</div>
-    <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; font-size:11.5px; color:#334155; max-height:75px; overflow-y:auto; line-height:1.4;"></div>
+    <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; font-size:11.5px; color:#334155; max-height:110px; overflow-y:auto; line-height:1.4;"></div>
     <button class="btn-sub" onclick="closeModal('modal-diary')">手帳を閉じる</button>
   </div>
 </div>
 
+<!-- 🎰 ガチャモーダル -->
 <div class="modal-overlay" id="modal-gacha" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-gacha')">✕</div>
@@ -236,17 +205,12 @@
   </div>
 </div>
 
+<!-- ⚙️ システム設定モーダル（ここに「🎭 キャラ基本表現」ボタンを配置） -->
 <div class="modal-overlay" id="modal-settings" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-settings')">✕</div>
-    <div class="modal-title">⚙️ システム・骨組み・大きさ・観察窓設定</div>
-    <div class="setting-group">
-      <label class="setting-label">🦴 キャラクター構造（本格3D骨組み ⇔ サイコロ箱型）</label>
-      <select id="setting-rig-type" class="setting-input">
-        <option value="articulated">🦴 本格3D骨組み（腰・胸・首・肩・ひじ・手・股・ひざ・足首）</option>
-        <option value="box">🎲 サイコロ箱型（シンプル比較用）</option>
-      </select>
-    </div>
+    <div class="modal-title">⚙️ システム設定</div>
+    <button class="btn-accent" onclick="openExpressionModalFromSettings()">🎭 キャラ基本表現（20種バランス調整・骨組み切替）</button>
     <div class="setting-group">
       <label class="setting-label">🎥 追従カメラの観察窓（スポット透過）・分割線</label>
       <select id="setting-cam-style" class="setting-input">
@@ -256,7 +220,7 @@
       </select>
     </div>
     <div class="setting-group">
-      <label class="setting-label">📏 1号機の大きさ（3段階：今の大きさが「大」）</label>
+      <label class="setting-label">📏 1号機の大きさ（3段階）</label>
       <select id="setting-size-level" class="setting-input">
         <option value="large">大（最大サイズ：基準の大きさ）</option>
         <option value="medium">中（ひとまわりコンパクト）</option>
@@ -264,7 +228,7 @@
       </select>
     </div>
     <div class="setting-group">
-      <label class="setting-label">🐛 1号機の体型（3段階：太っちょが最大幅）</label>
+      <label class="setting-label">🐛 1号機の体型（3段階）</label>
       <select id="setting-body-type" class="setting-input">
         <option value="fat">太っちょ（幅4マス：最大の横幅・狭い穴につかえる）</option>
         <option value="normal">標準（幅3マス：通常のトンネルを通過）</option>
@@ -295,8 +259,32 @@
       <input type="password" id="setting-groq-key" class="setting-input" placeholder="Groqキーを貼り付け">
     </div>
     <button class="btn-primary" onclick="saveSettings()">設定を保存して閉じる</button>
-    <hr style="border:0; border-top:1px solid #e2e8f0; margin:4px 0;">
+    <hr style="border:0; border-top:1px solid #e2e8f0; margin:2px 0;">
     <button class="btn-danger" onclick="resetGameDirectly()">🔄 データを消して最初からやり直す（初期化）</button>
+  </div>
+</div>
+
+<!-- 🎭 キャラ基本表現モーダル（ボックス/3D骨組みタブ＋20種縦列リスト＋確定/キャンセル） -->
+<div class="modal-overlay" id="modal-expressions" style="display:none;">
+  <div class="modal-content">
+    <div class="modal-close" onclick="cancelExpressionModal()">✕</div>
+    <div class="modal-title">🎭 キャラ基本表現（バランス調整・全20種）</div>
+    <div style="font-size:11px; color:#475569; line-height:1.35;">
+      上のタブで「🎲サイコロ箱型」と「🦴3D骨組み（◯関節と線のマッチ棒）」を選び、左のボタンでしぐさ選択、右の欄でAIの連想ワードを調整できます。ルール外の行動時は自動で「🌀模索・奮闘」します。
+    </div>
+    <div class="rig-tab-bar">
+      <div class="rig-tab-btn active" id="tab-rig-box" onclick="selectTempRigTab('box')">🎲 サイコロ箱型(基本)</div>
+      <div class="rig-tab-btn" id="tab-rig-stick" onclick="selectTempRigTab('stick')">🦴 3D骨組み(◯と線)</div>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:10.5px; font-weight:800; color:#64748b; padding:0 4px;">
+      <span>👈 表現ボタン（20種類）</span>
+      <span>🤖 AI連想ワード（状態・道具・動作）</span>
+    </div>
+    <div class="expr-list-container" id="expr-list-container"></div>
+    <div class="modal-footer-btns">
+      <button class="btn-sub" onclick="cancelExpressionModal()">キャンセル</button>
+      <button class="btn-primary" onclick="confirmExpressionModal()">✅ 確定（水槽へ反映）</button>
+    </div>
   </div>
 </div>
 
@@ -304,6 +292,83 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
+  // ============================================================================
+  // 【コア①：20種の基本表現データ表 ＆ AI連想ワード辞書コア】
+  // ⚠️ AIモデルへの絶対命令：この20種類の定義と角度テーブルは1行も省略・削除しないこと
+  // ============================================================================
+  const DEFAULT_EXPRESSIONS = [
+    { key: 'normal',   icon: '🙂', label: '通常',           bulb: 0xfacc15, words: '立つ、待つ、見守る、落ち着く、通常' },
+    { key: 'joy',      icon: '😆', label: '喜ぶ',           bulb: 0xf472b6, words: 'バンザイ、成功、リンゴ、食べた、嬉しい、開通' },
+    { key: 'anger',    icon: '😡', label: '怒る',           bulb: 0xef4444, words: '地団駄、つかえた、悔しい、プンプン、怒る、狭い' },
+    { key: 'sad',      icon: '😭', label: '悲しむ',         bulb: 0x38bdf8, words: 'うなだれる、失敗、おなかすいた、しょんぼり、泣く' },
+    { key: 'fun',      icon: '🎵', label: '楽しむ',         bulb: 0x34d399, words: 'ダンス、鼻歌、ごきげん、ステップ、踊る、散歩' },
+    { key: 'fear',     icon: '😰', label: '怖がる',         bulb: 0x8b5cf6, words: '後ずさり、ビクビク、危険、お化け、怯える、暗い' },
+    { key: 'shiver',   icon: '🥶', label: '震える',         bulb: 0x60a5fa, words: '寒い、ガタガタ、武者震い、氷、冷たい、体力不足' },
+    { key: 'hot',      icon: '🥵', label: '暑がる',         bulb: 0xf97316, words: 'あおぐ、バテる、汗、熱い、蒸し暑い、疲れた' },
+    { key: 'think',    icon: '💡', label: '考える',         bulb: 0xfef08a, words: 'ひらめく、悩む、作戦会議、腕組み、思考、迷う' },
+    { key: 'surprise', icon: '😲', label: '驚く',           bulb: 0xf87171, words: 'びっくり、飛び上がる、発見、ハッとする、白波' },
+    { key: 'wave',     icon: '👋', label: '挨拶',           bulb: 0x4ade80, words: '手を振る、ヤッホー、呼ぶ、お礼、バイバイ、挨拶' },
+    { key: 'sleep',    icon: '💤', label: '居眠り',         bulb: 0x94a3b8, words: '寝る、船をこぐ、休憩、お昼寝、ひとやすみ、眠い' },
+    { key: 'swing_v',  icon: '⛏️', label: '縦に振りかざす', bulb: 0xfb923c, words: '斧、剣、ツルハシ、餅つき用きね、釣り竿、叩く、割る', tool: true },
+    { key: 'swing_h',  icon: '🧹', label: '横に払う・掃く', bulb: 0x2dd4bf, words: '掃除、草刈り、鎌、ほうき、ペンキ塗り、払う、削る', tool: true },
+    { key: 'pickup',   icon: '🤲', label: '拾う・置く',     bulb: 0xa3e635, words: 'しゃがむ、採取、種まき、置く、調べる、撫でる、拾う' },
+    { key: 'carry',    icon: '📦', label: '持ち上げる',     bulb: 0xfbbf24, words: '重い石、筋トレ、頭上に掲げる、積む、運ぶ、ブロック' },
+    { key: 'push',     icon: '👐', label: '前に押す・掘る', bulb: 0xf87171, words: '壁押し、トンネル掘り、どかす、突っ張る、前掘り、掘削' },
+    { key: 'run',      icon: '🏃', label: '走る・急ぐ',     bulb: 0x38bdf8, words: 'ダッシュ、逃げる、急ぐ、運動、駆け足、走る' },
+    { key: 'peek',     icon: '🔍', label: 'のぞき込む',     bulb: 0xc084fc, words: '下を見る、穴をのぞく、観察、キョロキョロ、探す' },
+    { key: 'struggle', icon: '🌀', label: '模索・奮闘する', bulb: 0xf43f5e, words: 'ルール外の行動、試行錯誤、ジタバタ挑戦、特訓、未知' }
+  ];
+
+  // 20種類の動きを軽量・高速に計算するコンパクトモーション定義テーブル（スマホ発熱ゼロ設計）
+  // [spd:速度, bounce:上下跳ね, bodyX:前傾, headX:首縦, shLX:左肩X, shLZ:左肩Z, elLX:左肘X, shRX:右肩X, shRZ:右肩Z, elRX:右肘X, hipX:股関節, kneeX:膝, waveMode:特殊波]
+  const POSE_TABLE = {
+    normal:   { spd: 3.5, bounce: 0.01, bodyX: 0.00, headX: 0.00, shLX: 0.05,  shLZ: 0.05, elLX: -0.20, shRX: -0.05, shRZ: -0.05, elRX: -0.20, hipX: -0.05, kneeX: 0.10, mode: 'breath' },
+    joy:      { spd: 7.5, bounce: 0.22, bodyX: -0.10, headX: -0.20, shLX: -2.65, shLZ: 0.35, elLX: -0.35, shRX: -2.65, shRZ: -0.35, elRX: -0.35, hipX: -0.35, kneeX: 0.70, mode: 'jump' },
+    anger:    { spd: 16,  bounce: 0.04, bodyX: 0.18, headX: 0.12, shLX: -0.90, shLZ: 0.35, elLX: -1.35, shRX: -0.90, shRZ: -0.35, elRX: -1.35, hipX: -0.85, kneeX: 1.30, mode: 'stomp' },
+    sad:      { spd: 2.2, bounce: -0.11, bodyX: 0.35, headX: 0.35, shLX: -0.45, shLZ: 0.10, elLX: -0.85, shRX: -0.45, shRZ: -0.10, elRX: -0.85, hipX: -1.40, kneeX: 0.80, mode: 'sit' },
+    fun:      { spd: 6.0, bounce: 0.07, bodyX: 0.00, headX: -0.08, shLX: -0.30, shLZ: 0.85, elLX: -0.75, shRX: -0.30, shRZ: -0.85, elRX: -0.75, hipX: -0.30, kneeX: 0.60, mode: 'dance' },
+    fear:     { spd: 24,  bounce: -0.04, bodyX: -0.22, headX: 0.20, shLX: -1.45, shLZ: -0.25, elLX: -1.15, shRX: -1.45, shRZ: 0.25, elRX: -1.15, hipX: -0.35, kneeX: 0.65, mode: 'tremor' },
+    shiver:   { spd: 36,  bounce: -0.05, bodyX: 0.28, headX: 0.25, shLX: -0.85, shLZ: -0.45, elLX: -1.45, shRX: -0.85, shRZ: 0.45, elRX: -1.45, hipX: -0.45, kneeX: 0.85, mode: 'tremor' },
+    hot:      { spd: 11,  bounce: -0.03, bodyX: 0.20, headX: 0.22, shLX: 0.15,  shLZ: 0.15, elLX: -0.15, shRX: -1.35, shRZ: -0.35, elRX: -1.10, hipX: -0.25, kneeX: 0.45, mode: 'fan' },
+    think:    { spd: 2.8, bounce: 0.00, bodyX: 0.05, headX: 0.10, shLX: -0.75, shLZ: -0.45, elLX: -1.35, shRX: -1.25, shRZ: 0.25, elRX: -1.55, hipX: -0.08, kneeX: 0.15, mode: 'think' },
+    surprise: { spd: 8.5, bounce: 0.17, bodyX: -0.26, headX: -0.25, shLX: -2.25, shLZ: 0.55, elLX: -0.20, shRX: -2.25, shRZ: -0.55, elRX: -0.20, hipX: 0.15,  kneeX: 0.20, mode: 'jump' },
+    wave:     { spd: 11,  bounce: 0.02, bodyX: 0.00, headX: -0.05, shLX: 0.10,  shLZ: 0.15, elLX: -0.25, shRX: -2.40, shRZ: -0.45, elRX: -0.40, hipX: -0.08, kneeX: 0.15, mode: 'wave' },
+    sleep:    { spd: 1.8, bounce: -0.11, bodyX: 0.28, headX: 0.35, shLX: -0.25, shLZ: 0.10, elLX: -0.65, shRX: -0.25, shRZ: -0.10, elRX: -0.65, hipX: -1.40, kneeX: 0.80, mode: 'sleep' },
+    swing_v:  { spd: 9.5, bounce: 0.03, bodyX: 0.22, headX: 0.10, shLX: -0.60, shLZ: 0.20, elLX: -0.80, shRX: -1.75, shRZ: -0.10, elRX: -0.75, hipX: -0.35, kneeX: 0.65, mode: 'swing_v' },
+    swing_h:  { spd: 8.5, bounce: 0.02, bodyX: 0.18, headX: 0.12, shLX: -0.85, shLZ: 0.35, elLX: -0.65, shRX: -1.10, shRZ: -0.65, elRX: -0.55, hipX: -0.30, kneeX: 0.55, mode: 'swing_h' },
+    pickup:   { spd: 5.0, bounce: -0.10, bodyX: 0.50, headX: 0.25, shLX: -1.25, shLZ: 0.10, elLX: -0.45, shRX: -1.25, shRZ: -0.10, elRX: -0.45, hipX: -0.95, kneeX: 1.65, mode: 'pickup' },
+    carry:    { spd: 4.5, bounce: -0.04, bodyX: -0.12, headX: -0.15, shLX: -2.45, shLZ: 0.20, elLX: -0.55, shRX: -2.45, shRZ: -0.20, elRX: -0.55, hipX: -0.45, kneeX: 0.85, mode: 'carry' },
+    push:     { spd: 7.0, bounce: -0.05, bodyX: 0.42, headX: -0.15, shLX: -1.55, shLZ: 0.10, elLX: -0.65, shRX: -1.55, shRZ: -0.10, elRX: -0.65, hipX: -0.65, kneeX: 1.10, mode: 'push' },
+    run:      { spd: 14,  bounce: 0.06, bodyX: 0.25, headX: -0.10, shLX: -0.85, shLZ: 0.15, elLX: -1.25, shRX: 0.65,  shRZ: -0.15, elRX: -1.25, hipX: -0.85, kneeX: 1.25, mode: 'run' },
+    peek:     { spd: 3.2, bounce: -0.04, bodyX: 0.45, headX: 0.38, shLX: -0.45, shLZ: 0.25, elLX: -1.10, shRX: -1.35, shRZ: 0.20, elRX: -1.20, hipX: -0.40, kneeX: 0.70, mode: 'peek' },
+    struggle: { spd: 13,  bounce: 0.09, bodyX: 0.15, headX: 0.20, shLX: -1.65, shLZ: 0.65, elLX: -0.95, shRX: -1.25, shRZ: -0.75, elRX: -1.15, hipX: -0.75, kneeX: 1.20, mode: 'struggle' }
+  };
+
+  let CUSTOM_WORDS_MAP = {};
+  DEFAULT_EXPRESSIONS.forEach(item => { CUSTOM_WORDS_MAP[item.key] = item.words; });
+
+  function getExpressionSpec(key) {
+    return DEFAULT_EXPRESSIONS.find(e => e.key === key) || DEFAULT_EXPRESSIONS[0];
+  }
+
+  // 行動テキストやAIの思考テキストから、登録された連想ワードに一致する表現キーを自動判定（該当なし＆未知の挑戦なら struggle）
+  function matchExpressionFromText(text, fallbackKey = 'struggle') {
+    if (!text) return fallbackKey;
+    for (let i = 0; i < DEFAULT_EXPRESSIONS.length; i++) {
+      const k = DEFAULT_EXPRESSIONS[i].key;
+      const rawWords = CUSTOM_WORDS_MAP[k] || DEFAULT_EXPRESSIONS[i].words;
+      const wordList = rawWords.split(/[、,，\s]+/).filter(Boolean);
+      for (let w of wordList) {
+        if (w.length >= 1 && text.includes(w)) return k;
+      }
+    }
+    return fallbackKey;
+  }
+
+  // ============================================================================
+  // 【コア④：頭脳通信・クラウド保存コア（Firebase Firestore ＆ localStorage）】
+  // ⚠️ AIモデルへの絶対命令：Firebase設定と自動保存・自動復元処理は一切削らないこと
+  // ============================================================================
   const firebaseConfig = {
     apiKey: "AIzaSyAE7E42I361W4i-I6CD4NEgydMSbAiDDOE",
     authDomain: "lifecore-5c9bf.firebaseapp.com",
@@ -315,9 +380,7 @@
 
   let firestoreDocRef = null;
   try {
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     firestoreDocRef = db.collection('lifecore_saves').doc('island_spacecore_v15');
   } catch (e) {
@@ -353,6 +416,10 @@
     exportSave() { return { energy: this.energy, stamina: this.stamina, mental: this.mental }; }
   }
 
+  // ============================================================================
+  // 【コア③：空間・物理・カメラコア（第一エリア空間・外周土壁・観察窓カメラ）】
+  // ⚠️ AIモデルへの絶対命令：空間ルールとカメラ制御は1文字も削らないこと
+  // ============================================================================
   const AREA1_MAX_GROUND_LV = 5;
   const AREA1_MIN_UNDER_LV  = -4;
   const WATER_SURFACE_Y     = -0.40;
@@ -443,29 +510,6 @@
     slim:   { label: 'スリム',   reqWidth: 2, scaleX: 0.72, scaleZ: 0.72 }
   };
 
-  // 一覧管理された12種類の基本感情・ポーズ辞書
-  const EMOTION_SPECS = {
-    normal:   { label: '通常',   icon: '🙂', bulbHex: 0xfacc15 },
-    fear:     { label: '怖がる', icon: '😰', bulbHex: 0x8b5cf6 },
-    shiver:   { label: '震える', icon: '🥶', bulbHex: 0x60a5fa },
-    hot:      { label: '暑がる', icon: '🥵', bulbHex: 0xf97316 },
-    joy:      { label: '喜ぶ',   icon: '😆', bulbHex: 0xf472b6 },
-    anger:    { label: '怒る',   icon: '😡', bulbHex: 0xef4444 },
-    sad:      { label: '悲しむ', icon: '😭', bulbHex: 0x38bdf8 },
-    fun:      { label: '楽しむ', icon: '🎵', bulbHex: 0x34d399 },
-    think:    { label: '考える', icon: '💡', bulbHex: 0xfef08a },
-    surprise: { label: '驚く',   icon: '😲', bulbHex: 0xf87171 },
-    wave:     { label: '挨拶',   icon: '👋', bulbHex: 0x4ade80 },
-    sleep:    { label: '居眠り', icon: '💤', bulbHex: 0x94a3b8 }
-  };
-
-  // 腕・全身の汎用アクションレイヤー辞書（採掘・釣り・剣などを1つの「swing」で共通処理、アイテム取得を「pickup」で処理）
-  const ACTION_LAYER_SPECS = {
-    none:   { label: 'なし', icon: '🚫' },
-    swing:  { label: '振る(共通)', icon: '⛏️' },
-    pickup: { label: '拾う', icon: '🤲' }
-  };
-
   const ALL_DIRS = [
     { name: '北',   dx: 0,  dz: -1, rot: Math.PI,          isDiag: false },
     { name: '南',   dx: 0,  dz: 1,  rot: 0,                isDiag: false },
@@ -488,24 +532,22 @@
 
   let life = new LifeCore(), GAME_DAY = 1, TIME_STEP = 0;
   let BAG = ['stone', 'apple', 'stone', 'grass'];
-  let DIARY_LOGS = ['🌱 1日目：本格3D骨組み（14関節・レイヤー合成・成長パラメータ）とサイコロ型を比較できる1号機が誕生！'];
+  let DIARY_LOGS = ['🌱 1日目：サイコロ箱型（デフォルト）とマッチ棒3D骨組みを切り替えられる1号機が誕生！'];
   let CAM_VISUAL_STYLE = safeStorage.getItem('cam_visual_style_v15') || 'hide';
   let HEIGHT_MAP = {}, CHIP_MAP = {}, WATER_MAP = {};
 
+  // デフォルトは「🎲サイコロ箱型（box）」
   let ROBOT = {
     unitModel: 1,
     gen: 1,
-    rigType: 'articulated', // 'articulated'（🦴本格3D骨組み） | 'box'（🎲サイコロ箱型）
-    growthLv: 3,            // 1（ヨチヨチ）〜 5（達人：経験値による動きの成長度）
-    exp: 20,                // 行動ごとに増える経験値
+    rigType: 'box',       // 'box'（🎲サイコロ箱型：デフォルト） | 'stick'（🦴◯と線のマッチ棒3D骨組み）
     pos: { x: 0, z: 0, lv: -1, sx: 2, sz: 2 },
     rotY: Math.PI,
     speed: 3,
     sizeLevel: 'large',
     bodyType: 'fat',
     posture: 'stand',
-    emotion: 'normal',
-    actionLayer: 'none'     // 'none' | 'swing'（振る共通） | 'pickup'（拾う）
+    emotion: 'normal'     // 20種類の表現キーのいずれか
   };
   let WORLD_ITEMS = [{ type: 'apple', x: -1, z: 1 }, { type: 'apple', x: 1, z: 0 }];
 
@@ -554,12 +596,18 @@
   function applyLoadedWorldData(d) {
     if (!d || typeof d !== 'object') return;
     if (d.life) life = new LifeCore(d.life);
+    if (d.customWords && typeof d.customWords === 'object') {
+      DEFAULT_EXPRESSIONS.forEach(item => {
+        if (typeof d.customWords[item.key] === 'string') {
+          CUSTOM_WORDS_MAP[item.key] = d.customWords[item.key];
+        }
+      });
+    }
     if (d.robot && d.robot.pos) {
       ROBOT.unitModel = Number(d.robot.unitModel) || 1;
       ROBOT.gen = Number(d.robot.gen) || 1;
-      ROBOT.rigType = (d.robot.rigType === 'box') ? 'box' : 'articulated';
-      ROBOT.growthLv = Math.max(1, Math.min(5, Number(d.robot.growthLv) || 3));
-      ROBOT.exp = Number(d.robot.exp) || 20;
+      // 読み込み時に stick 指定がある場合のみ stick、それ以外はデフォルトの box
+      ROBOT.rigType = (d.robot.rigType === 'stick') ? 'stick' : 'box';
       ROBOT.pos.x = Number.isFinite(d.robot.pos.x) ? d.robot.pos.x : 0;
       ROBOT.pos.z = Number.isFinite(d.robot.pos.z) ? d.robot.pos.z : 0;
       ROBOT.pos.lv = Number.isFinite(d.robot.pos.lv) ? d.robot.pos.lv : (HEIGHT_MAP[`${ROBOT.pos.x},${ROBOT.pos.z}`] ?? 0);
@@ -570,8 +618,7 @@
       ROBOT.sizeLevel = SIZE_SPECS[d.robot.sizeLevel] ? d.robot.sizeLevel : 'large';
       ROBOT.bodyType = BODY_SPECS[d.robot.bodyType] ? d.robot.bodyType : 'fat';
       ROBOT.posture = d.robot.posture === 'crawl' ? 'crawl' : 'stand';
-      ROBOT.emotion = EMOTION_SPECS[d.robot.emotion] ? d.robot.emotion : 'normal';
-      ROBOT.actionLayer = ACTION_LAYER_SPECS[d.robot.actionLayer] ? d.robot.actionLayer : 'none';
+      ROBOT.emotion = POSE_TABLE[d.robot.emotion] ? d.robot.emotion : 'normal';
     }
     if (d.heightMap) {
       for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
@@ -617,7 +664,6 @@
       if (parsed) {
         applyLoadedWorldData(parsed);
         safeStorage.setItem('island_spacecore_v15', JSON.stringify(parsed));
-        document.getElementById('setting-rig-type').value = ROBOT.rigType;
         document.getElementById('setting-size-level').value = ROBOT.sizeLevel;
         document.getElementById('setting-body-type').value = ROBOT.bodyType;
         document.getElementById('setting-speed').value = String(ROBOT.speed || 3);
@@ -640,6 +686,7 @@
     const payload = {
       life: life.exportSave(),
       robot: ROBOT,
+      customWords: CUSTOM_WORDS_MAP,
       heightMap: HEIGHT_MAP,
       chipMap: CHIP_MAP,
       items: WORLD_ITEMS,
@@ -673,11 +720,7 @@
     safeStorage.removeItem('island_spacecore_v15');
     safeStorage.removeItem('island_spacecore_v14');
     if (firestoreDocRef) {
-      try {
-        await firestoreDocRef.delete();
-      } catch (e) {
-        console.warn('Firestore delete error:', e);
-      }
+      try { await firestoreDocRef.delete(); } catch (e) {}
     }
     location.reload();
   }
@@ -687,39 +730,28 @@
     const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
     let reqW = bSpec.reqWidth;
     if (ROBOT.sizeLevel === 'small') reqW = Math.max(2, reqW - 1);
-    return {
-      reqWidth: reqW,
-      standH: sSpec.standH,
-      crawlH: sSpec.crawlH
-    };
+    return { reqWidth: reqW, standH: sSpec.standH, crawlH: sSpec.crawlH };
   }
 
   function evaluateBlockPassage(gx, gz, lv) {
     if (gx < -2 || gx > 2 || gz < -2 || gz > 2) return { openWidth: 5, openHeight: 5, hasCeiling: false };
     const topLv = HEIGHT_MAP[`${gx},${gz}`] ?? 0;
-    if (lv >= topLv) {
-      return { openWidth: 5, openHeight: 5, hasCeiling: false };
-    }
+    if (lv >= topLv) return { openWidth: 5, openHeight: 5, hasCeiling: false };
     const blockLv = lv + 1;
     const chip = CHIP_MAP[`${gx},${gz},${blockLv}`];
     if (!chip) return { openWidth: 0, openHeight: 0, hasCeiling: true };
 
-    let openHeight = 0;
-    let minWidthAtOpenLayers = 5;
+    let openHeight = 0, minWidthAtOpenLayers = 5;
     for (let sy = 0; sy < 5; sy++) {
       let carvedCount = 0;
-      for (let sx = 0; sx < 5; sx++) {
-        for (let sz = 0; sz < 5; sz++) {
-          if (chip[`${sx},${sy},${sz}`]) carvedCount++;
-        }
+      for (let sx = 0; sx < 5; sx++) for (let sz = 0; sz < 5; sz++) {
+        if (chip[`${sx},${sy},${sz}`]) carvedCount++;
       }
       const approxWidth = Math.min(5, Math.floor(Math.sqrt(carvedCount)));
       if (approxWidth >= 2) {
         openHeight = sy + 1;
         minWidthAtOpenLayers = Math.min(minWidthAtOpenLayers, approxWidth);
-      } else {
-        break;
-      }
+      } else break;
     }
     const hasCeiling = (openHeight < 5) || (topLv > blockLv);
     return { openWidth: openHeight > 0 ? minWidthAtOpenLayers : 0, openHeight, hasCeiling };
@@ -732,7 +764,6 @@
     }
     const eff = getEffectiveClearanceSpecs();
     const destTopLv = HEIGHT_MAP[`${nx},${nz}`] ?? 0;
-
     const targetLv = (destTopLv <= curLv) ? destTopLv : curLv;
     const pass = evaluateBlockPassage(nx, nz, targetLv);
 
@@ -757,8 +788,7 @@
   }
 
   function digFromCharacterFront(gx, gz, curLv, dir, crawlMode = false, count = 35) {
-    const tx = gx + (dir ? dir.dx : 0);
-    const tz = gz + (dir ? dir.dz : 0);
+    const tx = gx + (dir ? dir.dx : 0), tz = gz + (dir ? dir.dz : 0);
     const targetX = (tx >= -2 && tx <= 2) ? tx : gx;
     const targetZ = (tz >= -2 && tz <= 2) ? tz : gz;
     const topLv = HEIGHT_MAP[`${targetX},${targetZ}`] ?? 0;
@@ -772,7 +802,6 @@
 
     const eff = getEffectiveClearanceSpecs();
     const maxSy = crawlMode ? 2 : 4;
-
     const candidates = [];
     for (let sy = 0; sy <= maxSy; sy++) {
       for (let sx = 0; sx < 5; sx++) {
@@ -816,7 +845,6 @@
     }
 
     const isEdgeCell = (targetX === -2 || targetX === 2 || targetZ === -2 || targetZ === 2);
-
     if (!crawlMode && leftInnerCount <= 8) {
       if (!isEdgeCell || digLv > 0) {
         delete CHIP_MAP[chipKey];
@@ -839,9 +867,7 @@
   function getSurfaceYAt(gx, gz, lvOverride = null) {
     if (gx < -2 || gx > 2 || gz < -2 || gz > 2) return -0.55;
     const topLv = HEIGHT_MAP[`${gx},${gz}`] ?? 0;
-    if (lvOverride !== null && lvOverride < topLv) {
-      return lvOverride * 1.0;
-    }
+    if (lvOverride !== null && lvOverride < topLv) return lvOverride * 1.0;
     const chip = CHIP_MAP[`${gx},${gz},${topLv}`];
     if (!chip) return topLv * 1.0;
     for (let sy = 4; sy >= 0; sy--) {
@@ -897,10 +923,7 @@
 
   let activeCamera = followCam;
   let manualCameraMode = null;
-
-  let fpvYawOffset = 0;
-  let fpvPitch = -0.06;
-  let fpvZoomFactor = 1.0;
+  let fpvYawOffset = 0, fpvPitch = -0.06, fpvZoomFactor = 1.0;
 
   function resetFpvToRobotFront() {
     fpvYawOffset = 0;
@@ -935,8 +958,6 @@
   const underLight = new THREE.DirectionalLight(0xbae6fd, 0.52);
   underLight.position.set(-5, -14, -5);
   scene.add(underLight);
-
-  function wakeUpRenderer() {}
 
   const subCubeGeo = new THREE.BoxGeometry(0.2025, 0.2025, 0.2025);
   const fullCubeEdgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002));
@@ -995,11 +1016,9 @@
     glassSubMat.needsUpdate = true;
 
     let subIdx = 0;
-
     for (let x = -2; x <= 2; x++) {
       for (let z = -2; z <= 2; z++) {
         const topLv = HEIGHT_MAP[`${x},${z}`] ?? 0;
-
         for (let lv = AREA1_MIN_UNDER_LV; lv <= topLv; lv++) {
           const centerY = lv * 1.0 - 0.5;
           const chippedSet = CHIP_MAP[`${x},${z},${lv}`] || null;
@@ -1167,26 +1186,25 @@
   addConstellation('🥄 北斗七星', [[26,20,-8],[26,17,-3],[25,15,2],[24,12,6],[24,8,10],[27,7,14],[27,11,11]], [26,4,5]);
   addConstellation('🏹 オリオン座', [[-5,20,26],[5,20,26],[-2,14,28],[0,14,28],[2,14,28],[-5,8,26],[5,8,26]], [0,4,28]);
 
-  // =========================================================
-  // 【過去チャットから完全復元】
-  // 1. 🎲 サイコロ箱型モデル（boxRigGroup：これまでのシンプル比較用）
-  // 2. 🦴 本格3D階層ボーンモデル（articulatedRigGroup：腰→胸→首→頭、肩→上腕→ひじ→前腕→手ソケット、股関節→太もも→ひざ→すね→足首）
-  // 両方を robotPoseGroup の中に保持し、ワンタップで比較・育成可能！
-  // =========================================================
+  // ============================================================================
+  // 【コア②：キャラ骨格コア（🎲サイコロ箱型 ＆ 🦴◯と線のマッチ棒3Dデッサン骨格）】
+  // ⚠️ AIモデルへの絶対命令：両方の骨格モデルと関節構造は1文字も削らないこと
+  // ============================================================================
   const robotGroup = new THREE.Group();
   const robotPoseGroup = new THREE.Group();
   robotGroup.add(robotPoseGroup);
   scene.add(robotGroup);
 
-  const matMainBlue  = new THREE.MeshLambertMaterial({ color: 0x38bdf8 });
-  const matLightBlue = new THREE.MeshLambertMaterial({ color: 0xbae6fd });
-  const matJointCyan = new THREE.MeshLambertMaterial({ color: 0x0284c7 });
-  const matDarkLimb  = new THREE.MeshLambertMaterial({ color: 0x0f172a });
-  const matAccentWht = new THREE.MeshLambertMaterial({ color: 0xf8fafc });
+  const matMainBlue   = new THREE.MeshLambertMaterial({ color: 0x38bdf8 });
+  const matLightBlue  = new THREE.MeshLambertMaterial({ color: 0xbae6fd });
+  const matDarkLimb   = new THREE.MeshLambertMaterial({ color: 0x0f172a });
+  const matStickJoint = new THREE.MeshLambertMaterial({ color: 0xfef08a }); // ◯関節（見やすいパステルイエロー球体）
+  const matStickBone  = new THREE.MeshLambertMaterial({ color: 0xf8fafc }); // 線（マッチ棒の白い骨格ライン）
+  const matStickFrame = new THREE.MeshLambertMaterial({ color: 0x7dd3fc, wireframe: false }); // デッサン胸郭・骨盤
   const sharedBulbMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
 
   // ---------------------------------------------------------
-  // A. 🎲 サイコロ箱型（シンプル比較用リグ）
+  // A. 🎲 サイコロ箱型モデル（デフォルト：boxRigGroup）
   // ---------------------------------------------------------
   const boxRigGroup = new THREE.Group();
   robotPoseGroup.add(boxRigGroup);
@@ -1229,6 +1247,16 @@
   boxArmRPivot.add(boxArmR);
   boxRigGroup.add(boxArmRPivot);
 
+  const boxTool = new THREE.Group();
+  const boxToolBar = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.32, 0.04), new THREE.MeshLambertMaterial({ color: 0xd4a373 }));
+  boxToolBar.position.set(0, -0.26, 0.12);
+  boxToolBar.rotation.x = Math.PI / 2.5;
+  const boxToolHead = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.05, 0.05), new THREE.MeshLambertMaterial({ color: 0x94a3b8 }));
+  boxToolHead.position.set(0, -0.26, 0.24);
+  boxTool.add(boxToolBar); boxTool.add(boxToolHead);
+  boxTool.visible = false;
+  boxArmRPivot.add(boxTool);
+
   const boxLegLPivot = new THREE.Group();
   boxLegLPivot.position.set(-0.11, 0.15, 0);
   const boxLegL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 0.14), matDarkLimb);
@@ -1244,209 +1272,170 @@
   boxRigGroup.add(boxLegRPivot);
 
   // ---------------------------------------------------------
-  // B. 🦴 本格3D階層ボーンモデル（14関節＋手・頭・背中ソケット付き）
+  // B. 🦴 3D骨組みモデル（◯と線で関節・部位をつないだマッチ棒デッサン人形：stickRigGroup）
   // ---------------------------------------------------------
-  const artRigGroup = new THREE.Group();
-  robotPoseGroup.add(artRigGroup);
+  const stickRigGroup = new THREE.Group();
+  robotPoseGroup.add(stickRigGroup);
+  const SB = {}; // Stick Bones
 
-  // 1. 骨盤・腰ボーン (Pelvis / Waist) - 全身のルート関節
-  const BONES = {};
-  BONES.pelvis = new THREE.Group();
-  BONES.pelvis.position.set(0, 0.24, 0);
-  artRigGroup.add(BONES.pelvis);
+  function makeSphereJoint(r = 0.042) {
+    return new THREE.Mesh(new THREE.SphereGeometry(r, 10, 10), matStickJoint);
+  }
+  function makeStickRod(len = 0.16, r = 0.022) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 8), matStickBone);
+    m.position.y = -len / 2;
+    return m;
+  }
 
-  const pelvisMesh = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.14, 0.28), matJointCyan);
-  pelvisMesh.position.y = 0.0;
-  BONES.pelvis.add(pelvisMesh);
+  // 1. 骨盤・腰ルート (pelvis) + 股関節の横棒
+  SB.pelvis = new THREE.Group();
+  SB.pelvis.position.set(0, 0.38, 0);
+  stickRigGroup.add(SB.pelvis);
+  SB.pelvis.add(makeSphereJoint(0.048)); // 腰の中央◯関節
+  const pelvisBar = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.24, 8), matStickFrame);
+  pelvisBar.rotation.z = Math.PI / 2;
+  SB.pelvis.add(pelvisBar);
 
-  // 2. 胸・体幹ボーン (Chest / Spine) - 腰の子ボーン
-  BONES.chest = new THREE.Group();
-  BONES.chest.position.set(0, 0.07, 0);
-  BONES.pelvis.add(BONES.chest);
+  // 2. 背骨・胸郭 (chest) + 肩の横棒
+  SB.chest = new THREE.Group();
+  SB.chest.position.set(0, 0.0, 0);
+  SB.pelvis.add(SB.chest);
+  const spineRod = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.020, 0.26, 8), matStickBone);
+  spineRod.position.y = 0.13;
+  SB.chest.add(spineRod);
+  // 胸郭のデッサンフレーム（逆台形風の楕円胸パーツ）
+  const ribCage = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.09, 0.20, 10), matStickFrame);
+  ribCage.scale.set(1.0, 1.0, 0.62);
+  ribCage.position.y = 0.15;
+  SB.chest.add(ribCage);
+  const chestJoint = makeSphereJoint(0.042);
+  chestJoint.position.y = 0.15;
+  SB.chest.add(chestJoint);
+  const clavicleBar = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.38, 8), matStickBone);
+  clavicleBar.rotation.z = Math.PI / 2;
+  clavicleBar.position.y = 0.25;
+  SB.chest.add(clavicleBar);
 
-  const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.28, 0.32), matMainBlue);
-  chestMesh.position.y = 0.14;
-  BONES.chest.add(chestMesh);
+  // 3. 首 (neck) → 4. 頭 (head：デッサン人形風の卵型＋十字ライン＋頭頂ランプ)
+  SB.neck = new THREE.Group();
+  SB.neck.position.set(0, 0.26, 0);
+  SB.chest.add(SB.neck);
+  SB.neck.add(makeSphereJoint(0.036));
+  const neckRod = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.06, 8), matStickBone);
+  neckRod.position.y = 0.03;
+  SB.neck.add(neckRod);
 
-  // 胸のコアバッジ（立体ディテール）
-  const coreBadge = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.04), matAccentWht);
-  coreBadge.position.set(0, 0.16, 0.165);
-  BONES.chest.add(coreBadge);
+  SB.head = new THREE.Group();
+  SB.head.position.set(0, 0.06, 0);
+  SB.neck.add(SB.head);
+  const stickHeadMesh = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 12), matStickBone);
+  stickHeadMesh.scale.set(0.88, 1.12, 0.92);
+  stickHeadMesh.position.y = 0.14;
+  SB.head.add(stickHeadMesh);
+  // デッサン人形の顔正面の十字ライン（向きが一目でわかる！）
+  const faceCrossV = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.24, 0.02), matDarkLimb);
+  faceCrossV.position.set(0, 0.14, 0.125);
+  SB.head.add(faceCrossV);
+  const faceCrossH = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.018, 0.02), matDarkLimb);
+  faceCrossH.position.set(0, 0.15, 0.125);
+  SB.head.add(faceCrossH);
+  const stickBulb = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), sharedBulbMat);
+  stickBulb.position.y = 0.33;
+  SB.head.add(stickBulb);
 
-  // 背中ソケット（将来リュックや羽などを装着しても体型変化に自動追従するソケット）
-  BONES.backSocket = new THREE.Group();
-  BONES.backSocket.position.set(0, 0.15, -0.17);
-  BONES.chest.add(BONES.backSocket);
+  // 5. 左腕：左肩◯ (shoulderL) → 上腕線 → 左ひじ◯ (elbowL) → 前腕線 → 左手首◯ (wristL)
+  SB.shoulderL = new THREE.Group();
+  SB.shoulderL.position.set(-0.19, 0.25, 0);
+  SB.chest.add(SB.shoulderL);
+  SB.shoulderL.add(makeSphereJoint(0.044));
+  SB.shoulderL.add(makeStickRod(0.16, 0.022));
 
-  // 3. 首ボーン (Neck) → 4. 頭ボーン (Head)
-  BONES.neck = new THREE.Group();
-  BONES.neck.position.set(0, 0.28, 0);
-  BONES.chest.add(BONES.neck);
+  SB.elbowL = new THREE.Group();
+  SB.elbowL.position.set(0, -0.16, 0);
+  SB.shoulderL.add(SB.elbowL);
+  SB.elbowL.add(makeSphereJoint(0.038));
+  SB.elbowL.add(makeStickRod(0.15, 0.020));
 
-  const neckRing = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.10, 0.06, 12), matJointCyan);
-  neckRing.position.y = 0.02;
-  BONES.neck.add(neckRing);
+  SB.wristL = new THREE.Group();
+  SB.wristL.position.set(0, -0.15, 0);
+  SB.elbowL.add(SB.wristL);
+  SB.wristL.add(makeSphereJoint(0.034));
+  const palmL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, 0.07), matStickFrame);
+  palmL.position.y = -0.04;
+  SB.wristL.add(palmL);
 
-  BONES.head = new THREE.Group();
-  BONES.head.position.set(0, 0.04, 0);
-  BONES.neck.add(BONES.head);
+  // 6. 右腕：右肩◯ (shoulderR) → 上腕線 → 右ひじ◯ (elbowR) → 前腕線 → 右手首◯ (wristR) + ツール
+  SB.shoulderR = new THREE.Group();
+  SB.shoulderR.position.set(0.19, 0.25, 0);
+  SB.chest.add(SB.shoulderR);
+  SB.shoulderR.add(makeSphereJoint(0.044));
+  SB.shoulderR.add(makeStickRod(0.16, 0.022));
 
-  const artHeadMesh = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.34, 0.36), matLightBlue);
-  artHeadMesh.position.y = 0.17;
-  BONES.head.add(artHeadMesh);
+  SB.elbowR = new THREE.Group();
+  SB.elbowR.position.set(0, -0.16, 0);
+  SB.shoulderR.add(SB.elbowR);
+  SB.elbowR.add(makeSphereJoint(0.038));
+  SB.elbowR.add(makeStickRod(0.15, 0.020));
 
-  // 耳センサー（左右の立体造形）
-  const earL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.12), matJointCyan);
-  earL.position.set(-0.22, 0.17, 0);
-  BONES.head.add(earL);
-  const earR = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.12), matJointCyan);
-  earR.position.set(0.22, 0.17, 0);
-  BONES.head.add(earR);
+  SB.wristR = new THREE.Group();
+  SB.wristR.position.set(0, -0.15, 0);
+  SB.elbowR.add(SB.wristR);
+  SB.wristR.add(makeSphereJoint(0.034));
+  const palmR = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, 0.07), matStickFrame);
+  palmR.position.y = -0.04;
+  SB.wristR.add(palmR);
 
-  BONES.eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.10, 0.05), matDarkLimb);
-  BONES.eyeL.position.set(-0.09, 0.18, 0.182);
-  BONES.head.add(BONES.eyeL);
+  const stickTool = new THREE.Group();
+  const sToolBar = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.34, 8), new THREE.MeshLambertMaterial({ color: 0xd4a373 }));
+  sToolBar.position.set(0, -0.04, 0.14);
+  sToolBar.rotation.x = Math.PI / 2.2;
+  const sToolHead = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.045, 0.05), new THREE.MeshLambertMaterial({ color: 0x94a3b8 }));
+  sToolHead.position.set(0, -0.04, 0.28);
+  stickTool.add(sToolBar); stickTool.add(sToolHead);
+  stickTool.visible = false;
+  SB.wristR.add(stickTool);
 
-  BONES.eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.10, 0.05), matDarkLimb);
-  BONES.eyeR.position.set(0.09, 0.18, 0.182);
-  BONES.head.add(BONES.eyeR);
+  // 7. 左脚：左股関節◯ (hipL) → 太もも線 → 左ひざ◯ (kneeL) → すね線 → 左足首◯ (ankleL)
+  SB.hipL = new THREE.Group();
+  SB.hipL.position.set(-0.11, -0.02, 0);
+  SB.pelvis.add(SB.hipL);
+  SB.hipL.add(makeSphereJoint(0.044));
+  SB.hipL.add(makeStickRod(0.17, 0.025));
 
-  // 頭頂ソケット＆アンテナランプ
-  const antennaStem = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.08, 8), matJointCyan);
-  antennaStem.position.y = 0.37;
-  BONES.head.add(antennaStem);
+  SB.kneeL = new THREE.Group();
+  SB.kneeL.position.set(0, -0.17, 0);
+  SB.hipL.add(SB.kneeL);
+  SB.kneeL.add(makeSphereJoint(0.040));
+  SB.kneeL.add(makeStickRod(0.16, 0.022));
 
-  BONES.bulb = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), sharedBulbMat);
-  BONES.bulb.position.y = 0.44;
-  BONES.head.add(BONES.bulb);
+  SB.ankleL = new THREE.Group();
+  SB.ankleL.position.set(0, -0.16, 0);
+  SB.kneeL.add(SB.ankleL);
+  SB.ankleL.add(makeSphereJoint(0.034));
+  const stickFootL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.15), matStickFrame);
+  stickFootL.position.set(0, -0.02, 0.03);
+  SB.ankleL.add(stickFootL);
 
-  // 5. 左肩 (ShoulderL) → 6. 左ひじ (ElbowL) → 7. 左手ソケット (HandSocketL)
-  BONES.shoulderL = new THREE.Group();
-  BONES.shoulderL.position.set(-0.25, 0.24, 0);
-  BONES.chest.add(BONES.shoulderL);
+  // 8. 右脚：右股関節◯ (hipR) → 太もも線 → 右ひざ◯ (kneeR) → すね線 → 右足首◯ (ankleR)
+  SB.hipR = new THREE.Group();
+  SB.hipR.position.set(0.11, -0.02, 0);
+  SB.pelvis.add(SB.hipR);
+  SB.hipR.add(makeSphereJoint(0.044));
+  SB.hipR.add(makeStickRod(0.17, 0.025));
 
-  const shoulderJointL = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 10), matJointCyan);
-  BONES.shoulderL.add(shoulderJointL);
+  SB.kneeR = new THREE.Group();
+  SB.kneeR.position.set(0, -0.17, 0);
+  SB.hipR.add(SB.kneeR);
+  SB.kneeR.add(makeSphereJoint(0.040));
+  SB.kneeR.add(makeStickRod(0.16, 0.022));
 
-  const upperArmL = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.15, 0.10), matDarkLimb);
-  upperArmL.position.y = -0.09;
-  BONES.shoulderL.add(upperArmL);
-
-  BONES.elbowL = new THREE.Group();
-  BONES.elbowL.position.set(0, -0.17, 0);
-  BONES.shoulderL.add(BONES.elbowL);
-
-  const elbowJointL = new THREE.Mesh(new THREE.SphereGeometry(0.052, 8, 8), matJointCyan);
-  BONES.elbowL.add(elbowJointL);
-
-  const foreArmL = new THREE.Mesh(new THREE.BoxGeometry(0.088, 0.15, 0.095), matDarkLimb);
-  foreArmL.position.y = -0.08;
-  BONES.elbowL.add(foreArmL);
-
-  BONES.handSocketL = new THREE.Group();
-  BONES.handSocketL.position.set(0, -0.16, 0);
-  BONES.elbowL.add(BONES.handSocketL);
-
-  const handMeshL = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.07, 0.11), matLightBlue);
-  BONES.handSocketL.add(handMeshL);
-
-  // 8. 右肩 (ShoulderR) → 9. 右ひじ (ElbowR) → 10. 右手ソケット (HandSocketR)
-  BONES.shoulderR = new THREE.Group();
-  BONES.shoulderR.position.set(0.25, 0.24, 0);
-  BONES.chest.add(BONES.shoulderR);
-
-  const shoulderJointR = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 10), matJointCyan);
-  BONES.shoulderR.add(shoulderJointR);
-
-  const upperArmR = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.15, 0.10), matDarkLimb);
-  upperArmR.position.y = -0.09;
-  BONES.shoulderR.add(upperArmR);
-
-  BONES.elbowR = new THREE.Group();
-  BONES.elbowR.position.set(0, -0.17, 0);
-  BONES.shoulderR.add(BONES.elbowR);
-
-  const elbowJointR = new THREE.Mesh(new THREE.SphereGeometry(0.052, 8, 8), matJointCyan);
-  BONES.elbowR.add(elbowJointR);
-
-  const foreArmR = new THREE.Mesh(new THREE.BoxGeometry(0.088, 0.15, 0.095), matDarkLimb);
-  foreArmR.position.y = -0.08;
-  BONES.elbowR.add(foreArmR);
-
-  BONES.handSocketR = new THREE.Group();
-  BONES.handSocketR.position.set(0, -0.16, 0);
-  BONES.elbowR.add(BONES.handSocketR);
-
-  const handMeshR = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.07, 0.11), matLightBlue);
-  BONES.handSocketR.add(handMeshR);
-
-  // 右手ソケットに装着する「汎用ツール（ツルハシ/ステッキ）」：「振る(swing)」レイヤーの時に自動で手に現れる！
-  const toolGroup = new THREE.Group();
-  const toolHandle = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.34, 0.04), new THREE.MeshLambertMaterial({ color: 0xd4a373 }));
-  toolHandle.position.set(0, 0.12, 0.08);
-  toolHandle.rotation.x = Math.PI / 3;
-  const toolHead = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 0.06), new THREE.MeshLambertMaterial({ color: 0x94a3b8 }));
-  toolHead.position.set(0, 0.20, 0.20);
-  toolGroup.add(toolHandle);
-  toolGroup.add(toolHead);
-  toolGroup.visible = false;
-  BONES.handSocketR.add(toolGroup);
-
-  // 11. 左股関節 (HipL) → 12. 左ひざ (KneeL) → 左足首 (AnkleL)
-  BONES.hipL = new THREE.Group();
-  BONES.hipL.position.set(-0.11, -0.04, 0);
-  BONES.pelvis.add(BONES.hipL);
-
-  const thighL = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.12), matDarkLimb);
-  thighL.position.y = -0.05;
-  BONES.hipL.add(thighL);
-
-  BONES.kneeL = new THREE.Group();
-  BONES.kneeL.position.set(0, -0.10, 0);
-  BONES.hipL.add(BONES.kneeL);
-
-  const kneeJointL = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), matJointCyan);
-  BONES.kneeL.add(kneeJointL);
-
-  const shinL = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.09, 0.11), matDarkLimb);
-  shinL.position.y = -0.05;
-  BONES.kneeL.add(shinL);
-
-  BONES.ankleL = new THREE.Group();
-  BONES.ankleL.position.set(0, -0.09, 0);
-  BONES.kneeL.add(BONES.ankleL);
-
-  const footL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.16), matLightBlue);
-  footL.position.set(0, -0.01, 0.02);
-  BONES.ankleL.add(footL);
-
-  // 13. 右股関節 (HipR) → 14. 右ひざ (KneeR) → 右足首 (AnkleR)
-  BONES.hipR = new THREE.Group();
-  BONES.hipR.position.set(0.11, -0.04, 0);
-  BONES.pelvis.add(BONES.hipR);
-
-  const thighR = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.12), matDarkLimb);
-  thighR.position.y = -0.05;
-  BONES.hipR.add(thighR);
-
-  BONES.kneeR = new THREE.Group();
-  BONES.kneeR.position.set(0, -0.10, 0);
-  BONES.hipR.add(BONES.kneeR);
-
-  const kneeJointR = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), matJointCyan);
-  BONES.kneeR.add(kneeJointR);
-
-  const shinR = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.09, 0.11), matDarkLimb);
-  shinR.position.y = -0.05;
-  BONES.kneeR.add(shinR);
-
-  BONES.ankleR = new THREE.Group();
-  BONES.ankleR.position.set(0, -0.09, 0);
-  BONES.kneeR.add(BONES.ankleR);
-
-  const footR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.16), matLightBlue);
-  footR.position.set(0, -0.01, 0.02);
-  BONES.ankleR.add(footR);
+  SB.ankleR = new THREE.Group();
+  SB.ankleR.position.set(0, -0.16, 0);
+  SB.kneeR.add(SB.ankleR);
+  SB.ankleR.add(makeSphereJoint(0.034));
+  const stickFootR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.15), matStickFrame);
+  stickFootR.position.set(0, -0.02, 0.03);
+  SB.ankleR.add(stickFootR);
 
   function syncRobot3DPosition() {
     const gx = ROBOT.pos.x, gz = ROBOT.pos.z;
@@ -1455,12 +1444,10 @@
     robotGroup.position.set(gx + subX, baseY, gz + subZ);
     robotGroup.rotation.y = ROBOT.rotY || 0;
 
-    // 🦴本格3D骨組み と 🎲サイコロ箱型 の表示切り替え
-    const isArticulated = (ROBOT.rigType !== 'box');
-    artRigGroup.visible = isArticulated;
-    boxRigGroup.visible = !isArticulated;
+    const isStick = (ROBOT.rigType === 'stick');
+    stickRigGroup.visible = isStick;
+    boxRigGroup.visible = !isStick;
 
-    // 大きさ3段階 × 体型3段階の反映（ソケットも階層内にあるため突き抜けずに自動追従！）
     const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
     const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
     robotPoseGroup.scale.set(
@@ -1477,293 +1464,148 @@
       robotPoseGroup.position.set(0, 0, 0);
     }
 
-    const eSpec = EMOTION_SPECS[ROBOT.emotion] || EMOTION_SPECS.normal;
-    sharedBulbMat.color.setHex(eSpec.bulbHex);
+    const eSpec = getExpressionSpec(ROBOT.emotion);
+    sharedBulbMat.color.setHex(eSpec.bulb);
   }
 
-  // =========================================================
-  // 【過去チャットから完全復元】
-  // データ駆動・レイヤー合成アニメーションエンジン：
-  // ・成長度 (ROBOT.growthLv: 1〜5) をパラメータとして受け取り、関節の可動域・滑らかさ・連動性が成長！
-  // ・レイヤー1（下半身・姿勢）＋ レイヤー2（体幹・12種の感情）＋ レイヤー3（腕アクション：振る/拾う）を合成！
-  // =========================================================
-  function updateRobotLayeredAnimation(t) {
-    const emo = ROBOT.emotion || 'normal';
-    const act = ROBOT.actionLayer || 'none';
-    // 成長パラメータ（Lv1=0.65:ヨチヨチぎこちない 〜 Lv3=1.00:標準 〜 Lv5=1.35:滑らかでダイナミックな関節連動）
-    const skill = 0.50 + (ROBOT.growthLv || 3) * 0.17;
-    // Lv1のときは少しカクッとした量子化タイムにしてヨチヨチ感を表現、Lvが上がるほど完全スムーズに！
-    const effT = (ROBOT.growthLv === 1) ? (Math.floor(t * 10) / 10) : t;
+  // 20種類の表現テーブル（POSE_TABLE）を「🎲サイコロ箱型」と「🦴3D骨組み（◯と線のマッチ棒）」の両方に高速適用
+  function updateRobotUnifiedAnimation(t) {
+    const emoKey = POSE_TABLE[ROBOT.emotion] ? ROBOT.emotion : 'normal';
+    const p = POSE_TABLE[emoKey];
+    const eSpec = getExpressionSpec(emoKey);
+    const phase = t * p.spd;
+    const wave = Math.sin(phase);
+    const cosW = Math.cos(phase);
+    const absW = Math.abs(wave);
 
-    // --- A. 🎲 サイコロ箱型モードのとき ---
-    if (ROBOT.rigType === 'box') {
-      boxRigGroup.position.set(0, 0, 0);
-      boxRigGroup.rotation.set(0, 0, 0);
-      boxHeadPivot.rotation.set(0, 0, 0);
-      boxArmLPivot.rotation.set(0, 0, 0);
-      boxArmRPivot.rotation.set(0, 0, 0);
-      boxLegLPivot.rotation.set(0, 0, 0);
-      boxLegRPivot.rotation.set(0, 0, 0);
-      boxEyeL.scale.set(1, 1, 1); boxEyeR.scale.set(1, 1, 1);
+    // 動的オフセットの計算（モードごとの特徴的な揺れ）
+    let dy = 0, bodyRotY = 0, bodyRotZ = 0, headRotY = 0, headRotZ = 0;
+    let armLDX = 0, armRDX = 0, armRDZ = 0, elRDX = 0, legLDX = 0, legRDX = 0;
 
-      if (ROBOT.posture === 'crawl') {
-        boxHeadPivot.rotation.x = -Math.PI / 3;
-        const w = Math.sin(effT * 7);
-        boxArmLPivot.rotation.x = -2.2 + w * 0.35;
-        boxArmRPivot.rotation.x = -2.2 - w * 0.35;
-        return;
-      }
-      if (emo === 'joy') {
-        boxRigGroup.position.y = Math.abs(Math.sin(effT * 7.5)) * 0.20;
-        boxArmLPivot.rotation.x = -2.7; boxArmRPivot.rotation.x = -2.7;
-      } else if (emo === 'anger') {
-        const s = Math.sin(effT * 18);
-        boxArmLPivot.rotation.x = -1.6 + s * 0.6; boxArmRPivot.rotation.x = -1.6 - s * 0.6;
-        boxLegLPivot.rotation.x = s * 0.5; boxLegRPivot.rotation.x = -s * 0.5;
-      } else if (emo === 'sad' || emo === 'sleep') {
-        boxRigGroup.position.y = -0.08;
-        boxHeadPivot.rotation.x = 0.45;
-        boxLegLPivot.rotation.x = -1.3; boxLegRPivot.rotation.x = -1.3;
-      } else {
-        boxHeadPivot.position.y = 0.56 + Math.sin(effT * 4) * 0.015;
-      }
-      if (act === 'swing') {
-        boxArmRPivot.rotation.x = -1.5 + Math.sin(effT * 12) * 1.1;
-      } else if (act === 'pickup') {
-        boxRigGroup.position.y = -0.06;
-        boxArmLPivot.rotation.x = -1.0; boxArmRPivot.rotation.x = -1.0;
-      }
-      return;
-    }
-
-    // --- B. 🦴 本格3D骨組み（14関節階層ボーン＋レイヤー合成）モードのとき ---
-    BONES.pelvis.position.set(0, 0.24, 0);
-    BONES.pelvis.rotation.set(0, 0, 0);
-    BONES.chest.rotation.set(0, 0, 0);
-    BONES.neck.rotation.set(0, 0, 0);
-    BONES.head.rotation.set(0, 0, 0);
-    BONES.shoulderL.rotation.set(0, 0, 0);
-    BONES.elbowL.rotation.set(0, 0, 0);
-    BONES.shoulderR.rotation.set(0, 0, 0);
-    BONES.elbowR.rotation.set(0, 0, 0);
-    BONES.hipL.rotation.set(0, 0, 0);
-    BONES.kneeL.rotation.set(0, 0, 0);
-    BONES.ankleL.rotation.set(0, 0, 0);
-    BONES.hipR.rotation.set(0, 0, 0);
-    BONES.kneeR.rotation.set(0, 0, 0);
-    BONES.ankleR.rotation.set(0, 0, 0);
-    BONES.eyeL.scale.set(1, 1, 1); BONES.eyeR.scale.set(1, 1, 1);
-    BONES.eyeL.rotation.set(0, 0, 0); BONES.eyeR.rotation.set(0, 0, 0);
-    BONES.bulb.scale.set(1, 1, 1);
-    toolGroup.visible = (act === 'swing');
-
-    // 【レイヤー0：ほふく前進姿勢】ひじとひざを曲げてリアルに這う！
-    if (ROBOT.posture === 'crawl') {
-      const cWave = Math.sin(effT * 7);
-      BONES.pelvis.position.y = 0.24 + cWave * 0.02;
-      BONES.chest.rotation.y = cWave * 0.08 * skill;
-      BONES.head.rotation.x = -Math.PI / 2.8;
-      BONES.shoulderL.rotation.x = -2.1 + cWave * 0.4;
-      BONES.elbowL.rotation.x = -0.65;
-      BONES.shoulderR.rotation.x = -2.1 - cWave * 0.4;
-      BONES.elbowR.rotation.x = -0.65;
-      BONES.hipL.rotation.x = -0.4 - cWave * 0.35;
-      BONES.kneeL.rotation.x = 0.75;
-      BONES.hipR.rotation.x = -0.4 + cWave * 0.35;
-      BONES.kneeR.rotation.x = 0.75;
-      return;
-    }
-
-    // 【レイヤー1＆2：全身・体幹の感情＆需要ポーズ（12種類）】
-    if (emo === 'joy') {
-      // 😆 喜ぶ：しゃがみ込み（ひざ曲げ）から高くジャンプし、ひじを曲げて元気よくバンザイ！
-      const phase = effT * 7.5;
-      const s = Math.sin(phase);
-      if (s > 0) {
-        BONES.pelvis.position.y = 0.24 + s * 0.22 * skill;
-        BONES.hipL.rotation.x = 0.25 * s; BONES.kneeL.rotation.x = 0.35 * s;
-        BONES.hipR.rotation.x = -0.25 * s; BONES.kneeR.rotation.x = 0.35 * s;
-      } else {
-        // 着地時のクッション（ひざ・股関節の屈伸！）
-        const squat = -s * 0.45;
-        BONES.pelvis.position.y = 0.24 - squat * 0.08;
-        BONES.hipL.rotation.x = -squat; BONES.kneeL.rotation.x = squat * 1.8; BONES.ankleL.rotation.x = -squat * 0.8;
-        BONES.hipR.rotation.x = -squat; BONES.kneeR.rotation.x = squat * 1.8; BONES.ankleR.rotation.x = -squat * 0.8;
-      }
-      BONES.chest.rotation.x = -0.12;
-      BONES.chest.rotation.y = Math.sin(phase * 0.5) * 0.18 * skill;
-      BONES.head.rotation.x = -0.18;
-      BONES.shoulderL.rotation.x = -2.6 + Math.sin(phase * 2) * 0.25;
-      BONES.shoulderL.rotation.z = 0.35;
-      BONES.elbowL.rotation.x = -0.35;
-      BONES.shoulderR.rotation.x = -2.6 - Math.sin(phase * 2) * 0.25;
-      BONES.shoulderR.rotation.z = -0.35;
-      BONES.elbowR.rotation.x = -0.35;
-      BONES.eyeL.scale.set(1.25, 0.35, 1); BONES.eyeR.scale.set(1.25, 0.35, 1);
-
-    } else if (emo === 'anger') {
-      // 😡 怒る：胸を前傾させ、ひじを90度に曲げてガッツポーズのまま、ひざを高く上げて地団駄を踏む！
-      const stomp = Math.sin(effT * 16);
-      const liftL = Math.max(0, stomp);
-      const liftR = Math.max(0, -stomp);
-      BONES.pelvis.position.y = 0.22 + Math.abs(stomp) * 0.03;
-      BONES.pelvis.rotation.z = stomp * 0.08;
-      BONES.chest.rotation.x = 0.18;
-      BONES.chest.rotation.y = -stomp * 0.15 * skill;
-      BONES.head.rotation.x = 0.12;
-      BONES.shoulderL.rotation.x = -0.8 + stomp * 0.5;
-      BONES.shoulderL.rotation.z = 0.35;
-      BONES.elbowL.rotation.x = -1.35; // ひじを力強く曲げる！
-      BONES.shoulderR.rotation.x = -0.8 - stomp * 0.5;
-      BONES.shoulderR.rotation.z = -0.35;
-      BONES.elbowR.rotation.x = -1.35;
-      // 股関節とひざを曲げて交互に強く踏み込む！
-      BONES.hipL.rotation.x = -liftL * 0.95; BONES.kneeL.rotation.x = liftL * 1.35;
-      BONES.hipR.rotation.x = -liftR * 0.95; BONES.kneeR.rotation.x = liftR * 1.35;
-      BONES.eyeL.rotation.z = -0.35; BONES.eyeR.rotation.z = 0.35;
-      BONES.eyeL.scale.set(1.2, 0.75, 1); BONES.eyeR.scale.set(1.2, 0.75, 1);
-
-    } else if (emo === 'sad') {
-      // 😭 悲しむ：股関節とひざを曲げて体育座りのように座り込み、背中を丸めてうなだれる
-      BONES.pelvis.position.y = 0.12;
-      BONES.chest.rotation.x = 0.32;
-      BONES.neck.rotation.x = 0.25;
-      BONES.head.rotation.x = 0.25 + Math.sin(effT * 2.5) * 0.06;
-      BONES.head.rotation.z = Math.sin(effT * 1.8) * 0.08;
-      BONES.shoulderL.rotation.x = -0.45; BONES.elbowL.rotation.x = -0.85;
-      BONES.shoulderR.rotation.x = -0.45; BONES.elbowR.rotation.x = -0.85;
-      BONES.hipL.rotation.x = -1.45; BONES.kneeL.rotation.x = 0.65;
-      BONES.hipR.rotation.x = -1.45; BONES.kneeR.rotation.x = 0.65;
-      BONES.eyeL.rotation.z = 0.30; BONES.eyeR.rotation.z = -0.30;
-      BONES.eyeL.scale.set(1.15, 0.55, 1); BONES.eyeR.scale.set(1.15, 0.55, 1);
-
-    } else if (emo === 'fun') {
-      // 🎵 楽しむ：ひざでリズムを取りながら、腰・胸・首・ひじを連動させてルンルンダンス！
-      const beat = Math.sin(effT * 6.0);
-      const bounce = Math.abs(Math.cos(effT * 6.0));
-      BONES.pelvis.position.y = 0.23 - (1 - bounce) * 0.04;
-      BONES.pelvis.rotation.z = beat * 0.10 * skill;
-      BONES.chest.rotation.z = -beat * 0.14 * skill;
-      BONES.chest.rotation.y = Math.sin(effT * 3.0) * 0.25 * skill;
-      BONES.head.rotation.z = beat * 0.18;
-      BONES.shoulderL.rotation.z = 0.75 + beat * 0.35; BONES.elbowL.rotation.x = -0.75 - beat * 0.25;
-      BONES.shoulderR.rotation.z = -0.75 + beat * 0.35; BONES.elbowR.rotation.x = -0.75 + beat * 0.25;
-      BONES.hipL.rotation.x = -(1 - bounce) * 0.35; BONES.kneeL.rotation.x = (1 - bounce) * 0.65;
-      BONES.hipR.rotation.x = -(1 - bounce) * 0.35; BONES.kneeR.rotation.x = (1 - bounce) * 0.65;
-
-    } else if (emo === 'fear') {
-      // 😰 怖がる：腰を引いてのけぞり、ひじを曲げて両手で顔をガードしながらビクビク震える！
-      const tremor = Math.sin(effT * 26);
-      BONES.pelvis.position.set(0, 0.20, -0.06);
-      BONES.chest.rotation.x = -0.22;
-      BONES.head.rotation.x = 0.25;
-      BONES.head.rotation.y = tremor * 0.12;
-      BONES.shoulderL.rotation.x = -1.45; BONES.shoulderL.rotation.z = -0.25; BONES.elbowL.rotation.x = -1.15;
-      BONES.shoulderR.rotation.x = -1.45; BONES.shoulderR.rotation.z = 0.25;  BONES.elbowR.rotation.x = -1.15;
-      BONES.hipL.rotation.x = -0.35; BONES.kneeL.rotation.x = 0.65;
-      BONES.hipR.rotation.x = -0.20; BONES.kneeR.rotation.x = 0.45;
-      BONES.eyeL.scale.set(0.85, 1.5, 1); BONES.eyeR.scale.set(0.85, 1.5, 1);
-
-    } else if (emo === 'shiver') {
-      // 🥶 震える：ひじとひざをギュッと曲げて自分を抱きしめ、ガタガタ小刻みに震える！
-      const shiv = Math.sin(effT * 38);
-      BONES.pelvis.position.x = shiv * 0.015;
-      BONES.pelvis.position.y = 0.19;
-      BONES.chest.rotation.x = 0.28;
-      BONES.head.rotation.x = 0.25;
-      BONES.shoulderL.rotation.x = -0.85; BONES.shoulderL.rotation.z = -0.45; BONES.elbowL.rotation.x = -1.45;
-      BONES.shoulderR.rotation.x = -0.85; BONES.shoulderR.rotation.z = 0.45;  BONES.elbowR.rotation.x = -1.45;
-      BONES.hipL.rotation.x = -0.45; BONES.kneeL.rotation.x = 0.85;
-      BONES.hipR.rotation.x = -0.45; BONES.kneeR.rotation.x = 0.85;
-      BONES.eyeL.scale.set(1.1, 0.4, 1); BONES.eyeR.scale.set(1.1, 0.4, 1);
-
-    } else if (emo === 'hot') {
-      // 🥵 暑がる：腰と胸をぐったり落とし、右ひじを曲げてパタパタと顔をあおぐ！
-      const fan = Math.sin(effT * 12);
-      BONES.pelvis.position.y = 0.20;
-      BONES.chest.rotation.x = 0.20 + Math.sin(effT * 2) * 0.05;
-      BONES.head.rotation.x = 0.22; BONES.head.rotation.z = 0.12;
-      BONES.shoulderL.rotation.x = 0.15; BONES.shoulderL.rotation.z = 0.15; BONES.elbowL.rotation.x = -0.15;
-      BONES.shoulderR.rotation.x = -1.35; BONES.shoulderR.rotation.z = -0.35;
-      BONES.elbowR.rotation.x = -1.10 + fan * 0.45; // ひじ関節で顔をあおぐ！
-      BONES.hipL.rotation.x = -0.25; BONES.kneeL.rotation.x = 0.45;
-      BONES.hipR.rotation.x = -0.25; BONES.kneeR.rotation.x = 0.45;
-      BONES.eyeL.scale.set(1.2, 0.5, 1); BONES.eyeR.scale.set(1.2, 0.5, 1);
-
-    } else if (emo === 'think') {
-      // 💡 考える：左腕を胸の前に組み、右ひじを曲げてあごに手を当て、首をかしげてひらめく！
-      BONES.chest.rotation.y = 0.12;
-      BONES.head.rotation.z = Math.sin(effT * 2.5) * 0.22;
-      BONES.head.rotation.x = 0.08;
-      BONES.shoulderL.rotation.x = -0.75; BONES.shoulderL.rotation.z = -0.45; BONES.elbowL.rotation.x = -1.35;
-      BONES.shoulderR.rotation.x = -1.25; BONES.shoulderR.rotation.z = 0.25;  BONES.elbowR.rotation.x = -1.55;
-      BONES.eyeL.scale.set(1.25, 0.25, 1); BONES.eyeR.scale.set(1.25, 0.25, 1);
-      BONES.bulb.scale.setScalar(1 + Math.abs(Math.sin(effT * 10)) * 0.45);
-
-    } else if (emo === 'surprise') {
-      // 😲 驚く：ビクッと飛び上がって胸を反らし、両腕と両足をパッと広げる！
-      const j = Math.max(0, Math.sin(effT * 8));
-      BONES.pelvis.position.y = 0.24 + j * 0.16;
-      BONES.chest.rotation.x = -0.28 * j;
-      BONES.head.rotation.x = -0.20;
-      BONES.shoulderL.rotation.x = -2.2; BONES.shoulderL.rotation.z = 0.55; BONES.elbowL.rotation.x = -0.25;
-      BONES.shoulderR.rotation.x = -2.2; BONES.shoulderR.rotation.z = -0.55; BONES.elbowR.rotation.x = -0.25;
-      BONES.hipL.rotation.z = 0.25 * j; BONES.hipR.rotation.z = -0.25 * j;
-      BONES.eyeL.scale.set(0.65, 1.8, 1); BONES.eyeR.scale.set(0.65, 1.8, 1);
-
-    } else if (emo === 'wave') {
-      // 👋 挨拶：右肩を上げて、右ひじ関節を左右にスイングして可愛くバイバイ！
-      const w = Math.sin(effT * 11);
-      BONES.chest.rotation.z = -0.08;
-      BONES.head.rotation.z = 0.10;
-      BONES.shoulderL.rotation.z = 0.15; BONES.elbowL.rotation.x = -0.25;
-      BONES.shoulderR.rotation.x = -2.35; BONES.shoulderR.rotation.z = -0.45 + w * 0.25;
-      BONES.elbowR.rotation.z = w * 0.35;
-
-    } else if (emo === 'sleep') {
-      // 💤 居眠り：座り込んで胸と首と頭が順番にコックリコックリ揺れる！
-      const nod = Math.sin(effT * 1.8);
-      BONES.pelvis.position.y = 0.12;
-      BONES.chest.rotation.x = 0.25 + Math.max(0, nod) * 0.12;
-      BONES.neck.rotation.x = 0.15 + Math.max(0, nod) * 0.15;
-      BONES.head.rotation.x = 0.20 + Math.max(0, nod) * 0.20;
-      BONES.shoulderL.rotation.x = -0.25; BONES.elbowL.rotation.x = -0.65;
-      BONES.shoulderR.rotation.x = -0.25; BONES.elbowR.rotation.x = -0.65;
-      BONES.hipL.rotation.x = -1.45; BONES.kneeL.rotation.x = 0.75;
-      BONES.hipR.rotation.x = -1.45; BONES.kneeR.rotation.x = 0.75;
-      BONES.eyeL.scale.set(1.3, 0.12, 1); BONES.eyeR.scale.set(1.3, 0.12, 1);
-
+    if (p.mode === 'jump') {
+      dy = absW * p.bounce;
+      bodyRotY = Math.sin(phase * 0.5) * 0.18;
+      armLDX = wave * 0.25; armRDX = -wave * 0.25;
+      legLDX = wave * 0.30; legRDX = -wave * 0.30;
+    } else if (p.mode === 'stomp') {
+      dy = absW * p.bounce;
+      bodyRotZ = wave * 0.08;
+      armLDX = wave * 0.55; armRDX = -wave * 0.55;
+      legLDX = Math.max(0, wave) * p.hipX; legRDX = Math.max(0, -wave) * p.hipX;
+    } else if (p.mode === 'dance') {
+      dy = absW * p.bounce;
+      bodyRotZ = wave * 0.14; bodyRotY = Math.sin(phase * 0.5) * 0.25;
+      headRotZ = -wave * 0.18;
+      armLDX = wave * 0.35; armRDX = -wave * 0.35;
+    } else if (p.mode === 'tremor') {
+      dy = p.bounce;
+      bodyRotZ = wave * 0.04; headRotY = wave * 0.12;
+    } else if (p.mode === 'fan') {
+      dy = p.bounce;
+      elRDX = wave * 0.50; armRDX = wave * 0.35;
+    } else if (p.mode === 'think') {
+      headRotZ = wave * 0.22;
+    } else if (p.mode === 'wave') {
+      armRDZ = wave * 0.40; elRDX = wave * 0.30;
+    } else if (p.mode === 'sleep' || p.mode === 'sit') {
+      dy = p.bounce;
+      headRotZ = wave * 0.08;
+    } else if (p.mode === 'swing_v') {
+      // ⛏️ 縦に振りかざす（斧・剣・ツルハシ・餅つき用きね・釣り竿）
+      bodyRotY = wave * 0.20;
+      armRDX = wave * 1.25; elRDX = Math.max(0, wave) * 0.65;
+    } else if (p.mode === 'swing_h') {
+      // 🧹 横に払う・掃く
+      bodyRotY = wave * 0.45;
+      armRDZ = wave * 0.75; armLDX = -wave * 0.35;
+    } else if (p.mode === 'pickup') {
+      // 🤲 拾う・置く（しゃがんで手を伸ばす）
+      const r = (wave + 1) * 0.5;
+      dy = p.bounce * r;
+      armLDX = p.shLX * r; armRDX = p.shRX * r;
+    } else if (p.mode === 'carry') {
+      // 📦 持ち上げる・運ぶ
+      dy = p.bounce + absW * 0.04;
+      legLDX = wave * 0.40; legRDX = -wave * 0.40;
+    } else if (p.mode === 'push') {
+      // 👐 前に押す・掘る
+      armLDX = wave * 0.45; armRDX = -wave * 0.45;
+      legLDX = wave * 0.35; legRDX = -wave * 0.35;
+    } else if (p.mode === 'run') {
+      // 🏃 走る・急ぐ
+      dy = absW * p.bounce;
+      armLDX = wave * 0.95; armRDX = -wave * 0.95;
+      legLDX = -wave * 0.95; legRDX = wave * 0.95;
+    } else if (p.mode === 'peek') {
+      // 🔍 のぞき込む・探す
+      headRotY = wave * 0.45; bodyRotY = wave * 0.20;
+    } else if (p.mode === 'struggle') {
+      // 🌀 模索・奮闘する（ルール外の未知の動きに試行錯誤！）
+      dy = absW * p.bounce;
+      bodyRotY = Math.sin(phase * 0.7) * 0.35;
+      bodyRotZ = cosW * 0.16;
+      headRotZ = wave * 0.28;
+      armLDX = wave * 0.90; armRDX = cosW * 0.90;
+      legLDX = cosW * 0.60; legRDX = -wave * 0.60;
     } else {
-      // 🙂 通常：成長度に応じて呼吸と体重移動が滑らかに連動
-      const breath = Math.sin(effT * 3.5);
-      BONES.pelvis.position.y = 0.24 - Math.abs(breath) * 0.008;
-      BONES.chest.rotation.x = breath * 0.04 * skill;
-      BONES.head.rotation.y = Math.sin(effT * 1.7) * 0.08 * skill;
-      BONES.shoulderL.rotation.x = breath * 0.06; BONES.elbowL.rotation.x = -0.22;
-      BONES.shoulderR.rotation.x = -breath * 0.06; BONES.elbowR.rotation.x = -0.22;
-      BONES.hipL.rotation.x = -0.05; BONES.kneeL.rotation.x = 0.10;
-      BONES.hipR.rotation.x = -0.05; BONES.kneeR.rotation.x = 0.10;
+      dy = absW * p.bounce;
+      armLDX = wave * 0.06; armRDX = -wave * 0.06;
     }
 
-    // 【レイヤー3：腕・全身アクション合成（感情ポーズの上から重ね合わせ！）】
-    if (act === 'swing') {
-      // ⛏️ 振る（採掘・釣り・剣・斧すべて共通の基本パターン）：胸のひねり＋右肩振りかぶり＋右ひじスナップ！
-      const sw = Math.sin(effT * 10);
-      BONES.chest.rotation.y += sw * 0.25 * skill;
-      BONES.chest.rotation.x += (sw > 0 ? 0.18 : -0.10) * skill;
-      BONES.shoulderR.rotation.x = -1.65 + sw * 1.15;
-      BONES.shoulderR.rotation.z = -0.15;
-      BONES.elbowR.rotation.x = -0.85 + Math.max(0, sw) * 0.65;
-    } else if (act === 'pickup') {
-      // 🤲 拾う（しゃがんで手を伸ばす共通パターン）：股関節とひざを深く曲げ、両腕を足元へ伸ばす！
-      const reach = (Math.sin(effT * 5) + 1) * 0.5;
-      BONES.pelvis.position.y = 0.24 - reach * 0.10;
-      BONES.chest.rotation.x = 0.45 * reach;
-      BONES.hipL.rotation.x = -0.85 * reach; BONES.kneeL.rotation.x = 1.55 * reach; BONES.ankleL.rotation.x = -0.65 * reach;
-      BONES.hipR.rotation.x = -0.85 * reach; BONES.kneeR.rotation.x = 1.55 * reach; BONES.ankleR.rotation.x = -0.65 * reach;
-      BONES.shoulderL.rotation.x = -1.15 * reach; BONES.elbowL.rotation.x = -0.35 * reach;
-      BONES.shoulderR.rotation.x = -1.15 * reach; BONES.elbowR.rotation.x = -0.35 * reach;
+    // --- A. 🎲 サイコロ箱型の更新 ---
+    if (ROBOT.rigType !== 'stick') {
+      boxTool.visible = Boolean(eSpec.tool);
+      boxRigGroup.position.set(0, Math.max(-0.09, dy), 0);
+      boxRigGroup.rotation.set(p.bodyX * 0.5, bodyRotY, bodyRotZ);
+      boxHeadPivot.rotation.set(ROBOT.posture === 'crawl' ? -Math.PI / 3 : p.headX, headRotY, headRotZ);
+      boxArmLPivot.rotation.set(p.shLX + armLDX, 0, p.shLZ);
+      boxArmRPivot.rotation.set(p.shRX + armRDX, 0, p.shRZ + armRDZ);
+      boxLegLPivot.rotation.set(p.mode === 'stomp' ? legLDX : (p.hipX * 0.7 + legLDX), 0, 0);
+      boxLegRPivot.rotation.set(p.mode === 'stomp' ? legRDX : (p.hipX * 0.7 + legRDX), 0, 0);
+      return;
     }
+
+    // --- B. 🦴 3D骨組み（◯と線のマッチ棒モデル）の全身15関節更新 ---
+    stickTool.visible = Boolean(eSpec.tool);
+    if (ROBOT.posture === 'crawl') {
+      const cw = Math.sin(t * 7);
+      SB.pelvis.position.set(0, 0.38 + cw * 0.02, 0);
+      SB.pelvis.rotation.set(0, 0, 0);
+      SB.chest.rotation.set(0, cw * 0.12, 0);
+      SB.head.rotation.set(-Math.PI / 2.8, 0, 0);
+      SB.shoulderL.rotation.set(-2.1 + cw * 0.4, 0, 0.15); SB.elbowL.rotation.set(-0.65, 0, 0);
+      SB.shoulderR.rotation.set(-2.1 - cw * 0.4, 0, -0.15); SB.elbowR.rotation.set(-0.65, 0, 0);
+      SB.hipL.rotation.set(-0.4 - cw * 0.35, 0, 0); SB.kneeL.rotation.set(0.75, 0, 0);
+      SB.hipR.rotation.set(-0.4 + cw * 0.35, 0, 0); SB.kneeR.rotation.set(0.75, 0, 0);
+      return;
+    }
+
+    SB.pelvis.position.set(0, 0.38 + dy, 0);
+    SB.pelvis.rotation.set(0, bodyRotY * 0.4, bodyRotZ * 0.5);
+    SB.chest.rotation.set(p.bodyX, bodyRotY * 0.6, bodyRotZ * 0.5);
+    SB.neck.rotation.set(p.headX * 0.4, 0, 0);
+    SB.head.rotation.set(p.headX * 0.6, headRotY, headRotZ);
+
+    SB.shoulderL.rotation.set(p.shLX + armLDX, 0, p.shLZ);
+    SB.elbowL.rotation.set(p.elLX, 0, 0);
+    SB.wristL.rotation.set(0, 0, 0);
+
+    SB.shoulderR.rotation.set(p.shRX + armRDX, 0, p.shRZ + armRDZ);
+    SB.elbowR.rotation.set(p.elRX + elRDX, 0, 0);
+    SB.wristR.rotation.set(0, 0, armRDZ * 0.5);
+
+    const hL = (p.mode === 'stomp') ? legLDX : (p.hipX + legLDX);
+    const hR = (p.mode === 'stomp') ? legRDX : (p.hipX + legRDX);
+    const kL = (p.mode === 'stomp') ? (-legLDX * 1.4) : (p.kneeX + Math.max(0, -legLDX));
+    const kR = (p.mode === 'stomp') ? (-legRDX * 1.4) : (p.kneeX + Math.max(0, -legRDX));
+
+    SB.hipL.rotation.set(hL, 0, 0);
+    SB.kneeL.rotation.set(kL, 0, 0);
+    SB.ankleL.rotation.set(-kL * 0.35, 0, 0);
+
+    SB.hipR.rotation.set(hR, 0, 0);
+    SB.kneeR.rotation.set(kR, 0, 0);
+    SB.ankleR.rotation.set(-kR * 0.35, 0, 0);
   }
 
   function getRobotHeightLevel() {
@@ -1784,9 +1626,7 @@
   }
 
   function applyVoxelVisState(sv, newState, useFrostedGlass) {
-    if (sv.visState === newState && lastAppliedFrostedState === useFrostedGlass) {
-      return false;
-    }
+    if (sv.visState === newState && lastAppliedFrostedState === useFrostedGlass) return false;
     sv.visState = newState;
     if (newState === 0) {
       opaqueSubMesh.setMatrixAt(sv.idx, sv.fullMat);
@@ -1801,9 +1641,7 @@
   function updateTransparencyAndOcclusion(modeType, refCamPos, focusX, focusY, focusZ, targetFloorLv, lookDirX = 0, lookDirZ = 0) {
     const showLines = (CAM_VISUAL_STYLE === 'glass_line');
     macroOutlineGroup.visible = showLines;
-
-    let opaqueChanged = false;
-    let glassChanged = false;
+    let opaqueChanged = false, glassChanged = false;
 
     if (modeType === 'ground_fixed') {
       waterfallMesh.visible = true; seaMesh.visible = true;
@@ -1829,9 +1667,7 @@
           if (applyVoxelVisState(sv, 0, false)) opaqueChanged = true;
           continue;
         }
-        const dx = sv.wx - refCamPos.x;
-        const dy = sv.wy - refCamPos.y;
-        const dz = sv.wz - refCamPos.z;
+        const dx = sv.wx - refCamPos.x, dy = sv.wy - refCamPos.y, dz = sv.wz - refCamPos.z;
         const distToEye = Math.hypot(dx, dy, dz);
         const dotLook = dx * lookDirX + dz * lookDirZ;
         const isSelfCellCeiling = (sv.gx === curGx && sv.gz === curGz && sv.lv > targetFloorLv && ROBOT.posture === 'stand');
@@ -1845,11 +1681,9 @@
     }
 
     if (modeType === 'follow_spot') {
-      waterfallMesh.visible = false;
-      seaMesh.visible = false;
+      waterfallMesh.visible = false; seaMesh.visible = false;
     } else {
-      waterfallMesh.visible = true;
-      seaMesh.visible = true;
+      waterfallMesh.visible = true; seaMesh.visible = true;
       waterfallMat.opacity = (CAM_VISUAL_STYLE === 'hide') ? 0.12 : 0.18;
       seaMat.opacity = (CAM_VISUAL_STYLE === 'hide') ? 0.15 : 0.22;
     }
@@ -1864,12 +1698,10 @@
 
     for (let i = 0; i < subVoxelsMeta.length; i++) {
       const sv = subVoxelsMeta[i];
-
       if (sv.lv <= targetFloorLv) {
         if (applyVoxelVisState(sv, 0, useFrostedGlass)) { opaqueChanged = true; glassChanged = true; }
         continue;
       }
-
       if (modeType === 'underground_fixed') {
         if (sv.lv >= 0) {
           if (applyVoxelVisState(sv, 0, useFrostedGlass)) { opaqueChanged = true; glassChanged = true; }
@@ -1881,7 +1713,6 @@
         if (applyVoxelVisState(sv, inFront ? 1 : 0, useFrostedGlass)) { opaqueChanged = true; glassChanged = true; }
         continue;
       }
-
       if (sv.isChipped) {
         const subRelX = sv.wx - focusX, subRelZ = sv.wz - focusZ;
         const subDotFront = subRelX * nx + subRelZ * nz;
@@ -1915,7 +1746,6 @@
     if (manualCameraMode === 'robot') {
       robotGroup.visible = false;
       fpvZoomFactor = Math.max(0.50, Math.min(1.15, fpvZoomFactor));
-
       const isCrawl = (ROBOT.posture === 'crawl');
       const curAspect = window.innerWidth / Math.max(1, window.innerHeight);
       const portraitBoost = curAspect < 0.75 ? 10 : 0;
@@ -1930,20 +1760,18 @@
       const forwardOffset = isCrawl ? 0.06 : (-0.26 * fpvZoomFactor);
       const rot = ROBOT.rotY || 0;
       const lookYaw = rot + fpvYawOffset;
-
-      const lookDirX = Math.sin(lookYaw);
-      const lookDirZ = Math.cos(lookYaw);
+      const lookDirX = Math.sin(lookYaw), lookDirZ = Math.cos(lookYaw);
 
       const eyeX = robotGroup.position.x + lookDirX * forwardOffset;
       const eyeY = robotGroup.position.y + eyeH;
       const eyeZ = robotGroup.position.z + lookDirZ * forwardOffset;
 
-      const lookX = eyeX + 20 * Math.cos(fpvPitch) * lookDirX;
-      const lookY = eyeY + 20 * Math.sin(fpvPitch);
-      const lookZ = eyeZ + 20 * Math.cos(fpvPitch) * lookDirZ;
-
       innerRobotCam.position.set(eyeX, eyeY, eyeZ);
-      innerRobotCam.lookAt(lookX, lookY, lookZ);
+      innerRobotCam.lookAt(
+        eyeX + 20 * Math.cos(fpvPitch) * lookDirX,
+        eyeY + 20 * Math.sin(fpvPitch),
+        eyeZ + 20 * Math.cos(fpvPitch) * lookDirZ
+      );
 
       statusPanel.classList.toggle('sky-hidden', fpvPitch > 0.35);
       activeCamera = innerRobotCam;
@@ -1952,8 +1780,7 @@
     } else if (manualCameraMode === 'ground') {
       robotGroup.visible = true;
       statusPanel.classList.remove('sky-hidden');
-      const gPhi = camPhi;
-      const fixedDist = 14.8, centerTargetY = 0.8;
+      const gPhi = camPhi, fixedDist = 14.8, centerTargetY = 0.8;
       outerGroundCam.position.set(
         fixedDist * Math.sin(gPhi) * Math.sin(camTheta),
         centerTargetY + fixedDist * Math.cos(gPhi),
@@ -1966,10 +1793,8 @@
     } else if (manualCameraMode === 'underground') {
       robotGroup.visible = true;
       statusPanel.classList.remove('sky-hidden');
-      const uPhi = camPhi;
-      const fixedUGDist = 13.5, ugCenterY = -2.6;
-      let camY = ugCenterY + fixedUGDist * Math.cos(uPhi);
-      camY = Math.max(-6.2, Math.min(-0.65, camY));
+      const uPhi = camPhi, fixedUGDist = 13.5, ugCenterY = -2.6;
+      let camY = Math.max(-6.2, Math.min(-0.65, ugCenterY + fixedUGDist * Math.cos(uPhi)));
       outerUnderCam.position.set(
         fixedUGDist * Math.sin(uPhi) * Math.sin(camTheta),
         camY,
@@ -1982,8 +1807,7 @@
     } else {
       robotGroup.visible = true;
       statusPanel.classList.remove('sky-hidden');
-      const fPhi = camPhi;
-      const followDist = Math.max(4.8, Math.min(12.5, camRadius * 0.72));
+      const fPhi = camPhi, followDist = Math.max(4.8, Math.min(12.5, camRadius * 0.72));
       const tx = robotGroup.position.x;
       const ty = robotGroup.position.y + (ROBOT.posture === 'crawl' ? 0.25 : 0.45) * sSpec.scale;
       const tz = robotGroup.position.z;
@@ -2085,41 +1909,30 @@
     }
 
     if (!isDragging) return;
-
-    const dx = e.clientX - prevPointer.x;
-    const dy = e.clientY - prevPointer.y;
+    const dx = e.clientX - prevPointer.x, dy = e.clientY - prevPointer.y;
     if (Math.abs(dx) < 0.35 && Math.abs(dy) < 0.35) return;
-
-    prevPointer.x = e.clientX;
-    prevPointer.y = e.clientY;
+    prevPointer.x = e.clientX; prevPointer.y = e.clientY;
 
     if (manualCameraMode === 'robot') {
       fpvYawOffset -= dx * 0.0078;
-      fpvPitch     += dy * 0.0075;
-      fpvPitch = Math.max(-1.35, Math.min(1.48, fpvPitch));
+      fpvPitch = Math.max(-1.35, Math.min(1.48, fpvPitch + dy * 0.0075));
     } else {
       camTheta -= dx * 0.0090;
-      camPhi   += dy * 0.0085;
       const lim = getCamPhiLimits(manualCameraMode);
-      camPhi = Math.max(lim.min, Math.min(lim.max, camPhi));
+      camPhi = Math.max(lim.min, Math.min(lim.max, camPhi + dy * 0.0085));
     }
-
     cameraDirty = true;
   }, { passive: true });
 
   function onPointerUpOrCancel(e) {
     activePointers.delete(e.pointerId);
     try { domElem.releasePointerCapture(e.pointerId); } catch (err) {}
-
     if (activePointers.size === 1) {
       const remaining = Array.from(activePointers.values())[0];
-      prevPointer.x = remaining.x;
-      prevPointer.y = remaining.y;
-      isDragging = true;
-      prevPinchDist = null;
+      prevPointer.x = remaining.x; prevPointer.y = remaining.y;
+      isDragging = true; prevPinchDist = null;
     } else if (activePointers.size === 0) {
-      isDragging = false;
-      prevPinchDist = null;
+      isDragging = false; prevPinchDist = null;
     }
   }
   window.addEventListener('pointerup', onPointerUpOrCancel, { passive: true });
@@ -2153,8 +1966,8 @@
     const st = life.getState(), hLevel = getRobotHeightLevel();
     const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
     const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
-    const eSpec = EMOTION_SPECS[ROBOT.emotion] || EMOTION_SPECS.normal;
-    const rigBadge = ROBOT.rigType === 'box' ? '🎲箱型' : `🦴本格Lv${ROBOT.growthLv}`;
+    const eSpec = getExpressionSpec(ROBOT.emotion);
+    const rigBadge = ROBOT.rigType === 'stick' ? '🦴3D骨組み' : '🎲箱型';
 
     document.getElementById('val-stamina').innerText = st.stamina; document.getElementById('bar-stamina').style.width = st.stamina + '%';
     document.getElementById('val-life').innerText = st.energy; document.getElementById('bar-life').style.width = st.energy + '%';
@@ -2195,7 +2008,8 @@
     const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
     const dirNames = validMoves.map(m => `${m.dir.name}${m.check.posture === 'crawl' ? '(ほふく前進)' : ''}`).join('、');
     const itemsStr = WORLD_ITEMS.map(it => `${it.type}(${it.x},${it.z})`).join(', ') || 'なし';
-    const prompt = `あなたは第一エリア空間（地上5段・地下5段）の5x5アリの巣ボクセル島で暮らす自律ロボット「${ROBOT.unitModel}号機（第${ROBOT.gen}世代・成長Lv${ROBOT.growthLv}）」です。現在位置:(${ROBOT.pos.x},${ROBOT.pos.z}) 層:${formatHeightText(curH)} 大きさ:${sSpec.label} 体型:${bSpec.label} 姿勢:${ROBOT.posture === 'crawl' ? 'ほふく前進' : '立ち'} ステータス:たいりょく=${life.stamina},おなか=${life.energy},ごきげん=${life.mental} アイテム:${itemsStr} 移動可能8方向:[${dirNames}] JSON形式のみで次の行動と感情(joy/anger/sad/fun/fear/shiver/hot/think/surprise/wave/sleep/normal)と小学生向けの可愛い気持ち(1〜2文)を出力してください:{"action":"移動可能な方向名 または 斜め掘り または ほふく掘り または 休む","emotion":"感情・ポーズ名","thought":"気持ち"}`;
+    const exprSummary = DEFAULT_EXPRESSIONS.map(e => `${e.key}:[${CUSTOM_WORDS_MAP[e.key] || e.words}]`).join(' / ');
+    const prompt = `あなたは第一エリア空間（地上5段・地下5段）の5x5アリの巣ボクセル島で暮らす自律ロボット「${ROBOT.unitModel}号機（第${ROBOT.gen}世代）」です。現在位置:(${ROBOT.pos.x},${ROBOT.pos.z}) 層:${formatHeightText(curH)} 大きさ:${sSpec.label} 体型:${bSpec.label} ステータス:たいりょく=${life.stamina},おなか=${life.energy},ごきげん=${life.mental} アイテム:${itemsStr} 移動可能8方向:[${dirNames}] 基本表現辞書:${exprSummary} ※辞書にない新しい動きに模索・奮闘しても構いません。JSON形式のみで次の行動と表現キー(20種またはstruggle)と小学生向けの可愛い気持ち(1〜2文)を出力してください:{"action":"移動可能な方向名 または 斜め掘り または ほふく掘り または 休む または 自由な挑戦行動","emotion":"表現キー","thought":"気持ち"}`;
     try {
       if (aiType === 'gemini') {
         const key = safeStorage.getItem('api_gemini');
@@ -2226,16 +2040,9 @@
     const btn = document.getElementById('btn-action'); btn.disabled = true;
     document.getElementById('ai-status').innerText = '⚡ 思考中...';
     ROBOT.emotion = 'think';
-    ROBOT.actionLayer = 'none';
     updateEnvironmentAndUI();
 
     if (++TIME_STEP >= 20) { TIME_STEP = 0; GAME_DAY++; DIARY_LOGS.push(`🌅 ${GAME_DAY}日目の朝を迎えたよ！`); }
-
-    // 行動するたびに経験値（exp）が貯まり、一定値で動きの成長度（growthLv）が最大5まで自然に育つ！
-    ROBOT.exp = (ROBOT.exp || 0) + 5;
-    if (ROBOT.exp >= 50 && ROBOT.growthLv < 5) {
-      ROBOT.growthLv = Math.min(5, Math.floor(ROBOT.exp / 15) + 1);
-    }
 
     const curH = getRobotHeightLevel();
     let thoughtText = '', actionLabel = '';
@@ -2254,20 +2061,23 @@
       const blockedByFat = moveEvaluations.find(m => m.check.reason === 'too_fat');
 
       const aiDecision = await askAIForDecision(validMoves, curH);
-      let chosenMove = null, wantDig = false, wantCrawlDig = false, wantRest = false;
+      let chosenMove = null, wantDig = false, wantCrawlDig = false, wantRest = false, wantFreeStruggle = false;
 
       if (aiDecision && aiDecision.action) {
         if (aiDecision.action.includes('休')) wantRest = true;
         else if (aiDecision.action.includes('ほふく掘')) { wantDig = true; wantCrawlDig = true; }
         else if (aiDecision.action.includes('掘')) wantDig = true;
-        else chosenMove = validMoves.find(m => aiDecision.action.includes(m.dir.name.replace('(斜め)', ''))) || null;
+        else {
+          chosenMove = validMoves.find(m => aiDecision.action.includes(m.dir.name.replace('(斜め)', ''))) || null;
+          if (!chosenMove) wantFreeStruggle = true;
+        }
       }
 
-      if (!wantRest && !wantDig && !chosenMove) {
+      if (!wantRest && !wantDig && !chosenMove && !wantFreeStruggle) {
         if (life.stamina <= 25) wantRest = true;
-        else if (blockedByFat && Math.random() < 0.65) {
-          wantDig = true;
-        } else if (Math.random() < 0.35 && curH > AREA1_MIN_UNDER_LV && life.stamina > 35) {
+        else if (blockedByFat && Math.random() < 0.65) wantDig = true;
+        else if (Math.random() < 0.14) wantFreeStruggle = true; // ルール外の動きを自由に模索・奮闘する！
+        else if (Math.random() < 0.35 && curH > AREA1_MIN_UNDER_LV && life.stamina > 35) {
           wantDig = true;
           wantCrawlDig = (Math.random() < 0.5);
         } else {
@@ -2286,12 +2096,21 @@
         }
       }
 
-      if (wantRest) {
+      if (wantFreeStruggle) {
+        life.stamina -= 5; life.mental += 14;
+        ROBOT.posture = 'stand';
+        const combinedText = `${aiDecision?.action || ''} ${aiDecision?.thought || ''}`;
+        ROBOT.emotion = (aiDecision && POSE_TABLE[aiDecision.emotion])
+          ? aiDecision.emotion
+          : matchExpressionFromText(combinedText, 'struggle');
+        const eSpec = getExpressionSpec(ROBOT.emotion);
+        actionLabel = `${eSpec.icon} 自由模索：${eSpec.label}`;
+        thoughtText = aiDecision?.thought || 'うーん、こうやって手足を動かしたらどうなるかな！？基本ルールにない新しい動きも一生けんめい模索・奮闘中だよ！';
+      } else if (wantRest) {
         life.stamina += 35; life.energy -= 5; life.mental += 10;
         ROBOT.posture = 'stand';
         ROBOT.emotion = (life.energy <= 35) ? 'sad' : 'sleep';
-        ROBOT.actionLayer = 'none';
-        actionLabel = '💤 アルゴン：その場でひとやすみ';
+        actionLabel = '💤 その場でひとやすみ';
         thoughtText = aiDecision?.thought || (ROBOT.emotion === 'sad'
           ? 'おなかがすいてしょんぼり座り込んじゃった…。リンゴが食べたいなぁ。'
           : 'ふぅ〜、ひとやすみ。ポカポカしてきてコックリ居眠りしちゃった…。');
@@ -2300,8 +2119,6 @@
         ROBOT.rotY = digDir.rot;
         const digRes = digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, digDir, wantCrawlDig, 38);
         life.stamina -= 9; life.mental += 12;
-        // 掘削時は腕アクションレイヤー「swing（振る共通パターン）」を合成！
-        ROBOT.actionLayer = 'swing';
 
         if (digRes.completedLevel) {
           if (BAG.length < 10) BAG.push('stone');
@@ -2310,28 +2127,21 @@
           actionLabel = `⛏️ ${digDir.name}を掘り抜いて${formatHeightText(digRes.newLv)}開通！`;
           thoughtText = aiDecision?.thought || `やったー！${digDir.name}のブロックを掘り抜いて新しい道が開通したよ！嬉しくてバンザイジャンプ！`;
         } else if (digRes.isCrawlTunnel) {
-          ROBOT.emotion = 'wave';
+          ROBOT.emotion = 'push';
           actionLabel = `🐛 ${digDir.name}に「ほふく前進トンネル」を開通！`;
-          thoughtText = aiDecision?.thought || `上の緑と土を天井に残して、${digDir.name}にほふく前進でくぐれる低い横穴を掘ったよ！ヤッホー！`;
+          thoughtText = aiDecision?.thought || `上の緑と土を天井に残して、${digDir.name}にほふく前進でくぐれる低い横穴を押し広げたよ！`;
           DIARY_LOGS.push(`🐛 ${GAME_DAY}日目：${digDir.name}にほふく前進トンネルを掘った！`);
         } else {
-          ROBOT.emotion = blockedByFat ? 'anger' : 'fun';
+          ROBOT.emotion = blockedByFat ? 'anger' : 'swing_v';
           actionLabel = `⛏️ ${digDir.name}の土を前からボロボロ掘削中(残${digRes.leftCount})`;
           thoughtText = aiDecision?.thought || (blockedByFat
-            ? `もうっ！体が大きくて穴につかえちゃったから、地団駄を踏みながら右手で${digDir.name}の壁を削り広げているよ！`
-            : `ルンルン気分で右手のツルハシを振って${digDir.name}の土を削っているよ！（レイヤー合成中）`);
+            ? `もうっ！体が大きくて穴につかえちゃったから、地団駄を踏みながら${digDir.name}の壁を削り広げているよ！`
+            : `ツルハシを縦に振りかざして、${digDir.name}の目の前の土をザクザク削っているよ！`);
         }
       } else if (chosenMove) {
-        const d = chosenMove.dir;
-        const chk = chosenMove.check;
-        ROBOT.pos.x += d.dx;
-        ROBOT.pos.z += d.dz;
-        ROBOT.pos.lv = chk.targetLv;
-        ROBOT.pos.sx = 2;
-        ROBOT.pos.sz = 2;
-        ROBOT.rotY = d.rot;
-        ROBOT.posture = chk.posture;
-        ROBOT.actionLayer = 'none';
+        const d = chosenMove.dir, chk = chosenMove.check;
+        ROBOT.pos.x += d.dx; ROBOT.pos.z += d.dz; ROBOT.pos.lv = chk.targetLv;
+        ROBOT.pos.sx = 2; ROBOT.pos.sz = 2; ROBOT.rotY = d.rot; ROBOT.posture = chk.posture;
 
         life.energy -= 7; life.stamina -= 8; life.mental += 10;
         const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
@@ -2339,29 +2149,27 @@
 
         if (life.energy <= 28 || life.stamina <= 25) {
           ROBOT.emotion = 'shiver';
-        } else if (aiDecision && EMOTION_SPECS[aiDecision.emotion]) {
+        } else if (aiDecision && POSE_TABLE[aiDecision.emotion]) {
           ROBOT.emotion = aiDecision.emotion;
+        } else if (aiDecision && aiDecision.thought) {
+          ROBOT.emotion = matchExpressionFromText(aiDecision.thought, ROBOT.speed === 5 ? 'run' : 'fun');
         } else {
-          ROBOT.emotion = 'fun';
+          ROBOT.emotion = (ROBOT.speed === 5) ? 'run' : 'fun';
         }
 
         if (chk.posture === 'crawl') {
           actionLabel = `🐛 ${d.name}の低い穴を「ほふく前進」で通り抜けた！`;
-          thoughtText = aiDecision?.thought || `天井が低いから、ひじとひざを曲げて「ほふく前進（${sSpec.label}・${bSpec.label}）」で${d.name}へくぐり抜けたよ！`;
+          thoughtText = aiDecision?.thought || `天井が低いから体を伏せて「ほふく前進（${sSpec.label}・${bSpec.label}）」で${d.name}へくぐり抜けたよ！`;
           DIARY_LOGS.push(`🐛 ${GAME_DAY}日目：${d.name}のトンネルをほふく前進でくぐり抜けた！`);
         } else if (d.isDiag) {
           actionLabel = `↗️ ${d.name}へ斜め移動した！`;
-          thoughtText = aiDecision?.thought || `斜めルートを通って${d.name}へルンルン進んだよ！`;
+          thoughtText = aiDecision?.thought || `斜めルートを通って${d.name}へ進んだよ！`;
         } else {
           actionLabel = `👟 ${d.name}へ歩いた（${sSpec.label}・${bSpec.label}）`;
-          thoughtText = aiDecision?.thought || (ROBOT.emotion === 'shiver'
-            ? `${d.name}へ歩いたけど、おなかがペコペコで寒くてガタガタ震えちゃうよ…。`
-            : `${d.name}を向いて歩いたよ！📖手帳で本格3D骨組みとサイコロ型をいつでも比較できるよ！`);
+          thoughtText = aiDecision?.thought || `${d.name}を向いて歩いたよ！⚙️設定の「🎭キャラ基本表現」から20種類の動きやマッチ棒3D骨組みを試せるよ！`;
         }
       }
-      if (thoughtText) {
-        DIARY_LOGS.push(`💭 ${GAME_DAY}日目：${thoughtText}`);
-      }
+      if (thoughtText) DIARY_LOGS.push(`💭 ${GAME_DAY}日目：${thoughtText}`);
     }
 
     const itemIdx = WORLD_ITEMS.findIndex(it => it.x === ROBOT.pos.x && it.z === ROBOT.pos.z);
@@ -2369,25 +2177,19 @@
       const picked = WORLD_ITEMS.splice(itemIdx, 1)[0];
       if (picked.type === 'apple') {
         life.energy += 45; life.mental += 15;
-        ROBOT.posture = 'stand';
-        ROBOT.emotion = 'joy';
-        ROBOT.actionLayer = 'pickup';
-        actionLabel = '🍎 リンゴを見つけて拾って食べた！';
-        thoughtText = 'わーい！！しゃがんでリンゴを拾って食べたよ！嬉しくてバンザイジャンプ！！';
+        ROBOT.posture = 'stand'; ROBOT.emotion = 'joy';
+        actionLabel = '🍎 リンゴを見つけて食べて大喜び！';
+        thoughtText = 'わーい！！甘くておいしいリンゴを食べたよ！嬉しくてバンザイジャンプ！！';
         DIARY_LOGS.push(`🍎 ${GAME_DAY}日目：おいしいリンゴを食べて大喜びした！`);
       } else {
         if (BAG.length < 10) BAG.push(picked.type); life.mental += 10;
-        ROBOT.emotion = 'fun';
-        ROBOT.actionLayer = 'pickup';
-        actionLabel = `🎒 ${picked.type === 'stone' ? '石ブロック' : '草'}をカバンに拾った`;
-        thoughtText = '足元にいいものが落ちていたから、ひざを曲げてしゃがんでカバンに拾ったよ！';
+        ROBOT.emotion = 'pickup';
+        actionLabel = `🤲 ${picked.type === 'stone' ? '石ブロック' : '草'}をしゃがんで拾った`;
+        thoughtText = '足元にいいものが落ちていたから、しゃがんでカバンに拾ったよ！';
       }
     }
 
-    if (manualCameraMode === 'robot') {
-      resetFpvToRobotFront();
-    }
-
+    if (manualCameraMode === 'robot') resetFpvToRobotFront();
     document.getElementById('history-action').innerText = actionLabel;
     document.getElementById('message-box').innerText = thoughtText;
 
@@ -2397,7 +2199,7 @@
       ROBOT.emotion = 'sad';
       document.getElementById('message-box').innerText = `力尽きて倒れてしまった…。記憶を引き継ぎ、次の1号機（第${ROBOT.gen + 1}世代）が1日目から誕生します！`;
       setTimeout(() => {
-        ROBOT.gen += 1; ROBOT.pos = { x: 0, z: 0, lv: -1, sx: 2, sz: 2 }; ROBOT.rotY = Math.PI; ROBOT.posture = 'stand'; ROBOT.emotion = 'joy'; ROBOT.actionLayer = 'none';
+        ROBOT.gen += 1; ROBOT.pos = { x: 0, z: 0, lv: -1, sx: 2, sz: 2 }; ROBOT.rotY = Math.PI; ROBOT.posture = 'stand'; ROBOT.emotion = 'joy';
         GAME_DAY = 1; TIME_STEP = 0; life = new LifeCore();
         DIARY_LOGS.push(`📖 1号機（第${ROBOT.gen}世代）が1日目から新しく誕生した！`);
         if (!WORLD_ITEMS.length) WORLD_ITEMS.push({ type: 'apple', x: -1, z: 1 });
@@ -2409,90 +2211,105 @@
 
     setTimeout(() => {
       document.getElementById('ai-status').innerText = getActiveBrainBadgeText();
-      const eSpec = EMOTION_SPECS[ROBOT.emotion] || EMOTION_SPECS.normal;
-      sharedBulbMat.color.setHex(eSpec.bulbHex);
+      sharedBulbMat.color.setHex(getExpressionSpec(ROBOT.emotion).bulb);
       btn.disabled = false;
     }, 300);
   }
 
-  // 手帳から「🦴本格3D骨組み ⇔ 🎲サイコロ箱型」をワンタップ比較切り替え
-  function changeRigTypeFromDiary(rigKey) {
-    ROBOT.rigType = (rigKey === 'box') ? 'box' : 'articulated';
-    document.getElementById('setting-rig-type').value = ROBOT.rigType;
-    syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
-    const label = ROBOT.rigType === 'box' ? '🎲 サイコロ箱型（シンプル）' : '🦴 本格3D骨組み（14関節・ソケット付き）';
-    showToast(`${label} に切り替えたよ！手帳を閉じて動きを比較してみてね！`);
+  // ============================================================================
+  // 🎭 キャラ基本表現モーダル（確定 / キャンセル方式・20種類リスト＆連想ワード編集）
+  // ============================================================================
+  let tempRigType = 'box';
+  let tempEmotionKey = 'normal';
+
+  function openExpressionModalFromSettings() {
+    closeModal('modal-settings');
+    tempRigType = (ROBOT.rigType === 'stick') ? 'stick' : 'box';
+    tempEmotionKey = POSE_TABLE[ROBOT.emotion] ? ROBOT.emotion : 'normal';
+    renderExpressionModalList();
+    openModal('modal-expressions');
   }
 
-  // 手帳から「🌱動きの成長度（Lv1 / Lv3 / Lv5）」を切り替え
-  function changeGrowthLvFromDiary(lvNum) {
-    ROBOT.growthLv = Math.max(1, Math.min(5, Number(lvNum) || 3));
-    syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
-    showToast(`🌱 動きの成長度を「Lv.${ROBOT.growthLv}」に切り替えたよ！`);
+  function selectTempRigTab(rigKey) {
+    tempRigType = (rigKey === 'stick') ? 'stick' : 'box';
+    document.getElementById('tab-rig-box').classList.toggle('active', tempRigType === 'box');
+    document.getElementById('tab-rig-stick').classList.toggle('active', tempRigType === 'stick');
   }
 
-  // 手帳から「腕アクションレイヤー（振る・拾う・なし）」を重ね合わせ実演
-  function triggerActionLayerPreview(actKey) {
-    ROBOT.actionLayer = ACTION_LAYER_SPECS[actKey] ? actKey : 'none';
+  function selectTempExpressionRow(emoKey) {
+    tempEmotionKey = emoKey;
+    DEFAULT_EXPRESSIONS.forEach(item => {
+      const row = document.getElementById(`expr-row-${item.key}`);
+      if (row) row.classList.toggle('selected', item.key === tempEmotionKey);
+    });
+  }
+
+  function renderExpressionModalList() {
+    document.getElementById('tab-rig-box').classList.toggle('active', tempRigType === 'box');
+    document.getElementById('tab-rig-stick').classList.toggle('active', tempRigType === 'stick');
+    const listEl = document.getElementById('expr-list-container');
+    listEl.innerHTML = '';
+    DEFAULT_EXPRESSIONS.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'expr-row' + (item.key === tempEmotionKey ? ' selected' : '');
+      row.id = `expr-row-${item.key}`;
+
+      const leftBtn = document.createElement('button');
+      leftBtn.type = 'button';
+      leftBtn.className = 'expr-left-btn';
+      leftBtn.innerHTML = `<span class="expr-icon">${item.icon}</span><span>${item.label}</span>`;
+      leftBtn.onclick = () => selectTempExpressionRow(item.key);
+
+      const rightInput = document.createElement('input');
+      rightInput.type = 'text';
+      rightInput.className = 'expr-right-input';
+      rightInput.id = `expr-words-${item.key}`;
+      rightInput.value = CUSTOM_WORDS_MAP[item.key] || item.words;
+      rightInput.placeholder = 'AIが選ぶ連想ワード（カンマ区切り）';
+      rightInput.onfocus = () => selectTempExpressionRow(item.key);
+
+      row.appendChild(leftBtn);
+      row.appendChild(rightInput);
+      listEl.appendChild(row);
+    });
+  }
+
+  function confirmExpressionModal() {
+    // 20種類の連想ワード入力欄を保存
+    DEFAULT_EXPRESSIONS.forEach(item => {
+      const inp = document.getElementById(`expr-words-${item.key}`);
+      if (inp && inp.value.trim()) {
+        CUSTOM_WORDS_MAP[item.key] = inp.value.trim();
+      }
+    });
+    // タブで選ばれたキャラ構造（🎲box または 🦴stick）と基本表現を確定反映！
+    ROBOT.rigType = tempRigType;
+    ROBOT.emotion = tempEmotionKey;
     ROBOT.posture = 'stand';
     const topLv = HEIGHT_MAP[`${ROBOT.pos.x},${ROBOT.pos.z}`] ?? 0;
     ROBOT.pos.lv = topLv;
+
+    // 観察しやすいようにカメラ正面へ振り向く
     if (manualCameraMode !== 'robot') {
-      const activeCamPos = activeCamera.position;
-      const dx = activeCamPos.x - robotGroup.position.x;
-      const dz = activeCamPos.z - robotGroup.position.z;
+      const dx = activeCamera.position.x - robotGroup.position.x;
+      const dz = activeCamera.position.z - robotGroup.position.z;
       if (Math.hypot(dx, dz) > 0.1) ROBOT.rotY = Math.atan2(dx, dz);
     }
-    const actLabels = {
-      none:   '🚫 腕アクションレイヤーを解除したよ（感情ポーズのみ表示）',
-      swing:  '⛏️【レイヤー合成：振る（採掘・釣り・剣共通）】感情ポーズの上に「右手スイング＋ツール表示」を重ね合わせたよ！',
-      pickup: '🤲【レイヤー合成：拾う（しゃがむ）】股関節とひざを曲げて足元のアイテムへ手を伸ばす動きを重ね合わせたよ！'
-    };
-    document.getElementById('message-box').innerText = actLabels[ROBOT.actionLayer];
-    closeModal('modal-diary');
+
+    const eSpec = getExpressionSpec(ROBOT.emotion);
+    const rigLabel = ROBOT.rigType === 'stick' ? '🦴3D骨組み(◯関節と線のマッチ棒)' : '🎲サイコロ箱型(デフォルト)';
+    const wordsStr = CUSTOM_WORDS_MAP[ROBOT.emotion] || eSpec.words;
+    document.getElementById('message-box').innerText = `✅【確定反映】${rigLabel} ×「${eSpec.icon}${eSpec.label}」を実演中！（登録連想ワード：${wordsStr}）`;
+    document.getElementById('history-action').innerText = `🎭 表現確定：${eSpec.icon} ${eSpec.label}`;
+
+    closeModal('modal-expressions');
     rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState();
-    showToast(actLabels[ROBOT.actionLayer]);
+    showToast(`✅ ${rigLabel} ×「${eSpec.icon}${eSpec.label}」を反映したよ！`);
   }
 
-  function triggerEmotionPreview(emoKey) {
-    ROBOT.emotion = EMOTION_SPECS[emoKey] ? emoKey : 'normal';
-    ROBOT.posture = 'stand';
-    const topLv = HEIGHT_MAP[`${ROBOT.pos.x},${ROBOT.pos.z}`] ?? 0;
-    ROBOT.pos.lv = topLv;
-
-    if (manualCameraMode !== 'robot') {
-      const activeCamPos = activeCamera.position;
-      const dx = activeCamPos.x - robotGroup.position.x;
-      const dz = activeCamPos.z - robotGroup.position.z;
-      if (Math.hypot(dx, dz) > 0.1) {
-        ROBOT.rotY = Math.atan2(dx, dz);
-      }
-    }
-
-    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
-    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
-    const rigLabel = ROBOT.rigType === 'box' ? '🎲箱型' : `🦴本格骨Lv${ROBOT.growthLv}`;
-    const emoMessages = {
-      normal:   `🙂【通常 実演中！】(${rigLabel}・${sSpec.label}×${bSpec.label}) 穏やかに呼吸しながら周囲を見回しているよ！`,
-      fear:     `😰【怖がる 実演中！】(${rigLabel}・${sSpec.label}×${bSpec.label}) ひぃぃっ！腰を引いてひじを曲げ、両手で顔をガードして震えているよ！`,
-      shiver:   `🥶【震える 実演中！】(${rigLabel}・${sSpec.label}×${bSpec.label}) ガタガタ…。ひじとひざをギュッと曲げて小刻みに震えているよ…。`,
-      hot:      `🥵【暑がる 実演中！】(${rigLabel}・${sSpec.label}×${bSpec.label}) ふぅ〜…。ぐったり首を落として、右ひじを曲げてパタパタあおいでいるよ。`,
-      joy:      `😆【喜（よろこび）実演中！】(${rigLabel}・${sSpec.label}×${bSpec.label}) わーい！ひざの屈伸を使って高くバンザイジャンプしているよ！`,
-      anger:    `😡【怒（いかり）実演中！】(${rigLabel}・${sSpec.label}×${bSpec.label}) ぷんぷんっ！ひじを曲げてガッツポーズのまま、ひざを高く上げて地団駄を踏んでいるよ！`,
-      sad:      `😭【哀（かなしみ）実演中！】(${rigLabel}・${sSpec.label}×${bSpec.label}) しょんぼり…。股関節とひざを曲げて座り込み、背中を丸めてうなだれているよ…。`,
-      fun:      `🎵【楽（たのしみ）実演中！】(${rigLabel}・${sSpec.label}×${bSpec.label}) ルンルン♪ 腰・胸・首・ひじ・ひざを連動させて楽しくステップダンスしているよ！`,
-      think:    `💡【考える 実演中！】(${rigLabel}・${sSpec.label}×${bSpec.label}) ピコーン！左腕を組み、右手をあごに当てて首をかしげ、アイデアをひらめいたよ！`,
-      surprise: `😲【驚く 実演中！】(${rigLabel}・${sSpec.label}×${bSpec.label}) わわっ！！ビクッと飛び上がって胸を反らし、手足を大きく広げたよ！`,
-      wave:     `👋【挨拶 実演中！】(${rigLabel}・${sSpec.label}×${bSpec.label}) ヤッホー！右肩と右ひじの関節をしなやかに振って挨拶しているよ！`,
-      sleep:    `💤【居眠り 実演中！】(${rigLabel}・${sSpec.label}×${bSpec.label}) スゥスゥ…。座り込んで胸と首と頭が順番にコックリコックリ船をこいでいるよ。`
-    };
-    const msg = emoMessages[emoKey] || '🙂 通常姿勢に戻ったよ！';
-    document.getElementById('message-box').innerText = msg;
-    document.getElementById('history-action').innerText = `🎭 手帳テスト：${EMOTION_SPECS[ROBOT.emotion].icon} ${EMOTION_SPECS[ROBOT.emotion].label}`;
-
-    closeModal('modal-diary');
-    rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState();
-    showToast(`${EMOTION_SPECS[ROBOT.emotion].icon} ${rigLabel}で「${EMOTION_SPECS[ROBOT.emotion].label}」を実演中！`);
+  function cancelExpressionModal() {
+    closeModal('modal-expressions');
+    showToast('変更をキャンセルしたよ');
   }
 
   function changeRobotSizeFromDiary(sizeKey) {
@@ -2500,9 +2317,7 @@
     ROBOT.sizeLevel = sizeKey;
     document.getElementById('setting-size-level').value = sizeKey;
     syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
-    const sSpec = SIZE_SPECS[ROBOT.sizeLevel];
-    const bSpec = BODY_SPECS[ROBOT.bodyType];
-    showToast(`📏 大きさを「${sSpec.label}」（体型：${bSpec.label}）に切り替えたよ！`);
+    showToast(`📏 大きさを「${SIZE_SPECS[ROBOT.sizeLevel].label}」に切り替えたよ！`);
   }
 
   function changeRobotBodyFromDiary(bodyKey) {
@@ -2510,9 +2325,7 @@
     ROBOT.bodyType = bodyKey;
     document.getElementById('setting-body-type').value = bodyKey;
     syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
-    const sSpec = SIZE_SPECS[ROBOT.sizeLevel];
-    const bSpec = BODY_SPECS[ROBOT.bodyType];
-    showToast(`🐛 体型を「${bSpec.label}」（大きさ：${sSpec.label}）に切り替えたよ！`);
+    showToast(`🐛 体型を「${BODY_SPECS[ROBOT.bodyType].label}」に切り替えたよ！`);
   }
 
   function cycleBodyAndCrawlTest() {
@@ -2533,13 +2346,10 @@
       ROBOT.pos.lv = topLv;
     }
 
-    if (manualCameraMode === 'robot') {
-      resetFpvToRobotFront();
-    }
-
+    if (manualCameraMode === 'robot') resetFpvToRobotFront();
     const msg = ROBOT.posture === 'crawl'
-      ? `🐛 大きさ「${sSpec.label}」×体型「${bSpec.label}(幅${eff.reqWidth})」でひじ・ひざを曲げて「ほふく前進」中！`
-      : `🚶 大きさ「${sSpec.label}」×体型「${bSpec.label}(幅${eff.reqWidth})」の立ち姿勢！（📖手帳から骨組み比較も試せます）`;
+      ? `🐛 大きさ「${sSpec.label}」×体型「${bSpec.label}(幅${eff.reqWidth})」で「ほふく前進」中！`
+      : `🚶 大きさ「${sSpec.label}」×体型「${bSpec.label}(幅${eff.reqWidth})」の立ち姿勢！`;
     document.getElementById('message-box').innerText = msg;
     rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState();
     showToast(msg);
@@ -2551,17 +2361,14 @@
     const diagDirs = ALL_DIRS.filter(d => d.isDiag);
     const chosenDir = diagDirs[Math.floor(Math.random() * diagDirs.length)];
     ROBOT.rotY = chosenDir.rot;
-    ROBOT.emotion = 'fun';
-    ROBOT.actionLayer = 'swing';
+    ROBOT.emotion = 'swing_v';
 
     const curH = getRobotHeightLevel();
     const res = digFromCharacterFront(x, z, curH, chosenDir, true, 36);
-    if (manualCameraMode === 'robot') {
-      resetFpvToRobotFront();
-    }
+    if (manualCameraMode === 'robot') resetFpvToRobotFront();
     const msg = res.isCrawlTunnel
-      ? `⛏️ ${chosenDir.name}を向いてツールを振り、「斜めほふく前進トンネル」を開通したよ！`
-      : `⛏️ ${chosenDir.name}を向いてツールを振り、目の前から5×5×5小ブロックをボロボロ削ったよ！`;
+      ? `⛏️ ${chosenDir.name}を向いて縦に振りかざし、「斜めほふく前進トンネル」を開通したよ！`
+      : `⛏️ ${chosenDir.name}を向いて縦に振りかざし、目の前から5×5×5小ブロックを削ったよ！`;
     document.getElementById('message-box').innerText = msg;
     rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
     showToast(msg);
@@ -2580,17 +2387,16 @@
     const key = `${x},${z}`, cur = HEIGHT_MAP[key] ?? 0;
     delete CHIP_MAP[`${x},${z},${cur}`];
     if (cur >= AREA1_MAX_GROUND_LV) { showToast('ここは第一エリアの地上上限（5段目）だよ！'); closeFanMenu(); return; }
-    HEIGHT_MAP[key] = cur + 1; ROBOT.pos.lv = cur + 1; ROBOT.posture = 'stand'; ROBOT.emotion = 'joy';
+    HEIGHT_MAP[key] = cur + 1; ROBOT.pos.lv = cur + 1; ROBOT.posture = 'stand'; ROBOT.emotion = 'carry';
     if (manualCameraMode === 'robot') resetFpvToRobotFront();
     rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
-    showToast(`🪨 ブロックを積んで「${formatHeightText(cur + 1)}」にしたよ！`);
+    showToast(`🪨 ブロックを持ち上げて積んで「${formatHeightText(cur + 1)}」にしたよ！`);
   }
 
   function openModal(id) {
     activePointers.clear(); isDragging = false;
     if (id === 'modal-diary') renderDiaryModal();
     if (id === 'modal-settings') {
-      document.getElementById('setting-rig-type').value = ROBOT.rigType;
       document.getElementById('setting-cam-style').value = CAM_VISUAL_STYLE;
       document.getElementById('setting-size-level').value = ROBOT.sizeLevel;
       document.getElementById('setting-body-type').value = ROBOT.bodyType;
@@ -2605,31 +2411,14 @@
   function renderDiaryModal() {
     const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
     const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
-    const eSpec = EMOTION_SPECS[ROBOT.emotion] || EMOTION_SPECS.normal;
+    const eSpec = getExpressionSpec(ROBOT.emotion);
     const eff = getEffectiveClearanceSpecs();
-    const rigName = ROBOT.rigType === 'box' ? '🎲サイコロ箱型' : `🦴本格3D骨組み(成長Lv.${ROBOT.growthLv})`;
+    const rigName = ROBOT.rigType === 'stick' ? '🦴3D骨組み(◯と線)' : '🎲サイコロ箱型';
 
     document.getElementById('diary-emo-icon').innerText = eSpec.icon;
     document.getElementById('diary-robo-name').innerText = `${ROBOT.unitModel}号機（${rigName}・生存 ${GAME_DAY}日目）`;
-    document.getElementById('diary-robo-height').innerText = `現在：${formatHeightText(getRobotHeightLevel())} / 大きさ：${sSpec.label} / 体型：${bSpec.label}(幅${eff.reqWidth}) / 感情：${eSpec.label}`;
+    document.getElementById('diary-robo-height').innerText = `現在：${formatHeightText(getRobotHeightLevel())} / 大きさ：${sSpec.label} / 体型：${bSpec.label}(幅${eff.reqWidth}) / 表現：${eSpec.label}`;
 
-    document.getElementById('rig-chip-articulated').classList.toggle('rig-active', ROBOT.rigType !== 'box');
-    document.getElementById('rig-chip-box').classList.toggle('rig-active', ROBOT.rigType === 'box');
-
-    [1, 3, 5].forEach(lv => {
-      const gChip = document.getElementById(`growth-chip-${lv}`);
-      if (gChip) gChip.classList.toggle('active', ROBOT.growthLv === lv);
-    });
-
-    ['none', 'swing', 'pickup'].forEach(act => {
-      const aChip = document.getElementById(`act-chip-${act}`);
-      if (aChip) aChip.classList.toggle('active', ROBOT.actionLayer === act);
-    });
-
-    Object.keys(EMOTION_SPECS).forEach(k => {
-      const btn = document.getElementById(`emo-btn-${k}`);
-      if (btn) btn.classList.toggle('active', ROBOT.emotion === k);
-    });
     ['large', 'medium', 'small'].forEach(k => {
       const chip = document.getElementById(`size-chip-${k}`);
       if (chip) chip.classList.toggle('active', ROBOT.sizeLevel === k);
@@ -2685,7 +2474,6 @@
   };
 
   function saveSettings() {
-    ROBOT.rigType = document.getElementById('setting-rig-type').value || 'articulated';
     CAM_VISUAL_STYLE = document.getElementById('setting-cam-style').value || 'hide';
     safeStorage.setItem('cam_visual_style_v15', CAM_VISUAL_STYLE);
     ROBOT.sizeLevel = document.getElementById('setting-size-level').value || 'large';
@@ -2696,10 +2484,9 @@
     ROBOT.speed = Number(document.getElementById('setting-speed').value) || 3;
     rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateAllCamerasTransform(); updateEnvironmentAndUI(); saveWorldState();
     closeModal('modal-settings');
-    showToast(`⚙️ 設定を保存したよ（${ROBOT.rigType === 'box' ? '🎲箱型' : '🦴本格骨組み'} / ${SIZE_SPECS[ROBOT.sizeLevel].label}）！`);
+    showToast(`⚙️ 設定を保存したよ（大きさ:${SIZE_SPECS[ROBOT.sizeLevel].label} / 体型:${BODY_SPECS[ROBOT.bodyType].label}）！`);
   }
 
-  document.getElementById('setting-rig-type').value = ROBOT.rigType;
   document.getElementById('setting-cam-style').value = CAM_VISUAL_STYLE;
   document.getElementById('setting-size-level').value = ROBOT.sizeLevel;
   document.getElementById('setting-body-type').value = ROBOT.bodyType;
@@ -2733,9 +2520,7 @@
     turtleGroup.position.y = -10.4 + Math.sin(t * 0.7) * 0.18; turtleGroup.rotation.y = Math.sin(t * 0.25) * 0.06;
     skyGroup.rotation.y = t * 0.015;
 
-    // 1号機のレイヤー合成＆本格14関節ボーン（またはサイコロ箱型）アニメーションを更新
-    updateRobotLayeredAnimation(t);
-
+    updateRobotUnifiedAnimation(t);
     renderer.render(scene, activeCamera);
   }
   requestAnimationFrame(animate);
