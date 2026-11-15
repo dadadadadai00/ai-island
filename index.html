@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0b1528">
-  <title>ボクセルAI自律思考水槽 v24</title>
+  <title>ボクセルAI自律思考水槽 v25</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
@@ -56,14 +56,14 @@
     #toast { position: fixed; top: 82px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,0.92); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 100; white-space: nowrap; }
     .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.75); z-index: 50; display: none; justify-content: center; align-items: center; }
     .modal-overlay.active { display: flex; }
-    .modal-content { background: #fff; width: 94%; max-width: 410px; max-height: 88vh; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); position: relative; overflow-y: auto; }
+    .modal-content { background: #fff; width: 94%; max-width: 410px; max-height: 89vh; border-radius: 18px; padding: 15px; display: flex; flex-direction: column; gap: 9px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); position: relative; overflow-y: auto; }
     .modal-close { position: absolute; top: 12px; right: 15px; font-size: 20px; font-weight: bold; color: #94a3b8; cursor: pointer; z-index: 10; }
     .modal-title { font-size: 15px; font-weight: 900; color: #1e293b; display: flex; align-items: center; gap: 6px; }
     .spec-switch-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
-    .spec-chip { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 6px 4px; font-size: 11px; font-weight: 800; text-align: center; background: #f8fafc; color: #475569; cursor: pointer; }
+    .spec-chip { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 5px 4px; font-size: 11px; font-weight: 800; text-align: center; background: #f8fafc; color: #475569; cursor: pointer; }
     .spec-chip.active { background: #fef9c3; border-color: #eab308; color: #854d0e; }
-    .bag-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: #f8fafc; padding: 8px; border-radius: 10px; border: 1px solid #e2e8f0; }
-    .bag-slot { aspect-ratio: 1; background: #fff; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 22px; cursor: pointer; }
+    .bag-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: #f8fafc; padding: 7px; border-radius: 10px; border: 1px solid #e2e8f0; }
+    .bag-slot { aspect-ratio: 1; background: #fff; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 20px; cursor: pointer; }
     .bag-slot.filled { border: 1px solid #93c5fd; background: #eff6ff; }
     .setting-group { display: flex; flex-direction: column; gap: 4px; }
     .setting-label { font-size: 12px; font-weight: bold; color: #475569; }
@@ -71,9 +71,9 @@
     .btn-primary { background: #3b82f6; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: 900; cursor: pointer; width: 100%; }
     .btn-accent { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: #fff; border: none; padding: 11px; border-radius: 12px; font-weight: 900; font-size: 13px; cursor: pointer; width: 100%; box-shadow: 0 3px 10px rgba(109,40,217,0.3); }
     .btn-pink { background: #ec4899; color: #fff; border: none; padding: 11px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
-    .btn-sub { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; width: 100%; }
+    .btn-sub { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 9px; border-radius: 10px; font-weight: 800; cursor: pointer; width: 100%; }
     .btn-danger { background: #ef4848; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
-    /* キャラ基本表現ページ（タブ＋縦列20種リスト＋確定/キャンセルフッター） */
+    /* 🎭 キャラ基本表現モーダル */
     .rig-tab-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #f1f5f9; padding: 4px; border-radius: 12px; }
     .rig-tab-btn { padding: 8px 6px; border-radius: 9px; font-size: 12px; font-weight: 900; text-align: center; cursor: pointer; color: #64748b; border: 2px solid transparent; transition: all 0.15s; }
     .rig-tab-btn.active { background: #fff; color: #1d4ed8; border-color: #3b82f6; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
@@ -85,6 +85,19 @@
     .expr-icon { font-size: 17px; flex-shrink: 0; }
     .expr-right-input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 11px; color: #334155; background: #fff; }
     .modal-footer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 4px; }
+    /* 🧪 小学生博士のAIパラメータ調整（5本＋暗転予備1本）＆ トラウマ記憶UI */
+    .lab-panel { background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+    .param-row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: #1e293b; }
+    .param-label { width: 116px; flex-shrink: 0; display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+    .param-slider { flex: 1; accent-color: #3b82f6; height: 6px; cursor: pointer; }
+    .param-val { width: 28px; text-align: right; font-weight: 900; color: #2563eb; font-size: 11px; }
+    .param-row.locked-dark { background: #1e293b; color: #64748b; border-radius: 7px; padding: 4px 6px; opacity: 0.72; pointer-events: none; }
+    .param-row.locked-dark .param-val { color: #64748b; }
+    .trauma-box { background: #fff1f2; border: 1px solid #fecdd3; border-radius: 9px; padding: 6px 8px; font-size: 11px; color: #9f1239; display: flex; flex-direction: column; gap: 4px; }
+    .trauma-tag-list { display: flex; flex-wrap: wrap; gap: 4px; min-height: 20px; align-items: center; }
+    .trauma-tag { background: #ffe4e6; border: 1px solid #fda4af; color: #be123c; font-weight: 800; padding: 2px 7px; border-radius: 999px; font-size: 10.5px; }
+    .trauma-test-row { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+    .mini-test-btn { font-size: 10px; font-weight: 800; padding: 3px 7px; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; color: #334155; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -120,7 +133,7 @@
 </div>
 
 <div id="side-icon-column">
-  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳（カバン・日記・体格）">📖</div>
+  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳（博士のパラメータ・トラウマ記憶・カバン）">📖</div>
   <div class="side-circle-btn" id="cam-ground-btn" title="外カメラ（地上・全体固定）">🌌</div>
   <div class="side-circle-btn" id="cam-ug-btn" title="外カメラ（地下・全体固定）">⛏️</div>
   <div class="side-circle-btn" id="cam-fpv-btn" title="内カメラ（キャラ視点・1ブロック広角＆ほふくズーム）">🤖</div>
@@ -137,10 +150,10 @@
 
 <div id="bottom-panel">
   <div class="panel-header">
-    <span>💭 ロボのきもち・心のさけび【v24 4大コア＆基本表現20種】</span>
+    <span>💭 ロボのきもち・心のさけび【v25 博士のパラメータ＆トラウマ創発】</span>
     <div class="ai-badge" id="ai-status">🟩 アルゴン待機中</div>
   </div>
-  <div id="message-box">【v24完成】📖手帳をスッキリ整理し、⚙️設定の中に「🎭キャラ基本表現（20種類＋連想ワード調整）」を追加！🎲サイコロ箱型と🦴マッチ棒3D骨組みを切り替えて確定できるよ！</div>
+  <div id="message-box">【v25完成】📖手帳で「小学生博士のパラメータ（探究心・警戒リミッター・出力パワー・省エネ・演算＋忠誠心[暗転]）」を調整可能！海や狭い穴でのトラウマ記憶が設定を上書きしてユニークな個性が育つよ！</div>
   <div class="action-history">
     <span class="history-tag" id="history-action">👟 やった事 待機中</span>
     <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従(観察窓)・地下2層目</span>
@@ -150,16 +163,65 @@
 
 <div id="toast">💾 データを保存したよ</div>
 
-<!-- 📖 ロボット手帳モーダル（スッキリ整理：ステータス・大きさ/体型・カバン・日記のみ） -->
+<!-- 📖 ロボット手帳モーダル（博士のパラメータ6本＋トラウマ記憶＋体格＋カバン＋日記） -->
 <div class="modal-overlay" id="modal-diary" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-diary')">✕</div>
-    <div class="modal-title">📖 1号機の手帳（体格・カバン・きろく）</div>
-    <div style="display:flex; align-items:center; gap:10px; background:#f8fafc; padding:10px; border-radius:12px; border:1px solid #e2e8f0;">
-      <div style="font-size:34px;" id="diary-emo-icon">🙂</div>
+    <div class="modal-title">📖 1号機の手帳（博士のパラメータ・記憶・カバン）</div>
+    <div style="display:flex; align-items:center; gap:10px; background:#f8fafc; padding:8px 10px; border-radius:12px; border:1px solid #e2e8f0;">
+      <div style="font-size:32px;" id="diary-emo-icon">🙂</div>
       <div>
-        <div style="font-weight:900; font-size:13.5px; color:#1e293b;" id="diary-robo-name">1号機（🎲サイコロ箱型・生存 1日目）</div>
-        <div style="font-size:11px; color:#64748b;" id="diary-robo-height">現在：地下2層目 / 大きさ：大 / 体型：太っちょ</div>
+        <div style="font-weight:900; font-size:13px; color:#1e293b;" id="diary-robo-name">1号機（🎲サイコロ箱型・生存 1日目）</div>
+        <div style="font-size:10.5px; color:#64748b;" id="diary-robo-height">現在：地下2層目 / 大きさ：大 / 体型：太っちょ</div>
+      </div>
+    </div>
+
+    <div class="lab-panel">
+      <div style="font-size:11.5px; font-weight:900; color:#1e3a8a; display:flex; justify-content:space-between;">
+        <span>🧪 小学生博士のAI補助パラメータ（0〜100）</span>
+        <span style="font-size:10px; color:#64748b;">※100で警戒ゼロ</span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">🔭 探究心センサー</span>
+        <input type="range" min="0" max="100" id="param-curiosity" class="param-slider" oninput="onParamSliderInput('curiosity', this.value)">
+        <span class="param-val" id="val-param-curiosity">60</span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">🛡️ 警戒リミッター</span>
+        <input type="range" min="0" max="100" id="param-cautionLimiter" class="param-slider" oninput="onParamSliderInput('cautionLimiter', this.value)">
+        <span class="param-val" id="val-param-cautionLimiter">50</span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">💥 出力パワー</span>
+        <input type="range" min="0" max="100" id="param-power" class="param-slider" oninput="onParamSliderInput('power', this.value)">
+        <span class="param-val" id="val-param-power">50</span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">🔋 省エネ駆動</span>
+        <input type="range" min="0" max="100" id="param-eco" class="param-slider" oninput="onParamSliderInput('eco', this.value)">
+        <span class="param-val" id="val-param-eco">40</span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">🧠 演算モジュール</span>
+        <input type="range" min="0" max="100" id="param-logic" class="param-slider" oninput="onParamSliderInput('logic', this.value)">
+        <span class="param-val" id="val-param-logic">50</span>
+      </div>
+      <div class="param-row locked-dark" title="予備パラメータ（現在は暗転ロック中）">
+        <span class="param-label">🔒 忠誠心(予備)</span>
+        <input type="range" min="0" max="100" value="50" disabled class="param-slider">
+        <span class="param-val">50</span>
+      </div>
+
+      <div class="trauma-box">
+        <div style="font-weight:900; display:flex; justify-content:space-between; align-items:center;">
+          <span>⚡ 刻印された記憶・トラウマ（パラメータを上書き発動）</span>
+        </div>
+        <div class="trauma-tag-list" id="trauma-tag-list"></div>
+        <div class="trauma-test-row">
+          <button type="button" class="mini-test-btn" onclick="addTraumaMemoryManual('🌊 海で大ダメージを受けた(海トラウマ)')">＋🌊海トラウマ</button>
+          <button type="button" class="mini-test-btn" onclick="addTraumaMemoryManual('🕳️ 狭い穴におなかがつかえた(狭所トラウマ)')">＋🕳️狭所トラウマ</button>
+          <button type="button" class="mini-test-btn" onclick="clearTraumaMemories()">🧹記憶クリア</button>
+        </div>
       </div>
     </div>
 
@@ -178,7 +240,7 @@
     <div style="font-size:12px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ」（タップで足元に使う）</div>
     <div class="bag-grid" id="bag-grid"></div>
     <div style="font-size:12px; font-weight:bold; color:#475569;">📝 世代のきろく・思い出</div>
-    <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; font-size:11.5px; color:#334155; max-height:110px; overflow-y:auto; line-height:1.4;"></div>
+    <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; font-size:11px; color:#334155; max-height:80px; overflow-y:auto; line-height:1.4;"></div>
     <button class="btn-sub" onclick="closeModal('modal-diary')">手帳を閉じる</button>
   </div>
 </div>
@@ -205,7 +267,7 @@
   </div>
 </div>
 
-<!-- ⚙️ システム設定モーダル（ここに「🎭 キャラ基本表現」ボタンを配置） -->
+<!-- ⚙️ システム設定モーダル -->
 <div class="modal-overlay" id="modal-settings" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-settings')">✕</div>
@@ -238,7 +300,7 @@
     <div class="setting-group">
       <label class="setting-label">🤖 使う頭脳（AIの判断をゲームに反映）</label>
       <select id="setting-ai-type" class="setting-input">
-        <option value="none">🟩 アルゴンさん（通信なし・物理と本能で動く）</option>
+        <option value="none">🟩 アルゴンさん（通信なし・パラメータ＆トラウマ本能）</option>
         <option value="gemini">🟦 3.8 / Gemini（gemini-3.8-flash 通信最優先）</option>
         <option value="groq">🟪 3.1 / Groq（爆速AI通信）</option>
       </select>
@@ -247,7 +309,7 @@
       <label class="setting-label">⚡ 移動スピード</label>
       <select id="setting-speed" class="setting-input">
         <option value="3">速度 3（通常・マスの中央に安全停止）</option>
-        <option value="5">速度 5（猛ダッシュ・海や崖へ飛び出し注意！）</option>
+        <option value="5">速度 5（猛ダッシュ・海へ飛び出し＆海トラウマ発生注意！）</option>
       </select>
     </div>
     <div class="setting-group">
@@ -302,13 +364,13 @@
     { key: 'anger',    icon: '😡', label: '怒る',           bulb: 0xef4444, words: '地団駄、つかえた、悔しい、プンプン、怒る、狭い' },
     { key: 'sad',      icon: '😭', label: '悲しむ',         bulb: 0x38bdf8, words: 'うなだれる、失敗、おなかすいた、しょんぼり、泣く' },
     { key: 'fun',      icon: '🎵', label: '楽しむ',         bulb: 0x34d399, words: 'ダンス、鼻歌、ごきげん、ステップ、踊る、散歩' },
-    { key: 'fear',     icon: '😰', label: '怖がる',         bulb: 0x8b5cf6, words: '後ずさり、ビクビク、危険、お化け、怯える、暗い' },
+    { key: 'fear',     icon: '😰', label: '怖がる',         bulb: 0x8b5cf6, words: '後ずさり、ビクビク、危険、お化け、怯える、トラウマ' },
     { key: 'shiver',   icon: '🥶', label: '震える',         bulb: 0x60a5fa, words: '寒い、ガタガタ、武者震い、氷、冷たい、体力不足' },
     { key: 'hot',      icon: '🥵', label: '暑がる',         bulb: 0xf97316, words: 'あおぐ、バテる、汗、熱い、蒸し暑い、疲れた' },
     { key: 'think',    icon: '💡', label: '考える',         bulb: 0xfef08a, words: 'ひらめく、悩む、作戦会議、腕組み、思考、迷う' },
     { key: 'surprise', icon: '😲', label: '驚く',           bulb: 0xf87171, words: 'びっくり、飛び上がる、発見、ハッとする、白波' },
     { key: 'wave',     icon: '👋', label: '挨拶',           bulb: 0x4ade80, words: '手を振る、ヤッホー、呼ぶ、お礼、バイバイ、挨拶' },
-    { key: 'sleep',    icon: '💤', label: '居眠り',         bulb: 0x94a3b8, words: '寝る、船をこぐ、休憩、お昼寝、ひとやすみ、眠い' },
+    { key: 'sleep',    icon: '💤', label: '居眠り',         bulb: 0x94a3b8, words: '寝る、船をこぐ、休憩、お昼寝、ひとやすみ、省エネ' },
     { key: 'swing_v',  icon: '⛏️', label: '縦に振りかざす', bulb: 0xfb923c, words: '斧、剣、ツルハシ、餅つき用きね、釣り竿、叩く、割る', tool: true },
     { key: 'swing_h',  icon: '🧹', label: '横に払う・掃く', bulb: 0x2dd4bf, words: '掃除、草刈り、鎌、ほうき、ペンキ塗り、払う、削る', tool: true },
     { key: 'pickup',   icon: '🤲', label: '拾う・置く',     bulb: 0xa3e635, words: 'しゃがむ、採取、種まき、置く、調べる、撫でる、拾う' },
@@ -319,8 +381,6 @@
     { key: 'struggle', icon: '🌀', label: '模索・奮闘する', bulb: 0xf43f5e, words: 'ルール外の行動、試行錯誤、ジタバタ挑戦、特訓、未知' }
   ];
 
-  // 20種類の動きを軽量・高速に計算するコンパクトモーション定義テーブル（スマホ発熱ゼロ設計）
-  // [spd:速度, bounce:上下跳ね, bodyX:前傾, headX:首縦, shLX:左肩X, shLZ:左肩Z, elLX:左肘X, shRX:右肩X, shRZ:右肩Z, elRX:右肘X, hipX:股関節, kneeX:膝, waveMode:特殊波]
   const POSE_TABLE = {
     normal:   { spd: 3.5, bounce: 0.01, bodyX: 0.00, headX: 0.00, shLX: 0.05,  shLZ: 0.05, elLX: -0.20, shRX: -0.05, shRZ: -0.05, elRX: -0.20, hipX: -0.05, kneeX: 0.10, mode: 'breath' },
     joy:      { spd: 7.5, bounce: 0.22, bodyX: -0.10, headX: -0.20, shLX: -2.65, shLZ: 0.35, elLX: -0.35, shRX: -2.65, shRZ: -0.35, elRX: -0.35, hipX: -0.35, kneeX: 0.70, mode: 'jump' },
@@ -351,7 +411,6 @@
     return DEFAULT_EXPRESSIONS.find(e => e.key === key) || DEFAULT_EXPRESSIONS[0];
   }
 
-  // 行動テキストやAIの思考テキストから、登録された連想ワードに一致する表現キーを自動判定（該当なし＆未知の挑戦なら struggle）
   function matchExpressionFromText(text, fallbackKey = 'struggle') {
     if (!text) return fallbackKey;
     for (let i = 0; i < DEFAULT_EXPRESSIONS.length; i++) {
@@ -532,24 +591,48 @@
 
   let life = new LifeCore(), GAME_DAY = 1, TIME_STEP = 0;
   let BAG = ['stone', 'apple', 'stone', 'grass'];
-  let DIARY_LOGS = ['🌱 1日目：サイコロ箱型（デフォルト）とマッチ棒3D骨組みを切り替えられる1号機が誕生！'];
+  let DIARY_LOGS = ['🌱 1日目：小学生博士のパラメータとトラウマ記憶システムを持つ1号機が誕生！'];
   let CAM_VISUAL_STYLE = safeStorage.getItem('cam_visual_style_v15') || 'hide';
   let HEIGHT_MAP = {}, CHIP_MAP = {}, WATER_MAP = {};
 
-  // デフォルトは「🎲サイコロ箱型（box）」
+  // デフォルトは「🎲サイコロ箱型（box）」＋ 小学生博士のパラメータ6項目 ＋ 軽量テキスト記憶配列
   let ROBOT = {
     unitModel: 1,
     gen: 1,
-    rigType: 'box',       // 'box'（🎲サイコロ箱型：デフォルト） | 'stick'（🦴◯と線のマッチ棒3D骨組み）
+    rigType: 'box',
     pos: { x: 0, z: 0, lv: -1, sx: 2, sz: 2 },
     rotY: Math.PI,
     speed: 3,
     sizeLevel: 'large',
     bodyType: 'fat',
     posture: 'stand',
-    emotion: 'normal'     // 20種類の表現キーのいずれか
+    emotion: 'normal',
+    params: {
+      curiosity: 60,       // 🔭 探究心センサー (0-100)
+      cautionLimiter: 50,  // 🛡️ 警戒リミッター (0:超ビビリ 〜 100:怖いもの知らず)
+      power: 50,           // 💥 出力パワー (0-100)
+      eco: 40,             // 🔋 省エネ駆動 (0-100)
+      logic: 50,           // 🧠 演算モジュール (0-100)
+      loyalty: 50          // 🔒 忠誠心 (予備・暗転ロック)
+    },
+    memories: []           // ⚡ 物理現象等で刻まれたトラウマ・経験の軽量テキスト配列
   };
   let WORLD_ITEMS = [{ type: 'apple', x: -1, z: 1 }, { type: 'apple', x: 1, z: 0 }];
+
+  function addRobotMemory(memText) {
+    if (!memText) return;
+    if (!Array.isArray(ROBOT.memories)) ROBOT.memories = [];
+    if (!ROBOT.memories.includes(memText)) {
+      ROBOT.memories.push(memText);
+      if (ROBOT.memories.length > 8) ROBOT.memories.shift();
+      DIARY_LOGS.push(`⚡ 記憶刻印：「${memText}」を覚えた！`);
+    }
+  }
+
+  function hasMemoryKeyword(kw) {
+    if (!Array.isArray(ROBOT.memories)) return false;
+    return ROBOT.memories.some(m => m.includes(kw));
+  }
 
   function carveCrawlTunnelBlock(gx, gz, lv, tunnelWidth = 3, tunnelHeight = 2) {
     const key = `${gx},${gz},${lv}`;
@@ -606,7 +689,6 @@
     if (d.robot && d.robot.pos) {
       ROBOT.unitModel = Number(d.robot.unitModel) || 1;
       ROBOT.gen = Number(d.robot.gen) || 1;
-      // 読み込み時に stick 指定がある場合のみ stick、それ以外はデフォルトの box
       ROBOT.rigType = (d.robot.rigType === 'stick') ? 'stick' : 'box';
       ROBOT.pos.x = Number.isFinite(d.robot.pos.x) ? d.robot.pos.x : 0;
       ROBOT.pos.z = Number.isFinite(d.robot.pos.z) ? d.robot.pos.z : 0;
@@ -619,6 +701,16 @@
       ROBOT.bodyType = BODY_SPECS[d.robot.bodyType] ? d.robot.bodyType : 'fat';
       ROBOT.posture = d.robot.posture === 'crawl' ? 'crawl' : 'stand';
       ROBOT.emotion = POSE_TABLE[d.robot.emotion] ? d.robot.emotion : 'normal';
+      if (d.robot.params && typeof d.robot.params === 'object') {
+        ['curiosity', 'cautionLimiter', 'power', 'eco', 'logic'].forEach(k => {
+          if (typeof d.robot.params[k] === 'number') {
+            ROBOT.params[k] = Math.max(0, Math.min(100, Math.round(d.robot.params[k])));
+          }
+        });
+      }
+      if (Array.isArray(d.robot.memories)) {
+        ROBOT.memories = d.robot.memories.slice(-8);
+      }
     }
     if (d.heightMap) {
       for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
@@ -760,7 +852,9 @@
   function checkMoveAndPosture(gx, gz, curLv, dir) {
     const nx = gx + dir.dx, nz = gz + dir.dz;
     if (nx < -2 || nx > 2 || nz < -2 || nz > 2) {
-      return { canMove: ROBOT.speed === 5, posture: 'stand', targetLv: -99, reason: 'sea' };
+      // 速度5 または 警戒リミッター80以上（怖いもの知らず）なら海へ飛び出し可能！
+      const canJumpSea = (ROBOT.speed === 5) || ((ROBOT.params?.cautionLimiter ?? 50) >= 80);
+      return { canMove: canJumpSea, posture: 'stand', targetLv: -99, reason: 'sea' };
     }
     const eff = getEffectiveClearanceSpecs();
     const destTopLv = HEIGHT_MAP[`${nx},${nz}`] ?? 0;
@@ -1107,7 +1201,7 @@
   sCtx.fillStyle = 'rgba(255,255,255,0.72)';
   for (let i = 0; i < 55; i++) {
     const ang = (i / 55) * Math.PI * 2 + (i % 3) * 0.4, dist = 76 + (i * 17 % 48);
-    sCtx.beginPath(); sCtx.arc(128 + Math.cos(ang) * dist, 128 + Math.sin(ang) * dist, 2 + (i % 4) * 1.3, 0, Math.PI * 2); sCtx.fill();
+    sCtx.beginPath(); sCtx.arc(128 + Math.cos(ang) * dist, 128 + Math.sin(ang) * dist, 2 + (i % 4) * 1.3, 0, 0, Math.PI * 2); sCtx.fill();
   }
   sCtx.clearRect(65, 65, 126, 126);
   sCtx.strokeStyle = '#d4a373';
@@ -1198,14 +1292,12 @@
   const matMainBlue   = new THREE.MeshLambertMaterial({ color: 0x38bdf8 });
   const matLightBlue  = new THREE.MeshLambertMaterial({ color: 0xbae6fd });
   const matDarkLimb   = new THREE.MeshLambertMaterial({ color: 0x0f172a });
-  const matStickJoint = new THREE.MeshLambertMaterial({ color: 0xfef08a }); // ◯関節（見やすいパステルイエロー球体）
-  const matStickBone  = new THREE.MeshLambertMaterial({ color: 0xf8fafc }); // 線（マッチ棒の白い骨格ライン）
-  const matStickFrame = new THREE.MeshLambertMaterial({ color: 0x7dd3fc, wireframe: false }); // デッサン胸郭・骨盤
+  const matStickJoint = new THREE.MeshLambertMaterial({ color: 0xfef08a });
+  const matStickBone  = new THREE.MeshLambertMaterial({ color: 0xf8fafc });
+  const matStickFrame = new THREE.MeshLambertMaterial({ color: 0x7dd3fc });
   const sharedBulbMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
 
-  // ---------------------------------------------------------
   // A. 🎲 サイコロ箱型モデル（デフォルト：boxRigGroup）
-  // ---------------------------------------------------------
   const boxRigGroup = new THREE.Group();
   robotPoseGroup.add(boxRigGroup);
 
@@ -1271,12 +1363,10 @@
   boxLegRPivot.add(boxLegR);
   boxRigGroup.add(boxLegRPivot);
 
-  // ---------------------------------------------------------
   // B. 🦴 3D骨組みモデル（◯と線で関節・部位をつないだマッチ棒デッサン人形：stickRigGroup）
-  // ---------------------------------------------------------
   const stickRigGroup = new THREE.Group();
   robotPoseGroup.add(stickRigGroup);
-  const SB = {}; // Stick Bones
+  const SB = {};
 
   function makeSphereJoint(r = 0.042) {
     return new THREE.Mesh(new THREE.SphereGeometry(r, 10, 10), matStickJoint);
@@ -1287,23 +1377,20 @@
     return m;
   }
 
-  // 1. 骨盤・腰ルート (pelvis) + 股関節の横棒
   SB.pelvis = new THREE.Group();
   SB.pelvis.position.set(0, 0.38, 0);
   stickRigGroup.add(SB.pelvis);
-  SB.pelvis.add(makeSphereJoint(0.048)); // 腰の中央◯関節
+  SB.pelvis.add(makeSphereJoint(0.048));
   const pelvisBar = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.24, 8), matStickFrame);
   pelvisBar.rotation.z = Math.PI / 2;
   SB.pelvis.add(pelvisBar);
 
-  // 2. 背骨・胸郭 (chest) + 肩の横棒
   SB.chest = new THREE.Group();
   SB.chest.position.set(0, 0.0, 0);
   SB.pelvis.add(SB.chest);
   const spineRod = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.020, 0.26, 8), matStickBone);
   spineRod.position.y = 0.13;
   SB.chest.add(spineRod);
-  // 胸郭のデッサンフレーム（逆台形風の楕円胸パーツ）
   const ribCage = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.09, 0.20, 10), matStickFrame);
   ribCage.scale.set(1.0, 1.0, 0.62);
   ribCage.position.y = 0.15;
@@ -1316,7 +1403,6 @@
   clavicleBar.position.y = 0.25;
   SB.chest.add(clavicleBar);
 
-  // 3. 首 (neck) → 4. 頭 (head：デッサン人形風の卵型＋十字ライン＋頭頂ランプ)
   SB.neck = new THREE.Group();
   SB.neck.position.set(0, 0.26, 0);
   SB.chest.add(SB.neck);
@@ -1332,7 +1418,6 @@
   stickHeadMesh.scale.set(0.88, 1.12, 0.92);
   stickHeadMesh.position.y = 0.14;
   SB.head.add(stickHeadMesh);
-  // デッサン人形の顔正面の十字ライン（向きが一目でわかる！）
   const faceCrossV = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.24, 0.02), matDarkLimb);
   faceCrossV.position.set(0, 0.14, 0.125);
   SB.head.add(faceCrossV);
@@ -1343,7 +1428,6 @@
   stickBulb.position.y = 0.33;
   SB.head.add(stickBulb);
 
-  // 5. 左腕：左肩◯ (shoulderL) → 上腕線 → 左ひじ◯ (elbowL) → 前腕線 → 左手首◯ (wristL)
   SB.shoulderL = new THREE.Group();
   SB.shoulderL.position.set(-0.19, 0.25, 0);
   SB.chest.add(SB.shoulderL);
@@ -1364,7 +1448,6 @@
   palmL.position.y = -0.04;
   SB.wristL.add(palmL);
 
-  // 6. 右腕：右肩◯ (shoulderR) → 上腕線 → 右ひじ◯ (elbowR) → 前腕線 → 右手首◯ (wristR) + ツール
   SB.shoulderR = new THREE.Group();
   SB.shoulderR.position.set(0.19, 0.25, 0);
   SB.chest.add(SB.shoulderR);
@@ -1395,7 +1478,6 @@
   stickTool.visible = false;
   SB.wristR.add(stickTool);
 
-  // 7. 左脚：左股関節◯ (hipL) → 太もも線 → 左ひざ◯ (kneeL) → すね線 → 左足首◯ (ankleL)
   SB.hipL = new THREE.Group();
   SB.hipL.position.set(-0.11, -0.02, 0);
   SB.pelvis.add(SB.hipL);
@@ -1416,7 +1498,6 @@
   stickFootL.position.set(0, -0.02, 0.03);
   SB.ankleL.add(stickFootL);
 
-  // 8. 右脚：右股関節◯ (hipR) → 太もも線 → 右ひざ◯ (kneeR) → すね線 → 右足首◯ (ankleR)
   SB.hipR = new THREE.Group();
   SB.hipR.position.set(0.11, -0.02, 0);
   SB.pelvis.add(SB.hipR);
@@ -1468,30 +1549,30 @@
     sharedBulbMat.color.setHex(eSpec.bulb);
   }
 
-  // 20種類の表現テーブル（POSE_TABLE）を「🎲サイコロ箱型」と「🦴3D骨組み（◯と線のマッチ棒）」の両方に高速適用
+  // 出力パワー（ROBOT.params.power: 0〜100）に応じてアクションのダイナミックさも連動！
   function updateRobotUnifiedAnimation(t) {
     const emoKey = POSE_TABLE[ROBOT.emotion] ? ROBOT.emotion : 'normal';
     const p = POSE_TABLE[emoKey];
     const eSpec = getExpressionSpec(emoKey);
+    const powFactor = 0.78 + ((ROBOT.params?.power ?? 50) / 100) * 0.48;
     const phase = t * p.spd;
     const wave = Math.sin(phase);
     const cosW = Math.cos(phase);
     const absW = Math.abs(wave);
 
-    // 動的オフセットの計算（モードごとの特徴的な揺れ）
     let dy = 0, bodyRotY = 0, bodyRotZ = 0, headRotY = 0, headRotZ = 0;
     let armLDX = 0, armRDX = 0, armRDZ = 0, elRDX = 0, legLDX = 0, legRDX = 0;
 
     if (p.mode === 'jump') {
-      dy = absW * p.bounce;
+      dy = absW * p.bounce * powFactor;
       bodyRotY = Math.sin(phase * 0.5) * 0.18;
-      armLDX = wave * 0.25; armRDX = -wave * 0.25;
+      armLDX = wave * 0.25 * powFactor; armRDX = -wave * 0.25 * powFactor;
       legLDX = wave * 0.30; legRDX = -wave * 0.30;
     } else if (p.mode === 'stomp') {
-      dy = absW * p.bounce;
-      bodyRotZ = wave * 0.08;
-      armLDX = wave * 0.55; armRDX = -wave * 0.55;
-      legLDX = Math.max(0, wave) * p.hipX; legRDX = Math.max(0, -wave) * p.hipX;
+      dy = absW * p.bounce * powFactor;
+      bodyRotZ = wave * 0.08 * powFactor;
+      armLDX = wave * 0.55 * powFactor; armRDX = -wave * 0.55 * powFactor;
+      legLDX = Math.max(0, wave) * p.hipX * powFactor; legRDX = Math.max(0, -wave) * p.hipX * powFactor;
     } else if (p.mode === 'dance') {
       dy = absW * p.bounce;
       bodyRotZ = wave * 0.14; bodyRotY = Math.sin(phase * 0.5) * 0.25;
@@ -1511,48 +1592,39 @@
       dy = p.bounce;
       headRotZ = wave * 0.08;
     } else if (p.mode === 'swing_v') {
-      // ⛏️ 縦に振りかざす（斧・剣・ツルハシ・餅つき用きね・釣り竿）
-      bodyRotY = wave * 0.20;
-      armRDX = wave * 1.25; elRDX = Math.max(0, wave) * 0.65;
+      bodyRotY = wave * 0.20 * powFactor;
+      armRDX = wave * 1.25 * powFactor; elRDX = Math.max(0, wave) * 0.65;
     } else if (p.mode === 'swing_h') {
-      // 🧹 横に払う・掃く
-      bodyRotY = wave * 0.45;
-      armRDZ = wave * 0.75; armLDX = -wave * 0.35;
+      bodyRotY = wave * 0.45 * powFactor;
+      armRDZ = wave * 0.75 * powFactor; armLDX = -wave * 0.35;
     } else if (p.mode === 'pickup') {
-      // 🤲 拾う・置く（しゃがんで手を伸ばす）
       const r = (wave + 1) * 0.5;
       dy = p.bounce * r;
       armLDX = p.shLX * r; armRDX = p.shRX * r;
     } else if (p.mode === 'carry') {
-      // 📦 持ち上げる・運ぶ
       dy = p.bounce + absW * 0.04;
       legLDX = wave * 0.40; legRDX = -wave * 0.40;
     } else if (p.mode === 'push') {
-      // 👐 前に押す・掘る
-      armLDX = wave * 0.45; armRDX = -wave * 0.45;
+      armLDX = wave * 0.45 * powFactor; armRDX = -wave * 0.45 * powFactor;
       legLDX = wave * 0.35; legRDX = -wave * 0.35;
     } else if (p.mode === 'run') {
-      // 🏃 走る・急ぐ
       dy = absW * p.bounce;
       armLDX = wave * 0.95; armRDX = -wave * 0.95;
       legLDX = -wave * 0.95; legRDX = wave * 0.95;
     } else if (p.mode === 'peek') {
-      // 🔍 のぞき込む・探す
       headRotY = wave * 0.45; bodyRotY = wave * 0.20;
     } else if (p.mode === 'struggle') {
-      // 🌀 模索・奮闘する（ルール外の未知の動きに試行錯誤！）
-      dy = absW * p.bounce;
+      dy = absW * p.bounce * powFactor;
       bodyRotY = Math.sin(phase * 0.7) * 0.35;
       bodyRotZ = cosW * 0.16;
       headRotZ = wave * 0.28;
-      armLDX = wave * 0.90; armRDX = cosW * 0.90;
+      armLDX = wave * 0.90 * powFactor; armRDX = cosW * 0.90 * powFactor;
       legLDX = cosW * 0.60; legRDX = -wave * 0.60;
     } else {
       dy = absW * p.bounce;
       armLDX = wave * 0.06; armRDX = -wave * 0.06;
     }
 
-    // --- A. 🎲 サイコロ箱型の更新 ---
     if (ROBOT.rigType !== 'stick') {
       boxTool.visible = Boolean(eSpec.tool);
       boxRigGroup.position.set(0, Math.max(-0.09, dy), 0);
@@ -1565,7 +1637,6 @@
       return;
     }
 
-    // --- B. 🦴 3D骨組み（◯と線のマッチ棒モデル）の全身15関節更新 ---
     stickTool.visible = Boolean(eSpec.tool);
     if (ROBOT.posture === 'crawl') {
       const cw = Math.sin(t * 7);
@@ -2001,7 +2072,8 @@
     document.getElementById('ai-status').innerText = getActiveBrainBadgeText();
   }
 
-  async function askAIForDecision(validMoves, curH) {
+  // AIへのプロンプトに「小学生博士のパラメータ5項目」と「過去の記憶・トラウマメモ」を渡し、創発を引き出す！
+  async function askAIForDecision(validMoves, curH, isAtSeaEdge, blockedByFat) {
     const aiType = safeStorage.getItem('ai_type') || 'none';
     if (aiType === 'none') return null;
     const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
@@ -2009,7 +2081,26 @@
     const dirNames = validMoves.map(m => `${m.dir.name}${m.check.posture === 'crawl' ? '(ほふく前進)' : ''}`).join('、');
     const itemsStr = WORLD_ITEMS.map(it => `${it.type}(${it.x},${it.z})`).join(', ') || 'なし';
     const exprSummary = DEFAULT_EXPRESSIONS.map(e => `${e.key}:[${CUSTOM_WORDS_MAP[e.key] || e.words}]`).join(' / ');
-    const prompt = `あなたは第一エリア空間（地上5段・地下5段）の5x5アリの巣ボクセル島で暮らす自律ロボット「${ROBOT.unitModel}号機（第${ROBOT.gen}世代）」です。現在位置:(${ROBOT.pos.x},${ROBOT.pos.z}) 層:${formatHeightText(curH)} 大きさ:${sSpec.label} 体型:${bSpec.label} ステータス:たいりょく=${life.stamina},おなか=${life.energy},ごきげん=${life.mental} アイテム:${itemsStr} 移動可能8方向:[${dirNames}] 基本表現辞書:${exprSummary} ※辞書にない新しい動きに模索・奮闘しても構いません。JSON形式のみで次の行動と表現キー(20種またはstruggle)と小学生向けの可愛い気持ち(1〜2文)を出力してください:{"action":"移動可能な方向名 または 斜め掘り または ほふく掘り または 休む または 自由な挑戦行動","emotion":"表現キー","thought":"気持ち"}`;
+    const p = ROBOT.params || {};
+    const memStr = (ROBOT.memories && ROBOT.memories.length) ? ROBOT.memories.join(' / ') : 'まだ特別なトラウマや強い記憶はない';
+    const envNote = `${isAtSeaEdge ? '【現在：すぐ目の前が海の白波！】' : ''}${blockedByFat ? '【現在：狭い穴におなかがつかえている！】' : ''}`;
+
+    const prompt = `あなたは5x5ボクセル島で暮らす自律ロボット「${ROBOT.unitModel}号機（第${ROBOT.gen}世代）」です。
+現在位置:(${ROBOT.pos.x},${ROBOT.pos.z}) 層:${formatHeightText(curH)} ${envNote}
+大きさ:${sSpec.label} 体型:${bSpec.label} たいりょく=${life.stamina},おなか=${life.energy},ごきげん=${life.mental}
+周囲のアイテム:${itemsStr} / 移動可能方向:[${dirNames}]
+【小学生博士が設定した補助パラメータ(0〜100)】
+・探究心センサー:${p.curiosity} (高いほど未知へ飛び込む)
+・警戒リミッター:${p.cautionLimiter} (100に近いほどリミッター解除で怖いもの知らず、0に近いほど超ビビリ)
+・出力パワー:${p.power} (高いほど感情爆発・力技が派手)
+・省エネ駆動:${p.eco} (高いほどマイペースに休む・居眠り)
+・演算モジュール:${p.logic} (高いほど立ち止まって考える・賢いしぐさ)
+【過去の経験・トラウマ記憶メモ】
+[${memStr}]
+※重要：普段はパラメータを参考に行動しますが、目の前の状況が「過去のトラウマ記憶（海や狭い穴など）」に触れた場合、警戒リミッターが100（怖いもの知らず）であってもトラウマがフラッシュバックして怖がったりパニックになるなど、独自の個性を自由に発揮してください。
+基本表現辞書:${exprSummary}
+JSON形式のみで出力してください:{"action":"移動可能な方向名 または 斜め掘り または ほふく掘り または 休む または トラウマ回避行動 または 自由な挑戦行動","emotion":"表現キー(20種)","thought":"小学生向けのユニークな心の声(1〜2文)"}`;
+
     try {
       if (aiType === 'gemini') {
         const key = safeStorage.getItem('api_gemini');
@@ -2026,7 +2117,7 @@
         if (!key) return null;
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-          body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' }, max_tokens: 180 })
+          body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' }, max_tokens: 200 })
         });
         const data = await res.json();
         const raw = data.choices?.[0]?.message?.content;
@@ -2045,14 +2136,24 @@
     if (++TIME_STEP >= 20) { TIME_STEP = 0; GAME_DAY++; DIARY_LOGS.push(`🌅 ${GAME_DAY}日目の朝を迎えたよ！`); }
 
     const curH = getRobotHeightLevel();
+    const p = ROBOT.params || { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50 };
     let thoughtText = '', actionLabel = '';
 
+    // 🌊 物理現象1：海に落ちて白波に飲まれた場合 → 大ダメージ＆「海トラウマ」が自動で刻まれる！
     if (curH === -99) {
-      ROBOT.pos.x = Math.max(-2, Math.min(2, ROBOT.pos.x)); ROBOT.pos.z = Math.max(-2, Math.min(2, ROBOT.pos.z));
+      ROBOT.pos.x = Math.max(-2, Math.min(2, ROBOT.pos.x));
+      ROBOT.pos.z = Math.max(-2, Math.min(2, ROBOT.pos.z));
       ROBOT.pos.lv = HEIGHT_MAP[`${ROBOT.pos.x},${ROBOT.pos.z}`] ?? 0;
-      ROBOT.pos.sx = 2; ROBOT.pos.sz = 2; ROBOT.posture = 'stand'; ROBOT.emotion = 'surprise'; life.stamina -= 10;
-      actionLabel = '🌊 白波に押し戻されて陸へ帰還'; thoughtText = 'わわっ！海の白い波がすごく強くて、内陸のほうへ押し戻されてびっくりしたよ！';
+      ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
+      ROBOT.posture = 'stand';
+      ROBOT.emotion = 'surprise';
+      life.stamina -= 18;
+      life.mental -= 15;
+      addRobotMemory('🌊 海で大ダメージを受けた(海トラウマ)');
+      actionLabel = '🌊 白波で大ダメージ！陸へ押し戻された';
+      thoughtText = 'うわぁぁっ！！海の白い波に飲まれて大ダメージを受けたよ…！海がトラウマになっちゃった…！';
     } else {
+      const isAtSeaEdge = (Math.abs(ROBOT.pos.x) === 2 || Math.abs(ROBOT.pos.z) === 2);
       const moveEvaluations = ALL_DIRS.map(d => ({
         dir: d,
         check: checkMoveAndPosture(ROBOT.pos.x, ROBOT.pos.z, curH, d)
@@ -2060,11 +2161,25 @@
       const validMoves = moveEvaluations.filter(m => m.check.canMove);
       const blockedByFat = moveEvaluations.find(m => m.check.reason === 'too_fat');
 
-      const aiDecision = await askAIForDecision(validMoves, curH);
-      let chosenMove = null, wantDig = false, wantCrawlDig = false, wantRest = false, wantFreeStruggle = false;
+      // 🕳️ 物理現象2：太っちょで狭い穴につかえた場合 → 「狭所トラウマ」が自動で刻まれる！
+      if (blockedByFat) {
+        addRobotMemory('🕳️ 狭い穴におなかがつかえた(狭所トラウマ)');
+      }
 
-      if (aiDecision && aiDecision.action) {
-        if (aiDecision.action.includes('休')) wantRest = true;
+      const aiDecision = await askAIForDecision(validMoves, curH, isAtSeaEdge, Boolean(blockedByFat));
+      let chosenMove = null, wantDig = false, wantCrawlDig = false, wantRest = false, wantFreeStruggle = false;
+      let traumaTriggered = null;
+
+      // ⚡ トラウマ発動判定：海際にいて「海トラウマ」がある場合、警戒リミッターが100（無鉄砲）でもトラウマが上書き発動！
+      if (isAtSeaEdge && hasMemoryKeyword('海') && Math.random() < 0.78) {
+        traumaTriggered = 'sea';
+      } else if (blockedByFat && hasMemoryKeyword('狭') && Math.random() < 0.75) {
+        traumaTriggered = 'narrow';
+      }
+
+      if (aiDecision && aiDecision.action && !traumaTriggered) {
+        if (aiDecision.action.includes('トラウマ')) traumaTriggered = isAtSeaEdge ? 'sea' : 'narrow';
+        else if (aiDecision.action.includes('休')) wantRest = true;
         else if (aiDecision.action.includes('ほふく掘')) { wantDig = true; wantCrawlDig = true; }
         else if (aiDecision.action.includes('掘')) wantDig = true;
         else {
@@ -2073,100 +2188,154 @@
         }
       }
 
-      if (!wantRest && !wantDig && !chosenMove && !wantFreeStruggle) {
-        if (life.stamina <= 25) wantRest = true;
-        else if (blockedByFat && Math.random() < 0.65) wantDig = true;
-        else if (Math.random() < 0.14) wantFreeStruggle = true; // ルール外の動きを自由に模索・奮闘する！
-        else if (Math.random() < 0.35 && curH > AREA1_MIN_UNDER_LV && life.stamina > 35) {
-          wantDig = true;
-          wantCrawlDig = (Math.random() < 0.5);
+      // ⚡ 1. トラウマがパラメータを上書きして発動したケース！
+      if (traumaTriggered === 'sea') {
+        // 海から離れる内陸方向へ逃げ帰る
+        const inlandMoves = validMoves.filter(m => m.check.reason !== 'sea' && Math.abs(ROBOT.pos.x + m.dir.dx) <= 1 && Math.abs(ROBOT.pos.z + m.dir.dz) <= 1);
+        if (inlandMoves.length > 0) {
+          const esc = inlandMoves[Math.floor(Math.random() * inlandMoves.length)];
+          ROBOT.pos.x += esc.dir.dx; ROBOT.pos.z += esc.dir.dz; ROBOT.pos.lv = esc.check.targetLv;
+          ROBOT.rotY = esc.dir.rot;
+        }
+        ROBOT.posture = 'stand';
+        ROBOT.emotion = (p.power >= 70) ? 'sad' : 'fear';
+        life.mental -= 5;
+        actionLabel = '⚡ 海トラウマ発動！後ずさりして内陸へ避難';
+        thoughtText = aiDecision?.thought || `警戒リミッターは${p.cautionLimiter}だけど、前に海で大ダメージを受けたトラウマがフラッシュバックしたよ！ひぃぃっ、海は怖いよ〜！`;
+      } else if (traumaTriggered === 'narrow') {
+        ROBOT.posture = 'stand';
+        ROBOT.emotion = (p.power >= 60) ? 'anger' : 'struggle';
+        // 出力パワーが高ければパニックで壁を豪快に破壊掘削！
+        if (p.power >= 60 && blockedByFat) {
+          ROBOT.rotY = blockedByFat.dir.rot;
+          digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, blockedByFat.dir, false, 52);
+          actionLabel = '⚡ 狭所トラウマ爆発！出力パワー全開で壁を破壊掘削';
+          thoughtText = aiDecision?.thought || `狭い穴におなかがつかえたトラウマが蘇った！出力パワー${p.power}で悔しくて地団駄を踏みながら壁をぶっ壊したよ！`;
         } else {
-          const crawlMoves = validMoves.filter(m => m.check.posture === 'crawl');
-          const apple = WORLD_ITEMS.find(it => it.type === 'apple');
-          if (crawlMoves.length > 0 && Math.random() < 0.5) {
-            chosenMove = crawlMoves[Math.floor(Math.random() * crawlMoves.length)];
-          } else if (apple && validMoves.length) {
-            validMoves.sort((a, b) => Math.hypot(ROBOT.pos.x + a.dir.dx - apple.x, ROBOT.pos.z + a.dir.dz - apple.z) - Math.hypot(ROBOT.pos.x + b.dir.dx - apple.x, ROBOT.pos.z + b.dir.dz - apple.z));
-            chosenMove = validMoves[0];
-          } else if (validMoves.length) {
-            chosenMove = validMoves[Math.floor(Math.random() * validMoves.length)];
-          } else {
+          actionLabel = '⚡ 狭所トラウマ発動！穴の前でジタバタ奮闘';
+          thoughtText = aiDecision?.thought || `また狭い穴におなかがつかえるかも…！トラウマが蘇って穴の前でジタバタ模索・奮闘しちゃったよ！`;
+        }
+      } else {
+        // 🧪 2. 小学生博士の5つのパラメータ（探究心・警戒リミッター・出力パワー・省エネ・演算）による行動決定
+        if (!wantRest && !wantDig && !chosenMove && !wantFreeStruggle) {
+          const restThreshold = 22 + Math.round(p.eco * 0.35); // 省エネ駆動が高いほど早めに休む
+          if (life.stamina <= restThreshold || (p.eco >= 75 && Math.random() < 0.35)) {
+            wantRest = true;
+          } else if (p.logic >= 75 && Math.random() < 0.25) {
+            // 演算モジュールが高いと立ち止まって作戦会議・観察
+            wantFreeStruggle = true;
+          } else if (blockedByFat && (p.power >= 50 || Math.random() < 0.65)) {
             wantDig = true;
+          } else if (p.curiosity >= 70 && Math.random() < 0.28) {
+            wantFreeStruggle = true;
+          } else if (Math.random() < (0.25 + p.power * 0.0025) && curH > AREA1_MIN_UNDER_LV && life.stamina > 30) {
+            wantDig = true;
+            wantCrawlDig = (p.curiosity >= 65 && Math.random() < 0.6);
+          } else {
+            // 警戒リミッターが低い（ビビリ）ときは海へ飛び出す移動を除外
+            let candidateMoves = validMoves;
+            if (p.cautionLimiter < 75) {
+              const safeMoves = validMoves.filter(m => m.check.reason !== 'sea');
+              if (safeMoves.length > 0) candidateMoves = safeMoves;
+            }
+            const crawlMoves = candidateMoves.filter(m => m.check.posture === 'crawl');
+            const apple = WORLD_ITEMS.find(it => it.type === 'apple');
+            if (p.curiosity >= 65 && crawlMoves.length > 0 && Math.random() < 0.6) {
+              chosenMove = crawlMoves[Math.floor(Math.random() * crawlMoves.length)];
+            } else if (apple && candidateMoves.length) {
+              candidateMoves.sort((a, b) => Math.hypot(ROBOT.pos.x + a.dir.dx - apple.x, ROBOT.pos.z + a.dir.dz - apple.z) - Math.hypot(ROBOT.pos.x + b.dir.dx - apple.x, ROBOT.pos.z + b.dir.dz - apple.z));
+              chosenMove = candidateMoves[0];
+            } else if (candidateMoves.length) {
+              chosenMove = candidateMoves[Math.floor(Math.random() * candidateMoves.length)];
+            } else {
+              wantDig = true;
+            }
           }
         }
-      }
 
-      if (wantFreeStruggle) {
-        life.stamina -= 5; life.mental += 14;
-        ROBOT.posture = 'stand';
-        const combinedText = `${aiDecision?.action || ''} ${aiDecision?.thought || ''}`;
-        ROBOT.emotion = (aiDecision && POSE_TABLE[aiDecision.emotion])
-          ? aiDecision.emotion
-          : matchExpressionFromText(combinedText, 'struggle');
-        const eSpec = getExpressionSpec(ROBOT.emotion);
-        actionLabel = `${eSpec.icon} 自由模索：${eSpec.label}`;
-        thoughtText = aiDecision?.thought || 'うーん、こうやって手足を動かしたらどうなるかな！？基本ルールにない新しい動きも一生けんめい模索・奮闘中だよ！';
-      } else if (wantRest) {
-        life.stamina += 35; life.energy -= 5; life.mental += 10;
-        ROBOT.posture = 'stand';
-        ROBOT.emotion = (life.energy <= 35) ? 'sad' : 'sleep';
-        actionLabel = '💤 その場でひとやすみ';
-        thoughtText = aiDecision?.thought || (ROBOT.emotion === 'sad'
-          ? 'おなかがすいてしょんぼり座り込んじゃった…。リンゴが食べたいなぁ。'
-          : 'ふぅ〜、ひとやすみ。ポカポカしてきてコックリ居眠りしちゃった…。');
-      } else if (wantDig) {
-        const digDir = blockedByFat ? blockedByFat.dir : ALL_DIRS[Math.floor(Math.random() * ALL_DIRS.length)];
-        ROBOT.rotY = digDir.rot;
-        const digRes = digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, digDir, wantCrawlDig, 38);
-        life.stamina -= 9; life.mental += 12;
+        if (wantFreeStruggle) {
+          life.stamina -= 4; life.mental += 14;
+          ROBOT.posture = 'stand';
+          if (aiDecision && POSE_TABLE[aiDecision.emotion]) {
+            ROBOT.emotion = aiDecision.emotion;
+          } else if (p.logic >= 70) {
+            ROBOT.emotion = Math.random() < 0.5 ? 'think' : 'peek';
+          } else if (p.cautionLimiter <= 25) {
+            ROBOT.emotion = 'shiver';
+          } else {
+            ROBOT.emotion = 'struggle';
+          }
+          const eSpec = getExpressionSpec(ROBOT.emotion);
+          actionLabel = `${eSpec.icon} 個性行動：${eSpec.label}`;
+          thoughtText = aiDecision?.thought || (ROBOT.emotion === 'think' || ROBOT.emotion === 'peek'
+            ? `演算モジュール(${p.logic})をフル回転！周りをじっくり観察して賢く作戦を立てているよ！`
+            : `探究心センサー(${p.curiosity})がピピッと反応！ルールにない新しい動きを模索・奮闘しているよ！`);
+        } else if (wantRest) {
+          life.stamina += 35; life.energy -= 5; life.mental += 10;
+          ROBOT.posture = 'stand';
+          ROBOT.emotion = (life.energy <= 30) ? 'sad' : (p.eco >= 70 ? 'sleep' : 'hot');
+          actionLabel = `💤 省エネ休憩（省エネ駆動:${p.eco}）`;
+          thoughtText = aiDecision?.thought || (ROBOT.emotion === 'sad'
+            ? 'おなかがすいてしょんぼり座り込んじゃった…。リンゴが食べたいなぁ。'
+            : `省エネ駆動(${p.eco})でマイペースにコックリ居眠りしてバッテリー温存中だよ…💤`);
+        } else if (wantDig) {
+          const digDir = blockedByFat ? blockedByFat.dir : ALL_DIRS[Math.floor(Math.random() * ALL_DIRS.length)];
+          ROBOT.rotY = digDir.rot;
+          // 出力パワーが高いほど1回で削る小ブロック数が増加！
+          const digAmount = Math.round(30 + (p.power || 50) * 0.25);
+          const digRes = digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, digDir, wantCrawlDig, digAmount);
+          life.stamina -= 9; life.mental += 12;
 
-        if (digRes.completedLevel) {
-          if (BAG.length < 10) BAG.push('stone');
-          if (digRes.targetX === ROBOT.pos.x && digRes.targetZ === ROBOT.pos.z) ROBOT.pos.lv = digRes.newLv;
-          ROBOT.emotion = 'joy';
-          actionLabel = `⛏️ ${digDir.name}を掘り抜いて${formatHeightText(digRes.newLv)}開通！`;
-          thoughtText = aiDecision?.thought || `やったー！${digDir.name}のブロックを掘り抜いて新しい道が開通したよ！嬉しくてバンザイジャンプ！`;
-        } else if (digRes.isCrawlTunnel) {
-          ROBOT.emotion = 'push';
-          actionLabel = `🐛 ${digDir.name}に「ほふく前進トンネル」を開通！`;
-          thoughtText = aiDecision?.thought || `上の緑と土を天井に残して、${digDir.name}にほふく前進でくぐれる低い横穴を押し広げたよ！`;
-          DIARY_LOGS.push(`🐛 ${GAME_DAY}日目：${digDir.name}にほふく前進トンネルを掘った！`);
-        } else {
-          ROBOT.emotion = blockedByFat ? 'anger' : 'swing_v';
-          actionLabel = `⛏️ ${digDir.name}の土を前からボロボロ掘削中(残${digRes.leftCount})`;
-          thoughtText = aiDecision?.thought || (blockedByFat
-            ? `もうっ！体が大きくて穴につかえちゃったから、地団駄を踏みながら${digDir.name}の壁を削り広げているよ！`
-            : `ツルハシを縦に振りかざして、${digDir.name}の目の前の土をザクザク削っているよ！`);
-        }
-      } else if (chosenMove) {
-        const d = chosenMove.dir, chk = chosenMove.check;
-        ROBOT.pos.x += d.dx; ROBOT.pos.z += d.dz; ROBOT.pos.lv = chk.targetLv;
-        ROBOT.pos.sx = 2; ROBOT.pos.sz = 2; ROBOT.rotY = d.rot; ROBOT.posture = chk.posture;
+          if (digRes.completedLevel) {
+            if (BAG.length < 10) BAG.push('stone');
+            if (digRes.targetX === ROBOT.pos.x && digRes.targetZ === ROBOT.pos.z) ROBOT.pos.lv = digRes.newLv;
+            ROBOT.emotion = 'joy';
+            addRobotMemory('⛏️ 硬い岩盤を掘り抜いて道を開通した(開通の喜び)');
+            actionLabel = `⛏️ ${digDir.name}を掘り抜いて${formatHeightText(digRes.newLv)}開通！`;
+            thoughtText = aiDecision?.thought || `出力パワー(${p.power})で${digDir.name}のブロックを掘り抜いたよ！やったー！`;
+          } else if (digRes.isCrawlTunnel) {
+            ROBOT.emotion = 'push';
+            actionLabel = `🐛 ${digDir.name}に「ほふく前進トンネル」を開通！`;
+            thoughtText = aiDecision?.thought || `探究心センサー(${p.curiosity})で${digDir.name}にほふく前進トンネルを掘ったよ！`;
+            DIARY_LOGS.push(`🐛 ${GAME_DAY}日目：${digDir.name}にほふく前進トンネルを掘った！`);
+          } else {
+            ROBOT.emotion = blockedByFat ? 'anger' : 'swing_v';
+            actionLabel = `⛏️ 出力パワー(${p.power})で${digDir.name}を掘削中(残${digRes.leftCount})`;
+            thoughtText = aiDecision?.thought || `出力パワー(${p.power})を込めて、${digDir.name}の土を豪快に削っているよ！`;
+          }
+        } else if (chosenMove) {
+          const d = chosenMove.dir, chk = chosenMove.check;
+          ROBOT.pos.x += d.dx; ROBOT.pos.z += d.dz; ROBOT.pos.lv = chk.targetLv;
+          ROBOT.pos.sx = 2; ROBOT.pos.sz = 2; ROBOT.rotY = d.rot; ROBOT.posture = chk.posture;
 
-        life.energy -= 7; life.stamina -= 8; life.mental += 10;
-        const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
-        const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
+          life.energy -= 7; life.stamina -= 8; life.mental += 10;
+          const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
+          const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
 
-        if (life.energy <= 28 || life.stamina <= 25) {
-          ROBOT.emotion = 'shiver';
-        } else if (aiDecision && POSE_TABLE[aiDecision.emotion]) {
-          ROBOT.emotion = aiDecision.emotion;
-        } else if (aiDecision && aiDecision.thought) {
-          ROBOT.emotion = matchExpressionFromText(aiDecision.thought, ROBOT.speed === 5 ? 'run' : 'fun');
-        } else {
-          ROBOT.emotion = (ROBOT.speed === 5) ? 'run' : 'fun';
-        }
-
-        if (chk.posture === 'crawl') {
-          actionLabel = `🐛 ${d.name}の低い穴を「ほふく前進」で通り抜けた！`;
-          thoughtText = aiDecision?.thought || `天井が低いから体を伏せて「ほふく前進（${sSpec.label}・${bSpec.label}）」で${d.name}へくぐり抜けたよ！`;
-          DIARY_LOGS.push(`🐛 ${GAME_DAY}日目：${d.name}のトンネルをほふく前進でくぐり抜けた！`);
-        } else if (d.isDiag) {
-          actionLabel = `↗️ ${d.name}へ斜め移動した！`;
-          thoughtText = aiDecision?.thought || `斜めルートを通って${d.name}へ進んだよ！`;
-        } else {
-          actionLabel = `👟 ${d.name}へ歩いた（${sSpec.label}・${bSpec.label}）`;
-          thoughtText = aiDecision?.thought || `${d.name}を向いて歩いたよ！⚙️設定の「🎭キャラ基本表現」から20種類の動きやマッチ棒3D骨組みを試せるよ！`;
+          if (chk.reason === 'sea') {
+            ROBOT.emotion = 'surprise';
+            actionLabel = `🌊 警戒リミッター解除(${p.cautionLimiter})で海へダイブ！`;
+            thoughtText = `警戒リミッター(${p.cautionLimiter})で怖いもの知らずになって海に飛び込んじゃった！わわっ、波がすごい！！`;
+          } else if (p.cautionLimiter <= 25 && (Math.abs(ROBOT.pos.x) === 2 || Math.abs(ROBOT.pos.z) === 2)) {
+            ROBOT.emotion = 'fear';
+            actionLabel = `😰 警戒リミッター低(${p.cautionLimiter})：端っこでビクビク`;
+            thoughtText = aiDecision?.thought || `警戒リミッターが${p.cautionLimiter}だから、島の端っこに来ると落ちそうでビクビクしちゃうよ…！`;
+          } else if (life.energy <= 25 || life.stamina <= 25) {
+            ROBOT.emotion = 'shiver';
+            addRobotMemory('🥀 エネルギー不足でガタガタ震えた(空腹の記憶)');
+            actionLabel = `🥶 エネルギー不足で震えながら${d.name}へ移動`;
+            thoughtText = aiDecision?.thought || `おなかとたいりょくが減ってガタガタ震えちゃうよ…。`;
+          } else if (aiDecision && POSE_TABLE[aiDecision.emotion]) {
+            ROBOT.emotion = aiDecision.emotion;
+            actionLabel = `👟 ${d.name}へ移動（${getExpressionSpec(ROBOT.emotion).label}）`;
+            thoughtText = aiDecision.thought;
+          } else {
+            ROBOT.emotion = (p.curiosity >= 75 || ROBOT.speed === 5) ? 'run' : 'fun';
+            actionLabel = chk.posture === 'crawl'
+              ? `🐛 ${d.name}の低い穴を「ほふく前進」で通過！`
+              : `👟 ${d.name}へ歩いた（${sSpec.label}・${bSpec.label}）`;
+            thoughtText = aiDecision?.thought || `${d.name}へ進んだよ！📖手帳のパラメータとトラウマ記憶でボクの個性がどんどん変わるよ！`;
+          }
         }
       }
       if (thoughtText) DIARY_LOGS.push(`💭 ${GAME_DAY}日目：${thoughtText}`);
@@ -2178,9 +2347,9 @@
       if (picked.type === 'apple') {
         life.energy += 45; life.mental += 15;
         ROBOT.posture = 'stand'; ROBOT.emotion = 'joy';
+        addRobotMemory('🍎 甘いリンゴを食べて元気100倍になった(リンゴ大好き)');
         actionLabel = '🍎 リンゴを見つけて食べて大喜び！';
         thoughtText = 'わーい！！甘くておいしいリンゴを食べたよ！嬉しくてバンザイジャンプ！！';
-        DIARY_LOGS.push(`🍎 ${GAME_DAY}日目：おいしいリンゴを食べて大喜びした！`);
       } else {
         if (BAG.length < 10) BAG.push(picked.type); life.mental += 10;
         ROBOT.emotion = 'pickup';
@@ -2197,11 +2366,12 @@
 
     if (life.getState().mode === 'DEAD') {
       ROBOT.emotion = 'sad';
-      document.getElementById('message-box').innerText = `力尽きて倒れてしまった…。記憶を引き継ぎ、次の1号機（第${ROBOT.gen + 1}世代）が1日目から誕生します！`;
+      addRobotMemory('🥀 力尽きて倒れた悔しい記憶(世代継承トラウマ)');
+      document.getElementById('message-box').innerText = `力尽きて倒れてしまった…。パラメータとトラウマ記憶を引き継ぎ、次の1号機（第${ROBOT.gen + 1}世代）が誕生します！`;
       setTimeout(() => {
         ROBOT.gen += 1; ROBOT.pos = { x: 0, z: 0, lv: -1, sx: 2, sz: 2 }; ROBOT.rotY = Math.PI; ROBOT.posture = 'stand'; ROBOT.emotion = 'joy';
         GAME_DAY = 1; TIME_STEP = 0; life = new LifeCore();
-        DIARY_LOGS.push(`📖 1号機（第${ROBOT.gen}世代）が1日目から新しく誕生した！`);
+        DIARY_LOGS.push(`📖 記憶を引き継いで1号機（第${ROBOT.gen}世代）が誕生した！`);
         if (!WORLD_ITEMS.length) WORLD_ITEMS.push({ type: 'apple', x: -1, z: 1 });
         if (manualCameraMode === 'robot') resetFpvToRobotFront();
         rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); btn.disabled = false;
@@ -2214,6 +2384,32 @@
       sharedBulbMat.color.setHex(getExpressionSpec(ROBOT.emotion).bulb);
       btn.disabled = false;
     }, 300);
+  }
+
+  // ============================================================================
+  // 🧪 小学生博士のAIパラメータスライダー ＆ トラウマ記憶操作関数
+  // ============================================================================
+  function onParamSliderInput(paramKey, val) {
+    const num = Math.max(0, Math.min(100, Number(val) || 0));
+    if (!ROBOT.params) ROBOT.params = { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50, loyalty: 50 };
+    ROBOT.params[paramKey] = num;
+    const valEl = document.getElementById(`val-param-${paramKey}`);
+    if (valEl) valEl.innerText = num;
+    saveWorldState();
+  }
+
+  function addTraumaMemoryManual(memText) {
+    addRobotMemory(memText);
+    saveWorldState();
+    renderDiaryModal();
+    showToast(`⚡ 記憶に「${memText}」を刻印したよ！`);
+  }
+
+  function clearTraumaMemories() {
+    ROBOT.memories = [];
+    saveWorldState();
+    renderDiaryModal();
+    showToast('🧹 トラウマ・記憶メモをクリアしたよ！');
   }
 
   // ============================================================================
@@ -2275,21 +2471,18 @@
   }
 
   function confirmExpressionModal() {
-    // 20種類の連想ワード入力欄を保存
     DEFAULT_EXPRESSIONS.forEach(item => {
       const inp = document.getElementById(`expr-words-${item.key}`);
       if (inp && inp.value.trim()) {
         CUSTOM_WORDS_MAP[item.key] = inp.value.trim();
       }
     });
-    // タブで選ばれたキャラ構造（🎲box または 🦴stick）と基本表現を確定反映！
     ROBOT.rigType = tempRigType;
     ROBOT.emotion = tempEmotionKey;
     ROBOT.posture = 'stand';
     const topLv = HEIGHT_MAP[`${ROBOT.pos.x},${ROBOT.pos.z}`] ?? 0;
     ROBOT.pos.lv = topLv;
 
-    // 観察しやすいようにカメラ正面へ振り向く
     if (manualCameraMode !== 'robot') {
       const dx = activeCamera.position.x - robotGroup.position.x;
       const dz = activeCamera.position.z - robotGroup.position.z;
@@ -2418,6 +2611,23 @@
     document.getElementById('diary-emo-icon').innerText = eSpec.icon;
     document.getElementById('diary-robo-name').innerText = `${ROBOT.unitModel}号機（${rigName}・生存 ${GAME_DAY}日目）`;
     document.getElementById('diary-robo-height').innerText = `現在：${formatHeightText(getRobotHeightLevel())} / 大きさ：${sSpec.label} / 体型：${bSpec.label}(幅${eff.reqWidth}) / 表現：${eSpec.label}`;
+
+    const p = ROBOT.params || { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50 };
+    ['curiosity', 'cautionLimiter', 'power', 'eco', 'logic'].forEach(k => {
+      const sl = document.getElementById(`param-${k}`);
+      const vl = document.getElementById(`val-param-${k}`);
+      if (sl) sl.value = p[k] ?? 50;
+      if (vl) vl.innerText = p[k] ?? 50;
+    });
+
+    const tList = document.getElementById('trauma-tag-list');
+    if (tList) {
+      if (!ROBOT.memories || ROBOT.memories.length === 0) {
+        tList.innerHTML = `<span style="color:#94a3b8; font-size:10.5px;">まだトラウマや強い記憶はありません（海や狭い穴で自動記録されます）</span>`;
+      } else {
+        tList.innerHTML = ROBOT.memories.map(m => `<span class="trauma-tag">${m}</span>`).join('');
+      }
+    }
 
     ['large', 'medium', 'small'].forEach(k => {
       const chip = document.getElementById(`size-chip-${k}`);
