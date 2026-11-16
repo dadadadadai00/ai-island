@@ -43,12 +43,13 @@ const SIZE_SPECS = {
 };
 
 // 🐛 キャラの太さ（横幅）5段階：分割1〜5ブロック
+// wallOffsetSub は壁掘り時にマスの中心(2)からどれだけ壁側へ寄るか（太いキャラほど壁に顔がめり込まないよう手前に立つ）
 const BODY_SPECS = {
-  fat5:    { label: 'でぶっちょ', reqWidth: 5, scaleX: 1.82, scaleZ: 1.75 },
-  fat4:    { label: 'ちょいでぶ', reqWidth: 4, scaleX: 1.45, scaleZ: 1.40 },
-  normal3: { label: '標準',       reqWidth: 3, scaleX: 1.08, scaleZ: 1.05 },
-  slim2:   { label: 'ちょいやせ', reqWidth: 2, scaleX: 0.72, scaleZ: 0.72 },
-  slim1:   { label: 'やせっちょ', reqWidth: 1, scaleX: 0.38, scaleZ: 0.38 }
+  fat5:    { label: 'でぶっちょ', reqWidth: 5, scaleX: 1.82, scaleZ: 1.75, wallOffsetSub: 0.00 },
+  fat4:    { label: 'ちょいでぶ', reqWidth: 4, scaleX: 1.45, scaleZ: 1.40, wallOffsetSub: 0.22 },
+  normal3: { label: '標準',       reqWidth: 3, scaleX: 1.08, scaleZ: 1.05, wallOffsetSub: 0.65 },
+  slim2:   { label: 'ちょいやせ', reqWidth: 2, scaleX: 0.72, scaleZ: 0.72, wallOffsetSub: 1.15 },
+  slim1:   { label: 'やせっちょ', reqWidth: 1, scaleX: 0.38, scaleZ: 0.38, wallOffsetSub: 1.68 }
 };
 
 const POSE_TABLE = {
@@ -336,6 +337,26 @@ function getEffectiveParams() {
   return eff;
 }
 
+// 📏 壁際でサイズや太さを変更したとき、壁に顔やお腹がめり込まないよう現在位置(sx, sz)を自動補正する関数
+function clampCharSubPosForBodySize() {
+  const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
+  const maxOff = bSpec.wallOffsetSub ?? 0.65;
+  const curSx = Number.isFinite(ROBOT.pos.sx) ? ROBOT.pos.sx : 2;
+  const curSz = Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2;
+  ROBOT.pos.sx = Math.max(2 - maxOff, Math.min(2 + maxOff, curSx));
+  ROBOT.pos.sz = Math.max(2 - maxOff, Math.min(2 + maxOff, curSz));
+}
+
+// ⛏️ 掘る方向(dir)の壁に対して、キャラの太さ(reqWidth)に合わせた最適距離に立たせる関数（顔はめり込まずツルハシが壁に届く）
+function stepCharCloseToWallForDig(dir) {
+  if (!dir) return;
+  const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
+  const off = bSpec.wallOffsetSub ?? 0.65;
+  const diagFactor = dir.isDiag ? 0.82 : 1.0;
+  ROBOT.pos.sx = 2 + dir.dx * off * diagFactor;
+  ROBOT.pos.sz = 2 + dir.dz * off * diagFactor;
+}
+
 function carveCrawlTunnelBlock(gx, gz, lv, tunnelWidth = 3, tunnelHeight = 2) {
   const key = `${gx},${gz},${lv}`;
   if (!CHIP_MAP[key]) CHIP_MAP[key] = {};
@@ -420,6 +441,7 @@ function applyLoadedWorldData(d) {
     ROBOT.bodyType = normalizeBodyKey(d.robot.bodyType);
     ROBOT.posture = d.robot.posture === 'crawl' ? 'crawl' : 'stand';
     ROBOT.emotion = POSE_TABLE[d.robot.emotion] ? d.robot.emotion : 'normal';
+    clampCharSubPosForBodySize();
     if (d.robot.params && typeof d.robot.params === 'object') {
       ['curiosity', 'cautionLimiter', 'power', 'eco', 'logic'].forEach(k => {
         if (typeof d.robot.params[k] === 'number') {
@@ -620,7 +642,6 @@ function checkMoveAndPosture(gx, gz, curLv, dir) {
   const destSubH = getSurfaceSubUnitsForChar(nx, nz, eff.reqWidth, destTopLv);
   const diffSub = destSubH - curSubH;
 
-  // 1. 横穴（トンネル）進入チェック（ほふく前進時は登れる段差は最大1ブロックまで！）
   if (destTopLv > curLv) {
     const tunnelPass = evaluateBlockPassage(nx, nz, curLv);
     if (tunnelPass.hasCeiling && tunnelPass.openHeight >= eff.crawlH) {
@@ -643,7 +664,6 @@ function checkMoveAndPosture(gx, gz, curLv, dir) {
     return { canMove: false, posture: ROBOT.posture, targetLv: curLv, reason: 'too_fat', stepDiff: diffSub };
   }
 
-  // 【上りルール】ほふく前進中は分割1ブロックの段差までしか登れない
   if (diffSub > 0) {
     if (ROBOT.posture === 'crawl' && diffSub > 1) {
       return { canMove: false, posture: 'crawl', targetLv: curLv, reason: 'crawl_steep', stepDiff: diffSub };
@@ -657,7 +677,6 @@ function checkMoveAndPosture(gx, gz, curLv, dir) {
     return { canMove: false, posture: ROBOT.posture, targetLv: curLv, reason: 'too_high_step', stepDiff: diffSub };
   }
 
-  // 【下り・重力落下ルール】
   const dropSub = -diffSub;
   if (dropSub === 0) {
     return { canMove: true, posture: 'stand', targetLv: destTopLv, reason: 'open', stepDiff: 0 };
@@ -713,16 +732,8 @@ function carveFrontStepToClimbable(targetX, targetZ, curSubH, charSubH) {
   return true;
 }
 
-// ⛏️ 壁際までキャラが歩み寄って自分のサイズ（幅1〜5×高1〜5）分だけ削る＆斜め掘りの手前壁制限！
-function stepCharCloseToWallForDig(dir) {
-  if (!dir) return;
-  ROBOT.pos.sx = dir.dx > 0 ? 4 : (dir.dx < 0 ? 0 : 2);
-  ROBOT.pos.sz = dir.dz > 0 ? 4 : (dir.dz < 0 ? 0 : 2);
-}
-
 function digFromCharacterFront(gx, gz, curLv, dir, crawlMode = false, powerBoost = 50) {
   const eff = getEffectiveClearanceSpecs();
-  // 斜め掘りの場合、手前の「右ブロック」または「左ブロック」が自分の太さ(reqWidth)分開いているかチェック
   if (dir && dir.isDiag) {
     const sideA = evaluateBlockPassage(gx + dir.dx, gz, curLv);
     const sideB = evaluateBlockPassage(gx, gz + dir.dz, curLv);
@@ -752,8 +763,8 @@ function digFromCharacterFront(gx, gz, curLv, dir, crawlMode = false, powerBoost
 
   const maxSy = crawlMode ? Math.max(0, eff.crawlH - 1) : Math.max(0, eff.subH - 1);
   const digCount = Math.max(1, eff.reqWidth * (maxSy + 1) * (eff.reqWidth >= 4 ? 3 : 2));
-  const charWorldX = gx + ((ROBOT.pos.sx ?? 2) - 2) * 0.20;
-  const charWorldZ = gz + ((ROBOT.pos.sz ?? 2) - 2) * 0.20;
+  const charWorldX = gx + ((ROBOT.pos.sx ?? 2) - 2) * 0.20 + (dir ? dir.dx * 0.16 : 0);
+  const charWorldZ = gz + ((ROBOT.pos.sz ?? 2) - 2) * 0.20 + (dir ? dir.dz * 0.16 : 0);
 
   const candidates = [];
   for (let sy = 0; sy <= 4; sy++) {
@@ -801,7 +812,6 @@ function digFromCharacterFront(gx, gz, curLv, dir, crawlMode = false, powerBoost
   return { completedLevel: false, newLv: digLv, leftCount: leftInnerCount, isCrawlTunnel: isCrawlReady, targetX, targetZ };
 }
 
-// 👇 足元（真下）を自分の太さ（幅1〜5）で掘り、重力落下＆着地ポーズ／ダメージ判定を行う関数
 function digUnderneathAndFall() {
   const { x, z } = ROBOT.pos;
   if (x < -2 || x > 2 || z < -2 || z > 2) return null;
@@ -907,7 +917,6 @@ function getStyleShortName() {
   return '観察窓ガラス';
 }
 
-// 🤖 AI思考ルーチン（gemini-3.8-flash ＆ Groq通信）
 async function askAIForDecision(validMoves, curH, isAtSeaEdge, blockedByFat, blockedByHighStep, blockedByCrawlSteep) {
   const aiType = safeStorage.getItem('ai_type') || 'none';
   if (aiType === 'none') return null;
@@ -1064,6 +1073,7 @@ async function executeTurn() {
       if (inlandMoves.length > 0) {
         const esc = inlandMoves[Math.floor(Math.random() * inlandMoves.length)];
         ROBOT.pos.x += esc.dir.dx; ROBOT.pos.z += esc.dir.dz; ROBOT.pos.lv = esc.check.targetLv; ROBOT.rotY = esc.dir.rot;
+        ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
       }
       ROBOT.posture = 'stand'; ROBOT.emotion = 'fear';
       actionLabel = `🌊 海トラウマ発動：内陸へ避難`;
@@ -1098,9 +1108,9 @@ async function executeTurn() {
         const curSubH = getSurfaceSubUnits(ROBOT.pos.x, ROBOT.pos.z, curH);
         carveFrontStepToClimbable(ROBOT.pos.x + d.dx, ROBOT.pos.z + d.dz, curSubH, sSpec.subH);
         ROBOT.emotion = 'swing_v';
-        actionLabel = `⛏️ 悩み解決(${sSpec.label}・高${sSpec.subH})：${d.name}の壁際に歩み寄って階段に削った！`;
-        thoughtText = aiDecision?.thought || `${d.name}の壁の目の前まで歩み寄って、ボクの身長(分割${sSpec.subH}ブロック)でバタバタよじ登れる高さまで壁を削って階段にしたよ！`;
-        DIARY_LOGS.push(`⛏️ ${GAME_DAY}日目：壁際まで歩み寄って自分の身長に合う階段を削った！`);
+        actionLabel = `⛏️ 悩み解決(${sSpec.label}・高${sSpec.subH})：${d.name}の壁の手前に立って階段に削った！`;
+        thoughtText = aiDecision?.thought || `${d.name}の壁の手前（ボクの太さ${bSpec.reqWidth}がめり込まない位置）に立って、身長(分割${sSpec.subH}ブロック)でよじ登れる高さまで壁を削って階段にしたよ！`;
+        DIARY_LOGS.push(`⛏️ ${GAME_DAY}日目：壁の手前に立って自分の身長に合う階段を削った！`);
       }
     } else if (wantSolveNarrow && blockedByFat) {
       const d = blockedByFat.dir;
@@ -1120,8 +1130,8 @@ async function executeTurn() {
         stepCharCloseToWallForDig(d);
         carveCrawlTunnelBlock(ROBOT.pos.x + d.dx, ROBOT.pos.z + d.dz, curH + 1, bSpec.reqWidth, Math.max(2, sSpec.crawlH));
         ROBOT.emotion = 'push';
-        actionLabel = `👐 悩み解決(${bSpec.label}・幅${bSpec.reqWidth})：壁際で自分の太さに合わせて穴を削り広げた！`;
-        thoughtText = aiDecision?.thought || `ボクの太さ「${bSpec.label}(分割${bSpec.reqWidth}ブロック)」でも通れるように、${d.name}の壁際で横穴を幅${bSpec.reqWidth}ブロック分まで削り広げたよ！`;
+        actionLabel = `👐 悩み解決(${bSpec.label}・幅${bSpec.reqWidth})：壁の手前で自分の太さに合わせて穴を削り広げた！`;
+        thoughtText = aiDecision?.thought || `ボクの太さ「${bSpec.label}(分割${bSpec.reqWidth}ブロック)」でも通れるように、${d.name}の壁の手前に立って横穴を幅${bSpec.reqWidth}ブロック分まで削り広げたよ！`;
       }
     } else if (wantRest) {
       life.stamina += 35; life.energy -= 5; life.mental += 10;
@@ -1139,18 +1149,18 @@ async function executeTurn() {
 
       if (digRes.blockedDiagFirst) {
         ROBOT.emotion = 'swing_v';
-        actionLabel = `⛏️ 斜め奥は手前が邪魔！まず${digRes.sideDirName}の壁際を幅${bSpec.reqWidth}で削った`;
-        thoughtText = aiDecision?.thought || `斜め奥を掘ろうとしたけど手前の壁が邪魔で手が届かないから、まず${digRes.sideDirName}の壁際まで寄って削ったよ！`;
+        actionLabel = `⛏️ 斜め奥は手前が邪魔！まず${digRes.sideDirName}の壁を幅${bSpec.reqWidth}で削った`;
+        thoughtText = aiDecision?.thought || `斜め奥を掘ろうとしたけど手前の壁が邪魔で手が届かないから、まず${digRes.sideDirName}の壁の手前に立って削ったよ！`;
       } else if (digRes.completedLevel) {
         if (BAG.length < 10) BAG.push('stone');
         if (digRes.targetX === ROBOT.pos.x && digRes.targetZ === ROBOT.pos.z) ROBOT.pos.lv = digRes.newLv;
         ROBOT.emotion = 'joy';
         actionLabel = `⛏️ ${digDir.name}を掘り抜いて${formatHeightText(digRes.newLv)}開通！`;
-        thoughtText = aiDecision?.thought || `${digDir.name}の壁際まで寄って掘り抜き、道が開通したよ！カバンに🪨石素材をゲット！`;
+        thoughtText = aiDecision?.thought || `${digDir.name}の壁を掘り抜いて道が開通したよ！カバンに🪨石素材をゲット！`;
       } else {
         ROBOT.emotion = 'swing_v';
-        actionLabel = `⛏️ ${digDir.name}の壁際に密着して掘削中(幅${bSpec.reqWidth}×高${sSpec.subH}・残${digRes.leftCount})`;
-        thoughtText = aiDecision?.thought || `${digDir.name}の壁のすぐ目の前に立って、ボクのサイズ(幅${bSpec.reqWidth}×高${sSpec.subH})で土を削っているよ！`;
+        actionLabel = `⛏️ ${digDir.name}の壁の手前で掘削中(幅${bSpec.reqWidth}×高${sSpec.subH}・残${digRes.leftCount})`;
+        thoughtText = aiDecision?.thought || `${digDir.name}の壁の手前にピタッと立って、ボクのサイズ(幅${bSpec.reqWidth}×高${sSpec.subH})で土を削っているよ！`;
       }
     } else if (chosenMove) {
       const d = chosenMove.dir, chk = chosenMove.check;
@@ -1292,6 +1302,7 @@ function setTinySlimPreset() {
   ROBOT.bodyType = 'slim1';
   ROBOT.posture = 'stand';
   ROBOT.emotion = 'joy';
+  clampCharSubPosForBodySize();
   document.getElementById('setting-size-level').value = 'tiny';
   document.getElementById('setting-body-type').value = 'slim1';
   syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
@@ -1303,6 +1314,7 @@ function setTinySlimPreset() {
 function changeRobotSizeFromDiary(sizeKey) {
   if (!SIZE_SPECS[sizeKey]) return;
   ROBOT.sizeLevel = sizeKey;
+  clampCharSubPosForBodySize();
   document.getElementById('setting-size-level').value = sizeKey;
   syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
   const s = SIZE_SPECS[sizeKey];
@@ -1312,6 +1324,7 @@ function changeRobotSizeFromDiary(sizeKey) {
 function changeRobotBodyFromDiary(bodyKey) {
   if (!BODY_SPECS[bodyKey]) return;
   ROBOT.bodyType = bodyKey;
+  clampCharSubPosForBodySize();
   document.getElementById('setting-body-type').value = bodyKey;
   syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
   const b = BODY_SPECS[bodyKey];
@@ -1477,12 +1490,13 @@ function cycleBodyAndCrawlTest() {
   ROBOT.sizeLevel = sizeOrder[nextIdx];
   ROBOT.bodyType = bodyOrder[nextIdx];
   ROBOT.posture = 'stand';
+  clampCharSubPosForBodySize();
 
   const sSpec = SIZE_SPECS[ROBOT.sizeLevel];
   const bSpec = BODY_SPECS[ROBOT.bodyType];
   if (manualCameraMode === 'robot') resetFpvToRobotFront();
 
-  const msg = `📏 体格プリセット切替：高さ「${sSpec.label}(分割${sSpec.subH}ブロック)」×太さ「${bSpec.label}(分割${bSpec.reqWidth}ブロック)」！（階段:${sSpec.stairMax}段まで / バタバタよじ登り・安全着地:${sSpec.subH}段まで / ほふく高:${sSpec.crawlH}）`;
+  const msg = `📏 体格プリセット切替：高さ「${sSpec.label}(分割${sSpec.subH}ブロック)」×太さ「${bSpec.label}(分割${bSpec.reqWidth}ブロック)」！（壁から顔がめり込まない位置へ自動調整済み）`;
   document.getElementById('message-box').innerText = msg;
   rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState();
   showToast(`${sSpec.label}(高${sSpec.subH}) × ${bSpec.label}(幅${bSpec.reqWidth}) に切り替えたよ！`);
@@ -1502,8 +1516,8 @@ function quickDiagonalOrFrontDig() {
   const res = digFromCharacterFront(x, z, curH, chosenDir, true, 50);
   if (manualCameraMode === 'robot') resetFpvToRobotFront();
   const msg = res.blockedDiagFirst
-    ? `⛏️ 斜め奥(${chosenDir.name})を掘るには手前の壁が邪魔！まず${res.sideDirName}の壁際まで寄って幅${bSpec.reqWidth}×高${sSpec.crawlH}で削ったよ！`
-    : `⛏️ ${chosenDir.name}の壁際まで歩み寄って、自分のサイズ(幅${bSpec.reqWidth}×ほふく高${sSpec.crawlH})でピンポイントに削ったよ！`;
+    ? `⛏️ 斜め奥(${chosenDir.name})を掘るには手前の壁が邪魔！まず${res.sideDirName}の壁の手前に立って幅${bSpec.reqWidth}×高${sSpec.crawlH}で削ったよ！`
+    : `⛏️ ${chosenDir.name}の壁の手前（顔がめり込まない位置）に立って、自分のサイズ(幅${bSpec.reqWidth}×ほふく高${sSpec.crawlH})で削ったよ！`;
   document.getElementById('message-box').innerText = msg;
   rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
   showToast(msg);
@@ -1644,6 +1658,7 @@ function saveSettings() {
   safeStorage.setItem('cam_visual_style_v15', CAM_VISUAL_STYLE);
   ROBOT.sizeLevel = normalizeSizeKey(document.getElementById('setting-size-level').value);
   ROBOT.bodyType = normalizeBodyKey(document.getElementById('setting-body-type').value);
+  clampCharSubPosForBodySize();
   safeStorage.setItem('ai_type', document.getElementById('setting-ai-type').value);
   safeStorage.setItem('api_gemini', document.getElementById('setting-gemini-key').value.trim());
   safeStorage.setItem('api_groq', document.getElementById('setting-groq-key').value.trim());
