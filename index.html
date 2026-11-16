@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0b1528">
-  <title>ボクセルAI自律思考水槽 v26</title>
+  <title>ボクセルAI自律思考水槽 v27</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
@@ -56,12 +56,12 @@
     #toast { position: fixed; top: 82px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,0.92); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 100; white-space: nowrap; }
     .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.75); z-index: 50; display: none; justify-content: center; align-items: center; }
     .modal-overlay.active { display: flex; }
-    .modal-content { background: #fff; width: 94%; max-width: 410px; max-height: 89vh; border-radius: 18px; padding: 15px; display: flex; flex-direction: column; gap: 9px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); position: relative; overflow-y: auto; }
+    .modal-content { background: #fff; width: 94%; max-width: 416px; max-height: 90vh; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); position: relative; overflow-y: auto; }
     .modal-close { position: absolute; top: 12px; right: 15px; font-size: 20px; font-weight: bold; color: #94a3b8; cursor: pointer; z-index: 10; }
     .modal-title { font-size: 15px; font-weight: 900; color: #1e293b; display: flex; align-items: center; gap: 6px; }
-    .spec-switch-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
-    .spec-chip { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 5px 4px; font-size: 11px; font-weight: 800; text-align: center; background: #f8fafc; color: #475569; cursor: pointer; }
-    .spec-chip.active { background: #fef9c3; border-color: #eab308; color: #854d0e; }
+    .spec-switch-row-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+    .spec-chip { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 5px 2px; font-size: 10px; font-weight: 800; text-align: center; background: #f8fafc; color: #475569; cursor: pointer; line-height: 1.2; }
+    .spec-chip.active { background: #fef9c3; border-color: #eab308; color: #854d0e; box-shadow: 0 0 0 1.5px rgba(234,179,8,0.25); }
     .bag-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: #f8fafc; padding: 7px; border-radius: 10px; border: 1px solid #e2e8f0; }
     .bag-slot { aspect-ratio: 1; background: #fff; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 20px; cursor: pointer; }
     .bag-slot.filled { border: 1px solid #93c5fd; background: #eff6ff; }
@@ -73,7 +73,6 @@
     .btn-pink { background: #ec4899; color: #fff; border: none; padding: 11px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
     .btn-sub { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 9px; border-radius: 10px; font-weight: 800; cursor: pointer; width: 100%; }
     .btn-danger { background: #ef4848; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
-    /* 🎭 キャラ基本表現モーダル ＆ 📖 手帳タブ共通 */
     .rig-tab-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #f1f5f9; padding: 4px; border-radius: 12px; }
     .rig-tab-btn { padding: 7px 5px; border-radius: 9px; font-size: 11.5px; font-weight: 900; text-align: center; cursor: pointer; color: #64748b; border: 2px solid transparent; transition: all 0.15s; }
     .rig-tab-btn.active { background: #fff; color: #1d4ed8; border-color: #3b82f6; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
@@ -86,8 +85,7 @@
     .expr-icon { font-size: 17px; flex-shrink: 0; }
     .expr-right-input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 11px; color: #334155; background: #fff; }
     .modal-footer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 4px; }
-    /* 🧪 手帳：タブ1（博士の基本設定）＆ タブ2（AIの裏パラメータ＆トラウマ6種ボタン） */
-    .lab-panel { background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 9px 10px; display: flex; flex-direction: column; gap: 6px; }
+    .lab-panel { background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; }
     .lab-panel.hidden-tab { background: #fff1f2; border-color: #fda4af; }
     .param-row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: #1e293b; }
     .param-label { width: 114px; flex-shrink: 0; display: flex; align-items: center; gap: 3px; white-space: nowrap; }
@@ -95,7 +93,6 @@
     .param-val { width: 30px; text-align: right; font-weight: 900; color: #2563eb; font-size: 11px; }
     .param-row.locked-dark { background: #1e293b; color: #64748b; border-radius: 7px; padding: 4px 6px; opacity: 0.72; pointer-events: none; }
     .param-row.locked-dark .param-val { color: #64748b; }
-    /* 裏パラメータ専用ゲージ（操作不可・＋－変動表示） */
     .eff-bar-wrap { flex: 1; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; position: relative; }
     .eff-bar-fill { height: 100%; background: #3b82f6; border-radius: 999px; transition: width 0.25s, background-color 0.25s; }
     .eff-bar-fill.up { background: #f97316; }
@@ -104,12 +101,11 @@
     .diff-plus { color: #ea580c; }
     .diff-minus { color: #7c3aed; }
     .diff-zero { color: #64748b; }
-    .trauma-display-box { background: #fff; border: 1px dashed #cbd5e1; border-radius: 9px; padding: 6px 8px; font-size: 11px; color: #475569; display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
-    .trauma-tag-list { display: flex; flex-wrap: wrap; gap: 4px; min-height: 20px; align-items: center; }
-    .trauma-tag { background: #ffe4e6; border: 1px solid #fda4af; color: #be123c; font-weight: 800; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; display: inline-flex; align-items: center; gap: 3px; }
-    /* タブ2の6種トラウマON/OFFボタングリッド */
+    .trauma-display-box { background: #fff; border: 1px dashed #cbd5e1; border-radius: 9px; padding: 5px 8px; font-size: 11px; color: #475569; display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+    .trauma-tag-list { display: flex; flex-wrap: wrap; gap: 4px; min-height: 18px; align-items: center; }
+    .trauma-tag { background: #ffe4e6; border: 1px solid #fda4af; color: #be123c; font-weight: 800; padding: 2px 8px; border-radius: 999px; font-size: 10px; display: inline-flex; align-items: center; gap: 3px; }
     .trauma-btn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 2px; }
-    .trauma-toggle-btn { border: 1.5px solid #cbd5e1; background: #fff; color: #334155; border-radius: 9px; padding: 6px 6px; font-size: 10.5px; font-weight: 900; cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; transition: transform 0.1s, background-color 0.15s; }
+    .trauma-toggle-btn { border: 1.5px solid #cbd5e1; background: #fff; color: #334155; border-radius: 9px; padding: 5px 6px; font-size: 10.5px; font-weight: 900; cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; transition: transform 0.1s, background-color 0.15s; }
     .trauma-toggle-btn:active { transform: scale(0.96); }
     .trauma-toggle-btn.active { background: #ffe4e6; border-color: #f43f5e; color: #9f1239; box-shadow: 0 0 0 2px rgba(244,63,94,0.2); }
     .trauma-btn-sub { font-size: 9.5px; font-weight: 700; color: #64748b; }
@@ -142,14 +138,14 @@
       <div class="badge badge-time" id="ui-time">☀️ 朝</div>
     </div>
     <div class="status-right-group">
-      <div class="badge badge-mood" id="ui-mood" onclick="cycleBodyAndCrawlTest()" title="タップで姿勢・体型切り替え">🙂通常(大・太っちょ)</div>
+      <div class="badge badge-mood" id="ui-mood" onclick="cycleBodyAndCrawlTest()" title="タップで極小×やせっちょ等へ順番に切り替え">🙂通常(極小1・やせっちょ1)</div>
       <button class="btn-icon" id="btn-settings" aria-label="設定">⚙️</button>
     </div>
   </div>
 </div>
 
 <div id="side-icon-column">
-  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳（表:博士の設定 / 裏:トラウマ6種実験室）">📖</div>
+  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳（5段階サイズ・表裏パラメータ・カバン）">📖</div>
   <div class="side-circle-btn" id="cam-ground-btn" title="外カメラ（地上・全体固定）">🌌</div>
   <div class="side-circle-btn" id="cam-ug-btn" title="外カメラ（地下・全体固定）">⛏️</div>
   <div class="side-circle-btn" id="cam-fpv-btn" title="内カメラ（キャラ視点・1ブロック広角＆ほふくズーム）">🤖</div>
@@ -157,19 +153,19 @@
 
 <div id="fan-menu-wrapper">
   <div class="fan-item" onclick="quickDropApple()">🍎<span class="fan-label">リンゴ</span></div>
-  <div class="fan-item" onclick="quickStackBlock()">🪨<span class="fan-label">1段積む</span></div>
+  <div class="fan-item" onclick="quickStackSubStep()">🪜<span class="fan-label">小段差+1</span></div>
   <div class="fan-item" onclick="openModal('modal-gacha'); closeFanMenu();">🎰<span class="fan-label">ガチャ</span></div>
-  <div class="fan-item" onclick="cycleBodyAndCrawlTest(); closeFanMenu();">🐛<span class="fan-label">体型/ほふく</span></div>
+  <div class="fan-item" onclick="setTinySlimPreset(); closeFanMenu();">🧚<span class="fan-label">極小×やせ</span></div>
   <div class="fan-item" onclick="quickDiagonalOrFrontDig()">⛏️<span class="fan-label">斜め/前掘り</span></div>
   <div id="plus-main-btn" title="メニューを開く">＋</div>
 </div>
 
 <div id="bottom-panel">
   <div class="panel-header">
-    <span>💭 ロボのきもち・心のさけび【v26 表・裏パラメータ＆トラウマ6種】</span>
+    <span>💭 ロボのきもち・心のさけび【v27 5×5サイズ＆階段・よじ登り物理】</span>
     <div class="ai-badge" id="ai-status">🟩 アルゴン待機中</div>
   </div>
-  <div id="message-box">【v26完成】📖手帳を開くと「🟢博士の基本設定（表）」と「🔴裏パラメータ＆トラウマ実験室（裏）」をタブで切り替えられるよ！6種類のトラウマボタンで裏の数字が＋－に歪む様子を実験してみてね！</div>
+  <div id="message-box">【v27完成】分割ブロック1〜5個を基準に「高さ5段階（巨大〜極小）×太さ5段階（でぶっちょ〜やせっちょ）」を実装！身長の半分以下はスイスイ階段、身長と同じ段差は足をバタバタよじ登り＆着地ポーズで降りるよ！</div>
   <div class="action-history">
     <span class="history-tag" id="history-action">👟 やった事 待機中</span>
     <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従(観察窓)・地下2層目</span>
@@ -179,17 +175,40 @@
 
 <div id="toast">💾 データを保存したよ</div>
 
-<!-- 📖 ロボット手帳モーダル（2タブ構成：タブ1＝博士の基本設定＋トラウマ表示 / タブ2＝AI裏パラメータ＋全6種トラウマON/OFFボタン） -->
+<!-- 📖 ロボット手帳モーダル（5段階×5段階サイズ＋2タブ構成パラメータ＋カバン＋日記） -->
 <div class="modal-overlay" id="modal-diary" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-diary')">✕</div>
-    <div class="modal-title">📖 1号機の手帳（パラメータ・トラウマ・カバン）</div>
+    <div class="modal-title">📖 1号機の手帳（5段階体格・トラウマ・カバン）</div>
     <div style="display:flex; align-items:center; gap:10px; background:#f8fafc; padding:7px 10px; border-radius:12px; border:1px solid #e2e8f0;">
-      <div style="font-size:30px;" id="diary-emo-icon">🙂</div>
-      <div>
-        <div style="font-weight:900; font-size:13px; color:#1e293b;" id="diary-robo-name">1号機（🎲サイコロ箱型・生存 1日目）</div>
-        <div style="font-size:10.5px; color:#64748b;" id="diary-robo-height">現在：地下2層目 / 大きさ：大 / 体型：太っちょ</div>
+      <div style="font-size:28px;" id="diary-emo-icon">🙂</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:900; font-size:12.5px; color:#1e293b;" id="diary-robo-name">1号機（🎲サイコロ箱型・生存 1日目）</div>
+        <div style="font-size:10px; color:#64748b;" id="diary-robo-height">現在：地下2層目 / 高さ：極小(1) / 太さ：やせっちょ(1)</div>
+        <div style="font-size:10px; color:#0f766e; font-weight:800;" id="diary-step-rule">🪜 階段:0段 / 🧗 よじ登り・安全着地:分割1ブロック</div>
       </div>
+    </div>
+
+    <!-- 📏 大きさ（高さ）5段階 × 🐛 太さ（横幅）5段階 -->
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-size:11px; font-weight:900; color:#0f766e;">📏 大きさ(高さ：分割1〜5ブロック)</span>
+      <button type="button" onclick="setTinySlimPreset()" style="font-size:9.5px; font-weight:900; padding:2px 7px; border-radius:6px; border:1px solid #14b8a6; background:#f0fdfa; color:#0f766e; cursor:pointer;">🧚 極小×やせっちょ(1×1)にする</button>
+    </div>
+    <div class="spec-switch-row-5">
+      <div class="spec-chip" id="size-chip-giant" onclick="changeRobotSizeFromDiary('giant')">巨大<br>(高5)</div>
+      <div class="spec-chip" id="size-chip-large" onclick="changeRobotSizeFromDiary('large')">大<br>(高4)</div>
+      <div class="spec-chip" id="size-chip-medium" onclick="changeRobotSizeFromDiary('medium')">標準<br>(高3)</div>
+      <div class="spec-chip" id="size-chip-small" onclick="changeRobotSizeFromDiary('small')">小<br>(高2)</div>
+      <div class="spec-chip" id="size-chip-tiny" onclick="changeRobotSizeFromDiary('tiny')">極小<br>(高1)</div>
+    </div>
+
+    <div style="font-size:11px; font-weight:900; color:#0f766e;">🐛 太さ(横幅：分割1〜5ブロック)</div>
+    <div class="spec-switch-row-5">
+      <div class="spec-chip" id="body-chip-fat5" onclick="changeRobotBodyFromDiary('fat5')">でぶっちょ<br>(幅5)</div>
+      <div class="spec-chip" id="body-chip-fat4" onclick="changeRobotBodyFromDiary('fat4')">ちょいでぶ<br>(幅4)</div>
+      <div class="spec-chip" id="body-chip-normal3" onclick="changeRobotBodyFromDiary('normal3')">標準<br>(幅3)</div>
+      <div class="spec-chip" id="body-chip-slim2" onclick="changeRobotBodyFromDiary('slim2')">ちょいやせ<br>(幅2)</div>
+      <div class="spec-chip" id="body-chip-slim1" onclick="changeRobotBodyFromDiary('slim1')">やせっちょ<br>(幅1)</div>
     </div>
 
     <!-- 表・裏パラメータ切り替えタブバー -->
@@ -198,11 +217,11 @@
       <div class="rig-tab-btn" id="tab-diary-hidden" onclick="switchDiaryParamTab('hidden')">🔴 裏パラメータ＆実験(裏)</div>
     </div>
 
-    <!-- 🟢【タブ1：博士の基本設定（表の顔）】スライダー操作可 ＋ 現在のトラウマ表示のみ（ボタンなし） -->
+    <!-- 🟢【タブ1：博士の基本設定（表の顔）】 -->
     <div class="lab-panel" id="diary-panel-base">
-      <div style="font-size:11px; font-weight:900; color:#1e3a8a; display:flex; justify-content:space-between;">
+      <div style="font-size:10.5px; font-weight:900; color:#1e3a8a; display:flex; justify-content:space-between;">
         <span>🧪 小学生博士が設定する基本パラメータ</span>
-        <span style="font-size:10px; color:#64748b;">※100で警戒ゼロ</span>
+        <span style="font-size:9.5px; color:#64748b;">※100で警戒ゼロ</span>
       </div>
       <div class="param-row">
         <span class="param-label">🔭 探究心センサー</span>
@@ -234,18 +253,17 @@
         <input type="range" min="0" max="100" value="50" disabled class="param-slider">
         <span class="param-val">50</span>
       </div>
-
       <div class="trauma-display-box">
-        <div style="font-weight:900; font-size:10.5px; color:#9f1239;">⚡ 現在キャラが抱えているトラウマ（表示のみ）</div>
+        <div style="font-weight:900; font-size:10px; color:#9f1239;">⚡ 現在キャラが抱えているトラウマ（表示のみ）</div>
         <div class="trauma-tag-list" id="base-trauma-tag-list"></div>
       </div>
     </div>
 
-    <!-- 🔴【タブ2：AIの裏パラメータとトラウマ実験室（裏の顔）】裏ゲージ（操作不可）＋ 全6種トラウマON/OFFボタン -->
+    <!-- 🔴【タブ2：AIの裏パラメータとトラウマ実験室（裏の顔）】 -->
     <div class="lab-panel hidden-tab" id="diary-panel-hidden" style="display:none;">
-      <div style="font-size:11px; font-weight:900; color:#9f1239; display:flex; justify-content:space-between;">
+      <div style="font-size:10.5px; font-weight:900; color:#9f1239; display:flex; justify-content:space-between;">
         <span>🧠 AIが実際に使う「裏パラメータ（最終値）」</span>
-        <span style="font-size:10px; color:#be123c;">※トラウマで＋－変動</span>
+        <span style="font-size:9.5px; color:#be123c;">※トラウマで＋－変動</span>
       </div>
       <div class="param-row">
         <span class="param-label">🔭 探究心センサー</span>
@@ -278,29 +296,17 @@
         <span class="eff-val-box">50 (ロック)</span>
       </div>
 
-      <div style="font-size:10.5px; font-weight:900; color:#9f1239; margin-top:2px; display:flex; justify-content:space-between; align-items:center;">
+      <div style="font-size:10px; font-weight:900; color:#9f1239; margin-top:2px; display:flex; justify-content:space-between; align-items:center;">
         <span>⚡ トラウマ発症スイッチ（複数ONで裏の数字が歪む！）</span>
-        <button type="button" onclick="clearAllTraumas()" style="font-size:9.5px; font-weight:800; padding:2px 6px; border-radius:5px; border:1px solid #fda4af; background:#fff; color:#be123c; cursor:pointer;">全クリア</button>
+        <button type="button" onclick="clearAllTraumas()" style="font-size:9px; font-weight:800; padding:2px 6px; border-radius:5px; border:1px solid #fda4af; background:#fff; color:#be123c; cursor:pointer;">全クリア</button>
       </div>
       <div class="trauma-btn-grid" id="trauma-btn-grid"></div>
     </div>
 
-    <div style="font-size:11.5px; font-weight:800; color:#0f766e;">📏 大きさ3段階 × 🐛 体型3段階</div>
-    <div class="spec-switch-row">
-      <div class="spec-chip" id="size-chip-large" onclick="changeRobotSizeFromDiary('large')">大（最大）</div>
-      <div class="spec-chip" id="size-chip-medium" onclick="changeRobotSizeFromDiary('medium')">中サイズ</div>
-      <div class="spec-chip" id="size-chip-small" onclick="changeRobotSizeFromDiary('small')">小サイズ</div>
-    </div>
-    <div class="spec-switch-row">
-      <div class="spec-chip" id="body-chip-fat" onclick="changeRobotBodyFromDiary('fat')">太っちょ(幅4)</div>
-      <div class="spec-chip" id="body-chip-normal" onclick="changeRobotBodyFromDiary('normal')">標準(幅3)</div>
-      <div class="spec-chip" id="body-chip-slim" onclick="changeRobotBodyFromDiary('slim')">スリム(幅2)</div>
-    </div>
-
-    <div style="font-size:12px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ」（タップで足元に使う）</div>
+    <div style="font-size:11.5px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ・素材」（🪨小段差積み / 🧴オイル滑り抜け / 🍎食事）</div>
     <div class="bag-grid" id="bag-grid"></div>
-    <div style="font-size:12px; font-weight:bold; color:#475569;">📝 世代のきろく・思い出</div>
-    <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; font-size:11px; color:#334155; max-height:75px; overflow-y:auto; line-height:1.4;"></div>
+    <div style="font-size:11.5px; font-weight:bold; color:#475569;">📝 世代のきろく・思い出</div>
+    <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px; font-size:10.5px; color:#334155; max-height:70px; overflow-y:auto; line-height:1.4;"></div>
     <button class="btn-sub" onclick="closeModal('modal-diary')">手帳を閉じる</button>
   </div>
 </div>
@@ -318,7 +324,7 @@
         <circle cx="60" cy="114" r="12" fill="#fff" stroke="#db2777" stroke-width="3"/>
         <rect x="46" y="132" width="28" height="14" rx="4" fill="#9d174d"/>
       </svg>
-      <div id="gacha-result-text" style="font-size:13px; font-weight:800; color:#be185d; min-height:20px; margin-top:4px;">🍎・🪨(段差ブロック)・🌿 がランダムに出るよ！</div>
+      <div id="gacha-result-text" style="font-size:12.5px; font-weight:800; color:#be185d; min-height:20px; margin-top:4px;">🍎リンゴ・🪨段差石・🧴スライムオイル・🌿草 が出るよ！</div>
     </div>
     <div style="display:flex; gap:8px;">
       <button class="btn-pink" id="btn-spin">スタート</button>
@@ -342,25 +348,29 @@
       </select>
     </div>
     <div class="setting-group">
-      <label class="setting-label">📏 1号機の大きさ（3段階）</label>
+      <label class="setting-label">📏 1号機の大きさ（高さ5段階：分割1〜5ブロック）</label>
       <select id="setting-size-level" class="setting-input">
-        <option value="large">大（最大サイズ：基準の大きさ）</option>
-        <option value="medium">中（ひとまわりコンパクト）</option>
-        <option value="small">小（ちびっこサイズ）</option>
+        <option value="giant">巨大（分割5ブロック＝1ブロック高）</option>
+        <option value="large">大（分割4ブロック）</option>
+        <option value="medium">標準（分割3ブロック）</option>
+        <option value="small">小（分割2ブロック）</option>
+        <option value="tiny">極小（分割1ブロック）</option>
       </select>
     </div>
     <div class="setting-group">
-      <label class="setting-label">🐛 1号機の体型（3段階）</label>
+      <label class="setting-label">🐛 1号機の太さ（横幅5段階：分割1〜5ブロック）</label>
       <select id="setting-body-type" class="setting-input">
-        <option value="fat">太っちょ（幅4マス：最大の横幅・狭い穴につかえる）</option>
-        <option value="normal">標準（幅3マス：通常のトンネルを通過）</option>
-        <option value="slim">スリム（幅2マス：細い斜め穴もスイスイ通過）</option>
+        <option value="fat5">でぶっちょ（分割5ブロック＝1ブロック幅）</option>
+        <option value="fat4">ちょいでぶ（分割4ブロック）</option>
+        <option value="normal3">標準（分割3ブロック）</option>
+        <option value="slim2">ちょいやせ（分割2ブロック）</option>
+        <option value="slim1">やせっちょ（分割1ブロック）</option>
       </select>
     </div>
     <div class="setting-group">
       <label class="setting-label">🤖 使う頭脳（AIの判断をゲームに反映）</label>
       <select id="setting-ai-type" class="setting-input">
-        <option value="none">🟩 アルゴンさん（通信なし・裏パラメータ＆トラウマ本能）</option>
+        <option value="none">🟩 アルゴンさん（通信なし・5段階物理＆トラウマ本能）</option>
         <option value="gemini">🟦 3.8 / Gemini（gemini-3.8-flash 通信最優先）</option>
         <option value="groq">🟪 3.1 / Groq（爆速AI通信）</option>
       </select>
@@ -415,11 +425,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
   // ============================================================================
-  // 【コア①：20種の基本表現データ表 ＆ 6種のトラウマ定義（裏パラメータ補正ルール）】
-  // ⚠️ AIモデルへの絶対命令：この20種類の表現と6種類のトラウマ定義は1行も省略・削除しないこと
+  // 【コア①：20種の基本表現データ表 ＆ 6種のトラウマ定義 ＆ 5×5サイズ定義】
+  // ⚠️ AIモデルへの絶対命令：この定義と角度テーブルは1行も省略・削除しないこと
   // ============================================================================
   const DEFAULT_EXPRESSIONS = [
-    { key: 'normal',   icon: '🙂', label: '通常',           bulb: 0xfacc15, words: '立つ、待つ、見守る、落ち着く、通常' },
+    { key: 'normal',   icon: '🙂', label: '通常',           bulb: 0xfacc15, words: '立つ、待つ、見守る、落ち着く、通常、階段' },
     { key: 'joy',      icon: '😆', label: '喜ぶ',           bulb: 0xf472b6, words: 'バンザイ、成功、リンゴ、食べた、嬉しい、開通' },
     { key: 'anger',    icon: '😡', label: '怒る',           bulb: 0xef4444, words: '地団駄、つかえた、悔しい、プンプン、怒る、狭い' },
     { key: 'sad',      icon: '😭', label: '悲しむ',         bulb: 0x38bdf8, words: 'うなだれる、失敗、おなかすいた、しょんぼり、泣く' },
@@ -433,61 +443,40 @@
     { key: 'sleep',    icon: '💤', label: '居眠り',         bulb: 0x94a3b8, words: '寝る、船をこぐ、休憩、お昼寝、ひとやすみ、省エネ' },
     { key: 'swing_v',  icon: '⛏️', label: '縦に振りかざす', bulb: 0xfb923c, words: '斧、剣、ツルハシ、餅つき用きね、釣り竿、叩く、割る', tool: true },
     { key: 'swing_h',  icon: '🧹', label: '横に払う・掃く', bulb: 0x2dd4bf, words: '掃除、草刈り、鎌、ほうき、ペンキ塗り、払う、削る', tool: true },
-    { key: 'pickup',   icon: '🤲', label: '拾う・置く',     bulb: 0xa3e635, words: 'しゃがむ、採取、種まき、置く、調べる、撫でる、拾う' },
-    { key: 'carry',    icon: '📦', label: '持ち上げる',     bulb: 0xfbbf24, words: '重い石、筋トレ、頭上に掲げる、積む、運ぶ、ブロック' },
+    { key: 'pickup',   icon: '🤲', label: '拾う・置く',     bulb: 0xa3e635, words: 'しゃがむ、採取、種まき、置く、調べる、着地ポーズ、拾う' },
+    { key: 'carry',    icon: '📦', label: '持ち上げる',     bulb: 0xfbbf24, words: '重い石、筋トレ、頭上に掲げる、積む、運ぶ、踏み台' },
     { key: 'push',     icon: '👐', label: '前に押す・掘る', bulb: 0xf87171, words: '壁押し、トンネル掘り、どかす、突っ張る、前掘り、掘削' },
     { key: 'run',      icon: '🏃', label: '走る・急ぐ',     bulb: 0x38bdf8, words: 'ダッシュ、逃げる、急ぐ、運動、駆け足、走る' },
     { key: 'peek',     icon: '🔍', label: 'のぞき込む',     bulb: 0xc084fc, words: '下を見る、穴をのぞく、観察、キョロキョロ、探す' },
-    { key: 'struggle', icon: '🌀', label: '模索・奮闘する', bulb: 0xf43f5e, words: 'ルール外の行動、試行錯誤、ジタバタ挑戦、特訓、未知' }
+    { key: 'struggle', icon: '🌀', label: '模索・奮闘する', bulb: 0xf43f5e, words: 'よじ登る、足をバタバタ、試行錯誤、ジタバタ挑戦、未知' }
   ];
 
-  // ⚡ 全6種類のトラウマ定義と裏パラメータへの＋－影響ルール
   const TRAUMA_SPECS = [
-    {
-      id: 'sea',
-      icon: '🌊',
-      name: '海トラウマ',
-      desc: '白波で溺れた(警戒-45)',
-      deltas: { curiosity: 0, cautionLimiter: -45, power: 0, eco: 0, logic: 0 }
-    },
-    {
-      id: 'narrow',
-      icon: '🕳️',
-      name: '狭所トラウマ',
-      desc: '穴につかえた(出力+35/探究-30)',
-      deltas: { curiosity: -30, cautionLimiter: 0, power: 35, eco: 0, logic: 0 }
-    },
-    {
-      id: 'stomach',
-      icon: '🤢',
-      name: 'はらいたトラウマ',
-      desc: '食中毒・腹痛(探究-45)',
-      deltas: { curiosity: -45, cautionLimiter: -15, power: 0, eco: 0, logic: 0 }
-    },
-    {
-      id: 'height',
-      icon: '🧗',
-      name: '高所トラウマ',
-      desc: '高い段が怖い(警戒が0に!)',
-      deltas: { curiosity: 0, cautionLimiter: -100, power: 0, eco: 0, logic: 0 },
-      forceZeroCaution: true
-    },
-    {
-      id: 'monster',
-      icon: '👻',
-      name: 'ビックリ生物トラウマ',
-      desc: '虫・お化け遭遇(演算-45)',
-      deltas: { curiosity: 0, cautionLimiter: -20, power: 0, eco: 0, logic: -45 }
-    },
-    {
-      id: 'overwork',
-      icon: '⛏️',
-      name: '過労トラウマ',
-      desc: '働きすぎ腰痛(省エネMAX/出力-35)',
-      deltas: { curiosity: 0, cautionLimiter: 0, power: -35, eco: 100, logic: 0 },
-      forceMaxEco: true
-    }
+    { id: 'sea',      icon: '🌊', name: '海トラウマ',         desc: '白波で溺れた(警戒-45)',          deltas: { curiosity: 0,   cautionLimiter: -45,  power: 0,   eco: 0,   logic: 0 } },
+    { id: 'narrow',   icon: '🕳️', name: '狭所トラウマ',       desc: '穴につかえた(出力+35/探究-30)',  deltas: { curiosity: -30, cautionLimiter: 0,    power: 35,  eco: 0,   logic: 0 } },
+    { id: 'stomach',  icon: '🤢', name: 'はらいたトラウマ',   desc: '食中毒・腹痛(探究-45)',          deltas: { curiosity: -45, cautionLimiter: -15,  power: 0,   eco: 0,   logic: 0 } },
+    { id: 'height',   icon: '🧗', name: '高所トラウマ',       desc: '高い段から落下(警戒が0に!)',     deltas: { curiosity: 0,   cautionLimiter: -100, power: 0,   eco: 0,   logic: 0 }, forceZeroCaution: true },
+    { id: 'monster',  icon: '👻', name: 'ビックリ生物トラウマ', desc: '虫・お化け遭遇(演算-45)',       deltas: { curiosity: 0,   cautionLimiter: -20,  power: 0,   eco: 0,   logic: -45 } },
+    { id: 'overwork', icon: '⛏️', name: '過労トラウマ',       desc: '働きすぎ腰痛(省エネMAX/出力-35)', deltas: { curiosity: 0,   cautionLimiter: 0,    power: -35, eco: 100, logic: 0 }, forceMaxEco: true }
   ];
+
+  // 📏 キャラの大きさ（高さ）5段階：分割1〜5ブロック（1ブロック＝分割5ブロック＝1.0m）
+  const SIZE_SPECS = {
+    giant:  { label: '巨大', subH: 5, scaleY: 1.00, standH: 5, crawlH: 3, stairMax: 2 },
+    large:  { label: '大',   subH: 4, scaleY: 0.80, standH: 4, crawlH: 2, stairMax: 2 },
+    medium: { label: '標準', subH: 3, scaleY: 0.60, standH: 3, crawlH: 2, stairMax: 1 },
+    small:  { label: '小',   subH: 2, scaleY: 0.40, standH: 2, crawlH: 1, stairMax: 1 },
+    tiny:   { label: '極小', subH: 1, scaleY: 0.20, standH: 1, crawlH: 1, stairMax: 0 }
+  };
+
+  // 🐛 キャラの太さ（横幅）5段階：分割1〜5ブロック（基準モデルの横幅0.54mを0.20m〜1.00mにスケーリング）
+  const BODY_SPECS = {
+    fat5:    { label: 'でぶっちょ', reqWidth: 5, scaleX: 1.82, scaleZ: 1.75 },
+    fat4:    { label: 'ちょいでぶ', reqWidth: 4, scaleX: 1.45, scaleZ: 1.40 },
+    normal3: { label: '標準',       reqWidth: 3, scaleX: 1.08, scaleZ: 1.05 },
+    slim2:   { label: 'ちょいやせ', reqWidth: 2, scaleX: 0.72, scaleZ: 0.72 },
+    slim1:   { label: 'やせっちょ', reqWidth: 1, scaleX: 0.38, scaleZ: 0.38 }
+  };
 
   const POSE_TABLE = {
     normal:   { spd: 3.5, bounce: 0.01, bodyX: 0.00, headX: 0.00, shLX: 0.05,  shLZ: 0.05, elLX: -0.20, shRX: -0.05, shRZ: -0.05, elRX: -0.20, hipX: -0.05, kneeX: 0.10, mode: 'breath' },
@@ -509,7 +498,7 @@
     push:     { spd: 7.0, bounce: -0.05, bodyX: 0.42, headX: -0.15, shLX: -1.55, shLZ: 0.10, elLX: -0.65, shRX: -1.55, shRZ: -0.10, elRX: -0.65, hipX: -0.65, kneeX: 1.10, mode: 'push' },
     run:      { spd: 14,  bounce: 0.06, bodyX: 0.25, headX: -0.10, shLX: -0.85, shLZ: 0.15, elLX: -1.25, shRX: 0.65,  shRZ: -0.15, elRX: -1.25, hipX: -0.85, kneeX: 1.25, mode: 'run' },
     peek:     { spd: 3.2, bounce: -0.04, bodyX: 0.45, headX: 0.38, shLX: -0.45, shLZ: 0.25, elLX: -1.10, shRX: -1.35, shRZ: 0.20, elRX: -1.20, hipX: -0.40, kneeX: 0.70, mode: 'peek' },
-    struggle: { spd: 13,  bounce: 0.09, bodyX: 0.15, headX: 0.20, shLX: -1.65, shLZ: 0.65, elLX: -0.95, shRX: -1.25, shRZ: -0.75, elRX: -1.15, hipX: -0.75, kneeX: 1.20, mode: 'struggle' }
+    struggle: { spd: 15,  bounce: 0.11, bodyX: 0.22, headX: -0.18, shLX: -1.85, shLZ: 0.55, elLX: -0.95, shRX: -1.45, shRZ: -0.65, elRX: -1.15, hipX: -0.95, kneeX: 1.35, mode: 'struggle' }
   };
 
   let CUSTOM_WORDS_MAP = {};
@@ -530,6 +519,19 @@
       }
     }
     return fallbackKey;
+  }
+
+  // 旧3段階キーから新5段階キーへの互換変換ヘルパー
+  function normalizeSizeKey(k) {
+    if (SIZE_SPECS[k]) return k;
+    return 'tiny';
+  }
+  function normalizeBodyKey(k) {
+    if (BODY_SPECS[k]) return k;
+    if (k === 'fat') return 'fat4';
+    if (k === 'normal') return 'normal3';
+    if (k === 'slim') return 'slim2';
+    return 'slim1';
   }
 
   // ============================================================================
@@ -584,7 +586,7 @@
   }
 
   // ============================================================================
-  // 【コア③：空間・物理・カメラコア（第一エリア空間・外周土壁・観察窓カメラ）】
+  // 【コア③：空間・物理・カメラコア（5段階×5段階・分割ブロック単位の階段＆よじ登り＆着地）】
   // ⚠️ AIモデルへの絶対命令：空間ルールとカメラ制御は1文字も削らないこと
   // ============================================================================
   const AREA1_MAX_GROUND_LV = 5;
@@ -665,18 +667,6 @@
     }
   }
 
-  const SIZE_SPECS = {
-    large:  { label: '大', scale: 1.00, standH: 4, crawlH: 2 },
-    medium: { label: '中', scale: 0.78, standH: 3, crawlH: 2 },
-    small:  { label: '小', scale: 0.58, standH: 2, crawlH: 1 }
-  };
-
-  const BODY_SPECS = {
-    fat:    { label: '太っちょ', reqWidth: 4, scaleX: 1.35, scaleZ: 1.30 },
-    normal: { label: '標準',     reqWidth: 3, scaleX: 1.00, scaleZ: 1.00 },
-    slim:   { label: 'スリム',   reqWidth: 2, scaleX: 0.72, scaleZ: 0.72 }
-  };
-
   const ALL_DIRS = [
     { name: '北',   dx: 0,  dz: -1, rot: Math.PI,          isDiag: false },
     { name: '南',   dx: 0,  dz: 1,  rot: 0,                isDiag: false },
@@ -685,7 +675,7 @@
     { name: '北西(斜め)', dx: -1, dz: -1, rot: -Math.PI * 0.75, isDiag: true },
     { name: '北東(斜め)', dx: 1,  dz: -1, rot: Math.PI * 0.75,  isDiag: true },
     { name: '南西(斜め)', dx: -1, dz: 1,  rot: -Math.PI * 0.25, isDiag: true },
-    { name: '南東(斜め)', dx: 1,  dz: 1,  rot: -Math.PI * 0.25,  isDiag: true }
+    { name: '南東(斜め)', dx: 1,  dz: 1,  rot: Math.PI * 0.25,  isDiag: true }
   ];
 
   function getDirNameFromRot(rotY) {
@@ -698,12 +688,14 @@
   }
 
   let life = new LifeCore(), GAME_DAY = 1, TIME_STEP = 0;
-  let BAG = ['stone', 'apple', 'stone', 'grass'];
-  let DIARY_LOGS = ['🌱 1日目：表パラメータ（博士の設定）と裏パラメータ（トラウマ6種）を持つ1号機が誕生！'];
+  // カバンには段差解決用の「stone(石ブロック)」や狭所解決用の「oil(スライムオイル)」を初期配備！
+  let BAG = ['stone', 'oil', 'apple', 'stone', 'grass'];
+  let DIARY_LOGS = ['🌱 1日目：分割1ブロックの「極小・やせっちょ」から「巨大・でぶっちょ」まで5×5段階変化できる1号機が誕生！'];
   let CAM_VISUAL_STYLE = safeStorage.getItem('cam_visual_style_v15') || 'hide';
   let HEIGHT_MAP = {}, CHIP_MAP = {}, WATER_MAP = {};
-  let currentDiaryTab = 'base'; // 'base'（🟢表：博士の基本設定） | 'hidden'（🔴裏：裏パラメータ＆実験室）
+  let currentDiaryTab = 'base';
 
+  // ご指定の「分割1ブロックの極小(tiny)・やせっちょ(slim1)」を初期プリセットに設定！
   let ROBOT = {
     unitModel: 1,
     gen: 1,
@@ -711,24 +703,23 @@
     pos: { x: 0, z: 0, lv: -1, sx: 2, sz: 2 },
     rotY: Math.PI,
     speed: 3,
-    sizeLevel: 'large',
-    bodyType: 'fat',
+    sizeLevel: 'tiny',     // 'giant'(5) | 'large'(4) | 'medium'(3) | 'small'(2) | 'tiny'(1)
+    bodyType: 'slim1',     // 'fat5'(5)  | 'fat4'(4)  | 'normal3'(3)| 'slim2'(2) | 'slim1'(1)
     posture: 'stand',
     emotion: 'normal',
     params: {
-      curiosity: 60,       // 🔭 探究心センサー (0-100)
-      cautionLimiter: 50,  // 🛡️ 警戒リミッター (0:超ビビリ 〜 100:怖いもの知らず)
-      power: 50,           // 💥 出力パワー (0-100)
-      eco: 40,             // 🔋 省エネ駆動 (0-100)
-      logic: 50,           // 🧠 演算モジュール (0-100)
-      loyalty: 50          // 🔒 忠誠心 (予備・暗転ロック)
+      curiosity: 60,
+      cautionLimiter: 50,
+      power: 50,
+      eco: 40,
+      logic: 50,
+      loyalty: 50
     },
-    traumas: [],           // ⚡ 現在発症中のトラウマID配列: ['sea','narrow','stomach','height','monster','overwork']
-    workStreak: 0          // 連続労働カウント（過労トラウマ発症判定用）
+    traumas: [],
+    workStreak: 0
   };
   let WORLD_ITEMS = [{ type: 'apple', x: -1, z: 1 }, { type: 'apple', x: 1, z: 0 }];
 
-  // トラウマの発症追加（ゲーム中の出来事 または 実験室ボタンから）
   function addTraumaById(traumaId, silent = false) {
     const spec = TRAUMA_SPECS.find(t => t.id === traumaId);
     if (!spec) return false;
@@ -746,7 +737,6 @@
     return Array.isArray(ROBOT.traumas) && ROBOT.traumas.includes(traumaId);
   }
 
-  // 🔴 裏パラメータ（最終値）の計算：基本パラメータ ＋ 発症中トラウマの補正値
   function getEffectiveParams() {
     const base = ROBOT.params || { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50, loyalty: 50 };
     const eff = {
@@ -757,8 +747,7 @@
       logic: base.logic ?? 50,
       loyalty: 50
     };
-    let forceZeroCaution = false;
-    let forceMaxEco = false;
+    let forceZeroCaution = false, forceMaxEco = false;
 
     const activeIds = Array.isArray(ROBOT.traumas) ? ROBOT.traumas : [];
     activeIds.forEach(id => {
@@ -799,12 +788,31 @@
     }
   }
 
+  // 階段実験ができるように、(0,1)に分割2ブロック段差、(1,0)に分割1ブロック段差を初期生成！
+  function carveTopSubLayers(gx, gz, lv, remainingSubHeight) {
+    const ck = `${gx},${gz},${lv}`;
+    if (!CHIP_MAP[ck]) CHIP_MAP[ck] = {};
+    for (let sy = remainingSubHeight; sy < 5; sy++) {
+      for (let sx = 0; sx < 5; sx++) {
+        for (let sz = 0; sz < 5; sz++) {
+          if (!isWaterFacingOuterSubVoxel(gx, gz, lv, sx, sy, sz)) {
+            CHIP_MAP[ck][`${sx},${sy},${sz}`] = 1;
+          }
+        }
+      }
+    }
+  }
+
   function initDefaultSpaceCore() {
     for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) HEIGHT_MAP[`${x},${z}`] = 0;
     HEIGHT_MAP['1,2'] = 1;
     HEIGHT_MAP['0,0'] = -1;
     CHIP_MAP = {};
     WATER_MAP = {};
+
+    // (0,0)は地下2層目(高さ-5分割単位)。隣の(1,0)を高さ-4分割単位(1段差)、(0,1)を高さ-3分割単位(2段差)にして階段テスト可能に！
+    carveTopSubLayers(1, 0, 0, 1); // (1,0)は分割1ブロック段差
+    carveTopSubLayers(0, 1, 0, 2); // (0,1)は分割2ブロック段差
 
     carveCrawlTunnelBlock(-1, -1, 0, 3, 2);
     for (let sy = 0; sy < 2; sy++) {
@@ -845,8 +853,8 @@
       ROBOT.pos.sz = Number.isFinite(d.robot.pos.sz) ? d.robot.pos.sz : 2;
       ROBOT.rotY = Number.isFinite(d.robot.rotY) ? d.robot.rotY : Math.PI;
       ROBOT.speed = Number(d.robot.speed) || 3;
-      ROBOT.sizeLevel = SIZE_SPECS[d.robot.sizeLevel] ? d.robot.sizeLevel : 'large';
-      ROBOT.bodyType = BODY_SPECS[d.robot.bodyType] ? d.robot.bodyType : 'fat';
+      ROBOT.sizeLevel = normalizeSizeKey(d.robot.sizeLevel);
+      ROBOT.bodyType = normalizeBodyKey(d.robot.bodyType);
       ROBOT.posture = d.robot.posture === 'crawl' ? 'crawl' : 'stand';
       ROBOT.emotion = POSE_TABLE[d.robot.emotion] ? d.robot.emotion : 'normal';
       if (d.robot.params && typeof d.robot.params === 'object') {
@@ -858,13 +866,6 @@
       }
       if (Array.isArray(d.robot.traumas)) {
         ROBOT.traumas = d.robot.traumas.filter(id => TRAUMA_SPECS.some(t => t.id === id));
-      } else if (Array.isArray(d.robot.memories)) {
-        // 旧セーブ互換変換
-        ROBOT.traumas = [];
-        d.robot.memories.forEach(m => {
-          if (m.includes('海')) ROBOT.traumas.push('sea');
-          if (m.includes('狭')) ROBOT.traumas.push('narrow');
-        });
       }
     }
     if (d.heightMap) {
@@ -972,12 +973,35 @@
     location.reload();
   }
 
+  // 📏 5段階の大きさ（高さ1〜5分割ブロック）× 🐛 5段階の太さ（横幅1〜5分割ブロック）に基づくクリアランス仕様
   function getEffectiveClearanceSpecs() {
-    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
-    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
-    let reqW = bSpec.reqWidth;
-    if (ROBOT.sizeLevel === 'small') reqW = Math.max(2, reqW - 1);
-    return { reqWidth: reqW, standH: sSpec.standH, crawlH: sSpec.crawlH };
+    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
+    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.tiny;
+    return {
+      reqWidth: bSpec.reqWidth, // 1〜5分割ブロック
+      subH: sSpec.subH,         // 1〜5分割ブロック
+      stairMax: sSpec.stairMax, // 身長の半分（切り捨て）：スイスイ階段上限
+      standH: sSpec.standH,
+      crawlH: sSpec.crawlH
+    };
+  }
+
+  function getSurfaceYAt(gx, gz, lvOverride = null) {
+    if (gx < -2 || gx > 2 || gz < -2 || gz > 2) return -0.55;
+    const topLv = HEIGHT_MAP[`${gx},${gz}`] ?? 0;
+    if (lvOverride !== null && lvOverride < topLv) return lvOverride * 1.0;
+    const chip = CHIP_MAP[`${gx},${gz},${topLv}`];
+    if (!chip) return topLv * 1.0;
+    for (let sy = 4; sy >= 0; sy--) {
+      if (!chip[`2,${sy},2`]) return (topLv - 1) * 1.0 + (sy + 1) * 0.20;
+    }
+    return (topLv - 1) * 1.0;
+  }
+
+  // 指定マスの地表高さを「分割ブロック単位（1ブロック＝5段）」の整数で取得
+  function getSurfaceSubUnits(gx, gz, lvOverride = null) {
+    const y = getSurfaceYAt(gx, gz, lvOverride);
+    return Math.round(y * 5);
   }
 
   function evaluateBlockPassage(gx, gz, lv) {
@@ -995,7 +1019,7 @@
         if (chip[`${sx},${sy},${sz}`]) carvedCount++;
       }
       const approxWidth = Math.min(5, Math.floor(Math.sqrt(carvedCount)));
-      if (approxWidth >= 2) {
+      if (approxWidth >= 1) {
         openHeight = sy + 1;
         minWidthAtOpenLayers = Math.min(minWidthAtOpenLayers, approxWidth);
       } else break;
@@ -1004,37 +1028,117 @@
     return { openWidth: openHeight > 0 ? minWidthAtOpenLayers : 0, openHeight, hasCeiling };
   }
 
+  // ============================================================================
+  // 🪜 5段階の高さ・太さに応じた「階段上り下り・バタバタよじ登り・安全着地」判定
+  // ============================================================================
   function checkMoveAndPosture(gx, gz, curLv, dir) {
     const nx = gx + dir.dx, nz = gz + dir.dz;
     const effP = getEffectiveParams();
     if (nx < -2 || nx > 2 || nz < -2 || nz > 2) {
-      // 裏パラメータの警戒リミッターが80以上（無鉄砲）または速度5なら海へ飛び出し可能！
       const canJumpSea = (ROBOT.speed === 5) || (effP.cautionLimiter >= 80);
-      return { canMove: canJumpSea, posture: 'stand', targetLv: -99, reason: 'sea' };
+      return { canMove: canJumpSea, posture: 'stand', targetLv: -99, reason: 'sea', stepDiff: 0 };
     }
     const eff = getEffectiveClearanceSpecs();
     const destTopLv = HEIGHT_MAP[`${nx},${nz}`] ?? 0;
-    const targetLv = (destTopLv <= curLv) ? destTopLv : curLv;
-    const pass = evaluateBlockPassage(nx, nz, targetLv);
 
-    if (pass.openWidth >= eff.reqWidth) {
-      if (!pass.hasCeiling || pass.openHeight >= eff.standH) {
-        return { canMove: true, posture: 'stand', targetLv, reason: 'open' };
-      }
-      if (pass.openHeight >= eff.crawlH) {
-        return { canMove: true, posture: 'crawl', targetLv, reason: 'crawl_tunnel' };
-      }
-    }
-
-    if (!dir.isDiag && (destTopLv - curLv) === 1) {
-      const upperPass = evaluateBlockPassage(nx, nz, destTopLv);
-      if (upperPass.openWidth >= eff.reqWidth && upperPass.openHeight >= eff.standH) {
-        return { canMove: true, posture: 'stand', targetLv: destTopLv, reason: 'climb' };
+    // 1. まず横穴（トンネル）として同じ層へ進入できるかチェック
+    if (destTopLv > curLv) {
+      const tunnelPass = evaluateBlockPassage(nx, nz, curLv);
+      if (tunnelPass.hasCeiling && tunnelPass.openHeight >= eff.crawlH) {
+        if (tunnelPass.openWidth >= eff.reqWidth) {
+          const pMode = (tunnelPass.openHeight >= eff.standH) ? 'stand' : 'crawl';
+          return { canMove: true, posture: pMode, targetLv: curLv, reason: pMode === 'crawl' ? 'crawl_tunnel' : 'open', stepDiff: 0 };
+        } else {
+          return { canMove: false, posture: ROBOT.posture, targetLv: curLv, reason: 'too_fat', stepDiff: 0 };
+        }
       }
     }
 
-    const blockedReason = (pass.openHeight >= eff.crawlH && pass.openWidth < eff.reqWidth) ? 'too_fat' : 'wall';
-    return { canMove: false, posture: ROBOT.posture, targetLv: curLv, reason: blockedReason };
+    // 2. 地表間の段差（分割ブロック単位：1個＝0.20m）を計算
+    const curSubH = getSurfaceSubUnits(gx, gz, curLv);
+    const destSubH = getSurfaceSubUnits(nx, nz, destTopLv);
+    const diffSub = destSubH - curSubH; // 正なら上り、負なら下り
+
+    const surfacePass = evaluateBlockPassage(nx, nz, destTopLv);
+    if (surfacePass.openWidth < eff.reqWidth) {
+      return { canMove: false, posture: ROBOT.posture, targetLv: curLv, reason: 'too_fat', stepDiff: diffSub };
+    }
+
+    // 【上りルール】
+    if (diffSub > 0) {
+      if (diffSub <= eff.stairMax) {
+        // 自分の高さの半分以下：スイスイ歩ける階段！
+        return { canMove: true, posture: 'stand', targetLv: destTopLv, reason: 'stairs_up', stepDiff: diffSub };
+      }
+      if (diffSub <= eff.subH) {
+        // 自分の高さと同じかそれ以下：足をバタバタさせながらよじ登る！
+        return { canMove: true, posture: 'stand', targetLv: destTopLv, reason: 'scramble_climb', stepDiff: diffSub };
+      }
+      // 自分の高さより高い段差：そのままでは登れない（素材や削りで解決が必要！）
+      return { canMove: false, posture: ROBOT.posture, targetLv: curLv, reason: 'too_high_step', stepDiff: diffSub };
+    }
+
+    // 【下り・平地ルール】
+    const dropSub = -diffSub;
+    if (dropSub === 0) {
+      return { canMove: true, posture: 'stand', targetLv: destTopLv, reason: 'open', stepDiff: 0 };
+    }
+    if (dropSub <= eff.stairMax) {
+      // 自分の高さの半分以下：スイスイ階段下り
+      return { canMove: true, posture: 'stand', targetLv: destTopLv, reason: 'stairs_down', stepDiff: diffSub };
+    }
+    if (dropSub <= eff.subH) {
+      // 自分の高さ以内：着地ポーズで何事もなく安全に降りられる！
+      return { canMove: true, posture: 'stand', targetLv: destTopLv, reason: 'safe_landing', stepDiff: diffSub };
+    }
+    // 自分の高さを超える高い崖：警戒リミッターが70以上なら飛び降りる（ダメージ＆高所トラウマ）
+    if (effP.cautionLimiter >= 70 || ROBOT.speed === 5) {
+      return { canMove: true, posture: 'stand', targetLv: destTopLv, reason: 'high_drop_damage', stepDiff: diffSub };
+    }
+    return { canMove: false, posture: ROBOT.posture, targetLv: curLv, reason: 'too_deep_cliff', stepDiff: diffSub };
+  }
+
+  // 足元に「分割ブロック単位（1〜2段分）」の踏み台・小階段を積む関数（高い段差の悩み解決用）
+  function addSubStepFootholdAt(gx, gz, addSubCount = 2) {
+    if (gx < -2 || gx > 2 || gz < -2 || gz > 2) return false;
+    const topLv = HEIGHT_MAP[`${gx},${gz}`] ?? 0;
+    const ck = `${gx},${gz},${topLv}`;
+    const chip = CHIP_MAP[ck];
+
+    if (chip && Object.keys(chip).length > 0) {
+      // 現在削れている層があれば、その下から addSubCount 段分を埋めて高くする
+      let curSyTop = -1;
+      for (let sy = 4; sy >= 0; sy--) {
+        if (!chip[`2,${sy},2`]) { curSyTop = sy; break; }
+      }
+      const nextSyTop = Math.min(4, curSyTop + addSubCount);
+      for (let sy = 0; sy <= nextSyTop; sy++) {
+        for (let sx = 0; sx < 5; sx++) for (let sz = 0; sz < 5; sz++) {
+          delete chip[`${sx},${sy},${sz}`];
+        }
+      }
+      if (nextSyTop === 4) delete CHIP_MAP[ck];
+      return true;
+    } else {
+      // フルブロック状態なら、1つ上のブロック層を作り、下から addSubCount 段分だけ残す（分割段差を作る）
+      if (topLv >= AREA1_MAX_GROUND_LV) return false;
+      const newLv = topLv + 1;
+      HEIGHT_MAP[`${gx},${gz}`] = newLv;
+      carveTopSubLayers(gx, gz, newLv, Math.min(5, addSubCount));
+      ROBOT.pos.lv = newLv;
+      return true;
+    }
+  }
+
+  // 目の前の高すぎる段差の上部を削って「自分の身長(subH)でよじ登れる階段」に加工する関数
+  function carveFrontStepToClimbable(targetX, targetZ, curSubH, charSubH) {
+    if (targetX < -2 || targetX > 2 || targetZ < -2 || targetZ > 2) return false;
+    const topLv = HEIGHT_MAP[`${targetX},${targetZ}`] ?? 0;
+    const desiredSubH = curSubH + charSubH; // ちょうど足をバタバタよじ登れる高さ
+    const baseSubOfTopLv = (topLv - 1) * 5;
+    const keepLayers = Math.max(1, Math.min(4, desiredSubH - baseSubOfTopLv));
+    carveTopSubLayers(targetX, targetZ, topLv, keepLayers);
+    return true;
   }
 
   function digFromCharacterFront(gx, gz, curLv, dir, crawlMode = false, count = 35) {
@@ -1051,7 +1155,7 @@
     if (!CHIP_MAP[chipKey]) CHIP_MAP[chipKey] = {};
 
     const eff = getEffectiveClearanceSpecs();
-    const maxSy = crawlMode ? 2 : 4;
+    const maxSy = crawlMode ? Math.max(0, eff.crawlH - 1) : 4;
     const candidates = [];
     for (let sy = 0; sy <= maxSy; sy++) {
       for (let sx = 0; sx < 5; sx++) {
@@ -1112,18 +1216,6 @@
     const pass = evaluateBlockPassage(targetX, targetZ, digLv - 1);
     const isCrawlReady = (pass.hasCeiling && pass.openHeight >= eff.crawlH && pass.openWidth >= eff.reqWidth);
     return { completedLevel: false, newLv: digLv, leftCount: leftInnerCount, isCrawlTunnel: isCrawlReady, targetX, targetZ };
-  }
-
-  function getSurfaceYAt(gx, gz, lvOverride = null) {
-    if (gx < -2 || gx > 2 || gz < -2 || gz > 2) return -0.55;
-    const topLv = HEIGHT_MAP[`${gx},${gz}`] ?? 0;
-    if (lvOverride !== null && lvOverride < topLv) return lvOverride * 1.0;
-    const chip = CHIP_MAP[`${gx},${gz},${topLv}`];
-    if (!chip) return topLv * 1.0;
-    for (let sy = 4; sy >= 0; sy--) {
-      if (!chip[`2,${sy},2`]) return (topLv - 1) * 1.0 + (sy + 1) * 0.20;
-    }
-    return (topLv - 1) * 1.0;
   }
 
   function hasSubVoxel(gx, gz, lv, sx, sy, sz) {
@@ -1674,6 +1766,7 @@
   stickFootR.position.set(0, -0.02, 0.03);
   SB.ankleR.add(stickFootR);
 
+  // 📏 5段階の高さ（scaleY: 0.20〜1.00）× 🐛 5段階の太さ（scaleX/Z: 0.38〜1.82）を3Dモデルへ正確に反映！
   function syncRobot3DPosition() {
     const gx = ROBOT.pos.x, gz = ROBOT.pos.z;
     const subX = ((ROBOT.pos.sx ?? 2) - 2) * 0.20, subZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.20;
@@ -1685,17 +1778,19 @@
     stickRigGroup.visible = isStick;
     boxRigGroup.visible = !isStick;
 
-    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
-    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
+    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.tiny;
+    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
+
+    // 立ち姿勢では Y=高さ(分割1〜5ブロック)、X/Z=太さ(分割1〜5ブロック)
     robotPoseGroup.scale.set(
-      sSpec.scale * bSpec.scaleX,
-      sSpec.scale,
-      sSpec.scale * bSpec.scaleZ
+      bSpec.scaleX,
+      sSpec.scaleY,
+      bSpec.scaleZ
     );
 
     if (ROBOT.posture === 'crawl') {
       robotPoseGroup.rotation.x = Math.PI / 2;
-      robotPoseGroup.position.set(0, 0.18 * sSpec.scale, -0.35 * sSpec.scale);
+      robotPoseGroup.position.set(0, 0.18 * sSpec.scaleY, -0.35 * sSpec.scaleY);
     } else {
       robotPoseGroup.rotation.x = 0;
       robotPoseGroup.position.set(0, 0, 0);
@@ -1705,7 +1800,6 @@
     sharedBulbMat.color.setHex(eSpec.bulb);
   }
 
-  // 裏パラメータの「出力パワー（effP.power）」に応じてアクションの振れ幅もリアルタイムに変化！
   function updateRobotUnifiedAnimation(t) {
     const emoKey = POSE_TABLE[ROBOT.emotion] ? ROBOT.emotion : 'normal';
     const p = POSE_TABLE[emoKey];
@@ -1775,8 +1869,8 @@
       bodyRotY = Math.sin(phase * 0.7) * 0.35;
       bodyRotZ = cosW * 0.16;
       headRotZ = wave * 0.28;
-      armLDX = wave * 0.90 * powFactor; armRDX = cosW * 0.90 * powFactor;
-      legLDX = cosW * 0.60; legRDX = -wave * 0.60;
+      armLDX = wave * 0.95 * powFactor; armRDX = cosW * 0.95 * powFactor;
+      legLDX = cosW * 0.85; legRDX = -wave * 0.85;
     } else {
       dy = absW * p.bounce;
       armLDX = wave * 0.06; armRDX = -wave * 0.06;
@@ -1969,7 +2063,7 @@
     const statusPanel = document.getElementById('status-panel');
     const h = getRobotHeightLevel();
     const isRobotUG = (h < 0 && h !== -99) || (ROBOT.posture === 'crawl');
-    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
+    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.tiny;
 
     if (manualCameraMode === 'robot') {
       robotGroup.visible = false;
@@ -1984,7 +2078,7 @@
         innerRobotCam.updateProjectionMatrix();
       }
 
-      const eyeH = isCrawl ? (0.22 * sSpec.scale) : (0.52 * sSpec.scale);
+      const eyeH = isCrawl ? (0.18 * sSpec.scaleY) : Math.max(0.14, 0.52 * sSpec.scaleY);
       const forwardOffset = isCrawl ? 0.06 : (-0.26 * fpvZoomFactor);
       const rot = ROBOT.rotY || 0;
       const lookYaw = rot + fpvYawOffset;
@@ -2035,9 +2129,9 @@
     } else {
       robotGroup.visible = true;
       statusPanel.classList.remove('sky-hidden');
-      const fPhi = camPhi, followDist = Math.max(4.8, Math.min(12.5, camRadius * 0.72));
+      const fPhi = camPhi, followDist = Math.max(4.5, Math.min(12.5, camRadius * 0.72));
       const tx = robotGroup.position.x;
-      const ty = robotGroup.position.y + (ROBOT.posture === 'crawl' ? 0.25 : 0.45) * sSpec.scale;
+      const ty = robotGroup.position.y + Math.max(0.15, (ROBOT.posture === 'crawl' ? 0.25 : 0.45) * sSpec.scaleY);
       const tz = robotGroup.position.z;
 
       followCam.position.set(
@@ -2192,8 +2286,8 @@
 
   function updateEnvironmentAndUI() {
     const st = life.getState(), hLevel = getRobotHeightLevel();
-    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
-    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
+    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.tiny;
+    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
     const eSpec = getExpressionSpec(ROBOT.emotion);
     const rigBadge = ROBOT.rigType === 'stick' ? '🦴3D骨組み' : '🎲箱型';
 
@@ -2214,7 +2308,7 @@
     document.getElementById('ui-time').innerText = timeLabel;
 
     const postureOrEmoIcon = ROBOT.posture === 'crawl' ? '🐛ほふく' : `${eSpec.icon}${eSpec.label}`;
-    document.getElementById('ui-mood').innerText = `${postureOrEmoIcon}(${sSpec.label}・${bSpec.label})`;
+    document.getElementById('ui-mood').innerText = `${postureOrEmoIcon}(${sSpec.label}${sSpec.subH}・${bSpec.label}${bSpec.reqWidth})`;
 
     const facingName = getDirNameFromRot(ROBOT.rotY || 0);
     const viewModeLabel = ROBOT.posture === 'crawl' ? 'ほふく接近' : (fpvZoomFactor < 0.8 ? 'ズーム' : '広角1ブロック');
@@ -2229,40 +2323,35 @@
     document.getElementById('ai-status').innerText = getActiveBrainBadgeText();
   }
 
-  // 🤖 AIプロンプトへの渡し方：博士の基本設定ではなく「トラウマ補正後の裏パラメータ（最終値）」と「現在発動中のトラウマ」を渡す！
-  async function askAIForDecision(validMoves, curH, isAtSeaEdge, blockedByFat) {
+  // 🤖 AIプロンプトへの渡し方：5段階サイズ（分割1〜5ブロック）、周囲の段差情報、カバンの中身を渡し、悩み解決（素材積み・階段削り・オイル使用）を引き出す！
+  async function askAIForDecision(validMoves, curH, isAtSeaEdge, blockedByFat, blockedByHighStep) {
     const aiType = safeStorage.getItem('ai_type') || 'none';
     if (aiType === 'none') return null;
-    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
-    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
-    const dirNames = validMoves.map(m => `${m.dir.name}${m.check.posture === 'crawl' ? '(ほふく前進)' : ''}`).join('、');
+    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.tiny;
+    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
+    const dirNames = validMoves.map(m => `${m.dir.name}(${m.check.reason === 'scramble_climb' ? 'よじ登り' : (m.check.reason === 'stairs_up' ? '階段' : (m.check.reason === 'safe_landing' ? '着地降り' : '移動'))})`).join('、');
     const itemsStr = WORLD_ITEMS.map(it => `${it.type}(${it.x},${it.z})`).join(', ') || 'なし';
+    const bagStr = BAG.join(', ') || '空っぽ';
     const exprSummary = DEFAULT_EXPRESSIONS.map(e => `${e.key}:[${CUSTOM_WORDS_MAP[e.key] || e.words}]`).join(' / ');
 
-    // AIにはトラウマの影響を加味した「裏パラメータ（最終値）」を渡す
     const effP = getEffectiveParams();
     const activeTraumaNames = (ROBOT.traumas || []).map(id => {
       const sp = TRAUMA_SPECS.find(t => t.id === id);
       return sp ? `${sp.icon}${sp.name}(${sp.desc})` : '';
     }).filter(Boolean).join('、') || 'なし';
 
-    const envNote = `${isAtSeaEdge ? '【目の前が海の白波】' : ''}${blockedByFat ? '【狭い穴におなかがつかえている】' : ''}${curH >= 2 ? '【地上の高い場所】' : ''}${TIME_STEP >= 13 ? '【暗い夜】' : ''}`;
+    const problemNote = `${blockedByHighStep ? `【現在：${blockedByHighStep.dir.name}の段差が分割${blockedByHighStep.check.stepDiff}ブロックあり、あなたの身長(分割${sSpec.subH}ブロック)より高くて登れません！カバンの石(stone)で踏み台を積むか、壁を階段状に削って解決できます】` : ''}${blockedByFat ? `【現在：${blockedByFat.dir.name}の穴があなたの太さ(${bSpec.label}・幅${bSpec.reqWidth})より狭くてつかえています！カバンのオイル(oil)を使うか壁を削り広げて解決できます】` : ''}`;
 
     const prompt = `あなたは5x5ボクセル島で暮らす自律ロボット「${ROBOT.unitModel}号機（第${ROBOT.gen}世代）」です。
-現在位置:(${ROBOT.pos.x},${ROBOT.pos.z}) 層:${formatHeightText(curH)} ${envNote}
-大きさ:${sSpec.label} 体型:${bSpec.label} たいりょく=${life.stamina},おなか=${life.energy},ごきげん=${life.mental}
+現在位置:(${ROBOT.pos.x},${ROBOT.pos.z}) 層:${formatHeightText(curH)}
+【体格（分割5ブロック基準）】大きさ:${sSpec.label}(高さ:分割${sSpec.subH}ブロック / スイスイ階段:${sSpec.stairMax}段まで / バタバタよじ登り・安全着地:${sSpec.subH}段まで) / 太さ:${bSpec.label}(横幅:分割${bSpec.reqWidth}ブロック)
+たいりょく=${life.stamina},おなか=${life.energy},ごきげん=${life.mental} / カバンの中身:[${bagStr}]
 周囲のアイテム:${itemsStr} / 移動可能方向:[${dirNames}]
-【現在のあなたの裏パラメータ（最終値 0〜100）】
-・探究心センサー:${effP.curiosity}
-・警戒リミッター:${effP.cautionLimiter} (100に近いほど怖いもの知らず、0に近いほど超ビビリ)
-・出力パワー:${effP.power}
-・省エネ駆動:${effP.eco}
-・演算モジュール:${effP.logic}
-【現在発動中のトラウマ】
-[${activeTraumaNames}]
-※重要：上記の「裏パラメータ（最終値）」と「現在発動中のトラウマ」から、その場の状況に応じた自由でユニークなリアクション（創発）を選んでください。
+${problemNote}
+【現在の裏パラメータ(0〜100)】探究心:${effP.curiosity}, 警戒リミッター:${effP.cautionLimiter}, 出力:${effP.power}, 省エネ:${effP.eco}, 演算:${effP.logic}
+【現在発動中のトラウマ】[${activeTraumaNames}]
 基本表現辞書:${exprSummary}
-JSON形式のみで出力してください:{"action":"移動可能な方向名 または 斜め掘り または ほふく掘り または 休む または トラウマ反応行動 または 自由な挑戦行動","emotion":"表現キー(20種)","thought":"小学生向けのユニークな心の声(1〜2文)"}`;
+JSON形式のみで出力してください:{"action":"移動可能な方向名 または 踏み台を積む または 階段を削る または オイルで滑り抜ける または 穴を削り広げる または 休む","emotion":"表現キー(20種)","thought":"小学生向けのユニークな心の声(1〜2文)"}`;
 
     try {
       if (aiType === 'gemini') {
@@ -2299,9 +2388,10 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
     if (++TIME_STEP >= 20) { TIME_STEP = 0; GAME_DAY++; DIARY_LOGS.push(`🌅 ${GAME_DAY}日目の朝を迎えたよ！`); }
 
     const curH = getRobotHeightLevel();
+    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.tiny;
+    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
     let thoughtText = '', actionLabel = '';
 
-    // 🌊 物理現象1：海に落ちて白波で大ダメージ → 「🌊海トラウマ」自動発症！
     if (curH === -99) {
       ROBOT.pos.x = Math.max(-2, Math.min(2, ROBOT.pos.x));
       ROBOT.pos.z = Math.max(-2, Math.min(2, ROBOT.pos.z));
@@ -2312,7 +2402,7 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
       life.stamina -= 18; life.mental -= 15;
       addTraumaById('sea', true);
       actionLabel = '🌊 白波で大ダメージ！「海トラウマ」発症';
-      thoughtText = 'うわぁぁっ！！海の白い波に飲まれて大ダメージを受けたよ…！「🌊海トラウマ」になって裏の警戒リミッターが下がっちゃった！';
+      thoughtText = 'うわぁぁっ！！海の白い波に飲まれて大ダメージを受けたよ…！「🌊海トラウマ」になっちゃった！';
     } else {
       const isAtSeaEdge = (Math.abs(ROBOT.pos.x) === 2 || Math.abs(ROBOT.pos.z) === 2);
       const moveEvaluations = ALL_DIRS.map(d => ({
@@ -2321,256 +2411,240 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
       }));
       const validMoves = moveEvaluations.filter(m => m.check.canMove);
       const blockedByFat = moveEvaluations.find(m => m.check.reason === 'too_fat');
+      const blockedByHighStep = moveEvaluations.find(m => m.check.reason === 'too_high_step');
 
-      // 🕳️ 物理現象2：太っちょで狭い穴につかえた → 「🕳️狭所トラウマ」自動発症！
       if (blockedByFat) addTraumaById('narrow', true);
-
-      // 🧗 物理現象3：地上3段目以上に登った時、低確率で下をのぞいて「🧗高所トラウマ」自動発症！
       if (curH >= 3 && Math.random() < 0.45) addTraumaById('height', true);
-
-      // 👻 物理現象4：夜・深淵の暗い時間に低確率で物音に驚き「👻ビックリ生物トラウマ」自動発症！
       if (TIME_STEP >= 14 && Math.random() < 0.22) addTraumaById('monster', true);
 
-      // トラウマ補正後の「裏パラメータ（最終値）」を取得
       const effP = getEffectiveParams();
-      const aiDecision = await askAIForDecision(validMoves, curH, isAtSeaEdge, Boolean(blockedByFat));
+      const aiDecision = await askAIForDecision(validMoves, curH, isAtSeaEdge, blockedByFat, blockedByHighStep);
 
-      let chosenMove = null, wantDig = false, wantCrawlDig = false, wantRest = false, wantFreeStruggle = false;
+      let chosenMove = null, wantDig = false, wantCrawlDig = false, wantRest = false;
+      let wantSolveHighStep = false, wantSolveNarrow = false;
       let traumaReaction = null;
 
-      // ⚡ 6種のトラウマによる特殊創発リアクション判定
-      if (hasTrauma('height') && curH >= 2 && Math.random() < 0.82) {
+      if (hasTrauma('height') && curH >= 2 && Math.random() < 0.78) {
         traumaReaction = 'height';
-      } else if (hasTrauma('sea') && isAtSeaEdge && Math.random() < 0.80) {
+      } else if (hasTrauma('sea') && isAtSeaEdge && Math.random() < 0.78) {
         traumaReaction = 'sea';
-      } else if (hasTrauma('narrow') && blockedByFat && Math.random() < 0.80) {
-        traumaReaction = 'narrow';
-      } else if (hasTrauma('overwork') && Math.random() < 0.68) {
+      } else if (hasTrauma('overwork') && Math.random() < 0.65) {
         traumaReaction = 'overwork';
-      } else if (hasTrauma('monster') && (TIME_STEP >= 13 || WORLD_ITEMS.some(it => it.type === 'grass' && Math.hypot(it.x - ROBOT.pos.x, it.z - ROBOT.pos.z) <= 1.5)) && Math.random() < 0.72) {
+      } else if (hasTrauma('monster') && TIME_STEP >= 13 && Math.random() < 0.70) {
         traumaReaction = 'monster';
       }
 
       if (aiDecision && aiDecision.action && !traumaReaction) {
-        if (aiDecision.action.includes('休')) wantRest = true;
+        if (aiDecision.action.includes('踏み台') || aiDecision.action.includes('階段')) wantSolveHighStep = true;
+        else if (aiDecision.action.includes('オイル') || aiDecision.action.includes('広げ')) wantSolveNarrow = true;
+        else if (aiDecision.action.includes('休')) wantRest = true;
         else if (aiDecision.action.includes('ほふく掘')) { wantDig = true; wantCrawlDig = true; }
         else if (aiDecision.action.includes('掘')) wantDig = true;
         else {
           chosenMove = validMoves.find(m => aiDecision.action.includes(m.dir.name.replace('(斜め)', ''))) || null;
-          if (!chosenMove) wantFreeStruggle = true;
         }
       }
 
-      // ⚡ トラウマ別のユニーク行動実行
+      // 悩み解決（高すぎる段差・狭すぎる穴）の優先選択！
+      if (!traumaReaction && !chosenMove && !wantRest && !wantDig && !wantSolveHighStep && !wantSolveNarrow) {
+        const restThreshold = 20 + Math.round(effP.eco * 0.38);
+        if (life.stamina <= restThreshold) {
+          wantRest = true;
+        } else if (blockedByHighStep && Math.random() < 0.72) {
+          wantSolveHighStep = true;
+        } else if (blockedByFat && Math.random() < 0.75) {
+          wantSolveNarrow = true;
+        } else {
+          // 階段上り・よじ登り・安全着地ができる移動を優先的に試す！
+          const stepMoves = validMoves.filter(m => ['scramble_climb', 'stairs_up', 'safe_landing', 'stairs_down'].includes(m.check.reason));
+          const apple = WORLD_ITEMS.find(it => it.type === 'apple');
+          if (stepMoves.length > 0 && Math.random() < 0.65) {
+            chosenMove = stepMoves[Math.floor(Math.random() * stepMoves.length)];
+          } else if (apple && validMoves.length && !hasTrauma('stomach')) {
+            validMoves.sort((a, b) => Math.hypot(ROBOT.pos.x + a.dir.dx - apple.x, ROBOT.pos.z + a.dir.dz - apple.z) - Math.hypot(ROBOT.pos.x + b.dir.dx - apple.x, ROBOT.pos.z + b.dir.dz - apple.z));
+            chosenMove = validMoves[0];
+          } else if (validMoves.length) {
+            chosenMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+          } else {
+            wantDig = true;
+          }
+        }
+      }
+
+      // ⚡ 1. トラウマ発動
       if (traumaReaction === 'height') {
-        ROBOT.posture = 'stand';
-        ROBOT.emotion = (Math.random() < 0.5) ? 'shiver' : 'sad';
-        life.mental -= 4;
-        actionLabel = `🧗 高所トラウマ発動(裏警戒:${effP.cautionLimiter})：足がすくんで泣く`;
-        thoughtText = aiDecision?.thought || `「🧗高所トラウマ」で裏の警戒リミッターが0になっちゃった！高い場所が怖くて足がガタガタすくんで動けないよ〜😭`;
+        ROBOT.posture = 'stand'; ROBOT.emotion = 'shiver';
+        actionLabel = `🧗 高所トラウマ発動(裏警戒:${effP.cautionLimiter})：足がすくむ`;
+        thoughtText = aiDecision?.thought || `「🧗高所トラウマ」で裏の警戒リミッターが0になっちゃった！高い場所が怖くて足がガタガタ震えるよ〜😭`;
       } else if (traumaReaction === 'sea') {
         const inlandMoves = validMoves.filter(m => m.check.reason !== 'sea' && Math.abs(ROBOT.pos.x + m.dir.dx) <= 1 && Math.abs(ROBOT.pos.z + m.dir.dz) <= 1);
         if (inlandMoves.length > 0) {
           const esc = inlandMoves[Math.floor(Math.random() * inlandMoves.length)];
-          ROBOT.pos.x += esc.dir.dx; ROBOT.pos.z += esc.dir.dz; ROBOT.pos.lv = esc.check.targetLv;
-          ROBOT.rotY = esc.dir.rot;
+          ROBOT.pos.x += esc.dir.dx; ROBOT.pos.z += esc.dir.dz; ROBOT.pos.lv = esc.check.targetLv; ROBOT.rotY = esc.dir.rot;
         }
-        ROBOT.posture = 'stand';
-        ROBOT.emotion = 'fear';
-        actionLabel = `🌊 海トラウマ発動(裏警戒:${effP.cautionLimiter})：内陸へ避難`;
-        thoughtText = aiDecision?.thought || `「🌊海トラウマ」で裏の警戒リミッターが${effP.cautionLimiter}に下がっているよ！白波が怖くて内陸へ後ずさりしたよ😰`;
-      } else if (traumaReaction === 'narrow') {
-        ROBOT.posture = 'stand';
-        ROBOT.emotion = 'anger';
-        if (blockedByFat) {
-          ROBOT.rotY = blockedByFat.dir.rot;
-          digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, blockedByFat.dir, false, 50);
-        }
-        actionLabel = `🕳️ 狭所トラウマ爆発(裏出力:${effP.power})：壁を破壊掘削！`;
-        thoughtText = aiDecision?.thought || `「🕳️狭所トラウマ」で裏の出力パワーが${effP.power}に急上昇！おなかがつかえた悔しさで地団駄を踏んで壁を壊したよ😡`;
+        ROBOT.posture = 'stand'; ROBOT.emotion = 'fear';
+        actionLabel = `🌊 海トラウマ発動：内陸へ避難`;
+        thoughtText = aiDecision?.thought || `「🌊海トラウマ」で白波が怖くて内陸へ後ずさりしたよ😰`;
       } else if (traumaReaction === 'overwork') {
-        ROBOT.posture = 'stand';
-        ROBOT.emotion = (Math.random() < 0.5) ? 'hot' : 'sleep';
-        life.stamina += 30; life.mental += 8;
-        ROBOT.workStreak = 0;
-        actionLabel = `⛏️ 過労トラウマ発動(裏省エネ:${effP.eco})：サボって休憩`;
-        thoughtText = aiDecision?.thought || `「⛏️過労トラウマ」で裏の省エネ駆動がMAX(${effP.eco})になっているよ！もう腰が痛いからサボって居眠りしちゃうよ…💤`;
+        ROBOT.posture = 'stand'; ROBOT.emotion = 'sleep';
+        life.stamina += 30; ROBOT.workStreak = 0;
+        actionLabel = `⛏️ 過労トラウマ発動：サボって居眠り`;
+        thoughtText = aiDecision?.thought || `「⛏️過労トラウマ」で省エネ駆動がMAXだよ！腰が痛いからサボって居眠りしちゃうよ…💤`;
       } else if (traumaReaction === 'monster') {
-        ROBOT.posture = 'stand';
-        ROBOT.emotion = (Math.random() < 0.5) ? 'surprise' : 'struggle';
-        actionLabel = `👻 ビックリ生物トラウマ(裏演算:${effP.logic})：パニック大騒ぎ`;
-        thoughtText = aiDecision?.thought || `「👻ビックリ生物トラウマ」で裏の演算モジュールが${effP.logic}に低下中！草むらや暗闇にお化けや虫がいそうでパニックだよ😲`;
-      } else {
-        // 🧠 裏パラメータ（effP）に基づく通常の自律行動ルーチン
-        if (!wantRest && !wantDig && !chosenMove && !wantFreeStruggle) {
-          const restThreshold = 20 + Math.round(effP.eco * 0.38);
-          if (life.stamina <= restThreshold || (effP.eco >= 75 && Math.random() < 0.42)) {
-            wantRest = true;
-          } else if (effP.logic >= 72 && Math.random() < 0.26) {
-            wantFreeStruggle = true;
-          } else if (blockedByFat && (effP.power >= 50 || Math.random() < 0.65)) {
-            wantDig = true;
-          } else if (effP.curiosity >= 70 && Math.random() < 0.28) {
-            wantFreeStruggle = true;
-          } else if (Math.random() < (0.24 + effP.power * 0.0025) && curH > AREA1_MIN_UNDER_LV && life.stamina > 30) {
-            wantDig = true;
-            wantCrawlDig = (effP.curiosity >= 60 && Math.random() < 0.55);
-          } else {
-            let candidateMoves = validMoves;
-            if (effP.cautionLimiter < 78) {
-              const safeMoves = validMoves.filter(m => m.check.reason !== 'sea');
-              if (safeMoves.length > 0) candidateMoves = safeMoves;
-            }
-            const crawlMoves = candidateMoves.filter(m => m.check.posture === 'crawl');
-            const apple = WORLD_ITEMS.find(it => it.type === 'apple');
+        ROBOT.posture = 'stand'; ROBOT.emotion = 'surprise';
+        actionLabel = `👻 ビックリ生物トラウマ：暗闇でパニック`;
+        thoughtText = aiDecision?.thought || `「👻ビックリ生物トラウマ」で暗闇にお化けや虫がいそうでパニックだよ😲`;
 
-            // 🤢 はらいたトラウマがある時は、リンゴへ近づくのを怖がって避ける！
-            if (apple && hasTrauma('stomach') && candidateMoves.length) {
-              candidateMoves.sort((a, b) => Math.hypot(ROBOT.pos.x + b.dir.dx - apple.x, ROBOT.pos.z + b.dir.dz - apple.z) - Math.hypot(ROBOT.pos.x + a.dir.dx - apple.x, ROBOT.pos.z + a.dir.dz - apple.z));
-              chosenMove = candidateMoves[0];
-            } else if (effP.curiosity >= 65 && crawlMoves.length > 0 && Math.random() < 0.6) {
-              chosenMove = crawlMoves[Math.floor(Math.random() * crawlMoves.length)];
-            } else if (apple && candidateMoves.length) {
-              candidateMoves.sort((a, b) => Math.hypot(ROBOT.pos.x + a.dir.dx - apple.x, ROBOT.pos.z + a.dir.dz - apple.z) - Math.hypot(ROBOT.pos.x + b.dir.dx - apple.x, ROBOT.pos.z + b.dir.dz - apple.z));
-              chosenMove = candidateMoves[0];
-            } else if (candidateMoves.length) {
-              chosenMove = candidateMoves[Math.floor(Math.random() * candidateMoves.length)];
-            } else {
-              wantDig = true;
-            }
-          }
+      // 💡 2. 悩み解決アクションA：段差が高すぎて登れないとき（素材で踏み台を積む or 壁を階段状に削る！）
+      } else if (wantSolveHighStep && blockedByHighStep) {
+        const d = blockedByHighStep.dir;
+        ROBOT.rotY = d.rot;
+        const stoneIdx = BAG.findIndex(it => it === 'stone' || it === 'grass');
+        if (stoneIdx !== -1 && Math.random() < 0.6) {
+          BAG.splice(stoneIdx, 1);
+          addSubStepFootholdAt(ROBOT.pos.x, ROBOT.pos.z, Math.max(1, sSpec.subH));
+          ROBOT.emotion = 'carry';
+          actionLabel = `🪜 悩み解決(${sSpec.label}・高${sSpec.subH})：カバンの素材で足元に踏み台を積んだ！`;
+          thoughtText = aiDecision?.thought || `${d.name}の段差(分割${blockedByHighStep.check.stepDiff}ブロック)がボクの身長(分割${sSpec.subH}ブロック)より高くて登れないから、カバンの石を使って足元に踏み台を積んだよ！`;
+          DIARY_LOGS.push(`🪜 ${GAME_DAY}日目：高い段差を登るために素材で踏み台を作った！`);
+        } else {
+          const curSubH = getSurfaceSubUnits(ROBOT.pos.x, ROBOT.pos.z, curH);
+          carveFrontStepToClimbable(ROBOT.pos.x + d.dx, ROBOT.pos.z + d.dz, curSubH, sSpec.subH);
+          ROBOT.emotion = 'swing_v';
+          actionLabel = `⛏️ 悩み解決(${sSpec.label}・高${sSpec.subH})：${d.name}の壁を削って階段を作った！`;
+          thoughtText = aiDecision?.thought || `${d.name}の段差が高すぎて登れなかったから、ボクの身長(分割${sSpec.subH}ブロック)でバタバタよじ登れる高さまで壁を削って階段にしたよ！`;
+          DIARY_LOGS.push(`⛏️ ${GAME_DAY}日目：自分の身長に合わせて壁を階段状に削った！`);
         }
 
-        if (wantFreeStruggle) {
-          life.stamina -= 4; life.mental += 14;
-          ROBOT.posture = 'stand';
-          if (aiDecision && POSE_TABLE[aiDecision.emotion]) {
-            ROBOT.emotion = aiDecision.emotion;
-          } else if (effP.logic >= 68) {
-            ROBOT.emotion = Math.random() < 0.5 ? 'think' : 'peek';
-          } else if (effP.cautionLimiter <= 25) {
-            ROBOT.emotion = 'shiver';
-          } else {
-            ROBOT.emotion = 'struggle';
-          }
-          const eSpec = getExpressionSpec(ROBOT.emotion);
-          actionLabel = `${eSpec.icon} 個性行動：${eSpec.label}(裏演算:${effP.logic})`;
-          thoughtText = aiDecision?.thought || (ROBOT.emotion === 'think' || ROBOT.emotion === 'peek'
-            ? `裏の演算モジュール(${effP.logic})で周りをじっくり観察して作戦を立てているよ！`
-            : `裏の探究心センサー(${effP.curiosity})でルール外のユニークな動きを模索・奮闘しているよ！`);
-        } else if (wantRest) {
-          life.stamina += 35; life.energy -= 5; life.mental += 10;
-          ROBOT.posture = 'stand';
-          ROBOT.workStreak = 0;
-          ROBOT.emotion = (life.energy <= 30) ? 'sad' : (effP.eco >= 70 ? 'sleep' : 'hot');
-          actionLabel = `💤 省エネ休憩（裏省エネ:${effP.eco}）`;
-          thoughtText = aiDecision?.thought || `裏の省エネ駆動(${effP.eco})でマイペースにコックリ居眠りしてバッテリー温存中だよ…💤`;
-        } else if (wantDig) {
-          const digDir = blockedByFat ? blockedByFat.dir : ALL_DIRS[Math.floor(Math.random() * ALL_DIRS.length)];
-          ROBOT.rotY = digDir.rot;
-          const digAmount = Math.round(28 + effP.power * 0.28);
-          const digRes = digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, digDir, wantCrawlDig, digAmount);
-          life.stamina -= 10; life.mental += 10;
-          ROBOT.workStreak = (ROBOT.workStreak || 0) + 1;
+      // 💡 3. 悩み解決アクションB：穴が狭すぎておなかがつかえたとき（スライムオイルで滑り抜ける or 太さに合わせて削り広げる！）
+      } else if (wantSolveNarrow && blockedByFat) {
+        const d = blockedByFat.dir;
+        ROBOT.rotY = d.rot;
+        const oilIdx = BAG.indexOf('oil');
+        if (oilIdx !== -1) {
+          BAG.splice(oilIdx, 1);
+          ROBOT.pos.x += d.dx; ROBOT.pos.z += d.dz;
+          ROBOT.posture = 'crawl';
+          ROBOT.emotion = 'joy';
+          // 狭所トラウマも克服！
+          ROBOT.traumas = (ROBOT.traumas || []).filter(t => t !== 'narrow');
+          actionLabel = `🧴 悩み解決(${bSpec.label}・幅${bSpec.reqWidth})：スライムオイルで狭い穴をツルッと突破！`;
+          thoughtText = aiDecision?.thought || `太さ「${bSpec.label}(分割${bSpec.reqWidth}ブロック)」で穴につかえたけど、カバンの🧴スライムオイルを塗ってツルッと滑り抜けたよ！狭所トラウマも克服！`;
+          DIARY_LOGS.push(`🧴 ${GAME_DAY}日目：スライムオイルで狭い穴を滑り抜けてトラウマ克服！`);
+        } else {
+          carveCrawlTunnelBlock(ROBOT.pos.x + d.dx, ROBOT.pos.z + d.dz, curH + 1, bSpec.reqWidth, Math.max(2, sSpec.crawlH));
+          ROBOT.emotion = 'push';
+          actionLabel = `👐 悩み解決(${bSpec.label}・幅${bSpec.reqWidth})：自分の太さに合わせて穴を削り広げた！`;
+          thoughtText = aiDecision?.thought || `ボクの太さ「${bSpec.label}(分割${bSpec.reqWidth}ブロック)」でも通れるように、${d.name}の横穴を幅${bSpec.reqWidth}ブロック分まで削り広げたよ！`;
+        }
 
-          // ⛏️ 物理現象5：連続で掘削して体力が減ると「⛏️過労トラウマ」自動発症！
-          if (ROBOT.workStreak >= 3 && life.stamina <= 55) {
-            addTraumaById('overwork', true);
-          }
+      } else if (wantRest) {
+        life.stamina += 35; life.energy -= 5; life.mental += 10;
+        ROBOT.posture = 'stand'; ROBOT.workStreak = 0;
+        ROBOT.emotion = (life.energy <= 30) ? 'sad' : 'sleep';
+        actionLabel = `💤 省エネ休憩（裏省エネ:${effP.eco}）`;
+        thoughtText = aiDecision?.thought || `マイペースにコックリ居眠りしてバッテリー温存中だよ…💤`;
 
-          if (digRes.completedLevel) {
-            if (BAG.length < 10) BAG.push('stone');
-            if (digRes.targetX === ROBOT.pos.x && digRes.targetZ === ROBOT.pos.z) ROBOT.pos.lv = digRes.newLv;
-            ROBOT.emotion = 'joy';
-            actionLabel = `⛏️ ${digDir.name}を掘り抜いて${formatHeightText(digRes.newLv)}開通！`;
-            thoughtText = aiDecision?.thought || `裏の出力パワー(${effP.power})で${digDir.name}を掘り抜いたよ！やったー！`;
-          } else if (digRes.isCrawlTunnel) {
-            ROBOT.emotion = 'push';
-            actionLabel = `🐛 ${digDir.name}に「ほふく前進トンネル」を開通！`;
-            thoughtText = aiDecision?.thought || `探究心(${effP.curiosity})で${digDir.name}にほふく前進トンネルを掘ったよ！`;
-            DIARY_LOGS.push(`🐛 ${GAME_DAY}日目：${digDir.name}にほふく前進トンネルを掘った！`);
-          } else {
-            ROBOT.emotion = blockedByFat ? 'anger' : 'swing_v';
-            actionLabel = `⛏️ 裏出力(${effP.power})で${digDir.name}を掘削中(残${digRes.leftCount})`;
-            thoughtText = aiDecision?.thought || `裏の出力パワー(${effP.power})を込めて${digDir.name}の土を削っているよ！`;
-          }
-        } else if (chosenMove) {
-          const d = chosenMove.dir, chk = chosenMove.check;
-          ROBOT.pos.x += d.dx; ROBOT.pos.z += d.dz; ROBOT.pos.lv = chk.targetLv;
-          ROBOT.pos.sx = 2; ROBOT.pos.sz = 2; ROBOT.rotY = d.rot; ROBOT.posture = chk.posture;
+      } else if (wantDig) {
+        const digDir = ALL_DIRS[Math.floor(Math.random() * ALL_DIRS.length)];
+        ROBOT.rotY = digDir.rot;
+        const digAmount = Math.round(25 + effP.power * 0.28);
+        const digRes = digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, digDir, wantCrawlDig, digAmount);
+        life.stamina -= 9; life.mental += 10;
+        ROBOT.workStreak = (ROBOT.workStreak || 0) + 1;
+        if (ROBOT.workStreak >= 3 && life.stamina <= 55) addTraumaById('overwork', true);
 
-          life.energy -= 7; life.stamina -= 8; life.mental += 10;
-          const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
-          const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
+        if (digRes.completedLevel) {
+          if (BAG.length < 10) BAG.push('stone');
+          if (digRes.targetX === ROBOT.pos.x && digRes.targetZ === ROBOT.pos.z) ROBOT.pos.lv = digRes.newLv;
+          ROBOT.emotion = 'joy';
+          actionLabel = `⛏️ ${digDir.name}を掘り抜いて${formatHeightText(digRes.newLv)}開通！`;
+          thoughtText = aiDecision?.thought || `${digDir.name}を掘り抜いて道が開通したよ！カバンに🪨石素材をゲット！`;
+        } else {
+          ROBOT.emotion = 'swing_v';
+          actionLabel = `⛏️ ${digDir.name}を掘削中(残${digRes.leftCount})`;
+          thoughtText = aiDecision?.thought || `ツルハシを縦に振って${digDir.name}の土を削り、階段状の段差を作っているよ！`;
+        }
 
-          if (chk.reason === 'sea') {
-            ROBOT.emotion = 'surprise';
-            actionLabel = `🌊 警戒リミッター解除(${effP.cautionLimiter})で海へダイブ！`;
-            thoughtText = `裏の警戒リミッター(${effP.cautionLimiter})で怖いもの知らずになって海に飛び込んじゃった！`;
-          } else if (hasTrauma('stomach') && WORLD_ITEMS.some(it => it.type === 'apple')) {
-            ROBOT.emotion = 'fear';
-            actionLabel = `🤢 はらいたトラウマ(裏探究:${effP.curiosity})：リンゴを避けて移動`;
-            thoughtText = aiDecision?.thought || `「🤢はらいたトラウマ」で探究心が${effP.curiosity}に下がっているから、リンゴを見るとおなかが痛くなりそうで避けちゃったよ😰`;
-          } else if (effP.cautionLimiter <= 25) {
-            ROBOT.emotion = 'shiver';
-            actionLabel = `🥶 裏警戒リミッター低(${effP.cautionLimiter})：ビクビク移動`;
-            thoughtText = aiDecision?.thought || `裏の警戒リミッターが${effP.cautionLimiter}だから、周りを警戒してガタガタ震えながら${d.name}へ歩いたよ…！`;
-          } else if (aiDecision && POSE_TABLE[aiDecision.emotion]) {
-            ROBOT.emotion = aiDecision.emotion;
-            actionLabel = `👟 ${d.name}へ移動（${getExpressionSpec(ROBOT.emotion).label}）`;
-            thoughtText = aiDecision.thought;
-          } else {
-            ROBOT.emotion = (effP.curiosity >= 75 || ROBOT.speed === 5) ? 'run' : 'fun';
-            actionLabel = chk.posture === 'crawl'
-              ? `🐛 ${d.name}の低い穴を「ほふく前進」で通過！`
-              : `👟 ${d.name}へ歩いた（${sSpec.label}・${bSpec.label}）`;
-            thoughtText = aiDecision?.thought || `${d.name}へ進んだよ！📖手帳の「🔴裏パラメータ＆実験」タブでトラウマによる数字の変化を見られるよ！`;
-          }
+      // 👟 4. 5段階の高さに応じた移動（スイスイ階段 / 足をバタバタよじ登り / 着地ポーズ降り / 落下ダメージ）
+      } else if (chosenMove) {
+        const d = chosenMove.dir, chk = chosenMove.check;
+        ROBOT.pos.x += d.dx; ROBOT.pos.z += d.dz; ROBOT.pos.lv = chk.targetLv;
+        ROBOT.pos.sx = 2; ROBOT.pos.sz = 2; ROBOT.rotY = d.rot; ROBOT.posture = chk.posture;
+
+        life.energy -= 6; life.stamina -= 7; life.mental += 10;
+
+        if (chk.reason === 'scramble_climb') {
+          // 🧗 足をバタバタさせながらよじ登る！（身長の半分超〜身長と同じ段差）
+          ROBOT.emotion = 'struggle';
+          life.stamina -= 4;
+          actionLabel = `🧗 バタバタよじ登り(${sSpec.label}:高${sSpec.subH})：分割${chk.stepDiff}ブロックの段差を登った！`;
+          thoughtText = aiDecision?.thought || `分割${chk.stepDiff}ブロックの段差はボク(${sSpec.label}・高${sSpec.subH})には階段じゃなくて壁だから、足をバタバタさせて一生けんめいよじ登ったよ！`;
+          DIARY_LOGS.push(`🧗 ${GAME_DAY}日目：${sSpec.label}(高${sSpec.subH})で分割${chk.stepDiff}ブロックの段差をバタバタよじ登った！`);
+        } else if (chk.reason === 'stairs_up') {
+          // 🪜 スイスイ階段上り（身長の半分以下の段差）
+          ROBOT.emotion = 'fun';
+          actionLabel = `🪜 スイスイ階段上り(${sSpec.label}:高${sSpec.subH})：分割${chk.stepDiff}ブロック段差を通過`;
+          thoughtText = aiDecision?.thought || `分割${chk.stepDiff}ブロックの段差なら、${sSpec.label}(高さ${sSpec.subH})のボクにはスイスイ歩ける階段だよ♪`;
+        } else if (chk.reason === 'safe_landing') {
+          // 🦸 着地ポーズで何事もなく降りられる！（身長と同じかそれ以下の段差下り）
+          ROBOT.emotion = 'pickup'; // 膝を深く曲げたカッコいい着地ポーズ
+          actionLabel = `🦸 着地ポーズで安全降下(${sSpec.label}:高${sSpec.subH})：分割${Math.abs(chk.stepDiff)}ブロック下りた！`;
+          thoughtText = aiDecision?.thought || `分割${Math.abs(chk.stepDiff)}ブロックの高さから飛び降りて、シュタッ！と着地ポーズでカッコよく降りたよ！ケガもなし！`;
+        } else if (chk.reason === 'stairs_down') {
+          ROBOT.emotion = 'normal';
+          actionLabel = `🪜 スイスイ階段下り(${sSpec.label}:高${sSpec.subH})：分割${Math.abs(chk.stepDiff)}ブロック下りた`;
+          thoughtText = aiDecision?.thought || `小さな段差をトントンと階段みたいに歩いて下りたよ！`;
+        } else if (chk.reason === 'high_drop_damage') {
+          // 💥 自分の身長より高い崖から飛び降りてダメージ＆高所トラウマ！
+          ROBOT.emotion = 'surprise';
+          life.stamina -= 16; life.mental -= 12;
+          addTraumaById('height', true);
+          actionLabel = `💥 身長超えの崖(${Math.abs(chk.stepDiff)}段)から落下！ダメージ＆高所トラウマ`;
+          thoughtText = `わわっ！！自分の身長(分割${sSpec.subH}ブロック)より高い${Math.abs(chk.stepDiff)}ブロックの崖から落ちてお尻をぶつけたよ…！「🧗高所トラウマ」になっちゃった😭`;
+        } else if (chk.posture === 'crawl') {
+          ROBOT.emotion = 'fun';
+          actionLabel = `🐛 ほふく前進(${sSpec.label}高${sSpec.subH}×${bSpec.label}幅${bSpec.reqWidth})で通過！`;
+          thoughtText = aiDecision?.thought || `天井が低いから「ほふく前進」で${d.name}へくぐり抜けたよ！`;
+        } else {
+          ROBOT.emotion = (effP.curiosity >= 75 || ROBOT.speed === 5) ? 'run' : 'fun';
+          actionLabel = `👟 ${d.name}へ移動（${sSpec.label}高${sSpec.subH}・${bSpec.label}幅${bSpec.reqWidth}）`;
+          thoughtText = aiDecision?.thought || `${d.name}へ進んだよ！📖手帳で5段階の高さ（巨大〜極小）と太さ（でぶっちょ〜やせっちょ）を自由に試してみてね！`;
         }
       }
       if (thoughtText) DIARY_LOGS.push(`💭 ${GAME_DAY}日目：${thoughtText}`);
     }
 
-    // アイテム接触判定（🤢はらいたトラウマがある時はリンゴを食べるのを怖がってスルーする場合あり！）
     const itemIdx = WORLD_ITEMS.findIndex(it => it.x === ROBOT.pos.x && it.z === ROBOT.pos.z);
     if (itemIdx !== -1) {
       const targetItem = WORLD_ITEMS[itemIdx];
-      if (targetItem.type === 'apple' && hasTrauma('stomach') && Math.random() < 0.75) {
-        ROBOT.posture = 'stand';
-        ROBOT.emotion = 'fear';
-        actionLabel = '🤢 はらいたトラウマ発動！足元のリンゴを食べずに後ずさり';
+      if (targetItem.type === 'apple' && hasTrauma('stomach') && Math.random() < 0.72) {
+        ROBOT.posture = 'stand'; ROBOT.emotion = 'fear';
+        actionLabel = '🤢 はらいたトラウマ発動！リンゴを食べずに後ずさり';
         thoughtText = '足元に🍎リンゴがあるけど、「🤢はらいたトラウマ」でおなかが痛くなるのが怖くて食べられないよ〜！';
       } else {
         const picked = WORLD_ITEMS.splice(itemIdx, 1)[0];
         if (picked.type === 'apple') {
-          // 低確率（18%）で傷んだリンゴに当たって「🤢はらいたトラウマ」発症！
-          if (Math.random() < 0.18) {
+          if (Math.random() < 0.16) {
             life.energy += 15; life.mental -= 12;
             ROBOT.posture = 'stand'; ROBOT.emotion = 'sad';
             addTraumaById('stomach', true);
             actionLabel = '🤢 傷んだリンゴでおなかイタイ！「はらいたトラウマ」発症';
-            thoughtText = 'うぅぅ…食べたリンゴがちょっと傷んでいておなかが痛くなっちゃった…！「🤢はらいたトラウマ」になっちゃったよ😭';
+            thoughtText = 'うぅぅ…食べたリンゴが傷んでいておなかが痛くなっちゃった…！「🤢はらいたトラウマ」になっちゃったよ😭';
           } else {
             life.energy += 45; life.mental += 15;
             ROBOT.posture = 'stand'; ROBOT.emotion = 'joy';
-            actionLabel = '🍎 リンゴを見つけて食べて大喜び！';
+            // 美味しいリンゴで「はらいたトラウマ」を克服！
+            ROBOT.traumas = (ROBOT.traumas || []).filter(t => t !== 'stomach');
+            actionLabel = '🍎 おいしいリンゴを食べて大喜び！';
             thoughtText = 'わーい！！甘くておいしいリンゴを食べたよ！嬉しくてバンザイジャンプ！！';
-            DIARY_LOGS.push(`🍎 ${GAME_DAY}日目：おいしいリンゴを食べて大喜びした！`);
           }
         } else {
           if (BAG.length < 10) BAG.push(picked.type);
           life.mental += 10;
-          // 草を拾ったとき低確率で虫が飛び出して「👻ビックリ生物トラウマ」発症！
-          if (picked.type === 'grass' && Math.random() < 0.35) {
-            ROBOT.emotion = 'surprise';
-            addTraumaById('monster', true);
-            actionLabel = '👻 草むらから虫が飛び出した！「ビックリ生物トラウマ」発症';
-            thoughtText = 'わわっ！！🌿草を拾ったら中から変な虫が飛び出してきてビックリしたよ！「👻ビックリ生物トラウマ」になっちゃった！';
-          } else {
-            ROBOT.emotion = 'pickup';
-            actionLabel = `🤲 ${picked.type === 'stone' ? '石ブロック' : '草'}をしゃがんで拾った`;
-            thoughtText = '足元にいいものが落ちていたから、しゃがんでカバンに拾ったよ！';
-          }
+          ROBOT.emotion = 'pickup';
+          actionLabel = `🤲 アイテムをしゃがんでカバンに拾った`;
+          thoughtText = '足元にいいものが落ちていたから、しゃがんでカバンに拾ったよ！';
         }
       }
     }
@@ -2603,8 +2677,39 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
   }
 
   // ============================================================================
-  // 📖 手帳の「表（博士の基本設定）⇔ 裏（裏パラメータ＆トラウマ実験室）」タブ切り替え＆UI更新
+  // 📖 手帳の5段階サイズ変更 ＆「分割1ブロックの極小・やせっちょ」ワンタップ設定
   // ============================================================================
+  function setTinySlimPreset() {
+    ROBOT.sizeLevel = 'tiny';
+    ROBOT.bodyType = 'slim1';
+    ROBOT.posture = 'stand';
+    ROBOT.emotion = 'joy';
+    document.getElementById('setting-size-level').value = 'tiny';
+    document.getElementById('setting-body-type').value = 'slim1';
+    syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
+    const msg = '🧚 指示プリセット：「分割1ブロックの極小(高1)×やせっちょ(幅1)」にしたよ！1段の段差も足をバタバタさせて一生けんめいよじ登るよ！';
+    document.getElementById('message-box').innerText = msg;
+    showToast(msg);
+  }
+
+  function changeRobotSizeFromDiary(sizeKey) {
+    if (!SIZE_SPECS[sizeKey]) return;
+    ROBOT.sizeLevel = sizeKey;
+    document.getElementById('setting-size-level').value = sizeKey;
+    syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
+    const s = SIZE_SPECS[sizeKey];
+    showToast(`📏 大きさを「${s.label}（分割${s.subH}ブロック高）」にしたよ！（階段:${s.stairMax}段 / よじ登り:${s.subH}段）`);
+  }
+
+  function changeRobotBodyFromDiary(bodyKey) {
+    if (!BODY_SPECS[bodyKey]) return;
+    ROBOT.bodyType = bodyKey;
+    document.getElementById('setting-body-type').value = bodyKey;
+    syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
+    const b = BODY_SPECS[bodyKey];
+    showToast(`🐛 太さを「${b.label}（分割${b.reqWidth}ブロック幅）」にしたよ！`);
+  }
+
   function switchDiaryParamTab(tabKey) {
     currentDiaryTab = (tabKey === 'hidden') ? 'hidden' : 'base';
     document.getElementById('tab-diary-base').className = 'rig-tab-btn' + (currentDiaryTab === 'base' ? ' active' : '');
@@ -2624,7 +2729,6 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
     saveWorldState();
   }
 
-  // タブ2：6種類のトラウマボタンのON/OFF切り替え（複数選択可・即座に裏パラメータを再計算＆キャラのしぐさに反映）
   function toggleTraumaButton(traumaId) {
     if (!Array.isArray(ROBOT.traumas)) ROBOT.traumas = [];
     const idx = ROBOT.traumas.indexOf(traumaId);
@@ -2634,26 +2738,17 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
       if (spec) showToast(`✨「${spec.icon}${spec.name}」を解除したよ！`);
     } else {
       ROBOT.traumas.push(traumaId);
-      // ボタンを押した瞬間にそのトラウマらしい表情へプレビュー変化
       const previewEmo = { sea: 'fear', narrow: 'anger', stomach: 'sad', height: 'shiver', monster: 'surprise', overwork: 'hot' }[traumaId] || 'fear';
       ROBOT.emotion = previewEmo;
       if (spec) showToast(`⚡「${spec.icon}${spec.name}」を発症！裏パラメータが歪んだよ！`);
     }
-    syncRobot3DPosition();
-    cameraDirty = true;
-    updateEnvironmentAndUI();
-    saveWorldState();
-    renderDiaryModal();
+    syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
   }
 
   function clearAllTraumas() {
     ROBOT.traumas = [];
     ROBOT.emotion = 'normal';
-    syncRobot3DPosition();
-    cameraDirty = true;
-    updateEnvironmentAndUI();
-    saveWorldState();
-    renderDiaryModal();
+    syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
     showToast('🧹 すべてのトラウマをクリアして裏パラメータが元に戻ったよ！');
   }
 
@@ -2671,13 +2766,9 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
         barEl.className = 'eff-bar-fill' + (diff > 0 ? ' up' : (diff < 0 ? ' down' : ''));
       }
       if (valEl) {
-        if (diff > 0) {
-          valEl.innerHTML = `${eVal} <span class="diff-plus">(+${diff})</span>`;
-        } else if (diff < 0) {
-          valEl.innerHTML = `${eVal} <span class="diff-minus">(${diff})</span>`;
-        } else {
-          valEl.innerHTML = `${eVal} <span class="diff-zero">(±0)</span>`;
-        }
+        if (diff > 0) valEl.innerHTML = `${eVal} <span class="diff-plus">(+${diff})</span>`;
+        else if (diff < 0) valEl.innerHTML = `${eVal} <span class="diff-minus">(${diff})</span>`;
+        else valEl.innerHTML = `${eVal} <span class="diff-zero">(±0)</span>`;
       }
     });
   }
@@ -2743,9 +2834,7 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
   function confirmExpressionModal() {
     DEFAULT_EXPRESSIONS.forEach(item => {
       const inp = document.getElementById(`expr-words-${item.key}`);
-      if (inp && inp.value.trim()) {
-        CUSTOM_WORDS_MAP[item.key] = inp.value.trim();
-      }
+      if (inp && inp.value.trim()) CUSTOM_WORDS_MAP[item.key] = inp.value.trim();
     });
     ROBOT.rigType = tempRigType;
     ROBOT.emotion = tempEmotionKey;
@@ -2775,47 +2864,24 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
     showToast('変更をキャンセルしたよ');
   }
 
-  function changeRobotSizeFromDiary(sizeKey) {
-    if (!SIZE_SPECS[sizeKey]) return;
-    ROBOT.sizeLevel = sizeKey;
-    document.getElementById('setting-size-level').value = sizeKey;
-    syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
-    showToast(`📏 大きさを「${SIZE_SPECS[ROBOT.sizeLevel].label}」に切り替えたよ！`);
-  }
-
-  function changeRobotBodyFromDiary(bodyKey) {
-    if (!BODY_SPECS[bodyKey]) return;
-    ROBOT.bodyType = bodyKey;
-    document.getElementById('setting-body-type').value = bodyKey;
-    syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
-    showToast(`🐛 体型を「${BODY_SPECS[ROBOT.bodyType].label}」に切り替えたよ！`);
-  }
-
+  // 上部バッジタップで5段階サイズ（極小×やせっちょ → 小×ちょいやせ → 標準×標準 → 大×ちょいでぶ → 巨大×でぶっちょ）を順番に体験！
   function cycleBodyAndCrawlTest() {
-    const bodyOrder = ['fat', 'normal', 'slim'];
-    const nextIdx = (bodyOrder.indexOf(ROBOT.bodyType) + 1) % bodyOrder.length;
+    const sizeOrder = ['tiny', 'small', 'medium', 'large', 'giant'];
+    const bodyOrder = ['slim1', 'slim2', 'normal3', 'fat4', 'fat5'];
+    const curIdx = sizeOrder.indexOf(ROBOT.sizeLevel);
+    const nextIdx = (curIdx + 1) % sizeOrder.length;
+    ROBOT.sizeLevel = sizeOrder[nextIdx];
     ROBOT.bodyType = bodyOrder[nextIdx];
-    ROBOT.posture = (ROBOT.posture === 'stand') ? 'crawl' : 'stand';
-    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
-    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
-    const eff = getEffectiveClearanceSpecs();
+    ROBOT.posture = 'stand';
 
-    const gx = ROBOT.pos.x, gz = ROBOT.pos.z;
-    const topLv = HEIGHT_MAP[`${gx},${gz}`] ?? 0;
-    if (ROBOT.posture === 'crawl') {
-      carveCrawlTunnelBlock(gx, gz, topLv, eff.reqWidth, 2);
-      ROBOT.pos.lv = topLv - 1;
-    } else {
-      ROBOT.pos.lv = topLv;
-    }
-
+    const sSpec = SIZE_SPECS[ROBOT.sizeLevel];
+    const bSpec = BODY_SPECS[ROBOT.bodyType];
     if (manualCameraMode === 'robot') resetFpvToRobotFront();
-    const msg = ROBOT.posture === 'crawl'
-      ? `🐛 大きさ「${sSpec.label}」×体型「${bSpec.label}(幅${eff.reqWidth})」で「ほふく前進」中！`
-      : `🚶 大きさ「${sSpec.label}」×体型「${bSpec.label}(幅${eff.reqWidth})」の立ち姿勢！`;
+
+    const msg = `📏 体格プリセット切替：高さ「${sSpec.label}(分割${sSpec.subH}ブロック)」×太さ「${bSpec.label}(分割${bSpec.reqWidth}ブロック)」！（階段:${sSpec.stairMax}段まで / バタバタよじ登り・安全着地:${sSpec.subH}段まで）`;
     document.getElementById('message-box').innerText = msg;
     rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState();
-    showToast(msg);
+    showToast(`${sSpec.label}(高${sSpec.subH}) × ${bSpec.label}(幅${bSpec.reqWidth}) に切り替えたよ！`);
   }
 
   function quickDiagonalOrFrontDig() {
@@ -2845,15 +2911,16 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
     WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z });
     rebuildTerrainAndItems(); cameraDirty = true; saveWorldState(); closeFanMenu(); showToast('🍎 足元にリンゴを置いたよ！');
   }
-  function quickStackBlock() {
+
+  // ＋メニューの「🪜小段差+1」：足元に分割1ブロック分の段差を積んで階段テストができる！
+  function quickStackSubStep() {
     const { x, z } = ROBOT.pos; if (x < -2 || x > 2 || z < -2 || z > 2) return;
-    const key = `${x},${z}`, cur = HEIGHT_MAP[key] ?? 0;
-    delete CHIP_MAP[`${x},${z},${cur}`];
-    if (cur >= AREA1_MAX_GROUND_LV) { showToast('ここは第一エリアの地上上限（5段目）だよ！'); closeFanMenu(); return; }
-    HEIGHT_MAP[key] = cur + 1; ROBOT.pos.lv = cur + 1; ROBOT.posture = 'stand'; ROBOT.emotion = 'carry';
+    const ok = addSubStepFootholdAt(x, z, 1);
+    if (!ok) { showToast('ここは第一エリアの地上上限（5段目）だよ！'); closeFanMenu(); return; }
+    ROBOT.posture = 'stand'; ROBOT.emotion = 'carry';
     if (manualCameraMode === 'robot') resetFpvToRobotFront();
     rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
-    showToast(`🪨 ブロックを持ち上げて積んで「${formatHeightText(cur + 1)}」にしたよ！`);
+    showToast('🪜 足元に「分割1ブロック」の小段差（階段）を積んだよ！');
   }
 
   function openModal(id) {
@@ -2872,17 +2939,16 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
   }
 
   function renderDiaryModal() {
-    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.large;
-    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.fat;
+    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.tiny;
+    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
     const eSpec = getExpressionSpec(ROBOT.emotion);
-    const eff = getEffectiveClearanceSpecs();
     const rigName = ROBOT.rigType === 'stick' ? '🦴3D骨組み(◯と線)' : '🎲サイコロ箱型';
 
     document.getElementById('diary-emo-icon').innerText = eSpec.icon;
     document.getElementById('diary-robo-name').innerText = `${ROBOT.unitModel}号機（${rigName}・生存 ${GAME_DAY}日目）`;
-    document.getElementById('diary-robo-height').innerText = `現在：${formatHeightText(getRobotHeightLevel())} / 大きさ：${sSpec.label} / 体型：${bSpec.label}(幅${eff.reqWidth}) / 表現：${eSpec.label}`;
+    document.getElementById('diary-robo-height').innerText = `現在：${formatHeightText(getRobotHeightLevel())} / 高さ：${sSpec.label}(分割${sSpec.subH}) / 太さ：${bSpec.label}(分割${bSpec.reqWidth})`;
+    document.getElementById('diary-step-rule').innerText = `🪜 スイスイ階段:${sSpec.stairMax}段まで / 🧗 バタバタよじ登り・安全着地:分割${sSpec.subH}ブロックまで`;
 
-    // タブ1：基本スライダーと「トラウマ表示のみ（ボタンではない）」の更新
     const p = ROBOT.params || { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50 };
     ['curiosity', 'cautionLimiter', 'power', 'eco', 'logic'].forEach(k => {
       const sl = document.getElementById(`param-${k}`);
@@ -2895,7 +2961,7 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
     if (baseTagList) {
       const activeIds = Array.isArray(ROBOT.traumas) ? ROBOT.traumas : [];
       if (activeIds.length === 0) {
-        baseTagList.innerHTML = `<span style="color:#94a3b8; font-size:10.5px;">現在抱えているトラウマはありません（健康そのもの！）</span>`;
+        baseTagList.innerHTML = `<span style="color:#94a3b8; font-size:10px;">現在抱えているトラウマはありません（健康そのもの！）</span>`;
       } else {
         baseTagList.innerHTML = activeIds.map(id => {
           const sp = TRAUMA_SPECS.find(t => t.id === id);
@@ -2904,7 +2970,6 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
       }
     }
 
-    // タブ2：裏パラメータ（最終値）ゲージと全6種トラウマON/OFFボタンの更新
     updateHiddenParamsUI();
     const btnGrid = document.getElementById('trauma-btn-grid');
     if (btnGrid) {
@@ -2923,11 +2988,11 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
       });
     }
 
-    ['large', 'medium', 'small'].forEach(k => {
+    ['giant', 'large', 'medium', 'small', 'tiny'].forEach(k => {
       const chip = document.getElementById(`size-chip-${k}`);
       if (chip) chip.classList.toggle('active', ROBOT.sizeLevel === k);
     });
-    ['fat', 'normal', 'slim'].forEach(k => {
+    ['fat5', 'fat4', 'normal3', 'slim2', 'slim1'].forEach(k => {
       const chip = document.getElementById(`body-chip-${k}`);
       if (chip) chip.classList.toggle('active', ROBOT.bodyType === k);
     });
@@ -2936,7 +3001,7 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
     for (let i = 0; i < 10; i++) {
       const slot = document.createElement('div'), item = BAG[i];
       slot.className = 'bag-slot' + (item ? ' filled' : '');
-      slot.innerText = item === 'apple' ? '🍎' : (item === 'stone' ? '🪨' : (item === 'grass' ? '🌿' : ''));
+      slot.innerText = item === 'apple' ? '🍎' : (item === 'stone' ? '🪨' : (item === 'oil' ? '🧴' : (item === 'grass' ? '🌿' : '')));
       if (item) slot.onclick = () => useBagItem(i);
       grid.appendChild(slot);
     }
@@ -2945,14 +3010,21 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
 
   function useBagItem(index) {
     const item = BAG[index]; if (!item) return;
-    const key = `${ROBOT.pos.x},${ROBOT.pos.z}`;
     if (item === 'stone' || item === 'grass') {
-      const cur = HEIGHT_MAP[key] ?? 0;
-      delete CHIP_MAP[`${ROBOT.pos.x},${ROBOT.pos.z},${cur}`];
-      if (cur >= AREA1_MAX_GROUND_LV) { showToast('ここは第一エリアの地上上限（5段目）だよ！'); return; }
-      HEIGHT_MAP[key] = cur + 1; ROBOT.pos.lv = cur + 1; BAG.splice(index, 1); showToast(`足元にブロックを積んで「${formatHeightText(cur + 1)}」にしたよ！`);
+      const ok = addSubStepFootholdAt(ROBOT.pos.x, ROBOT.pos.z, 2);
+      if (!ok) { showToast('ここは第一エリアの地上上限（5段目）だよ！'); return; }
+      BAG.splice(index, 1);
+      ROBOT.emotion = 'carry';
+      showToast('🪨 足元に分割2ブロックの踏み台（階段）を積んだよ！');
+    } else if (item === 'oil') {
+      BAG.splice(index, 1);
+      ROBOT.traumas = (ROBOT.traumas || []).filter(t => t !== 'narrow');
+      ROBOT.emotion = 'joy';
+      showToast('🧴 スライムオイルを塗ったよ！狭所トラウマが消えて狭い隙間もツルッと通れるよ！');
     } else if (item === 'apple') {
-      WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z }); BAG.splice(index, 1); showToast('足元に🍎リンゴを置いたよ！');
+      WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z });
+      BAG.splice(index, 1);
+      showToast('足元に🍎リンゴを置いたよ！');
     }
     rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); renderDiaryModal();
   }
@@ -2964,7 +3036,8 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
   document.getElementById('btn-spin').onclick = () => {
     const pool = [
       { type: 'apple', icon: '🍎', name: 'おいしいリンゴ（島に配置！）' },
-      { type: 'stone', icon: '🪨', name: '段差ブロック（カバンに追加！）' },
+      { type: 'stone', icon: '🪨', name: '踏み台・段差ブロック（カバンに追加！）' },
+      { type: 'oil',   icon: '🧴', name: 'ツルツル・スライムオイル（狭所突破＆ケア用！）' },
       { type: 'grass', icon: '🌿', name: '星見の草ブロック（カバンに追加！）' }
     ];
     const picked = pool[Math.floor(Math.random() * pool.length)];
@@ -2980,15 +3053,15 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
   function saveSettings() {
     CAM_VISUAL_STYLE = document.getElementById('setting-cam-style').value || 'hide';
     safeStorage.setItem('cam_visual_style_v15', CAM_VISUAL_STYLE);
-    ROBOT.sizeLevel = document.getElementById('setting-size-level').value || 'large';
-    ROBOT.bodyType = document.getElementById('setting-body-type').value || 'fat';
+    ROBOT.sizeLevel = normalizeSizeKey(document.getElementById('setting-size-level').value);
+    ROBOT.bodyType = normalizeBodyKey(document.getElementById('setting-body-type').value);
     safeStorage.setItem('ai_type', document.getElementById('setting-ai-type').value);
     safeStorage.setItem('api_gemini', document.getElementById('setting-gemini-key').value.trim());
     safeStorage.setItem('api_groq', document.getElementById('setting-groq-key').value.trim());
     ROBOT.speed = Number(document.getElementById('setting-speed').value) || 3;
     rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateAllCamerasTransform(); updateEnvironmentAndUI(); saveWorldState();
     closeModal('modal-settings');
-    showToast(`⚙️ 設定を保存したよ（大きさ:${SIZE_SPECS[ROBOT.sizeLevel].label} / 体型:${BODY_SPECS[ROBOT.bodyType].label}）！`);
+    showToast(`⚙️ 設定を保存したよ（高さ:${SIZE_SPECS[ROBOT.sizeLevel].label} / 太さ:${BODY_SPECS[ROBOT.bodyType].label}）！`);
   }
 
   document.getElementById('setting-cam-style').value = CAM_VISUAL_STYLE;
