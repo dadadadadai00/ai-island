@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0b1528">
-  <title>ボクセルAI自律思考水槽 v25</title>
+  <title>ボクセルAI自律思考水槽 v26</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
@@ -73,10 +73,11 @@
     .btn-pink { background: #ec4899; color: #fff; border: none; padding: 11px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
     .btn-sub { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 9px; border-radius: 10px; font-weight: 800; cursor: pointer; width: 100%; }
     .btn-danger { background: #ef4848; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
-    /* 🎭 キャラ基本表現モーダル */
+    /* 🎭 キャラ基本表現モーダル ＆ 📖 手帳タブ共通 */
     .rig-tab-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #f1f5f9; padding: 4px; border-radius: 12px; }
-    .rig-tab-btn { padding: 8px 6px; border-radius: 9px; font-size: 12px; font-weight: 900; text-align: center; cursor: pointer; color: #64748b; border: 2px solid transparent; transition: all 0.15s; }
+    .rig-tab-btn { padding: 7px 5px; border-radius: 9px; font-size: 11.5px; font-weight: 900; text-align: center; cursor: pointer; color: #64748b; border: 2px solid transparent; transition: all 0.15s; }
     .rig-tab-btn.active { background: #fff; color: #1d4ed8; border-color: #3b82f6; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+    .rig-tab-btn.active-danger { background: #fff1f2; color: #be123c; border-color: #f43f5e; box-shadow: 0 2px 6px rgba(244,63,94,0.15); }
     .expr-list-container { display: flex; flex-direction: column; gap: 6px; max-height: 48vh; overflow-y: auto; padding: 4px 2px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
     .expr-row { display: flex; align-items: center; gap: 6px; background: #f8fafc; padding: 5px; border-radius: 10px; border: 1.5px solid #e2e8f0; }
     .expr-row.selected { border-color: #3b82f6; background: #eff6ff; }
@@ -85,19 +86,34 @@
     .expr-icon { font-size: 17px; flex-shrink: 0; }
     .expr-right-input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 11px; color: #334155; background: #fff; }
     .modal-footer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 4px; }
-    /* 🧪 小学生博士のAIパラメータ調整（5本＋暗転予備1本）＆ トラウマ記憶UI */
-    .lab-panel { background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+    /* 🧪 手帳：タブ1（博士の基本設定）＆ タブ2（AIの裏パラメータ＆トラウマ6種ボタン） */
+    .lab-panel { background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 9px 10px; display: flex; flex-direction: column; gap: 6px; }
+    .lab-panel.hidden-tab { background: #fff1f2; border-color: #fda4af; }
     .param-row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: #1e293b; }
-    .param-label { width: 116px; flex-shrink: 0; display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+    .param-label { width: 114px; flex-shrink: 0; display: flex; align-items: center; gap: 3px; white-space: nowrap; }
     .param-slider { flex: 1; accent-color: #3b82f6; height: 6px; cursor: pointer; }
-    .param-val { width: 28px; text-align: right; font-weight: 900; color: #2563eb; font-size: 11px; }
+    .param-val { width: 30px; text-align: right; font-weight: 900; color: #2563eb; font-size: 11px; }
     .param-row.locked-dark { background: #1e293b; color: #64748b; border-radius: 7px; padding: 4px 6px; opacity: 0.72; pointer-events: none; }
     .param-row.locked-dark .param-val { color: #64748b; }
-    .trauma-box { background: #fff1f2; border: 1px solid #fecdd3; border-radius: 9px; padding: 6px 8px; font-size: 11px; color: #9f1239; display: flex; flex-direction: column; gap: 4px; }
+    /* 裏パラメータ専用ゲージ（操作不可・＋－変動表示） */
+    .eff-bar-wrap { flex: 1; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; position: relative; }
+    .eff-bar-fill { height: 100%; background: #3b82f6; border-radius: 999px; transition: width 0.25s, background-color 0.25s; }
+    .eff-bar-fill.up { background: #f97316; }
+    .eff-bar-fill.down { background: #8b5cf6; }
+    .eff-val-box { width: 64px; text-align: right; font-size: 10.5px; font-weight: 900; white-space: nowrap; }
+    .diff-plus { color: #ea580c; }
+    .diff-minus { color: #7c3aed; }
+    .diff-zero { color: #64748b; }
+    .trauma-display-box { background: #fff; border: 1px dashed #cbd5e1; border-radius: 9px; padding: 6px 8px; font-size: 11px; color: #475569; display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
     .trauma-tag-list { display: flex; flex-wrap: wrap; gap: 4px; min-height: 20px; align-items: center; }
-    .trauma-tag { background: #ffe4e6; border: 1px solid #fda4af; color: #be123c; font-weight: 800; padding: 2px 7px; border-radius: 999px; font-size: 10.5px; }
-    .trauma-test-row { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
-    .mini-test-btn { font-size: 10px; font-weight: 800; padding: 3px 7px; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; color: #334155; cursor: pointer; }
+    .trauma-tag { background: #ffe4e6; border: 1px solid #fda4af; color: #be123c; font-weight: 800; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; display: inline-flex; align-items: center; gap: 3px; }
+    /* タブ2の6種トラウマON/OFFボタングリッド */
+    .trauma-btn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 2px; }
+    .trauma-toggle-btn { border: 1.5px solid #cbd5e1; background: #fff; color: #334155; border-radius: 9px; padding: 6px 6px; font-size: 10.5px; font-weight: 900; cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; transition: transform 0.1s, background-color 0.15s; }
+    .trauma-toggle-btn:active { transform: scale(0.96); }
+    .trauma-toggle-btn.active { background: #ffe4e6; border-color: #f43f5e; color: #9f1239; box-shadow: 0 0 0 2px rgba(244,63,94,0.2); }
+    .trauma-btn-sub { font-size: 9.5px; font-weight: 700; color: #64748b; }
+    .trauma-toggle-btn.active .trauma-btn-sub { color: #be123c; }
   </style>
 </head>
 <body>
@@ -133,7 +149,7 @@
 </div>
 
 <div id="side-icon-column">
-  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳（博士のパラメータ・トラウマ記憶・カバン）">📖</div>
+  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳（表:博士の設定 / 裏:トラウマ6種実験室）">📖</div>
   <div class="side-circle-btn" id="cam-ground-btn" title="外カメラ（地上・全体固定）">🌌</div>
   <div class="side-circle-btn" id="cam-ug-btn" title="外カメラ（地下・全体固定）">⛏️</div>
   <div class="side-circle-btn" id="cam-fpv-btn" title="内カメラ（キャラ視点・1ブロック広角＆ほふくズーム）">🤖</div>
@@ -150,10 +166,10 @@
 
 <div id="bottom-panel">
   <div class="panel-header">
-    <span>💭 ロボのきもち・心のさけび【v25 博士のパラメータ＆トラウマ創発】</span>
+    <span>💭 ロボのきもち・心のさけび【v26 表・裏パラメータ＆トラウマ6種】</span>
     <div class="ai-badge" id="ai-status">🟩 アルゴン待機中</div>
   </div>
-  <div id="message-box">【v25完成】📖手帳で「小学生博士のパラメータ（探究心・警戒リミッター・出力パワー・省エネ・演算＋忠誠心[暗転]）」を調整可能！海や狭い穴でのトラウマ記憶が設定を上書きしてユニークな個性が育つよ！</div>
+  <div id="message-box">【v26完成】📖手帳を開くと「🟢博士の基本設定（表）」と「🔴裏パラメータ＆トラウマ実験室（裏）」をタブで切り替えられるよ！6種類のトラウマボタンで裏の数字が＋－に歪む様子を実験してみてね！</div>
   <div class="action-history">
     <span class="history-tag" id="history-action">👟 やった事 待機中</span>
     <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従(観察窓)・地下2層目</span>
@@ -163,22 +179,29 @@
 
 <div id="toast">💾 データを保存したよ</div>
 
-<!-- 📖 ロボット手帳モーダル（博士のパラメータ6本＋トラウマ記憶＋体格＋カバン＋日記） -->
+<!-- 📖 ロボット手帳モーダル（2タブ構成：タブ1＝博士の基本設定＋トラウマ表示 / タブ2＝AI裏パラメータ＋全6種トラウマON/OFFボタン） -->
 <div class="modal-overlay" id="modal-diary" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-diary')">✕</div>
-    <div class="modal-title">📖 1号機の手帳（博士のパラメータ・記憶・カバン）</div>
-    <div style="display:flex; align-items:center; gap:10px; background:#f8fafc; padding:8px 10px; border-radius:12px; border:1px solid #e2e8f0;">
-      <div style="font-size:32px;" id="diary-emo-icon">🙂</div>
+    <div class="modal-title">📖 1号機の手帳（パラメータ・トラウマ・カバン）</div>
+    <div style="display:flex; align-items:center; gap:10px; background:#f8fafc; padding:7px 10px; border-radius:12px; border:1px solid #e2e8f0;">
+      <div style="font-size:30px;" id="diary-emo-icon">🙂</div>
       <div>
         <div style="font-weight:900; font-size:13px; color:#1e293b;" id="diary-robo-name">1号機（🎲サイコロ箱型・生存 1日目）</div>
         <div style="font-size:10.5px; color:#64748b;" id="diary-robo-height">現在：地下2層目 / 大きさ：大 / 体型：太っちょ</div>
       </div>
     </div>
 
-    <div class="lab-panel">
-      <div style="font-size:11.5px; font-weight:900; color:#1e3a8a; display:flex; justify-content:space-between;">
-        <span>🧪 小学生博士のAI補助パラメータ（0〜100）</span>
+    <!-- 表・裏パラメータ切り替えタブバー -->
+    <div class="rig-tab-bar">
+      <div class="rig-tab-btn active" id="tab-diary-base" onclick="switchDiaryParamTab('base')">🟢 博士の基本設定(表)</div>
+      <div class="rig-tab-btn" id="tab-diary-hidden" onclick="switchDiaryParamTab('hidden')">🔴 裏パラメータ＆実験(裏)</div>
+    </div>
+
+    <!-- 🟢【タブ1：博士の基本設定（表の顔）】スライダー操作可 ＋ 現在のトラウマ表示のみ（ボタンなし） -->
+    <div class="lab-panel" id="diary-panel-base">
+      <div style="font-size:11px; font-weight:900; color:#1e3a8a; display:flex; justify-content:space-between;">
+        <span>🧪 小学生博士が設定する基本パラメータ</span>
         <span style="font-size:10px; color:#64748b;">※100で警戒ゼロ</span>
       </div>
       <div class="param-row">
@@ -212,17 +235,54 @@
         <span class="param-val">50</span>
       </div>
 
-      <div class="trauma-box">
-        <div style="font-weight:900; display:flex; justify-content:space-between; align-items:center;">
-          <span>⚡ 刻印された記憶・トラウマ（パラメータを上書き発動）</span>
-        </div>
-        <div class="trauma-tag-list" id="trauma-tag-list"></div>
-        <div class="trauma-test-row">
-          <button type="button" class="mini-test-btn" onclick="addTraumaMemoryManual('🌊 海で大ダメージを受けた(海トラウマ)')">＋🌊海トラウマ</button>
-          <button type="button" class="mini-test-btn" onclick="addTraumaMemoryManual('🕳️ 狭い穴におなかがつかえた(狭所トラウマ)')">＋🕳️狭所トラウマ</button>
-          <button type="button" class="mini-test-btn" onclick="clearTraumaMemories()">🧹記憶クリア</button>
-        </div>
+      <div class="trauma-display-box">
+        <div style="font-weight:900; font-size:10.5px; color:#9f1239;">⚡ 現在キャラが抱えているトラウマ（表示のみ）</div>
+        <div class="trauma-tag-list" id="base-trauma-tag-list"></div>
       </div>
+    </div>
+
+    <!-- 🔴【タブ2：AIの裏パラメータとトラウマ実験室（裏の顔）】裏ゲージ（操作不可）＋ 全6種トラウマON/OFFボタン -->
+    <div class="lab-panel hidden-tab" id="diary-panel-hidden" style="display:none;">
+      <div style="font-size:11px; font-weight:900; color:#9f1239; display:flex; justify-content:space-between;">
+        <span>🧠 AIが実際に使う「裏パラメータ（最終値）」</span>
+        <span style="font-size:10px; color:#be123c;">※トラウマで＋－変動</span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">🔭 探究心センサー</span>
+        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-curiosity" style="width:60%"></div></div>
+        <span class="eff-val-box" id="eff-val-curiosity">60 (±0)</span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">🛡️ 警戒リミッター</span>
+        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-cautionLimiter" style="width:50%"></div></div>
+        <span class="eff-val-box" id="eff-val-cautionLimiter">50 (±0)</span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">💥 出力パワー</span>
+        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-power" style="width:50%"></div></div>
+        <span class="eff-val-box" id="eff-val-power">50 (±0)</span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">🔋 省エネ駆動</span>
+        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-eco" style="width:40%"></div></div>
+        <span class="eff-val-box" id="eff-val-eco">40 (±0)</span>
+      </div>
+      <div class="param-row">
+        <span class="param-label">🧠 演算モジュール</span>
+        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-logic" style="width:50%"></div></div>
+        <span class="eff-val-box" id="eff-val-logic">50 (±0)</span>
+      </div>
+      <div class="param-row locked-dark">
+        <span class="param-label">🔒 忠誠心(予備)</span>
+        <div class="eff-bar-wrap"><div class="eff-bar-fill" style="width:50%"></div></div>
+        <span class="eff-val-box">50 (ロック)</span>
+      </div>
+
+      <div style="font-size:10.5px; font-weight:900; color:#9f1239; margin-top:2px; display:flex; justify-content:space-between; align-items:center;">
+        <span>⚡ トラウマ発症スイッチ（複数ONで裏の数字が歪む！）</span>
+        <button type="button" onclick="clearAllTraumas()" style="font-size:9.5px; font-weight:800; padding:2px 6px; border-radius:5px; border:1px solid #fda4af; background:#fff; color:#be123c; cursor:pointer;">全クリア</button>
+      </div>
+      <div class="trauma-btn-grid" id="trauma-btn-grid"></div>
     </div>
 
     <div style="font-size:11.5px; font-weight:800; color:#0f766e;">📏 大きさ3段階 × 🐛 体型3段階</div>
@@ -240,7 +300,7 @@
     <div style="font-size:12px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ」（タップで足元に使う）</div>
     <div class="bag-grid" id="bag-grid"></div>
     <div style="font-size:12px; font-weight:bold; color:#475569;">📝 世代のきろく・思い出</div>
-    <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; font-size:11px; color:#334155; max-height:80px; overflow-y:auto; line-height:1.4;"></div>
+    <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; font-size:11px; color:#334155; max-height:75px; overflow-y:auto; line-height:1.4;"></div>
     <button class="btn-sub" onclick="closeModal('modal-diary')">手帳を閉じる</button>
   </div>
 </div>
@@ -300,7 +360,7 @@
     <div class="setting-group">
       <label class="setting-label">🤖 使う頭脳（AIの判断をゲームに反映）</label>
       <select id="setting-ai-type" class="setting-input">
-        <option value="none">🟩 アルゴンさん（通信なし・パラメータ＆トラウマ本能）</option>
+        <option value="none">🟩 アルゴンさん（通信なし・裏パラメータ＆トラウマ本能）</option>
         <option value="gemini">🟦 3.8 / Gemini（gemini-3.8-flash 通信最優先）</option>
         <option value="groq">🟪 3.1 / Groq（爆速AI通信）</option>
       </select>
@@ -355,8 +415,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
   // ============================================================================
-  // 【コア①：20種の基本表現データ表 ＆ AI連想ワード辞書コア】
-  // ⚠️ AIモデルへの絶対命令：この20種類の定義と角度テーブルは1行も省略・削除しないこと
+  // 【コア①：20種の基本表現データ表 ＆ 6種のトラウマ定義（裏パラメータ補正ルール）】
+  // ⚠️ AIモデルへの絶対命令：この20種類の表現と6種類のトラウマ定義は1行も省略・削除しないこと
   // ============================================================================
   const DEFAULT_EXPRESSIONS = [
     { key: 'normal',   icon: '🙂', label: '通常',           bulb: 0xfacc15, words: '立つ、待つ、見守る、落ち着く、通常' },
@@ -365,10 +425,10 @@
     { key: 'sad',      icon: '😭', label: '悲しむ',         bulb: 0x38bdf8, words: 'うなだれる、失敗、おなかすいた、しょんぼり、泣く' },
     { key: 'fun',      icon: '🎵', label: '楽しむ',         bulb: 0x34d399, words: 'ダンス、鼻歌、ごきげん、ステップ、踊る、散歩' },
     { key: 'fear',     icon: '😰', label: '怖がる',         bulb: 0x8b5cf6, words: '後ずさり、ビクビク、危険、お化け、怯える、トラウマ' },
-    { key: 'shiver',   icon: '🥶', label: '震える',         bulb: 0x60a5fa, words: '寒い、ガタガタ、武者震い、氷、冷たい、体力不足' },
-    { key: 'hot',      icon: '🥵', label: '暑がる',         bulb: 0xf97316, words: 'あおぐ、バテる、汗、熱い、蒸し暑い、疲れた' },
+    { key: 'shiver',   icon: '🥶', label: '震える',         bulb: 0x60a5fa, words: '寒い、ガタガタ、武者震い、氷、冷たい、足がすくむ' },
+    { key: 'hot',      icon: '🥵', label: '暑がる',         bulb: 0xf97316, words: 'あおぐ、バテる、汗、熱い、蒸し暑い、過労、疲れた' },
     { key: 'think',    icon: '💡', label: '考える',         bulb: 0xfef08a, words: 'ひらめく、悩む、作戦会議、腕組み、思考、迷う' },
-    { key: 'surprise', icon: '😲', label: '驚く',           bulb: 0xf87171, words: 'びっくり、飛び上がる、発見、ハッとする、白波' },
+    { key: 'surprise', icon: '😲', label: '驚く',           bulb: 0xf87171, words: 'びっくり、飛び上がる、発見、ハッとする、白波、虫' },
     { key: 'wave',     icon: '👋', label: '挨拶',           bulb: 0x4ade80, words: '手を振る、ヤッホー、呼ぶ、お礼、バイバイ、挨拶' },
     { key: 'sleep',    icon: '💤', label: '居眠り',         bulb: 0x94a3b8, words: '寝る、船をこぐ、休憩、お昼寝、ひとやすみ、省エネ' },
     { key: 'swing_v',  icon: '⛏️', label: '縦に振りかざす', bulb: 0xfb923c, words: '斧、剣、ツルハシ、餅つき用きね、釣り竿、叩く、割る', tool: true },
@@ -379,6 +439,54 @@
     { key: 'run',      icon: '🏃', label: '走る・急ぐ',     bulb: 0x38bdf8, words: 'ダッシュ、逃げる、急ぐ、運動、駆け足、走る' },
     { key: 'peek',     icon: '🔍', label: 'のぞき込む',     bulb: 0xc084fc, words: '下を見る、穴をのぞく、観察、キョロキョロ、探す' },
     { key: 'struggle', icon: '🌀', label: '模索・奮闘する', bulb: 0xf43f5e, words: 'ルール外の行動、試行錯誤、ジタバタ挑戦、特訓、未知' }
+  ];
+
+  // ⚡ 全6種類のトラウマ定義と裏パラメータへの＋－影響ルール
+  const TRAUMA_SPECS = [
+    {
+      id: 'sea',
+      icon: '🌊',
+      name: '海トラウマ',
+      desc: '白波で溺れた(警戒-45)',
+      deltas: { curiosity: 0, cautionLimiter: -45, power: 0, eco: 0, logic: 0 }
+    },
+    {
+      id: 'narrow',
+      icon: '🕳️',
+      name: '狭所トラウマ',
+      desc: '穴につかえた(出力+35/探究-30)',
+      deltas: { curiosity: -30, cautionLimiter: 0, power: 35, eco: 0, logic: 0 }
+    },
+    {
+      id: 'stomach',
+      icon: '🤢',
+      name: 'はらいたトラウマ',
+      desc: '食中毒・腹痛(探究-45)',
+      deltas: { curiosity: -45, cautionLimiter: -15, power: 0, eco: 0, logic: 0 }
+    },
+    {
+      id: 'height',
+      icon: '🧗',
+      name: '高所トラウマ',
+      desc: '高い段が怖い(警戒が0に!)',
+      deltas: { curiosity: 0, cautionLimiter: -100, power: 0, eco: 0, logic: 0 },
+      forceZeroCaution: true
+    },
+    {
+      id: 'monster',
+      icon: '👻',
+      name: 'ビックリ生物トラウマ',
+      desc: '虫・お化け遭遇(演算-45)',
+      deltas: { curiosity: 0, cautionLimiter: -20, power: 0, eco: 0, logic: -45 }
+    },
+    {
+      id: 'overwork',
+      icon: '⛏️',
+      name: '過労トラウマ',
+      desc: '働きすぎ腰痛(省エネMAX/出力-35)',
+      deltas: { curiosity: 0, cautionLimiter: 0, power: -35, eco: 100, logic: 0 },
+      forceMaxEco: true
+    }
   ];
 
   const POSE_TABLE = {
@@ -577,7 +685,7 @@
     { name: '北西(斜め)', dx: -1, dz: -1, rot: -Math.PI * 0.75, isDiag: true },
     { name: '北東(斜め)', dx: 1,  dz: -1, rot: Math.PI * 0.75,  isDiag: true },
     { name: '南西(斜め)', dx: -1, dz: 1,  rot: -Math.PI * 0.25, isDiag: true },
-    { name: '南東(斜め)', dx: 1,  dz: 1,  rot: Math.PI * 0.25,  isDiag: true }
+    { name: '南東(斜め)', dx: 1,  dz: 1,  rot: -Math.PI * 0.25,  isDiag: true }
   ];
 
   function getDirNameFromRot(rotY) {
@@ -591,11 +699,11 @@
 
   let life = new LifeCore(), GAME_DAY = 1, TIME_STEP = 0;
   let BAG = ['stone', 'apple', 'stone', 'grass'];
-  let DIARY_LOGS = ['🌱 1日目：小学生博士のパラメータとトラウマ記憶システムを持つ1号機が誕生！'];
+  let DIARY_LOGS = ['🌱 1日目：表パラメータ（博士の設定）と裏パラメータ（トラウマ6種）を持つ1号機が誕生！'];
   let CAM_VISUAL_STYLE = safeStorage.getItem('cam_visual_style_v15') || 'hide';
   let HEIGHT_MAP = {}, CHIP_MAP = {}, WATER_MAP = {};
+  let currentDiaryTab = 'base'; // 'base'（🟢表：博士の基本設定） | 'hidden'（🔴裏：裏パラメータ＆実験室）
 
-  // デフォルトは「🎲サイコロ箱型（box）」＋ 小学生博士のパラメータ6項目 ＋ 軽量テキスト記憶配列
   let ROBOT = {
     unitModel: 1,
     gen: 1,
@@ -615,23 +723,63 @@
       logic: 50,           // 🧠 演算モジュール (0-100)
       loyalty: 50          // 🔒 忠誠心 (予備・暗転ロック)
     },
-    memories: []           // ⚡ 物理現象等で刻まれたトラウマ・経験の軽量テキスト配列
+    traumas: [],           // ⚡ 現在発症中のトラウマID配列: ['sea','narrow','stomach','height','monster','overwork']
+    workStreak: 0          // 連続労働カウント（過労トラウマ発症判定用）
   };
   let WORLD_ITEMS = [{ type: 'apple', x: -1, z: 1 }, { type: 'apple', x: 1, z: 0 }];
 
-  function addRobotMemory(memText) {
-    if (!memText) return;
-    if (!Array.isArray(ROBOT.memories)) ROBOT.memories = [];
-    if (!ROBOT.memories.includes(memText)) {
-      ROBOT.memories.push(memText);
-      if (ROBOT.memories.length > 8) ROBOT.memories.shift();
-      DIARY_LOGS.push(`⚡ 記憶刻印：「${memText}」を覚えた！`);
+  // トラウマの発症追加（ゲーム中の出来事 または 実験室ボタンから）
+  function addTraumaById(traumaId, silent = false) {
+    const spec = TRAUMA_SPECS.find(t => t.id === traumaId);
+    if (!spec) return false;
+    if (!Array.isArray(ROBOT.traumas)) ROBOT.traumas = [];
+    if (!ROBOT.traumas.includes(traumaId)) {
+      ROBOT.traumas.push(traumaId);
+      DIARY_LOGS.push(`⚡ トラウマ発症：「${spec.icon}${spec.name}」になった！`);
+      if (!silent) showToast(`⚡「${spec.icon}${spec.name}」が発症し、裏パラメータが変化したよ！`);
+      return true;
     }
+    return false;
   }
 
-  function hasMemoryKeyword(kw) {
-    if (!Array.isArray(ROBOT.memories)) return false;
-    return ROBOT.memories.some(m => m.includes(kw));
+  function hasTrauma(traumaId) {
+    return Array.isArray(ROBOT.traumas) && ROBOT.traumas.includes(traumaId);
+  }
+
+  // 🔴 裏パラメータ（最終値）の計算：基本パラメータ ＋ 発症中トラウマの補正値
+  function getEffectiveParams() {
+    const base = ROBOT.params || { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50, loyalty: 50 };
+    const eff = {
+      curiosity: base.curiosity ?? 60,
+      cautionLimiter: base.cautionLimiter ?? 50,
+      power: base.power ?? 50,
+      eco: base.eco ?? 40,
+      logic: base.logic ?? 50,
+      loyalty: 50
+    };
+    let forceZeroCaution = false;
+    let forceMaxEco = false;
+
+    const activeIds = Array.isArray(ROBOT.traumas) ? ROBOT.traumas : [];
+    activeIds.forEach(id => {
+      const sp = TRAUMA_SPECS.find(t => t.id === id);
+      if (!sp) return;
+      eff.curiosity += (sp.deltas.curiosity || 0);
+      eff.cautionLimiter += (sp.deltas.cautionLimiter || 0);
+      eff.power += (sp.deltas.power || 0);
+      eff.eco += (sp.deltas.eco || 0);
+      eff.logic += (sp.deltas.logic || 0);
+      if (sp.forceZeroCaution) forceZeroCaution = true;
+      if (sp.forceMaxEco) forceMaxEco = true;
+    });
+
+    if (forceZeroCaution) eff.cautionLimiter = 0;
+    if (forceMaxEco) eff.eco = 100;
+
+    ['curiosity', 'cautionLimiter', 'power', 'eco', 'logic'].forEach(k => {
+      eff[k] = Math.max(0, Math.min(100, Math.round(eff[k])));
+    });
+    return eff;
   }
 
   function carveCrawlTunnelBlock(gx, gz, lv, tunnelWidth = 3, tunnelHeight = 2) {
@@ -708,8 +856,15 @@
           }
         });
       }
-      if (Array.isArray(d.robot.memories)) {
-        ROBOT.memories = d.robot.memories.slice(-8);
+      if (Array.isArray(d.robot.traumas)) {
+        ROBOT.traumas = d.robot.traumas.filter(id => TRAUMA_SPECS.some(t => t.id === id));
+      } else if (Array.isArray(d.robot.memories)) {
+        // 旧セーブ互換変換
+        ROBOT.traumas = [];
+        d.robot.memories.forEach(m => {
+          if (m.includes('海')) ROBOT.traumas.push('sea');
+          if (m.includes('狭')) ROBOT.traumas.push('narrow');
+        });
       }
     }
     if (d.heightMap) {
@@ -851,9 +1006,10 @@
 
   function checkMoveAndPosture(gx, gz, curLv, dir) {
     const nx = gx + dir.dx, nz = gz + dir.dz;
+    const effP = getEffectiveParams();
     if (nx < -2 || nx > 2 || nz < -2 || nz > 2) {
-      // 速度5 または 警戒リミッター80以上（怖いもの知らず）なら海へ飛び出し可能！
-      const canJumpSea = (ROBOT.speed === 5) || ((ROBOT.params?.cautionLimiter ?? 50) >= 80);
+      // 裏パラメータの警戒リミッターが80以上（無鉄砲）または速度5なら海へ飛び出し可能！
+      const canJumpSea = (ROBOT.speed === 5) || (effP.cautionLimiter >= 80);
       return { canMove: canJumpSea, posture: 'stand', targetLv: -99, reason: 'sea' };
     }
     const eff = getEffectiveClearanceSpecs();
@@ -1549,12 +1705,13 @@
     sharedBulbMat.color.setHex(eSpec.bulb);
   }
 
-  // 出力パワー（ROBOT.params.power: 0〜100）に応じてアクションのダイナミックさも連動！
+  // 裏パラメータの「出力パワー（effP.power）」に応じてアクションの振れ幅もリアルタイムに変化！
   function updateRobotUnifiedAnimation(t) {
     const emoKey = POSE_TABLE[ROBOT.emotion] ? ROBOT.emotion : 'normal';
     const p = POSE_TABLE[emoKey];
     const eSpec = getExpressionSpec(emoKey);
-    const powFactor = 0.78 + ((ROBOT.params?.power ?? 50) / 100) * 0.48;
+    const effP = getEffectiveParams();
+    const powFactor = 0.75 + (effP.power / 100) * 0.52;
     const phase = t * p.spd;
     const wave = Math.sin(phase);
     const cosW = Math.cos(phase);
@@ -2072,7 +2229,7 @@
     document.getElementById('ai-status').innerText = getActiveBrainBadgeText();
   }
 
-  // AIへのプロンプトに「小学生博士のパラメータ5項目」と「過去の記憶・トラウマメモ」を渡し、創発を引き出す！
+  // 🤖 AIプロンプトへの渡し方：博士の基本設定ではなく「トラウマ補正後の裏パラメータ（最終値）」と「現在発動中のトラウマ」を渡す！
   async function askAIForDecision(validMoves, curH, isAtSeaEdge, blockedByFat) {
     const aiType = safeStorage.getItem('ai_type') || 'none';
     if (aiType === 'none') return null;
@@ -2081,25 +2238,31 @@
     const dirNames = validMoves.map(m => `${m.dir.name}${m.check.posture === 'crawl' ? '(ほふく前進)' : ''}`).join('、');
     const itemsStr = WORLD_ITEMS.map(it => `${it.type}(${it.x},${it.z})`).join(', ') || 'なし';
     const exprSummary = DEFAULT_EXPRESSIONS.map(e => `${e.key}:[${CUSTOM_WORDS_MAP[e.key] || e.words}]`).join(' / ');
-    const p = ROBOT.params || {};
-    const memStr = (ROBOT.memories && ROBOT.memories.length) ? ROBOT.memories.join(' / ') : 'まだ特別なトラウマや強い記憶はない';
-    const envNote = `${isAtSeaEdge ? '【現在：すぐ目の前が海の白波！】' : ''}${blockedByFat ? '【現在：狭い穴におなかがつかえている！】' : ''}`;
+
+    // AIにはトラウマの影響を加味した「裏パラメータ（最終値）」を渡す
+    const effP = getEffectiveParams();
+    const activeTraumaNames = (ROBOT.traumas || []).map(id => {
+      const sp = TRAUMA_SPECS.find(t => t.id === id);
+      return sp ? `${sp.icon}${sp.name}(${sp.desc})` : '';
+    }).filter(Boolean).join('、') || 'なし';
+
+    const envNote = `${isAtSeaEdge ? '【目の前が海の白波】' : ''}${blockedByFat ? '【狭い穴におなかがつかえている】' : ''}${curH >= 2 ? '【地上の高い場所】' : ''}${TIME_STEP >= 13 ? '【暗い夜】' : ''}`;
 
     const prompt = `あなたは5x5ボクセル島で暮らす自律ロボット「${ROBOT.unitModel}号機（第${ROBOT.gen}世代）」です。
 現在位置:(${ROBOT.pos.x},${ROBOT.pos.z}) 層:${formatHeightText(curH)} ${envNote}
 大きさ:${sSpec.label} 体型:${bSpec.label} たいりょく=${life.stamina},おなか=${life.energy},ごきげん=${life.mental}
 周囲のアイテム:${itemsStr} / 移動可能方向:[${dirNames}]
-【小学生博士が設定した補助パラメータ(0〜100)】
-・探究心センサー:${p.curiosity} (高いほど未知へ飛び込む)
-・警戒リミッター:${p.cautionLimiter} (100に近いほどリミッター解除で怖いもの知らず、0に近いほど超ビビリ)
-・出力パワー:${p.power} (高いほど感情爆発・力技が派手)
-・省エネ駆動:${p.eco} (高いほどマイペースに休む・居眠り)
-・演算モジュール:${p.logic} (高いほど立ち止まって考える・賢いしぐさ)
-【過去の経験・トラウマ記憶メモ】
-[${memStr}]
-※重要：普段はパラメータを参考に行動しますが、目の前の状況が「過去のトラウマ記憶（海や狭い穴など）」に触れた場合、警戒リミッターが100（怖いもの知らず）であってもトラウマがフラッシュバックして怖がったりパニックになるなど、独自の個性を自由に発揮してください。
+【現在のあなたの裏パラメータ（最終値 0〜100）】
+・探究心センサー:${effP.curiosity}
+・警戒リミッター:${effP.cautionLimiter} (100に近いほど怖いもの知らず、0に近いほど超ビビリ)
+・出力パワー:${effP.power}
+・省エネ駆動:${effP.eco}
+・演算モジュール:${effP.logic}
+【現在発動中のトラウマ】
+[${activeTraumaNames}]
+※重要：上記の「裏パラメータ（最終値）」と「現在発動中のトラウマ」から、その場の状況に応じた自由でユニークなリアクション（創発）を選んでください。
 基本表現辞書:${exprSummary}
-JSON形式のみで出力してください:{"action":"移動可能な方向名 または 斜め掘り または ほふく掘り または 休む または トラウマ回避行動 または 自由な挑戦行動","emotion":"表現キー(20種)","thought":"小学生向けのユニークな心の声(1〜2文)"}`;
+JSON形式のみで出力してください:{"action":"移動可能な方向名 または 斜め掘り または ほふく掘り または 休む または トラウマ反応行動 または 自由な挑戦行動","emotion":"表現キー(20種)","thought":"小学生向けのユニークな心の声(1〜2文)"}`;
 
     try {
       if (aiType === 'gemini') {
@@ -2136,10 +2299,9 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
     if (++TIME_STEP >= 20) { TIME_STEP = 0; GAME_DAY++; DIARY_LOGS.push(`🌅 ${GAME_DAY}日目の朝を迎えたよ！`); }
 
     const curH = getRobotHeightLevel();
-    const p = ROBOT.params || { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50 };
     let thoughtText = '', actionLabel = '';
 
-    // 🌊 物理現象1：海に落ちて白波に飲まれた場合 → 大ダメージ＆「海トラウマ」が自動で刻まれる！
+    // 🌊 物理現象1：海に落ちて白波で大ダメージ → 「🌊海トラウマ」自動発症！
     if (curH === -99) {
       ROBOT.pos.x = Math.max(-2, Math.min(2, ROBOT.pos.x));
       ROBOT.pos.z = Math.max(-2, Math.min(2, ROBOT.pos.z));
@@ -2147,11 +2309,10 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
       ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
       ROBOT.posture = 'stand';
       ROBOT.emotion = 'surprise';
-      life.stamina -= 18;
-      life.mental -= 15;
-      addRobotMemory('🌊 海で大ダメージを受けた(海トラウマ)');
-      actionLabel = '🌊 白波で大ダメージ！陸へ押し戻された';
-      thoughtText = 'うわぁぁっ！！海の白い波に飲まれて大ダメージを受けたよ…！海がトラウマになっちゃった…！';
+      life.stamina -= 18; life.mental -= 15;
+      addTraumaById('sea', true);
+      actionLabel = '🌊 白波で大ダメージ！「海トラウマ」発症';
+      thoughtText = 'うわぁぁっ！！海の白い波に飲まれて大ダメージを受けたよ…！「🌊海トラウマ」になって裏の警戒リミッターが下がっちゃった！';
     } else {
       const isAtSeaEdge = (Math.abs(ROBOT.pos.x) === 2 || Math.abs(ROBOT.pos.z) === 2);
       const moveEvaluations = ALL_DIRS.map(d => ({
@@ -2161,25 +2322,37 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
       const validMoves = moveEvaluations.filter(m => m.check.canMove);
       const blockedByFat = moveEvaluations.find(m => m.check.reason === 'too_fat');
 
-      // 🕳️ 物理現象2：太っちょで狭い穴につかえた場合 → 「狭所トラウマ」が自動で刻まれる！
-      if (blockedByFat) {
-        addRobotMemory('🕳️ 狭い穴におなかがつかえた(狭所トラウマ)');
-      }
+      // 🕳️ 物理現象2：太っちょで狭い穴につかえた → 「🕳️狭所トラウマ」自動発症！
+      if (blockedByFat) addTraumaById('narrow', true);
 
+      // 🧗 物理現象3：地上3段目以上に登った時、低確率で下をのぞいて「🧗高所トラウマ」自動発症！
+      if (curH >= 3 && Math.random() < 0.45) addTraumaById('height', true);
+
+      // 👻 物理現象4：夜・深淵の暗い時間に低確率で物音に驚き「👻ビックリ生物トラウマ」自動発症！
+      if (TIME_STEP >= 14 && Math.random() < 0.22) addTraumaById('monster', true);
+
+      // トラウマ補正後の「裏パラメータ（最終値）」を取得
+      const effP = getEffectiveParams();
       const aiDecision = await askAIForDecision(validMoves, curH, isAtSeaEdge, Boolean(blockedByFat));
-      let chosenMove = null, wantDig = false, wantCrawlDig = false, wantRest = false, wantFreeStruggle = false;
-      let traumaTriggered = null;
 
-      // ⚡ トラウマ発動判定：海際にいて「海トラウマ」がある場合、警戒リミッターが100（無鉄砲）でもトラウマが上書き発動！
-      if (isAtSeaEdge && hasMemoryKeyword('海') && Math.random() < 0.78) {
-        traumaTriggered = 'sea';
-      } else if (blockedByFat && hasMemoryKeyword('狭') && Math.random() < 0.75) {
-        traumaTriggered = 'narrow';
+      let chosenMove = null, wantDig = false, wantCrawlDig = false, wantRest = false, wantFreeStruggle = false;
+      let traumaReaction = null;
+
+      // ⚡ 6種のトラウマによる特殊創発リアクション判定
+      if (hasTrauma('height') && curH >= 2 && Math.random() < 0.82) {
+        traumaReaction = 'height';
+      } else if (hasTrauma('sea') && isAtSeaEdge && Math.random() < 0.80) {
+        traumaReaction = 'sea';
+      } else if (hasTrauma('narrow') && blockedByFat && Math.random() < 0.80) {
+        traumaReaction = 'narrow';
+      } else if (hasTrauma('overwork') && Math.random() < 0.68) {
+        traumaReaction = 'overwork';
+      } else if (hasTrauma('monster') && (TIME_STEP >= 13 || WORLD_ITEMS.some(it => it.type === 'grass' && Math.hypot(it.x - ROBOT.pos.x, it.z - ROBOT.pos.z) <= 1.5)) && Math.random() < 0.72) {
+        traumaReaction = 'monster';
       }
 
-      if (aiDecision && aiDecision.action && !traumaTriggered) {
-        if (aiDecision.action.includes('トラウマ')) traumaTriggered = isAtSeaEdge ? 'sea' : 'narrow';
-        else if (aiDecision.action.includes('休')) wantRest = true;
+      if (aiDecision && aiDecision.action && !traumaReaction) {
+        if (aiDecision.action.includes('休')) wantRest = true;
         else if (aiDecision.action.includes('ほふく掘')) { wantDig = true; wantCrawlDig = true; }
         else if (aiDecision.action.includes('掘')) wantDig = true;
         else {
@@ -2188,9 +2361,14 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
         }
       }
 
-      // ⚡ 1. トラウマがパラメータを上書きして発動したケース！
-      if (traumaTriggered === 'sea') {
-        // 海から離れる内陸方向へ逃げ帰る
+      // ⚡ トラウマ別のユニーク行動実行
+      if (traumaReaction === 'height') {
+        ROBOT.posture = 'stand';
+        ROBOT.emotion = (Math.random() < 0.5) ? 'shiver' : 'sad';
+        life.mental -= 4;
+        actionLabel = `🧗 高所トラウマ発動(裏警戒:${effP.cautionLimiter})：足がすくんで泣く`;
+        thoughtText = aiDecision?.thought || `「🧗高所トラウマ」で裏の警戒リミッターが0になっちゃった！高い場所が怖くて足がガタガタすくんで動けないよ〜😭`;
+      } else if (traumaReaction === 'sea') {
         const inlandMoves = validMoves.filter(m => m.check.reason !== 'sea' && Math.abs(ROBOT.pos.x + m.dir.dx) <= 1 && Math.abs(ROBOT.pos.z + m.dir.dz) <= 1);
         if (inlandMoves.length > 0) {
           const esc = inlandMoves[Math.floor(Math.random() * inlandMoves.length)];
@@ -2198,49 +2376,59 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
           ROBOT.rotY = esc.dir.rot;
         }
         ROBOT.posture = 'stand';
-        ROBOT.emotion = (p.power >= 70) ? 'sad' : 'fear';
-        life.mental -= 5;
-        actionLabel = '⚡ 海トラウマ発動！後ずさりして内陸へ避難';
-        thoughtText = aiDecision?.thought || `警戒リミッターは${p.cautionLimiter}だけど、前に海で大ダメージを受けたトラウマがフラッシュバックしたよ！ひぃぃっ、海は怖いよ〜！`;
-      } else if (traumaTriggered === 'narrow') {
+        ROBOT.emotion = 'fear';
+        actionLabel = `🌊 海トラウマ発動(裏警戒:${effP.cautionLimiter})：内陸へ避難`;
+        thoughtText = aiDecision?.thought || `「🌊海トラウマ」で裏の警戒リミッターが${effP.cautionLimiter}に下がっているよ！白波が怖くて内陸へ後ずさりしたよ😰`;
+      } else if (traumaReaction === 'narrow') {
         ROBOT.posture = 'stand';
-        ROBOT.emotion = (p.power >= 60) ? 'anger' : 'struggle';
-        // 出力パワーが高ければパニックで壁を豪快に破壊掘削！
-        if (p.power >= 60 && blockedByFat) {
+        ROBOT.emotion = 'anger';
+        if (blockedByFat) {
           ROBOT.rotY = blockedByFat.dir.rot;
-          digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, blockedByFat.dir, false, 52);
-          actionLabel = '⚡ 狭所トラウマ爆発！出力パワー全開で壁を破壊掘削';
-          thoughtText = aiDecision?.thought || `狭い穴におなかがつかえたトラウマが蘇った！出力パワー${p.power}で悔しくて地団駄を踏みながら壁をぶっ壊したよ！`;
-        } else {
-          actionLabel = '⚡ 狭所トラウマ発動！穴の前でジタバタ奮闘';
-          thoughtText = aiDecision?.thought || `また狭い穴におなかがつかえるかも…！トラウマが蘇って穴の前でジタバタ模索・奮闘しちゃったよ！`;
+          digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, blockedByFat.dir, false, 50);
         }
+        actionLabel = `🕳️ 狭所トラウマ爆発(裏出力:${effP.power})：壁を破壊掘削！`;
+        thoughtText = aiDecision?.thought || `「🕳️狭所トラウマ」で裏の出力パワーが${effP.power}に急上昇！おなかがつかえた悔しさで地団駄を踏んで壁を壊したよ😡`;
+      } else if (traumaReaction === 'overwork') {
+        ROBOT.posture = 'stand';
+        ROBOT.emotion = (Math.random() < 0.5) ? 'hot' : 'sleep';
+        life.stamina += 30; life.mental += 8;
+        ROBOT.workStreak = 0;
+        actionLabel = `⛏️ 過労トラウマ発動(裏省エネ:${effP.eco})：サボって休憩`;
+        thoughtText = aiDecision?.thought || `「⛏️過労トラウマ」で裏の省エネ駆動がMAX(${effP.eco})になっているよ！もう腰が痛いからサボって居眠りしちゃうよ…💤`;
+      } else if (traumaReaction === 'monster') {
+        ROBOT.posture = 'stand';
+        ROBOT.emotion = (Math.random() < 0.5) ? 'surprise' : 'struggle';
+        actionLabel = `👻 ビックリ生物トラウマ(裏演算:${effP.logic})：パニック大騒ぎ`;
+        thoughtText = aiDecision?.thought || `「👻ビックリ生物トラウマ」で裏の演算モジュールが${effP.logic}に低下中！草むらや暗闇にお化けや虫がいそうでパニックだよ😲`;
       } else {
-        // 🧪 2. 小学生博士の5つのパラメータ（探究心・警戒リミッター・出力パワー・省エネ・演算）による行動決定
+        // 🧠 裏パラメータ（effP）に基づく通常の自律行動ルーチン
         if (!wantRest && !wantDig && !chosenMove && !wantFreeStruggle) {
-          const restThreshold = 22 + Math.round(p.eco * 0.35); // 省エネ駆動が高いほど早めに休む
-          if (life.stamina <= restThreshold || (p.eco >= 75 && Math.random() < 0.35)) {
+          const restThreshold = 20 + Math.round(effP.eco * 0.38);
+          if (life.stamina <= restThreshold || (effP.eco >= 75 && Math.random() < 0.42)) {
             wantRest = true;
-          } else if (p.logic >= 75 && Math.random() < 0.25) {
-            // 演算モジュールが高いと立ち止まって作戦会議・観察
+          } else if (effP.logic >= 72 && Math.random() < 0.26) {
             wantFreeStruggle = true;
-          } else if (blockedByFat && (p.power >= 50 || Math.random() < 0.65)) {
+          } else if (blockedByFat && (effP.power >= 50 || Math.random() < 0.65)) {
             wantDig = true;
-          } else if (p.curiosity >= 70 && Math.random() < 0.28) {
+          } else if (effP.curiosity >= 70 && Math.random() < 0.28) {
             wantFreeStruggle = true;
-          } else if (Math.random() < (0.25 + p.power * 0.0025) && curH > AREA1_MIN_UNDER_LV && life.stamina > 30) {
+          } else if (Math.random() < (0.24 + effP.power * 0.0025) && curH > AREA1_MIN_UNDER_LV && life.stamina > 30) {
             wantDig = true;
-            wantCrawlDig = (p.curiosity >= 65 && Math.random() < 0.6);
+            wantCrawlDig = (effP.curiosity >= 60 && Math.random() < 0.55);
           } else {
-            // 警戒リミッターが低い（ビビリ）ときは海へ飛び出す移動を除外
             let candidateMoves = validMoves;
-            if (p.cautionLimiter < 75) {
+            if (effP.cautionLimiter < 78) {
               const safeMoves = validMoves.filter(m => m.check.reason !== 'sea');
               if (safeMoves.length > 0) candidateMoves = safeMoves;
             }
             const crawlMoves = candidateMoves.filter(m => m.check.posture === 'crawl');
             const apple = WORLD_ITEMS.find(it => it.type === 'apple');
-            if (p.curiosity >= 65 && crawlMoves.length > 0 && Math.random() < 0.6) {
+
+            // 🤢 はらいたトラウマがある時は、リンゴへ近づくのを怖がって避ける！
+            if (apple && hasTrauma('stomach') && candidateMoves.length) {
+              candidateMoves.sort((a, b) => Math.hypot(ROBOT.pos.x + b.dir.dx - apple.x, ROBOT.pos.z + b.dir.dz - apple.z) - Math.hypot(ROBOT.pos.x + a.dir.dx - apple.x, ROBOT.pos.z + a.dir.dz - apple.z));
+              chosenMove = candidateMoves[0];
+            } else if (effP.curiosity >= 65 && crawlMoves.length > 0 && Math.random() < 0.6) {
               chosenMove = crawlMoves[Math.floor(Math.random() * crawlMoves.length)];
             } else if (apple && candidateMoves.length) {
               candidateMoves.sort((a, b) => Math.hypot(ROBOT.pos.x + a.dir.dx - apple.x, ROBOT.pos.z + a.dir.dz - apple.z) - Math.hypot(ROBOT.pos.x + b.dir.dx - apple.x, ROBOT.pos.z + b.dir.dz - apple.z));
@@ -2258,50 +2446,53 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
           ROBOT.posture = 'stand';
           if (aiDecision && POSE_TABLE[aiDecision.emotion]) {
             ROBOT.emotion = aiDecision.emotion;
-          } else if (p.logic >= 70) {
+          } else if (effP.logic >= 68) {
             ROBOT.emotion = Math.random() < 0.5 ? 'think' : 'peek';
-          } else if (p.cautionLimiter <= 25) {
+          } else if (effP.cautionLimiter <= 25) {
             ROBOT.emotion = 'shiver';
           } else {
             ROBOT.emotion = 'struggle';
           }
           const eSpec = getExpressionSpec(ROBOT.emotion);
-          actionLabel = `${eSpec.icon} 個性行動：${eSpec.label}`;
+          actionLabel = `${eSpec.icon} 個性行動：${eSpec.label}(裏演算:${effP.logic})`;
           thoughtText = aiDecision?.thought || (ROBOT.emotion === 'think' || ROBOT.emotion === 'peek'
-            ? `演算モジュール(${p.logic})をフル回転！周りをじっくり観察して賢く作戦を立てているよ！`
-            : `探究心センサー(${p.curiosity})がピピッと反応！ルールにない新しい動きを模索・奮闘しているよ！`);
+            ? `裏の演算モジュール(${effP.logic})で周りをじっくり観察して作戦を立てているよ！`
+            : `裏の探究心センサー(${effP.curiosity})でルール外のユニークな動きを模索・奮闘しているよ！`);
         } else if (wantRest) {
           life.stamina += 35; life.energy -= 5; life.mental += 10;
           ROBOT.posture = 'stand';
-          ROBOT.emotion = (life.energy <= 30) ? 'sad' : (p.eco >= 70 ? 'sleep' : 'hot');
-          actionLabel = `💤 省エネ休憩（省エネ駆動:${p.eco}）`;
-          thoughtText = aiDecision?.thought || (ROBOT.emotion === 'sad'
-            ? 'おなかがすいてしょんぼり座り込んじゃった…。リンゴが食べたいなぁ。'
-            : `省エネ駆動(${p.eco})でマイペースにコックリ居眠りしてバッテリー温存中だよ…💤`);
+          ROBOT.workStreak = 0;
+          ROBOT.emotion = (life.energy <= 30) ? 'sad' : (effP.eco >= 70 ? 'sleep' : 'hot');
+          actionLabel = `💤 省エネ休憩（裏省エネ:${effP.eco}）`;
+          thoughtText = aiDecision?.thought || `裏の省エネ駆動(${effP.eco})でマイペースにコックリ居眠りしてバッテリー温存中だよ…💤`;
         } else if (wantDig) {
           const digDir = blockedByFat ? blockedByFat.dir : ALL_DIRS[Math.floor(Math.random() * ALL_DIRS.length)];
           ROBOT.rotY = digDir.rot;
-          // 出力パワーが高いほど1回で削る小ブロック数が増加！
-          const digAmount = Math.round(30 + (p.power || 50) * 0.25);
+          const digAmount = Math.round(28 + effP.power * 0.28);
           const digRes = digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, digDir, wantCrawlDig, digAmount);
-          life.stamina -= 9; life.mental += 12;
+          life.stamina -= 10; life.mental += 10;
+          ROBOT.workStreak = (ROBOT.workStreak || 0) + 1;
+
+          // ⛏️ 物理現象5：連続で掘削して体力が減ると「⛏️過労トラウマ」自動発症！
+          if (ROBOT.workStreak >= 3 && life.stamina <= 55) {
+            addTraumaById('overwork', true);
+          }
 
           if (digRes.completedLevel) {
             if (BAG.length < 10) BAG.push('stone');
             if (digRes.targetX === ROBOT.pos.x && digRes.targetZ === ROBOT.pos.z) ROBOT.pos.lv = digRes.newLv;
             ROBOT.emotion = 'joy';
-            addRobotMemory('⛏️ 硬い岩盤を掘り抜いて道を開通した(開通の喜び)');
             actionLabel = `⛏️ ${digDir.name}を掘り抜いて${formatHeightText(digRes.newLv)}開通！`;
-            thoughtText = aiDecision?.thought || `出力パワー(${p.power})で${digDir.name}のブロックを掘り抜いたよ！やったー！`;
+            thoughtText = aiDecision?.thought || `裏の出力パワー(${effP.power})で${digDir.name}を掘り抜いたよ！やったー！`;
           } else if (digRes.isCrawlTunnel) {
             ROBOT.emotion = 'push';
             actionLabel = `🐛 ${digDir.name}に「ほふく前進トンネル」を開通！`;
-            thoughtText = aiDecision?.thought || `探究心センサー(${p.curiosity})で${digDir.name}にほふく前進トンネルを掘ったよ！`;
+            thoughtText = aiDecision?.thought || `探究心(${effP.curiosity})で${digDir.name}にほふく前進トンネルを掘ったよ！`;
             DIARY_LOGS.push(`🐛 ${GAME_DAY}日目：${digDir.name}にほふく前進トンネルを掘った！`);
           } else {
             ROBOT.emotion = blockedByFat ? 'anger' : 'swing_v';
-            actionLabel = `⛏️ 出力パワー(${p.power})で${digDir.name}を掘削中(残${digRes.leftCount})`;
-            thoughtText = aiDecision?.thought || `出力パワー(${p.power})を込めて、${digDir.name}の土を豪快に削っているよ！`;
+            actionLabel = `⛏️ 裏出力(${effP.power})で${digDir.name}を掘削中(残${digRes.leftCount})`;
+            thoughtText = aiDecision?.thought || `裏の出力パワー(${effP.power})を込めて${digDir.name}の土を削っているよ！`;
           }
         } else if (chosenMove) {
           const d = chosenMove.dir, chk = chosenMove.check;
@@ -2314,47 +2505,73 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
 
           if (chk.reason === 'sea') {
             ROBOT.emotion = 'surprise';
-            actionLabel = `🌊 警戒リミッター解除(${p.cautionLimiter})で海へダイブ！`;
-            thoughtText = `警戒リミッター(${p.cautionLimiter})で怖いもの知らずになって海に飛び込んじゃった！わわっ、波がすごい！！`;
-          } else if (p.cautionLimiter <= 25 && (Math.abs(ROBOT.pos.x) === 2 || Math.abs(ROBOT.pos.z) === 2)) {
+            actionLabel = `🌊 警戒リミッター解除(${effP.cautionLimiter})で海へダイブ！`;
+            thoughtText = `裏の警戒リミッター(${effP.cautionLimiter})で怖いもの知らずになって海に飛び込んじゃった！`;
+          } else if (hasTrauma('stomach') && WORLD_ITEMS.some(it => it.type === 'apple')) {
             ROBOT.emotion = 'fear';
-            actionLabel = `😰 警戒リミッター低(${p.cautionLimiter})：端っこでビクビク`;
-            thoughtText = aiDecision?.thought || `警戒リミッターが${p.cautionLimiter}だから、島の端っこに来ると落ちそうでビクビクしちゃうよ…！`;
-          } else if (life.energy <= 25 || life.stamina <= 25) {
+            actionLabel = `🤢 はらいたトラウマ(裏探究:${effP.curiosity})：リンゴを避けて移動`;
+            thoughtText = aiDecision?.thought || `「🤢はらいたトラウマ」で探究心が${effP.curiosity}に下がっているから、リンゴを見るとおなかが痛くなりそうで避けちゃったよ😰`;
+          } else if (effP.cautionLimiter <= 25) {
             ROBOT.emotion = 'shiver';
-            addRobotMemory('🥀 エネルギー不足でガタガタ震えた(空腹の記憶)');
-            actionLabel = `🥶 エネルギー不足で震えながら${d.name}へ移動`;
-            thoughtText = aiDecision?.thought || `おなかとたいりょくが減ってガタガタ震えちゃうよ…。`;
+            actionLabel = `🥶 裏警戒リミッター低(${effP.cautionLimiter})：ビクビク移動`;
+            thoughtText = aiDecision?.thought || `裏の警戒リミッターが${effP.cautionLimiter}だから、周りを警戒してガタガタ震えながら${d.name}へ歩いたよ…！`;
           } else if (aiDecision && POSE_TABLE[aiDecision.emotion]) {
             ROBOT.emotion = aiDecision.emotion;
             actionLabel = `👟 ${d.name}へ移動（${getExpressionSpec(ROBOT.emotion).label}）`;
             thoughtText = aiDecision.thought;
           } else {
-            ROBOT.emotion = (p.curiosity >= 75 || ROBOT.speed === 5) ? 'run' : 'fun';
+            ROBOT.emotion = (effP.curiosity >= 75 || ROBOT.speed === 5) ? 'run' : 'fun';
             actionLabel = chk.posture === 'crawl'
               ? `🐛 ${d.name}の低い穴を「ほふく前進」で通過！`
               : `👟 ${d.name}へ歩いた（${sSpec.label}・${bSpec.label}）`;
-            thoughtText = aiDecision?.thought || `${d.name}へ進んだよ！📖手帳のパラメータとトラウマ記憶でボクの個性がどんどん変わるよ！`;
+            thoughtText = aiDecision?.thought || `${d.name}へ進んだよ！📖手帳の「🔴裏パラメータ＆実験」タブでトラウマによる数字の変化を見られるよ！`;
           }
         }
       }
       if (thoughtText) DIARY_LOGS.push(`💭 ${GAME_DAY}日目：${thoughtText}`);
     }
 
+    // アイテム接触判定（🤢はらいたトラウマがある時はリンゴを食べるのを怖がってスルーする場合あり！）
     const itemIdx = WORLD_ITEMS.findIndex(it => it.x === ROBOT.pos.x && it.z === ROBOT.pos.z);
     if (itemIdx !== -1) {
-      const picked = WORLD_ITEMS.splice(itemIdx, 1)[0];
-      if (picked.type === 'apple') {
-        life.energy += 45; life.mental += 15;
-        ROBOT.posture = 'stand'; ROBOT.emotion = 'joy';
-        addRobotMemory('🍎 甘いリンゴを食べて元気100倍になった(リンゴ大好き)');
-        actionLabel = '🍎 リンゴを見つけて食べて大喜び！';
-        thoughtText = 'わーい！！甘くておいしいリンゴを食べたよ！嬉しくてバンザイジャンプ！！';
+      const targetItem = WORLD_ITEMS[itemIdx];
+      if (targetItem.type === 'apple' && hasTrauma('stomach') && Math.random() < 0.75) {
+        ROBOT.posture = 'stand';
+        ROBOT.emotion = 'fear';
+        actionLabel = '🤢 はらいたトラウマ発動！足元のリンゴを食べずに後ずさり';
+        thoughtText = '足元に🍎リンゴがあるけど、「🤢はらいたトラウマ」でおなかが痛くなるのが怖くて食べられないよ〜！';
       } else {
-        if (BAG.length < 10) BAG.push(picked.type); life.mental += 10;
-        ROBOT.emotion = 'pickup';
-        actionLabel = `🤲 ${picked.type === 'stone' ? '石ブロック' : '草'}をしゃがんで拾った`;
-        thoughtText = '足元にいいものが落ちていたから、しゃがんでカバンに拾ったよ！';
+        const picked = WORLD_ITEMS.splice(itemIdx, 1)[0];
+        if (picked.type === 'apple') {
+          // 低確率（18%）で傷んだリンゴに当たって「🤢はらいたトラウマ」発症！
+          if (Math.random() < 0.18) {
+            life.energy += 15; life.mental -= 12;
+            ROBOT.posture = 'stand'; ROBOT.emotion = 'sad';
+            addTraumaById('stomach', true);
+            actionLabel = '🤢 傷んだリンゴでおなかイタイ！「はらいたトラウマ」発症';
+            thoughtText = 'うぅぅ…食べたリンゴがちょっと傷んでいておなかが痛くなっちゃった…！「🤢はらいたトラウマ」になっちゃったよ😭';
+          } else {
+            life.energy += 45; life.mental += 15;
+            ROBOT.posture = 'stand'; ROBOT.emotion = 'joy';
+            actionLabel = '🍎 リンゴを見つけて食べて大喜び！';
+            thoughtText = 'わーい！！甘くておいしいリンゴを食べたよ！嬉しくてバンザイジャンプ！！';
+            DIARY_LOGS.push(`🍎 ${GAME_DAY}日目：おいしいリンゴを食べて大喜びした！`);
+          }
+        } else {
+          if (BAG.length < 10) BAG.push(picked.type);
+          life.mental += 10;
+          // 草を拾ったとき低確率で虫が飛び出して「👻ビックリ生物トラウマ」発症！
+          if (picked.type === 'grass' && Math.random() < 0.35) {
+            ROBOT.emotion = 'surprise';
+            addTraumaById('monster', true);
+            actionLabel = '👻 草むらから虫が飛び出した！「ビックリ生物トラウマ」発症';
+            thoughtText = 'わわっ！！🌿草を拾ったら中から変な虫が飛び出してきてビックリしたよ！「👻ビックリ生物トラウマ」になっちゃった！';
+          } else {
+            ROBOT.emotion = 'pickup';
+            actionLabel = `🤲 ${picked.type === 'stone' ? '石ブロック' : '草'}をしゃがんで拾った`;
+            thoughtText = '足元にいいものが落ちていたから、しゃがんでカバンに拾ったよ！';
+          }
+        }
       }
     }
 
@@ -2366,7 +2583,6 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
 
     if (life.getState().mode === 'DEAD') {
       ROBOT.emotion = 'sad';
-      addRobotMemory('🥀 力尽きて倒れた悔しい記憶(世代継承トラウマ)');
       document.getElementById('message-box').innerText = `力尽きて倒れてしまった…。パラメータとトラウマ記憶を引き継ぎ、次の1号機（第${ROBOT.gen + 1}世代）が誕生します！`;
       setTimeout(() => {
         ROBOT.gen += 1; ROBOT.pos = { x: 0, z: 0, lv: -1, sx: 2, sz: 2 }; ROBOT.rotY = Math.PI; ROBOT.posture = 'stand'; ROBOT.emotion = 'joy';
@@ -2387,29 +2603,83 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
   }
 
   // ============================================================================
-  // 🧪 小学生博士のAIパラメータスライダー ＆ トラウマ記憶操作関数
+  // 📖 手帳の「表（博士の基本設定）⇔ 裏（裏パラメータ＆トラウマ実験室）」タブ切り替え＆UI更新
   // ============================================================================
+  function switchDiaryParamTab(tabKey) {
+    currentDiaryTab = (tabKey === 'hidden') ? 'hidden' : 'base';
+    document.getElementById('tab-diary-base').className = 'rig-tab-btn' + (currentDiaryTab === 'base' ? ' active' : '');
+    document.getElementById('tab-diary-hidden').className = 'rig-tab-btn' + (currentDiaryTab === 'hidden' ? ' active-danger' : '');
+    document.getElementById('diary-panel-base').style.display = (currentDiaryTab === 'base') ? 'flex' : 'none';
+    document.getElementById('diary-panel-hidden').style.display = (currentDiaryTab === 'hidden') ? 'flex' : 'none';
+    renderDiaryModal();
+  }
+
   function onParamSliderInput(paramKey, val) {
     const num = Math.max(0, Math.min(100, Number(val) || 0));
     if (!ROBOT.params) ROBOT.params = { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50, loyalty: 50 };
     ROBOT.params[paramKey] = num;
     const valEl = document.getElementById(`val-param-${paramKey}`);
     if (valEl) valEl.innerText = num;
+    updateHiddenParamsUI();
     saveWorldState();
   }
 
-  function addTraumaMemoryManual(memText) {
-    addRobotMemory(memText);
+  // タブ2：6種類のトラウマボタンのON/OFF切り替え（複数選択可・即座に裏パラメータを再計算＆キャラのしぐさに反映）
+  function toggleTraumaButton(traumaId) {
+    if (!Array.isArray(ROBOT.traumas)) ROBOT.traumas = [];
+    const idx = ROBOT.traumas.indexOf(traumaId);
+    const spec = TRAUMA_SPECS.find(t => t.id === traumaId);
+    if (idx >= 0) {
+      ROBOT.traumas.splice(idx, 1);
+      if (spec) showToast(`✨「${spec.icon}${spec.name}」を解除したよ！`);
+    } else {
+      ROBOT.traumas.push(traumaId);
+      // ボタンを押した瞬間にそのトラウマらしい表情へプレビュー変化
+      const previewEmo = { sea: 'fear', narrow: 'anger', stomach: 'sad', height: 'shiver', monster: 'surprise', overwork: 'hot' }[traumaId] || 'fear';
+      ROBOT.emotion = previewEmo;
+      if (spec) showToast(`⚡「${spec.icon}${spec.name}」を発症！裏パラメータが歪んだよ！`);
+    }
+    syncRobot3DPosition();
+    cameraDirty = true;
+    updateEnvironmentAndUI();
     saveWorldState();
     renderDiaryModal();
-    showToast(`⚡ 記憶に「${memText}」を刻印したよ！`);
   }
 
-  function clearTraumaMemories() {
-    ROBOT.memories = [];
+  function clearAllTraumas() {
+    ROBOT.traumas = [];
+    ROBOT.emotion = 'normal';
+    syncRobot3DPosition();
+    cameraDirty = true;
+    updateEnvironmentAndUI();
     saveWorldState();
     renderDiaryModal();
-    showToast('🧹 トラウマ・記憶メモをクリアしたよ！');
+    showToast('🧹 すべてのトラウマをクリアして裏パラメータが元に戻ったよ！');
+  }
+
+  function updateHiddenParamsUI() {
+    const base = ROBOT.params || { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50 };
+    const eff = getEffectiveParams();
+    ['curiosity', 'cautionLimiter', 'power', 'eco', 'logic'].forEach(k => {
+      const bVal = base[k] ?? 50;
+      const eVal = eff[k] ?? 50;
+      const diff = eVal - bVal;
+      const barEl = document.getElementById(`eff-bar-${k}`);
+      const valEl = document.getElementById(`eff-val-${k}`);
+      if (barEl) {
+        barEl.style.width = `${eVal}%`;
+        barEl.className = 'eff-bar-fill' + (diff > 0 ? ' up' : (diff < 0 ? ' down' : ''));
+      }
+      if (valEl) {
+        if (diff > 0) {
+          valEl.innerHTML = `${eVal} <span class="diff-plus">(+${diff})</span>`;
+        } else if (diff < 0) {
+          valEl.innerHTML = `${eVal} <span class="diff-minus">(${diff})</span>`;
+        } else {
+          valEl.innerHTML = `${eVal} <span class="diff-zero">(±0)</span>`;
+        }
+      }
+    });
   }
 
   // ============================================================================
@@ -2612,6 +2882,7 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
     document.getElementById('diary-robo-name').innerText = `${ROBOT.unitModel}号機（${rigName}・生存 ${GAME_DAY}日目）`;
     document.getElementById('diary-robo-height').innerText = `現在：${formatHeightText(getRobotHeightLevel())} / 大きさ：${sSpec.label} / 体型：${bSpec.label}(幅${eff.reqWidth}) / 表現：${eSpec.label}`;
 
+    // タブ1：基本スライダーと「トラウマ表示のみ（ボタンではない）」の更新
     const p = ROBOT.params || { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50 };
     ['curiosity', 'cautionLimiter', 'power', 'eco', 'logic'].forEach(k => {
       const sl = document.getElementById(`param-${k}`);
@@ -2620,13 +2891,36 @@ JSON形式のみで出力してください:{"action":"移動可能な方向名 
       if (vl) vl.innerText = p[k] ?? 50;
     });
 
-    const tList = document.getElementById('trauma-tag-list');
-    if (tList) {
-      if (!ROBOT.memories || ROBOT.memories.length === 0) {
-        tList.innerHTML = `<span style="color:#94a3b8; font-size:10.5px;">まだトラウマや強い記憶はありません（海や狭い穴で自動記録されます）</span>`;
+    const baseTagList = document.getElementById('base-trauma-tag-list');
+    if (baseTagList) {
+      const activeIds = Array.isArray(ROBOT.traumas) ? ROBOT.traumas : [];
+      if (activeIds.length === 0) {
+        baseTagList.innerHTML = `<span style="color:#94a3b8; font-size:10.5px;">現在抱えているトラウマはありません（健康そのもの！）</span>`;
       } else {
-        tList.innerHTML = ROBOT.memories.map(m => `<span class="trauma-tag">${m}</span>`).join('');
+        baseTagList.innerHTML = activeIds.map(id => {
+          const sp = TRAUMA_SPECS.find(t => t.id === id);
+          return sp ? `<span class="trauma-tag">${sp.icon} ${sp.name}</span>` : '';
+        }).join('');
       }
+    }
+
+    // タブ2：裏パラメータ（最終値）ゲージと全6種トラウマON/OFFボタンの更新
+    updateHiddenParamsUI();
+    const btnGrid = document.getElementById('trauma-btn-grid');
+    if (btnGrid) {
+      btnGrid.innerHTML = '';
+      TRAUMA_SPECS.forEach(sp => {
+        const isOn = hasTrauma(sp.id);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'trauma-toggle-btn' + (isOn ? ' active' : '');
+        btn.innerHTML = `
+          <div>${sp.icon} ${sp.name} ${isOn ? '【ON】' : ''}</div>
+          <div class="trauma-btn-sub">${sp.desc}</div>
+        `;
+        btn.onclick = () => toggleTraumaButton(sp.id);
+        btnGrid.appendChild(btn);
+      });
     }
 
     ['large', 'medium', 'small'].forEach(k => {
