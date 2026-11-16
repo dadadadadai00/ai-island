@@ -33,7 +33,6 @@ const TRAUMA_SPECS = [
   { id: 'overwork', icon: '⛏️', name: '過労トラウマ',       desc: '働きすぎ腰痛(省エネMAX/出力-35)', deltas: { curiosity: 0,   cautionLimiter: 0,    power: -35, eco: 100, logic: 0 }, forceMaxEco: true }
 ];
 
-// 📏 キャラの大きさ（高さ）5段階：ほふく前進時の高さ(crawlH)は立ち高さ(subH)の半分（切り上げ）
 const SIZE_SPECS = {
   giant:  { label: '巨大', subH: 5, scaleY: 1.00, standH: 5, crawlH: 3, stairMax: 2 },
   large:  { label: '大',   subH: 4, scaleY: 0.80, standH: 4, crawlH: 2, stairMax: 2 },
@@ -42,8 +41,6 @@ const SIZE_SPECS = {
   tiny:   { label: '極小', subH: 1, scaleY: 0.20, standH: 1, crawlH: 1, stairMax: 0 }
 };
 
-// 🐛 キャラの太さ（横幅）5段階：分割1〜5ブロック
-// wallOffsetSub は壁掘り時にマスの中心(2)からどれだけ壁側へ寄るか（太いキャラほど壁に顔がめり込まないよう手前に立つ）
 const BODY_SPECS = {
   fat5:    { label: 'でぶっちょ', reqWidth: 5, scaleX: 1.82, scaleZ: 1.75, wallOffsetSub: 0.00 },
   fat4:    { label: 'ちょいでぶ', reqWidth: 4, scaleX: 1.45, scaleZ: 1.40, wallOffsetSub: 0.22 },
@@ -337,7 +334,6 @@ function getEffectiveParams() {
   return eff;
 }
 
-// 📏 壁際でサイズや太さを変更したとき、壁に顔やお腹がめり込まないよう現在位置(sx, sz)を自動補正する関数
 function clampCharSubPosForBodySize() {
   const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
   const maxOff = bSpec.wallOffsetSub ?? 0.65;
@@ -347,7 +343,6 @@ function clampCharSubPosForBodySize() {
   ROBOT.pos.sz = Math.max(2 - maxOff, Math.min(2 + maxOff, curSz));
 }
 
-// ⛏️ 掘る方向(dir)の壁に対して、キャラの太さ(reqWidth)に合わせた最適距離に立たせる関数（顔はめり込まずツルハシが壁に届く）
 function stepCharCloseToWallForDig(dir) {
   if (!dir) return;
   const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
@@ -570,7 +565,6 @@ function getEffectiveClearanceSpecs() {
   };
 }
 
-// 🕳️ キャラの太さ（reqWidth: 1〜5）に応じた足元の地表高さ（分割ブロック単位）を取得：穴が自分の太さ以上なら下へ落下！
 function getSurfaceSubUnitsForChar(gx, gz, reqWidth = 1, lvOverride = null) {
   if (gx < -2 || gx > 2 || gz < -2 || gz > 2) return -3;
   const topLv = HEIGHT_MAP[`${gx},${gz}`] ?? 0;
@@ -628,7 +622,7 @@ function evaluateBlockPassage(gx, gz, lv) {
   return { openWidth: openHeight > 0 ? minWidthAtOpenLayers : 0, openHeight, hasCeiling };
 }
 
-// 🪜 5段階の高さ・太さ＆ほふく前進限界（段差1ブロックまで）＆重力落下判定
+// 🛑【追加】斜め移動時の「角抜け（幽霊すり抜け）」防止判定
 function checkMoveAndPosture(gx, gz, curLv, dir) {
   const nx = gx + dir.dx, nz = gz + dir.dz;
   const effP = getEffectiveParams();
@@ -637,6 +631,18 @@ function checkMoveAndPosture(gx, gz, curLv, dir) {
     return { canMove: canJumpSea, posture: 'stand', targetLv: -99, reason: 'sea', stepDiff: 0 };
   }
   const eff = getEffectiveClearanceSpecs();
+
+  // ★斜めに進むとき、手前の左右どちらかの「角（コーナー）」が自分の太さ分開いていないと進めない
+  if (dir.isDiag) {
+    const cornerA = evaluateBlockPassage(gx + dir.dx, gz, curLv);
+    const cornerB = evaluateBlockPassage(gx, gz + dir.dz, curLv);
+    const passA = (cornerA.openWidth >= eff.reqWidth) && (!cornerA.hasCeiling || cornerA.openHeight >= eff.crawlH);
+    const passB = (cornerB.openWidth >= eff.reqWidth) && (!cornerB.hasCeiling || cornerB.openHeight >= eff.crawlH);
+    if (!passA && !passB) {
+      return { canMove: false, posture: ROBOT.posture, targetLv: curLv, reason: 'blocked_by_corner', stepDiff: 0 };
+    }
+  }
+
   const destTopLv = HEIGHT_MAP[`${nx},${nz}`] ?? 0;
   const curSubH = getSurfaceSubUnitsForChar(gx, gz, eff.reqWidth, curLv);
   const destSubH = getSurfaceSubUnitsForChar(nx, nz, eff.reqWidth, destTopLv);
@@ -917,7 +923,7 @@ function getStyleShortName() {
   return '観察窓ガラス';
 }
 
-async function askAIForDecision(validMoves, curH, isAtSeaEdge, blockedByFat, blockedByHighStep, blockedByCrawlSteep) {
+async function askAIForDecision(validMoves, curH, isAtSeaEdge, blockedByFat, blockedByHighStep, blockedByCrawlSteep, blockedByCorner) {
   const aiType = safeStorage.getItem('ai_type') || 'none';
   if (aiType === 'none') return null;
   const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.tiny;
@@ -933,7 +939,7 @@ async function askAIForDecision(validMoves, curH, isAtSeaEdge, blockedByFat, blo
     return sp ? `${sp.icon}${sp.name}(${sp.desc})` : '';
   }).filter(Boolean).join('、') || 'なし';
 
-  const problemNote = `${blockedByHighStep ? `【現在：${blockedByHighStep.dir.name}の段差が分割${blockedByHighStep.check.stepDiff}ブロックあり、あなたの身長(分割${sSpec.subH}ブロック)より高くて登れません！カバンの石(stone)で踏み台を積むか、壁を階段状に削って解決できます】` : ''}${blockedByFat ? `【現在：${blockedByFat.dir.name}の穴があなたの太さ(${bSpec.label}・幅${bSpec.reqWidth})より狭くてつかえています！カバンのオイル(oil)を使うか壁を削り広げて解決できます】` : ''}${blockedByCrawlSteep ? `【現在：ほふく前進中は分割1ブロックを超える段差(${blockedByCrawlSteep.check.stepDiff}段)は登れません】` : ''}`;
+  const problemNote = `${blockedByHighStep ? `【現在：${blockedByHighStep.dir.name}の段差が分割${blockedByHighStep.check.stepDiff}ブロックあり、あなたの身長(分割${sSpec.subH}ブロック)より高くて登れません！カバンの石(stone)で踏み台を積むか、壁を階段状に削って解決できます】` : ''}${blockedByFat ? `【現在：${blockedByFat.dir.name}の穴があなたの太さ(${bSpec.label}・幅${bSpec.reqWidth})より狭くてつかえています！カバンのオイル(oil)を使うか壁を削り広げて解決できます】` : ''}${blockedByCrawlSteep ? `【現在：ほふく前進中は分割1ブロックを超える段差(${blockedByCrawlSteep.check.stepDiff}段)は登れません】` : ''}${blockedByCorner ? `【現在：${blockedByCorner.dir.name}へ進みたいですが、角の壁が邪魔で太さ(${bSpec.reqWidth})のあなたは斜めに進めません！左右どちらかの壁を削る必要があります】` : ''}`;
 
   const prompt = `あなたは5x5ボクセル島で暮らす自律ロボット「${ROBOT.unitModel}号機（第${ROBOT.gen}世代）」です。
 現在位置:(${ROBOT.pos.x},${ROBOT.pos.z}) 層:${formatHeightText(curH)}
@@ -944,7 +950,7 @@ ${problemNote}
 【現在の裏パラメータ(0〜100)】探究心:${effP.curiosity}, 警戒リミッター:${effP.cautionLimiter}, 出力:${effP.power}, 省エネ:${effP.eco}, 演算:${effP.logic}
 【現在発動中のトラウマ】[${activeTraumaNames}]
 基本表現辞書:${exprSummary}
-JSON形式のみで出力してください:{"action":"移動可能な方向名 または 踏み台を積む または 階段を削る または オイルで滑り抜ける または 穴を削り広げる または 足元を掘る または 休む","emotion":"表現キー(20種)","thought":"小学生向けのユニークな心の声(1〜2文)"}`;
+JSON形式のみで出力してください:{"action":"移動可能な方向名 または 踏み台を積む または 階段を削る または オイルで滑り抜ける または 穴を削り広げる または 角を削る または 足元を掘る または 休む","emotion":"表現キー(20種)","thought":"小学生向けのユニークな心の声(1〜2文)"}`;
 
   try {
     if (aiType === 'gemini') {
@@ -1006,16 +1012,17 @@ async function executeTurn() {
     const blockedByFat = moveEvaluations.find(m => m.check.reason === 'too_fat');
     const blockedByHighStep = moveEvaluations.find(m => m.check.reason === 'too_high_step');
     const blockedByCrawlSteep = moveEvaluations.find(m => m.check.reason === 'crawl_steep');
+    const blockedByCorner = moveEvaluations.find(m => m.check.reason === 'blocked_by_corner');
 
     if (blockedByFat) addTraumaById('narrow', true);
     if (curH >= 3 && Math.random() < 0.45) addTraumaById('height', true);
     if (TIME_STEP >= 14 && Math.random() < 0.22) addTraumaById('monster', true);
 
     const effP = getEffectiveParams();
-    const aiDecision = await askAIForDecision(validMoves, curH, isAtSeaEdge, blockedByFat, blockedByHighStep, blockedByCrawlSteep);
+    const aiDecision = await askAIForDecision(validMoves, curH, isAtSeaEdge, blockedByFat, blockedByHighStep, blockedByCrawlSteep, blockedByCorner);
 
     let chosenMove = null, wantDig = false, wantCrawlDig = false, wantDigDown = false, wantRest = false;
-    let wantSolveHighStep = false, wantSolveNarrow = false;
+    let wantSolveHighStep = false, wantSolveNarrow = false, wantSolveCorner = false;
     let traumaReaction = null;
 
     if (hasTrauma('height') && curH >= 2 && Math.random() < 0.78) {
@@ -1031,6 +1038,7 @@ async function executeTurn() {
     if (aiDecision && aiDecision.action && !traumaReaction) {
       if (aiDecision.action.includes('踏み台') || aiDecision.action.includes('階段')) wantSolveHighStep = true;
       else if (aiDecision.action.includes('オイル') || aiDecision.action.includes('広げ')) wantSolveNarrow = true;
+      else if (aiDecision.action.includes('角') || (blockedByCorner && aiDecision.action.includes('削'))) wantSolveCorner = true;
       else if (aiDecision.action.includes('足元')) wantDigDown = true;
       else if (aiDecision.action.includes('休')) wantRest = true;
       else if (aiDecision.action.includes('ほふく掘')) { wantDig = true; wantCrawlDig = true; }
@@ -1040,7 +1048,7 @@ async function executeTurn() {
       }
     }
 
-    if (!traumaReaction && !chosenMove && !wantRest && !wantDig && !wantDigDown && !wantSolveHighStep && !wantSolveNarrow) {
+    if (!traumaReaction && !chosenMove && !wantRest && !wantDig && !wantDigDown && !wantSolveHighStep && !wantSolveNarrow && !wantSolveCorner) {
       const restThreshold = 20 + Math.round(effP.eco * 0.38);
       if (life.stamina <= restThreshold) {
         wantRest = true;
@@ -1048,6 +1056,8 @@ async function executeTurn() {
         wantSolveHighStep = true;
       } else if (blockedByFat && Math.random() < 0.75) {
         wantSolveNarrow = true;
+      } else if (blockedByCorner && Math.random() < 0.75) {
+        wantSolveCorner = true;
       } else {
         const stepMoves = validMoves.filter(m => ['scramble_climb', 'stairs_up', 'safe_landing', 'stairs_down'].includes(m.check.reason));
         const apple = WORLD_ITEMS.find(it => it.type === 'apple');
@@ -1073,7 +1083,6 @@ async function executeTurn() {
       if (inlandMoves.length > 0) {
         const esc = inlandMoves[Math.floor(Math.random() * inlandMoves.length)];
         ROBOT.pos.x += esc.dir.dx; ROBOT.pos.z += esc.dir.dz; ROBOT.pos.lv = esc.check.targetLv; ROBOT.rotY = esc.dir.rot;
-        ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
       }
       ROBOT.posture = 'stand'; ROBOT.emotion = 'fear';
       actionLabel = `🌊 海トラウマ発動：内陸へ避難`;
@@ -1091,6 +1100,17 @@ async function executeTurn() {
       quickDigDown();
       btn.disabled = false;
       return;
+    } else if (wantSolveCorner && blockedByCorner) {
+      // ★追加: 斜め移動するための「角の壁削り」アクション
+      const d = blockedByCorner.dir;
+      const sideDir = ALL_DIRS.find(dxz => dxz.dx === d.dx && dxz.dz === 0) || ALL_DIRS[0];
+      ROBOT.rotY = sideDir.rot;
+      stepCharCloseToWallForDig(sideDir);
+      digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, sideDir, false, effP.power);
+      ROBOT.emotion = 'anger';
+      actionLabel = `😡 悩み解決(${bSpec.label})：斜めに進むため邪魔な${sideDir.name}の壁を削った！`;
+      thoughtText = aiDecision?.thought || `斜め(${d.name})に進みたいのに角の壁がおなかに引っかかる！邪魔な${sideDir.name}の壁を壊してやるーっ😡`;
+      DIARY_LOGS.push(`⛏️ ${GAME_DAY}日目：斜めに進むため邪魔な角の壁を削った！`);
     } else if (wantSolveHighStep && blockedByHighStep) {
       const d = blockedByHighStep.dir;
       ROBOT.rotY = d.rot;
@@ -1517,7 +1537,7 @@ function quickDiagonalOrFrontDig() {
   if (manualCameraMode === 'robot') resetFpvToRobotFront();
   const msg = res.blockedDiagFirst
     ? `⛏️ 斜め奥(${chosenDir.name})を掘るには手前の壁が邪魔！まず${res.sideDirName}の壁の手前に立って幅${bSpec.reqWidth}×高${sSpec.crawlH}で削ったよ！`
-    : `⛏️ ${chosenDir.name}の壁の手前（顔がめり込まない位置）に立って、自分のサイズ(幅${bSpec.reqWidth}×ほふく高${sSpec.crawlH})で削ったよ！`;
+    : `⛏️ ${chosenDir.name}の壁の手前（顔がめり込まない位置）に立って、自分のサイズ(幅${bSpec.reqWidth}×ほふく高${sSpec.crawlH})でピンポイントに削ったよ！`;
   document.getElementById('message-box').innerText = msg;
   rebuildTerrainAndItems(); syncRobot3DPosition(); cameraDirty = true; updateEnvironmentAndUI(); saveWorldState(); closeFanMenu();
   showToast(msg);
