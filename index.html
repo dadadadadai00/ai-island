@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0b1528">
-  <title>ボクセルAI自律思考水槽 v28</title>
+  <title>ボクセルAI自律思考水槽 v29</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
@@ -60,6 +60,9 @@
     .modal-content { background: #fff; width: 94%; max-width: 416px; max-height: 90vh; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); position: relative; overflow-y: auto; }
     .modal-close { position: absolute; top: 12px; right: 15px; font-size: 20px; font-weight: bold; color: #94a3b8; cursor: pointer; z-index: 10; }
     .modal-title { font-size: 15px; font-weight: 900; color: #1e293b; display: flex; align-items: center; gap: 6px; }
+    .dream-banner-box { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1.5px solid #f59e0b; border-radius: 11px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; }
+    .dream-banner-label { font-size: 10.5px; font-weight: 900; color: #92400e; }
+    .dream-banner-val { font-size: 13px; font-weight: 900; color: #b45309; }
     .spec-switch-row-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
     .spec-chip { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 5px 2px; font-size: 10px; font-weight: 800; text-align: center; background: #f8fafc; color: #475569; cursor: pointer; line-height: 1.2; }
     .spec-chip.active { background: #fef9c3; border-color: #eab308; color: #854d0e; box-shadow: 0 0 0 1.5px rgba(234,179,8,0.25); }
@@ -146,28 +149,28 @@
 </div>
 
 <div id="side-icon-column">
-  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳（5段階サイズ・表裏パラメータ・カバン）">📖</div>
+  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳（5つの夢ゲージ・5段階体格・カバン）">📖</div>
   <div class="side-circle-btn" id="cam-ground-btn" title="外カメラ（地上・全体固定）">🌌</div>
   <div class="side-circle-btn" id="cam-ug-btn" title="外カメラ（地下・全体固定）">⛏️</div>
   <div class="side-circle-btn" id="cam-fpv-btn" title="内カメラ（キャラ視点・1ブロック広角＆ほふくズーム）">🤖</div>
 </div>
 
 <div id="fan-menu-wrapper">
-  <div class="fan-item" onclick="quickDropApple()">🍎<span class="fan-label">リンゴ</span></div>
-  <div class="fan-item" onclick="quickStackSubStep()">🪜<span class="fan-label">小段差+1</span></div>
-  <div class="fan-item" onclick="quickDigDown()">👇<span class="fan-label">足元掘り</span></div>
-  <div class="fan-item" onclick="openModal('modal-gacha'); closeFanMenu();">🎰<span class="fan-label">ガチャ</span></div>
-  <div class="fan-item" onclick="setTinySlimPreset(); closeFanMenu();">🧚<span class="fan-label">極小×やせ</span></div>
-  <div class="fan-item" onclick="quickDiagonalOrFrontDig()">⛏️<span class="fan-label">斜め/前掘り</span></div>
+  <div class="fan-item" id="fan-btn-apple" onclick="quickDropApple()">🍎<span class="fan-label">リンゴ</span></div>
+  <div class="fan-item" id="fan-btn-step" onclick="quickStackSubStep()">🪜<span class="fan-label">小段差+1</span></div>
+  <div class="fan-item" id="fan-btn-digdown" onclick="quickDigDown()">👇<span class="fan-label">足元掘り</span></div>
+  <div class="fan-item" id="fan-btn-gacha" onclick="openModal('modal-gacha'); closeFanMenu();">🎰<span class="fan-label">ガチャ</span></div>
+  <div class="fan-item" id="fan-btn-preset" onclick="setTinySlimPreset(); closeFanMenu();">🧚<span class="fan-label">極小×やせ</span></div>
+  <div class="fan-item" id="fan-btn-digfront" onclick="quickDiagonalOrFrontDig()">⛏️<span class="fan-label">斜め/前掘り</span></div>
   <div id="plus-main-btn" title="メニューを開く">＋</div>
 </div>
 
 <div id="bottom-panel">
   <div class="panel-header">
-    <span>💭 ロボのきもち・心のさけび【v28 3ファイル分割・完全版】</span>
+    <span id="panel-header-title">💭 ロボのきもち・心のさけび【v29 4モード＆5つの夢ゲージ】</span>
     <div class="ai-badge" id="ai-status">🟩 アルゴン待機中</div>
   </div>
-  <div id="message-box">【v28分割完了】index.html・brain.js・world.js の3ファイル構成になったよ！全機能100%維持＆壁際掘削・太さ重力落下・ほふく制限がすべて動くよ！</div>
+  <div id="message-box">【v29完成】元のデザインはそのまま！⚙️設定で「4つの観察モード（野生・救援・試練・AI搭載）」を切り替えられ、📖手帳の「5つの夢ゲージ」で将来の夢（称号）が育つよ！</div>
   <div class="action-history">
     <span class="history-tag" id="history-action">👟 やった事 待機中</span>
     <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従(観察窓)・地下2層目</span>
@@ -177,11 +180,11 @@
 
 <div id="toast">💾 データを保存したよ</div>
 
-<!-- 📖 ロボット手帳モーダル -->
+<!-- 📖 ロボット手帳モーダル（いまの夢＋5つの夢ゲージ＋5段階体格＋トラウマ＋カバン） -->
 <div class="modal-overlay" id="modal-diary" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-diary')">✕</div>
-    <div class="modal-title">📖 1号機の手帳（5段階体格・トラウマ・カバン）</div>
+    <div class="modal-title">📖 1号機の手帳（5つの夢・5段階体格・カバン）</div>
     <div style="display:flex; align-items:center; gap:10px; background:#f8fafc; padding:7px 10px; border-radius:12px; border:1px solid #e2e8f0;">
       <div style="font-size:28px;" id="diary-emo-icon">🙂</div>
       <div style="flex:1; min-width:0;">
@@ -189,6 +192,12 @@
         <div style="font-size:10px; color:#64748b;" id="diary-robo-height">現在：地下2層目 / 高さ：極小(1) / 太さ：やせっちょ(1)</div>
         <div style="font-size:10px; color:#0f766e; font-weight:800;" id="diary-step-rule">🪜 階段:0段 / 🧗 よじ登り・安全着地:分割1ブロック / 🐛 ほふく高:1</div>
       </div>
+    </div>
+
+    <!-- 🌟 いまの夢（一番高い夢ゲージで自動変化） -->
+    <div class="dream-banner-box">
+      <span class="dream-banner-label">🌟 いまの夢（称号）</span>
+      <span class="dream-banner-val" id="diary-dream-title">『🧭 探検家・勇者』</span>
     </div>
 
     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -213,37 +222,38 @@
     </div>
 
     <div class="rig-tab-bar">
-      <div class="rig-tab-btn active" id="tab-diary-base" onclick="switchDiaryParamTab('base')">🟢 博士の基本設定(表)</div>
-      <div class="rig-tab-btn" id="tab-diary-hidden" onclick="switchDiaryParamTab('hidden')">🔴 裏パラメータ＆実験(裏)</div>
+      <div class="rig-tab-btn active" id="tab-diary-base" onclick="switchDiaryParamTab('base')">🟢 5つの夢ゲージ(表)</div>
+      <div class="rig-tab-btn" id="tab-diary-hidden" onclick="switchDiaryParamTab('hidden')">🔴 裏ゲージ＆トラウマ(裏)</div>
     </div>
 
+    <!-- 🟢 表タブ：5つの夢ゲージ -->
     <div class="lab-panel" id="diary-panel-base">
       <div style="font-size:10.5px; font-weight:900; color:#1e3a8a; display:flex; justify-content:space-between;">
-        <span>🧪 小学生博士が設定する基本パラメータ</span>
-        <span style="font-size:9.5px; color:#64748b;">※100で警戒ゼロ</span>
+        <span>🌈 行動で育つ「5つの夢ゲージ」</span>
+        <span style="font-size:9.5px; color:#64748b;">※最高値で夢が変化</span>
       </div>
       <div class="param-row">
-        <span class="param-label">🔭 探究心センサー</span>
+        <span class="param-label">🗡️ ぼうけん(探検家)</span>
         <input type="range" min="0" max="100" id="param-curiosity" class="param-slider" oninput="onParamSliderInput('curiosity', this.value)">
         <span class="param-val" id="val-param-curiosity">60</span>
       </div>
       <div class="param-row">
-        <span class="param-label">🛡️ 警戒リミッター</span>
+        <span class="param-label">🎵 げいじゅつ(音楽家)</span>
         <input type="range" min="0" max="100" id="param-cautionLimiter" class="param-slider" oninput="onParamSliderInput('cautionLimiter', this.value)">
         <span class="param-val" id="val-param-cautionLimiter">50</span>
       </div>
       <div class="param-row">
-        <span class="param-label">💥 出力パワー</span>
+        <span class="param-label">💪 ちから(大工さん)</span>
         <input type="range" min="0" max="100" id="param-power" class="param-slider" oninput="onParamSliderInput('power', this.value)">
         <span class="param-val" id="val-param-power">50</span>
       </div>
       <div class="param-row">
-        <span class="param-label">🔋 省エネ駆動</span>
+        <span class="param-label">💖 やさしさ(お花屋)</span>
         <input type="range" min="0" max="100" id="param-eco" class="param-slider" oninput="onParamSliderInput('eco', this.value)">
         <span class="param-val" id="val-param-eco">40</span>
       </div>
       <div class="param-row">
-        <span class="param-label">🧠 演算モジュール</span>
+        <span class="param-label">💡 かしこさ(学者)</span>
         <input type="range" min="0" max="100" id="param-logic" class="param-slider" oninput="onParamSliderInput('logic', this.value)">
         <span class="param-val" id="val-param-logic">50</span>
       </div>
@@ -258,33 +268,34 @@
       </div>
     </div>
 
+    <!-- 🔴 裏タブ：トラウマ補正後の夢ゲージ -->
     <div class="lab-panel hidden-tab" id="diary-panel-hidden" style="display:none;">
       <div style="font-size:10.5px; font-weight:900; color:#9f1239; display:flex; justify-content:space-between;">
-        <span>🧠 AIが実際に使う「裏パラメータ（最終値）」</span>
+        <span>🧠 AIが実際に使う「裏の夢ゲージ（最終値）」</span>
         <span style="font-size:9.5px; color:#be123c;">※トラウマで＋－変動</span>
       </div>
       <div class="param-row">
-        <span class="param-label">🔭 探究心センサー</span>
+        <span class="param-label">🗡️ ぼうけん(探検家)</span>
         <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-curiosity" style="width:60%"></div></div>
         <span class="eff-val-box" id="eff-val-curiosity">60 (±0)</span>
       </div>
       <div class="param-row">
-        <span class="param-label">🛡️ 警戒リミッター</span>
+        <span class="param-label">🎵 げいじゅつ(音楽家)</span>
         <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-cautionLimiter" style="width:50%"></div></div>
         <span class="eff-val-box" id="eff-val-cautionLimiter">50 (±0)</span>
       </div>
       <div class="param-row">
-        <span class="param-label">💥 出力パワー</span>
+        <span class="param-label">💪 ちから(大工さん)</span>
         <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-power" style="width:50%"></div></div>
         <span class="eff-val-box" id="eff-val-power">50 (±0)</span>
       </div>
       <div class="param-row">
-        <span class="param-label">🔋 省エネ駆動</span>
+        <span class="param-label">💖 やさしさ(お花屋)</span>
         <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-eco" style="width:40%"></div></div>
         <span class="eff-val-box" id="eff-val-eco">40 (±0)</span>
       </div>
       <div class="param-row">
-        <span class="param-label">🧠 演算モジュール</span>
+        <span class="param-label">💡 かしこさ(学者)</span>
         <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-logic" style="width:50%"></div></div>
         <span class="eff-val-box" id="eff-val-logic">50 (±0)</span>
       </div>
@@ -321,7 +332,7 @@
         <circle cx="60" cy="114" r="12" fill="#fff" stroke="#db2777" stroke-width="3"/>
         <rect x="46" y="132" width="28" height="14" rx="4" fill="#9d174d"/>
       </svg>
-      <div id="gacha-result-text" style="font-size:12.5px; font-weight:800; color:#be185d; min-height:20px; margin-top:4px;">🍎リンゴ・🪨段差石・🧴スライムオイル・🌿草 が出るよ！</div>
+      <div id="gacha-result-text" style="font-size:12.5px; font-weight:800; color:#be185d; min-height:20px; margin-top:4px;">🍎リンゴ・🪨段差石・🧴スライムオイル・🌿草ブロック が出るよ！</div>
     </div>
     <div style="display:flex; gap:8px;">
       <button class="btn-pink" id="btn-spin">スタート</button>
@@ -330,12 +341,21 @@
   </div>
 </div>
 
-<!-- ⚙️ システム設定モーダル -->
+<!-- ⚙️ システム設定モーダル（4つの観察モード切替を追加） -->
 <div class="modal-overlay" id="modal-settings" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-settings')">✕</div>
     <div class="modal-title">⚙️ システム設定</div>
     <button class="btn-accent" onclick="openExpressionModalFromSettings()">🎭 キャラ基本表現（20種バランス調整・骨組み切替）</button>
+    <div class="setting-group">
+      <label class="setting-label">👁️ 観察モード（4つの介入・記憶ルール切替）</label>
+      <select id="setting-obs-mode" class="setting-input">
+        <option value="wild">🌿 1. 野生モード（AI記憶なし・自力のみ）</option>
+        <option value="rescue">🚑 2. 救援モード（AI記憶なし・アイテム付与）</option>
+        <option value="trial">⚡ 3. 試練モード（AI記憶なし・段差や穴で試練）</option>
+        <option value="ai_mode">🤖 4. AI搭載モード（AI記憶あり・神様におねだり）</option>
+      </select>
+    </div>
     <div class="setting-group">
       <label class="setting-label">🎥 追従カメラの観察窓（スポット透過）・分割線</label>
       <select id="setting-cam-style" class="setting-input">
