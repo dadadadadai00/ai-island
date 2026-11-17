@@ -1,426 +1,1109 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#0b1528">
-  <title>ボクセルAI自律思考水槽 v28</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
-    #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; display: block; touch-action: none; }
-    #status-panel { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); width: 94%; max-width: 420px; background: rgba(255,255,255,0.96); border-radius: 18px; box-shadow: 0 4px 18px rgba(0,0,0,0.28); padding: 10px 12px; z-index: 10; transition: opacity 0.3s, transform 0.3s; }
-    #status-panel.sky-hidden { opacity: 0; pointer-events: none; transform: translate(-50%, -20px); }
-    .gauge-container { display: flex; justify-content: space-between; gap: 6px; }
-    .gauge-box { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 5px 6px; text-align: center; }
-    .gauge-title { font-size: 11px; font-weight: 800; color: #334155; margin-bottom: 4px; white-space: nowrap; }
-    .gauge-bar-bg { width: 100%; height: 6px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
-    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.35s; }
-    #bar-stamina { background: #ef4444; }
-    #bar-life { background: #eab308; }
-    #bar-mental { background: #10b981; }
-    .robot-status-row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 6px; border-top: 1px solid #f1f5f9; gap: 4px; flex-wrap: nowrap; }
-    .status-left-group { display: flex; align-items: center; gap: 5px; flex-shrink: 1; min-width: 0; }
-    .status-right-group { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
-    .robot-id-tag { font-size: 11px; font-weight: 900; color: #334155; white-space: nowrap; }
-    .badge { font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px; display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
-    .badge-days { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-    .badge-time { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
-    .badge-mood { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; cursor: pointer; }
-    .btn-icon { width: 26px; height: 26px; border-radius: 50%; background: #f1f5f9; display: flex; justify-content: center; align-items: center; font-size: 14px; cursor: pointer; border: 1px solid #cbd5e1; flex-shrink: 0; }
-    #side-icon-column { position: fixed; top: 122px; right: 14px; display: flex; flex-direction: column; gap: 10px; z-index: 12; }
-    .side-circle-btn { width: 46px; height: 46px; background: rgba(255,255,255,0.96); border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex; justify-content: center; align-items: center; font-size: 21px; cursor: pointer; border: 2.5px solid #e2e8f0; position: relative; transition: transform 0.18s, background-color 0.18s, border-color 0.18s; }
-    .side-circle-btn:active { transform: scale(0.92); }
-    .side-circle-btn.cam-active { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-color: #fde047; box-shadow: 0 0 0 3px rgba(253,224,71,0.55), 0 6px 14px rgba(29,78,216,0.5); transform: scale(1.08); }
-    .side-circle-btn.cam-active::after { content: 'ON'; position: absolute; bottom: -5px; right: -4px; background: #ef4444; color: #fff; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 999px; border: 1.5px solid #fff; line-height: 1.1; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-    #fan-menu-wrapper { position: fixed; bottom: 206px; left: 50%; transform: translateX(-50%); width: 50px; height: 50px; z-index: 15; }
-    #plus-main-btn { width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.98); border: 2px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.28); display: flex; justify-content: center; align-items: center; font-size: 28px; font-weight: bold; color: #334155; cursor: pointer; position: relative; z-index: 2; transition: transform 0.22s, background-color 0.22s; }
-    #fan-menu-wrapper.open #plus-main-btn { transform: rotate(45deg); background: #f1f5f9; }
-    .fan-item { position: absolute; top: 4px; left: 4px; width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,0.98); border: 2px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.22); display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 18px; cursor: pointer; opacity: 0; pointer-events: none; transform: translate(0,0) scale(0.4); transition: transform 0.26s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s; z-index: 1; }
-    .fan-label { position: absolute; bottom: -16px; font-size: 9px; font-weight: 900; color: #fff; background: rgba(15,23,42,0.85); padding: 1px 5px; border-radius: 6px; white-space: nowrap; pointer-events: none; }
-    #fan-menu-wrapper.open .fan-item { opacity: 1; pointer-events: auto; }
-    #fan-menu-wrapper.open .fan-item:nth-child(1) { transform: translate(-112px, -28px) scale(1); }
-    #fan-menu-wrapper.open .fan-item:nth-child(2) { transform: translate(-70px, -72px) scale(1); }
-    #fan-menu-wrapper.open .fan-item:nth-child(3) { transform: translate(-24px, -92px) scale(1); }
-    #fan-menu-wrapper.open .fan-item:nth-child(4) { transform: translate(24px, -92px) scale(1); }
-    #fan-menu-wrapper.open .fan-item:nth-child(5) { transform: translate(70px, -72px) scale(1); }
-    #fan-menu-wrapper.open .fan-item:nth-child(6) { transform: translate(112px, -28px) scale(1); }
-    #bottom-panel { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.98); border-top-left-radius: 20px; border-top-right-radius: 20px; box-shadow: 0 -4px 20px rgba(0,0,0,0.2); padding: 12px 15px 14px; z-index: 10; display: flex; flex-direction: column; gap: 8px; }
-    .panel-header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 800; color: #475569; }
-    .ai-badge { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: bold; }
-    #message-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 600; color: #1e293b; height: 64px; overflow-y: auto; line-height: 1.45; }
-    .action-history { font-size: 11px; color: #64748b; display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
-    .history-tag { background: #f1f5f9; padding: 2px 8px; border-radius: 8px; color: #334155; }
-    .btn-think { background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%); color: #fff; border: none; border-radius: 12px; padding: 12px; font-size: 15px; font-weight: 900; text-align: center; box-shadow: 0 4px 0 #2563eb; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; }
-    .btn-think:active { transform: translateY(3px); box-shadow: 0 1px 0 #2563eb; }
-    .btn-think:disabled { opacity: 0.6; pointer-events: none; }
-    #toast { position: fixed; top: 82px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,0.92); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 100; white-space: nowrap; }
-    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.75); z-index: 50; display: none; justify-content: center; align-items: center; }
-    .modal-overlay.active { display: flex; }
-    .modal-content { background: #fff; width: 94%; max-width: 416px; max-height: 90vh; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); position: relative; overflow-y: auto; }
-    .modal-close { position: absolute; top: 12px; right: 15px; font-size: 20px; font-weight: bold; color: #94a3b8; cursor: pointer; z-index: 10; }
-    .modal-title { font-size: 15px; font-weight: 900; color: #1e293b; display: flex; align-items: center; gap: 6px; }
-    .spec-switch-row-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
-    .spec-chip { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 5px 2px; font-size: 10px; font-weight: 800; text-align: center; background: #f8fafc; color: #475569; cursor: pointer; line-height: 1.2; }
-    .spec-chip.active { background: #fef9c3; border-color: #eab308; color: #854d0e; box-shadow: 0 0 0 1.5px rgba(234,179,8,0.25); }
-    .bag-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: #f8fafc; padding: 7px; border-radius: 10px; border: 1px solid #e2e8f0; }
-    .bag-slot { aspect-ratio: 1; background: #fff; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 20px; cursor: pointer; }
-    .bag-slot.filled { border: 1px solid #93c5fd; background: #eff6ff; }
-    .setting-group { display: flex; flex-direction: column; gap: 4px; }
-    .setting-label { font-size: 12px; font-weight: bold; color: #475569; }
-    .setting-input { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 12px; }
-    .btn-primary { background: #3b82f6; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: 900; cursor: pointer; width: 100%; }
-    .btn-accent { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: #fff; border: none; padding: 11px; border-radius: 12px; font-weight: 900; font-size: 13px; cursor: pointer; width: 100%; box-shadow: 0 3px 10px rgba(109,40,217,0.3); }
-    .btn-pink { background: #ec4899; color: #fff; border: none; padding: 11px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
-    .btn-sub { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 9px; border-radius: 10px; font-weight: 800; cursor: pointer; width: 100%; }
-    .btn-danger { background: #ef4848; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
-    .rig-tab-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #f1f5f9; padding: 4px; border-radius: 12px; }
-    .rig-tab-btn { padding: 7px 5px; border-radius: 9px; font-size: 11.5px; font-weight: 900; text-align: center; cursor: pointer; color: #64748b; border: 2px solid transparent; transition: all 0.15s; }
-    .rig-tab-btn.active { background: #fff; color: #1d4ed8; border-color: #3b82f6; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
-    .rig-tab-btn.active-danger { background: #fff1f2; color: #be123c; border-color: #f43f5e; box-shadow: 0 2px 6px rgba(244,63,94,0.15); }
-    .expr-list-container { display: flex; flex-direction: column; gap: 6px; max-height: 48vh; overflow-y: auto; padding: 4px 2px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
-    .expr-row { display: flex; align-items: center; gap: 6px; background: #f8fafc; padding: 5px; border-radius: 10px; border: 1.5px solid #e2e8f0; }
-    .expr-row.selected { border-color: #3b82f6; background: #eff6ff; }
-    .expr-left-btn { width: 118px; flex-shrink: 0; display: flex; align-items: center; gap: 5px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 6px 6px; cursor: pointer; font-size: 11px; font-weight: 900; color: #1e293b; text-align: left; }
-    .expr-row.selected .expr-left-btn { border-color: #2563eb; background: #dbeafe; color: #1e3a8a; }
-    .expr-icon { font-size: 17px; flex-shrink: 0; }
-    .expr-right-input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 11px; color: #334155; background: #fff; }
-    .modal-footer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 4px; }
-    .lab-panel { background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; }
-    .lab-panel.hidden-tab { background: #fff1f2; border-color: #fda4af; }
-    .param-row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: #1e293b; }
-    .param-label { width: 114px; flex-shrink: 0; display: flex; align-items: center; gap: 3px; white-space: nowrap; }
-    .param-slider { flex: 1; accent-color: #3b82f6; height: 6px; cursor: pointer; }
-    .param-val { width: 30px; text-align: right; font-weight: 900; color: #2563eb; font-size: 11px; }
-    .param-row.locked-dark { background: #1e293b; color: #64748b; border-radius: 7px; padding: 4px 6px; opacity: 0.72; pointer-events: none; }
-    .param-row.locked-dark .param-val { color: #64748b; }
-    .eff-bar-wrap { flex: 1; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; position: relative; }
-    .eff-bar-fill { height: 100%; background: #3b82f6; border-radius: 999px; transition: width 0.25s, background-color 0.25s; }
-    .eff-bar-fill.up { background: #f97316; }
-    .eff-bar-fill.down { background: #8b5cf6; }
-    .eff-val-box { width: 64px; text-align: right; font-size: 10.5px; font-weight: 900; white-space: nowrap; }
-    .diff-plus { color: #ea580c; }
-    .diff-minus { color: #7c3aed; }
-    .diff-zero { color: #64748b; }
-    .trauma-display-box { background: #fff; border: 1px dashed #cbd5e1; border-radius: 9px; padding: 5px 8px; font-size: 11px; color: #475569; display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
-    .trauma-tag-list { display: flex; flex-wrap: wrap; gap: 4px; min-height: 18px; align-items: center; }
-    .trauma-tag { background: #ffe4e6; border: 1px solid #fda4af; color: #be123c; font-weight: 800; padding: 2px 8px; border-radius: 999px; font-size: 10px; display: inline-flex; align-items: center; gap: 3px; }
-    .trauma-btn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 2px; }
-    .trauma-toggle-btn { border: 1.5px solid #cbd5e1; background: #fff; color: #334155; border-radius: 9px; padding: 5px 6px; font-size: 10.5px; font-weight: 900; cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; transition: transform 0.1s, background-color 0.15s; }
-    .trauma-toggle-btn:active { transform: scale(0.96); }
-    .trauma-toggle-btn.active { background: #ffe4e6; border-color: #f43f5e; color: #9f1239; box-shadow: 0 0 0 2px rgba(244,63,94,0.2); }
-    .trauma-btn-sub { font-size: 9.5px; font-weight: 700; color: #64748b; }
-    .trauma-toggle-btn.active .trauma-btn-sub { color: #be123c; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>5×5 AI箱庭ラボ - 夢と観察モード</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+  body, html {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: #1a2a3a;
+    font-family: "Hiragino Maru Gothic ProN", "Rounded Mplus 1c", sans-serif;
+  }
+  /* 主役の3D全画面キャンバス */
+  #canvas-container {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1;
+  }
+
+  /* 左上：最小限のステータス＆モード切替 */
+  #top-left-bar {
+    position: fixed; top: 12px; left: 12px; z-index: 10;
+    display: flex; flex-direction: column; gap: 6px;
+    pointer-events: none;
+  }
+  .status-pill {
+    pointer-events: auto;
+    background: rgba(15, 23, 42, 0.75); color: #fff;
+    padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: bold;
+    backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.2);
+    display: flex; align-items: center; gap: 8px;
+  }
+  #mode-select {
+    pointer-events: auto;
+    background: rgba(255, 255, 255, 0.92); color: #1e293b;
+    border: 2px solid #38bdf8; border-radius: 16px;
+    padding: 5px 10px; font-size: 13px; font-weight: bold;
+    outline: none; cursor: pointer;
+  }
+
+  /* 右上：小窓を開くアイコンボタン */
+  #top-right-bar {
+    position: fixed; top: 12px; right: 12px; z-index: 10;
+    display: flex; gap: 8px;
+  }
+  .icon-btn {
+    background: rgba(15, 23, 42, 0.75); color: #fff;
+    border: 1px solid rgba(255,255,255,0.25); border-radius: 50%;
+    width: 44px; height: 44px; font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; backdrop-filter: blur(6px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  }
+  .icon-btn:active { transform: scale(0.92); }
+
+  /* キャラの吹き出し（3D空間の邪魔をしない中央上配置） */
+  #speech-bubble {
+    position: fixed; top: 96px; left: 50%; transform: translateX(-50%);
+    z-index: 9; max-width: 88vw; width: max-content;
+    background: rgba(255, 255, 255, 0.94); color: #1e293b;
+    padding: 10px 16px; border-radius: 20px; font-size: 14px; font-weight: bold;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    border: 2px solid #fbbf24; pointer-events: none;
+    text-align: center; transition: opacity 0.3s;
+  }
+
+  /* 下部：最小限のアクションバー */
+  #bottom-bar {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    z-index: 10; display: flex; gap: 8px; align-items: center;
+    flex-wrap: wrap; justify-content: center; width: 95vw;
+    pointer-events: none;
+  }
+  .action-btn {
+    pointer-events: auto;
+    border: none; border-radius: 24px; padding: 11px 18px;
+    font-size: 14px; font-weight: bold; color: #fff;
+    cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .action-btn:active { transform: scale(0.95); }
+  .btn-step { background: linear-gradient(135deg, #10b981, #059669); font-size: 15px; }
+  .btn-rescue { background: linear-gradient(135deg, #f59e0b, #d97706); }
+  .btn-trial { background: linear-gradient(135deg, #ef4444, #dc2626); }
+
+  /* モーダル（初期状態は必ず display: none; で非表示） */
+  .modal-overlay {
+    display: none;
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px);
+    z-index: 100; align-items: center; justify-content: center; padding: 16px;
+  }
+  .modal-card {
+    background: #ffffff; color: #1e293b; width: 100%; max-width: 430px;
+    max-height: 85vh; border-radius: 22px; padding: 20px;
+    overflow-y: auto; box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+    position: relative;
+  }
+  .modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 14px;
+  }
+  .modal-title { font-size: 18px; font-weight: bold; margin: 0; }
+  .close-btn {
+    background: #e2e8f0; border: none; width: 32px; height: 32px;
+    border-radius: 50%; font-size: 16px; font-weight: bold; cursor: pointer;
+  }
+
+  /* 夢ゲージ（観察手帳）デザイン */
+  .dream-banner {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border: 2px solid #f59e0b; border-radius: 16px;
+    padding: 12px; text-align: center; margin-bottom: 14px;
+  }
+  .dream-title { font-size: 17px; font-weight: bold; color: #b45309; margin-top: 4px; }
+  .gauge-row { margin-bottom: 10px; }
+  .gauge-label {
+    display: flex; justify-content: space-between; font-size: 13px;
+    font-weight: bold; margin-bottom: 3px;
+  }
+  .gauge-bg {
+    width: 100%; height: 12px; background: #e2e8f0;
+    border-radius: 8px; overflow: hidden;
+  }
+  .gauge-fill { height: 100%; border-radius: 8px; transition: width 0.4s ease; }
+
+  .tag-badge {
+    display: inline-block; background: #fee2e2; color: #b91c1c;
+    font-size: 12px; font-weight: bold; padding: 3px 8px;
+    border-radius: 10px; margin: 2px;
+  }
+  .diary-log {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 10px; max-height: 130px; overflow-y: auto; font-size: 12px;
+    line-height: 1.5;
+  }
+  .input-field {
+    width: 100%; padding: 9px 12px; border: 1px solid #cbd5e1;
+    border-radius: 10px; font-size: 13px; margin-bottom: 8px;
+    user-select: text; -webkit-user-select: text;
+  }
+  .sub-btn {
+    background: #3b82f6; color: #fff; border: none; border-radius: 10px;
+    padding: 8px 14px; font-size: 13px; font-weight: bold; cursor: pointer;
+    width: 100%; margin-top: 4px;
+  }
+  .prompt-item {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    background: #f8fafc; padding: 8px; border-radius: 10px;
+  }
+</style>
 </head>
 <body>
 
+<!-- 主役の3D全画面キャンバス -->
 <div id="canvas-container"></div>
 
-<div id="status-panel">
-  <div class="gauge-container">
-    <div class="gauge-box">
-      <div class="gauge-title">❤️ たいりょく <span id="val-stamina">100</span></div>
-      <div class="gauge-bar-bg"><div class="bar-fill" id="bar-stamina" style="width:100%"></div></div>
-    </div>
-    <div class="gauge-box">
-      <div class="gauge-title">🍙 おなか <span id="val-life">100</span></div>
-      <div class="gauge-bar-bg"><div class="bar-fill" id="bar-life" style="width:100%"></div></div>
-    </div>
-    <div class="gauge-box">
-      <div class="gauge-title">🎵 ごきげん <span id="val-mental">100</span></div>
-      <div class="gauge-bar-bg"><div class="bar-fill" id="bar-mental" style="width:100%"></div></div>
-    </div>
+<!-- 左上：ステータス＆4つの観察モード切替 -->
+<div id="top-left-bar">
+  <div class="status-pill">
+    <span id="gen-day-text">🤖 1号機 (1日目)</span>
+    <span>⚡<span id="energy-text">80</span>%</span>
   </div>
-  <div class="robot-status-row">
-    <div class="status-left-group">
-      <div class="robot-id-tag" id="ui-robot-id">🎲箱型・1号機</div>
-      <div class="badge badge-days" id="ui-days">🌱 1日目</div>
-      <div class="badge badge-time" id="ui-time">☀️ 朝</div>
-    </div>
-    <div class="status-right-group">
-      <div class="badge badge-mood" id="ui-mood" onclick="cycleBodyAndCrawlTest()" title="タップで極小×やせっちょ等へ順番に切り替え">🙂通常(極小1・やせっちょ1)</div>
-      <button class="btn-icon" id="btn-settings" aria-label="設定">⚙️</button>
-    </div>
-  </div>
+  <select id="mode-select" onchange="changeObservationMode()">
+    <option value="wild">🌿 野生モード（自力のみ）</option>
+    <option value="rescue">🚑 救援モード（アイテム付与）</option>
+    <option value="trial">⚡ 試練モード（障害物配置）</option>
+    <option value="ai">🤖 AI搭載モード（記憶＆双方向）</option>
+  </select>
 </div>
 
-<div id="side-icon-column">
-  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳（5段階サイズ・表裏パラメータ・カバン）">📖</div>
-  <div class="side-circle-btn" id="cam-ground-btn" title="外カメラ（地上・全体固定）">🌌</div>
-  <div class="side-circle-btn" id="cam-ug-btn" title="外カメラ（地下・全体固定）">⛏️</div>
-  <div class="side-circle-btn" id="cam-fpv-btn" title="内カメラ（キャラ視点・1ブロック広角＆ほふくズーム）">🤖</div>
+<!-- 右上：モーダル呼び出しボタン -->
+<div id="top-right-bar">
+  <button class="icon-btn" onclick="openModal('notebook-modal')" title="観察手帳">📖</button>
+  <button class="icon-btn" onclick="openModal('prompt-modal')" title="奇想天外プロンプト">🌀</button>
+  <button class="icon-btn" onclick="openModal('settings-modal')" title="設定">⚙️</button>
 </div>
 
-<div id="fan-menu-wrapper">
-  <div class="fan-item" onclick="quickDropApple()">🍎<span class="fan-label">リンゴ</span></div>
-  <div class="fan-item" onclick="quickStackSubStep()">🪜<span class="fan-label">小段差+1</span></div>
-  <div class="fan-item" onclick="quickDigDown()">👇<span class="fan-label">足元掘り</span></div>
-  <div class="fan-item" onclick="openModal('modal-gacha'); closeFanMenu();">🎰<span class="fan-label">ガチャ</span></div>
-  <div class="fan-item" onclick="setTinySlimPreset(); closeFanMenu();">🧚<span class="fan-label">極小×やせ</span></div>
-  <div class="fan-item" onclick="quickDiagonalOrFrontDig()">⛏️<span class="fan-label">斜め/前掘り</span></div>
-  <div id="plus-main-btn" title="メニューを開く">＋</div>
+<!-- ロボットの心の声（吹き出し） -->
+<div id="speech-bubble">キョロキョロ…ここは5×5の小さな島だ！</div>
+
+<!-- 下部：モードに応じて切り替わる最小限の操作ボタン -->
+<div id="bottom-bar">
+  <button class="action-btn btn-step" onclick="stepSimulation()">🐾 1歩すすむ</button>
+
+  <!-- 救援・AI搭載モード用ボタン -->
+  <button class="action-btn btn-rescue mode-btn-rescue" style="display:none;" onclick="dropItem('apple')">🍎 リンゴを落とす</button>
+  <button class="action-btn btn-rescue mode-btn-rescue" style="display:none;" onclick="dropItem('stone')">🪨 石を落とす</button>
+
+  <!-- 試練・AI搭載モード用ボタン -->
+  <button class="action-btn btn-trial mode-btn-trial" style="display:none;" onclick="makeObstacle('wall')">🧱 カベを作る</button>
+  <button class="action-btn btn-trial mode-btn-trial" style="display:none;" onclick="makeObstacle('hole')">🕳️ 穴をほる</button>
 </div>
 
-<div id="bottom-panel">
-  <div class="panel-header">
-    <span>💭 ロボのきもち・心のさけび【v28 3ファイル分割・完全版】</span>
-    <div class="ai-badge" id="ai-status">🟩 アルゴン待機中</div>
-  </div>
-  <div id="message-box">【v28分割完了】index.html・brain.js・world.js の3ファイル構成になったよ！全機能100%維持＆壁際掘削・太さ重力落下・ほふく制限がすべて動くよ！</div>
-  <div class="action-history">
-    <span class="history-tag" id="history-action">👟 やった事 待機中</span>
-    <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従(観察窓)・地下2層目</span>
-  </div>
-  <button class="btn-think" id="btn-action">⚡ 今すぐ考える</button>
-</div>
-
-<div id="toast">💾 データを保存したよ</div>
-
-<!-- 📖 ロボット手帳モーダル -->
-<div class="modal-overlay" id="modal-diary" style="display:none;">
-  <div class="modal-content">
-    <div class="modal-close" onclick="closeModal('modal-diary')">✕</div>
-    <div class="modal-title">📖 1号機の手帳（5段階体格・トラウマ・カバン）</div>
-    <div style="display:flex; align-items:center; gap:10px; background:#f8fafc; padding:7px 10px; border-radius:12px; border:1px solid #e2e8f0;">
-      <div style="font-size:28px;" id="diary-emo-icon">🙂</div>
-      <div style="flex:1; min-width:0;">
-        <div style="font-weight:900; font-size:12.5px; color:#1e293b;" id="diary-robo-name">1号機（🎲サイコロ箱型・生存 1日目）</div>
-        <div style="font-size:10px; color:#64748b;" id="diary-robo-height">現在：地下2層目 / 高さ：極小(1) / 太さ：やせっちょ(1)</div>
-        <div style="font-size:10px; color:#0f766e; font-weight:800;" id="diary-step-rule">🪜 階段:0段 / 🧗 よじ登り・安全着地:分割1ブロック / 🐛 ほふく高:1</div>
-      </div>
+<!-- ① 📖 観察手帳モーダル（初期 display: none;） -->
+<div id="notebook-modal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title">📖 観察手帳（日記帳）</h2>
+      <button class="close-btn" onclick="closeModal('notebook-modal')">✕</button>
     </div>
 
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <span style="font-size:11px; font-weight:900; color:#0f766e;">📏 大きさ(高さ：分割1〜5ブロック)</span>
-      <button type="button" onclick="setTinySlimPreset()" style="font-size:9.5px; font-weight:900; padding:2px 7px; border-radius:6px; border:1px solid #14b8a6; background:#f0fdfa; color:#0f766e; cursor:pointer;">🧚 極小×やせっちょ(1×1)にする</button>
-    </div>
-    <div class="spec-switch-row-5">
-      <div class="spec-chip" id="size-chip-giant" onclick="changeRobotSizeFromDiary('giant')">巨大<br>(高5)</div>
-      <div class="spec-chip" id="size-chip-large" onclick="changeRobotSizeFromDiary('large')">大<br>(高4)</div>
-      <div class="spec-chip" id="size-chip-medium" onclick="changeRobotSizeFromDiary('medium')">標準<br>(高3)</div>
-      <div class="spec-chip" id="size-chip-small" onclick="changeRobotSizeFromDiary('small')">小<br>(高2)</div>
-      <div class="spec-chip" id="size-chip-tiny" onclick="changeRobotSizeFromDiary('tiny')">極小<br>(高1)</div>
+    <div class="dream-banner">
+      <div style="font-size:12px; color:#92400e; font-weight:bold;" id="notebook-robot-info">🤖 1号機（生存 1日目）</div>
+      <div class="dream-title" id="dream-title-text">いまの夢：『🧭 探検家・勇者』</div>
     </div>
 
-    <div style="font-size:11px; font-weight:900; color:#0f766e;">🐛 太さ(横幅：分割1〜5ブロック)</div>
-    <div class="spec-switch-row-5">
-      <div class="spec-chip" id="body-chip-fat5" onclick="changeRobotBodyFromDiary('fat5')">でぶっちょ<br>(幅5)</div>
-      <div class="spec-chip" id="body-chip-fat4" onclick="changeRobotBodyFromDiary('fat4')">ちょいでぶ<br>(幅4)</div>
-      <div class="spec-chip" id="body-chip-normal3" onclick="changeRobotBodyFromDiary('normal3')">標準<br>(幅3)</div>
-      <div class="spec-chip" id="body-chip-slim2" onclick="changeRobotBodyFromDiary('slim2')">ちょいやせ<br>(幅2)</div>
-      <div class="spec-chip" id="body-chip-slim1" onclick="changeRobotBodyFromDiary('slim1')">やせっちょ<br>(幅1)</div>
+    <!-- 5つの夢ゲージ -->
+    <div class="gauge-row">
+      <div class="gauge-label"><span>🗡️ ぼうけん（探検家）</span><span id="val-adventure">30</span></div>
+      <div class="gauge-bg"><div id="bar-adventure" class="gauge-fill" style="width:30%; background:#f97316;"></div></div>
+    </div>
+    <div class="gauge-row">
+      <div class="gauge-label"><span>🎵 げいじゅつ（音楽家）</span><span id="val-art">20</span></div>
+      <div class="gauge-bg"><div id="bar-art" class="gauge-fill" style="width:20%; background:#ec4899;"></div></div>
+    </div>
+    <div class="gauge-row">
+      <div class="gauge-label"><span>💡 かしこさ（学者）</span><span id="val-smart">25</span></div>
+      <div class="gauge-bg"><div id="bar-smart" class="gauge-fill" style="width:25%; background:#3b82f6;"></div></div>
+    </div>
+    <div class="gauge-row">
+      <div class="gauge-label"><span>💪 ちから（大工さん）</span><span id="val-power">25</span></div>
+      <div class="gauge-bg"><div id="bar-power" class="gauge-fill" style="width:25%; background:#ef4444;"></div></div>
+    </div>
+    <div class="gauge-row">
+      <div class="gauge-label"><span>💖 やさしさ（お花屋さん）</span><span id="val-kindness">30</span></div>
+      <div class="gauge-bg"><div id="bar-kindness" class="gauge-fill" style="width:30%; background:#10b981;"></div></div>
     </div>
 
-    <div class="rig-tab-bar">
-      <div class="rig-tab-btn active" id="tab-diary-base" onclick="switchDiaryParamTab('base')">🟢 博士の基本設定(表)</div>
-      <div class="rig-tab-btn" id="tab-diary-hidden" onclick="switchDiaryParamTab('hidden')">🔴 裏パラメータ＆実験(裏)</div>
+    <div style="margin: 12px 0;">
+      <div style="font-size:13px; font-weight:bold; margin-bottom:4px;">🎒 カバンの中身 ＆ 心のキズ</div>
+      <div id="bag-and-trauma" style="font-size:12px; color:#475569;">🪨所持している石: 0個 / トラウマなし</div>
     </div>
 
-    <div class="lab-panel" id="diary-panel-base">
-      <div style="font-size:10.5px; font-weight:900; color:#1e3a8a; display:flex; justify-content:space-between;">
-        <span>🧪 小学生博士が設定する基本パラメータ</span>
-        <span style="font-size:9.5px; color:#64748b;">※100で警戒ゼロ</span>
-      </div>
-      <div class="param-row">
-        <span class="param-label">🔭 探究心センサー</span>
-        <input type="range" min="0" max="100" id="param-curiosity" class="param-slider" oninput="onParamSliderInput('curiosity', this.value)">
-        <span class="param-val" id="val-param-curiosity">60</span>
-      </div>
-      <div class="param-row">
-        <span class="param-label">🛡️ 警戒リミッター</span>
-        <input type="range" min="0" max="100" id="param-cautionLimiter" class="param-slider" oninput="onParamSliderInput('cautionLimiter', this.value)">
-        <span class="param-val" id="val-param-cautionLimiter">50</span>
-      </div>
-      <div class="param-row">
-        <span class="param-label">💥 出力パワー</span>
-        <input type="range" min="0" max="100" id="param-power" class="param-slider" oninput="onParamSliderInput('power', this.value)">
-        <span class="param-val" id="val-param-power">50</span>
-      </div>
-      <div class="param-row">
-        <span class="param-label">🔋 省エネ駆動</span>
-        <input type="range" min="0" max="100" id="param-eco" class="param-slider" oninput="onParamSliderInput('eco', this.value)">
-        <span class="param-val" id="val-param-eco">40</span>
-      </div>
-      <div class="param-row">
-        <span class="param-label">🧠 演算モジュール</span>
-        <input type="range" min="0" max="100" id="param-logic" class="param-slider" oninput="onParamSliderInput('logic', this.value)">
-        <span class="param-val" id="val-param-logic">50</span>
-      </div>
-      <div class="param-row locked-dark" title="予備パラメータ（現在は暗転ロック中）">
-        <span class="param-label">🔒 忠誠心(予備)</span>
-        <input type="range" min="0" max="100" value="50" disabled class="param-slider">
-        <span class="param-val">50</span>
-      </div>
-      <div class="trauma-display-box">
-        <div style="font-weight:900; font-size:10px; color:#9f1239;">⚡ 現在キャラが抱えているトラウマ（表示のみ）</div>
-        <div class="trauma-tag-list" id="base-trauma-tag-list"></div>
-      </div>
+    <div style="margin-bottom: 12px;">
+      <div style="font-size:13px; font-weight:bold; margin-bottom:4px;">💌 今日の出来事を教えて育てる（AI判定）</div>
+      <input type="text" id="real-event-input" class="input-field" placeholder="例：今日は音楽を聴いたよ / 山へ散歩したよ">
+      <button class="sub-btn" onclick="sendRealWorldEvent()">AIに送って夢ゲージを伸ばす</button>
     </div>
 
-    <div class="lab-panel hidden-tab" id="diary-panel-hidden" style="display:none;">
-      <div style="font-size:10.5px; font-weight:900; color:#9f1239; display:flex; justify-content:space-between;">
-        <span>🧠 AIが実際に使う「裏パラメータ（最終値）」</span>
-        <span style="font-size:9.5px; color:#be123c;">※トラウマで＋－変動</span>
-      </div>
-      <div class="param-row">
-        <span class="param-label">🔭 探究心センサー</span>
-        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-curiosity" style="width:60%"></div></div>
-        <span class="eff-val-box" id="eff-val-curiosity">60 (±0)</span>
-      </div>
-      <div class="param-row">
-        <span class="param-label">🛡️ 警戒リミッター</span>
-        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-cautionLimiter" style="width:50%"></div></div>
-        <span class="eff-val-box" id="eff-val-cautionLimiter">50 (±0)</span>
-      </div>
-      <div class="param-row">
-        <span class="param-label">💥 出力パワー</span>
-        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-power" style="width:50%"></div></div>
-        <span class="eff-val-box" id="eff-val-power">50 (±0)</span>
-      </div>
-      <div class="param-row">
-        <span class="param-label">🔋 省エネ駆動</span>
-        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-eco" style="width:40%"></div></div>
-        <span class="eff-val-box" id="eff-val-eco">40 (±0)</span>
-      </div>
-      <div class="param-row">
-        <span class="param-label">🧠 演算モジュール</span>
-        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-logic" style="width:50%"></div></div>
-        <span class="eff-val-box" id="eff-val-logic">50 (±0)</span>
-      </div>
-      <div class="param-row locked-dark">
-        <span class="param-label">🔒 忠誠心(予備)</span>
-        <div class="eff-bar-wrap"><div class="eff-bar-fill" style="width:50%"></div></div>
-        <span class="eff-val-box">50 (ロック)</span>
-      </div>
-      <div style="font-size:10px; font-weight:900; color:#9f1239; margin-top:2px; display:flex; justify-content:space-between; align-items:center;">
-        <span>⚡ トラウマ発症スイッチ（複数ONで裏の数字が歪む！）</span>
-        <button type="button" onclick="clearAllTraumas()" style="font-size:9px; font-weight:800; padding:2px 6px; border-radius:5px; border:1px solid #fda4af; background:#fff; color:#be123c; cursor:pointer;">全クリア</button>
-      </div>
-      <div class="trauma-btn-grid" id="trauma-btn-grid"></div>
-    </div>
-
-    <div style="font-size:11.5px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ・素材」（🪨小段差積み / 🧴オイル滑り抜け / 🍎食事）</div>
-    <div class="bag-grid" id="bag-grid"></div>
-    <div style="font-size:11.5px; font-weight:bold; color:#475569;">📝 世代のきろく・思い出</div>
-    <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px; font-size:10.5px; color:#334155; max-height:70px; overflow-y:auto; line-height:1.4;"></div>
-    <button class="btn-sub" onclick="closeModal('modal-diary')">手帳を閉じる</button>
-  </div>
-</div>
-
-<!-- 🎰 ガチャモーダル -->
-<div class="modal-overlay" id="modal-gacha" style="display:none;">
-  <div class="modal-content">
-    <div class="modal-close" onclick="closeModal('modal-gacha')">✕</div>
-    <div class="modal-title" style="color:#be185d;">🎰 パステル・ガチャガチャ</div>
-    <div style="text-align:center; padding:6px 0;">
-      <svg width="110" height="145" viewBox="0 0 120 160">
-        <circle cx="60" cy="52" r="44" fill="#f0f9ff" stroke="#f472b6" stroke-width="4"/>
-        <circle cx="45" cy="62" r="12" fill="#fde047"/><circle cx="72" cy="65" r="12" fill="#c084fc"/><circle cx="58" cy="44" r="12" fill="#6ee7b7"/>
-        <path d="M22 92 L98 92 L90 152 L30 152 Z" fill="#f472b6" stroke="#db2777" stroke-width="3"/>
-        <circle cx="60" cy="114" r="12" fill="#fff" stroke="#db2777" stroke-width="3"/>
-        <rect x="46" y="132" width="28" height="14" rx="4" fill="#9d174d"/>
-      </svg>
-      <div id="gacha-result-text" style="font-size:12.5px; font-weight:800; color:#be185d; min-height:20px; margin-top:4px;">🍎リンゴ・🪨段差石・🧴スライムオイル・🌿草 が出るよ！</div>
-    </div>
-    <div style="display:flex; gap:8px;">
-      <button class="btn-pink" id="btn-spin">スタート</button>
-      <button class="btn-sub" onclick="closeModal('modal-gacha')">閉じる</button>
+    <div>
+      <div style="font-size:13px; font-weight:bold; margin-bottom:4px;">📝 観察日記ログ</div>
+      <div id="diary-log" class="diary-log"></div>
     </div>
   </div>
 </div>
 
-<!-- ⚙️ システム設定モーダル -->
-<div class="modal-overlay" id="modal-settings" style="display:none;">
-  <div class="modal-content">
-    <div class="modal-close" onclick="closeModal('modal-settings')">✕</div>
-    <div class="modal-title">⚙️ システム設定</div>
-    <button class="btn-accent" onclick="openExpressionModalFromSettings()">🎭 キャラ基本表現（20種バランス調整・骨組み切替）</button>
-    <div class="setting-group">
-      <label class="setting-label">🎥 追従カメラの観察窓（スポット透過）・分割線</label>
-      <select id="setting-cam-style" class="setting-input">
-        <option value="hide">③ 観察窓くっきり消去＋削り断面のみ立体表示（推奨）</option>
-        <option value="glass_noline">① 観察窓すりガラス透過（分割線なし）</option>
-        <option value="glass_line">② 詳細5×5×5分割線あり・すりガラス透過</option>
-      </select>
+<!-- ② 🌀 奇想天外プロンプト一覧モーダル（初期 display: none;） -->
+<div id="prompt-modal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title">🌀 奇想天外プロンプト一覧</h2>
+      <button class="close-btn" onclick="closeModal('prompt-modal')">✕</button>
     </div>
-    <div class="setting-group">
-      <label class="setting-label">📏 1号機の大きさ（高さ5段階：分割1〜5ブロック）</label>
-      <select id="setting-size-level" class="setting-input">
-        <option value="giant">巨大（分割5ブロック＝1ブロック高）</option>
-        <option value="large">大（分割4ブロック）</option>
-        <option value="medium">標準（分割3ブロック）</option>
-        <option value="small">小（分割2ブロック）</option>
-        <option value="tiny">極小（分割1ブロック）</option>
-      </select>
-    </div>
-    <div class="setting-group">
-      <label class="setting-label">🐛 1号機の太さ（横幅5段階：分割1〜5ブロック）</label>
-      <select id="setting-body-type" class="setting-input">
-        <option value="fat5">でぶっちょ（分割5ブロック＝1ブロック幅）</option>
-        <option value="fat4">ちょいでぶ（分割4ブロック）</option>
-        <option value="normal3">標準（分割3ブロック）</option>
-        <option value="slim2">ちょいやせ（分割2ブロック）</option>
-        <option value="slim1">やせっちょ（分割1ブロック）</option>
-      </select>
-    </div>
-    <div class="setting-group">
-      <label class="setting-label">🤖 使う頭脳（AIの判断をゲームに反映）</label>
-      <select id="setting-ai-type" class="setting-input">
-        <option value="none">🟩 アルゴンさん（通信なし・5段階物理＆トラウマ本能）</option>
-        <option value="gemini">🟦 3.8 / Gemini（gemini-3.8-flash 通信最優先）</option>
-        <option value="groq">🟪 3.1 / Groq（爆速AI通信）</option>
-      </select>
-    </div>
-    <div class="setting-group">
-      <label class="setting-label">⚡ 移動スピード</label>
-      <select id="setting-speed" class="setting-input">
-        <option value="3">速度 3（通常・マスの中央に安全停止）</option>
-        <option value="5">速度 5（猛ダッシュ・海へ飛び出し＆海トラウマ発生注意！）</option>
-      </select>
-    </div>
-    <div class="setting-group">
-      <label class="setting-label">🟦 Gemini APIキー (AIzaSy...)</label>
-      <input type="password" id="setting-gemini-key" class="setting-input" placeholder="Geminiキーを貼り付け">
-    </div>
-    <div class="setting-group">
-      <label class="setting-label">🟪 Groq APIキー (gsk_...)</label>
-      <input type="password" id="setting-groq-key" class="setting-input" placeholder="Groqキーを貼り付け">
-    </div>
-    <button class="btn-primary" onclick="saveSettings()">設定を保存して閉じる</button>
-    <hr style="border:0; border-top:1px solid #e2e8f0; margin:2px 0;">
-    <button class="btn-danger" onclick="resetGameDirectly()">🔄 データを消して最初からやり直す（初期化）</button>
+    <p style="font-size:12px; color:#64748b; margin-top:0;">
+      物理ルールでハプニングが起きた時だけ、ONになっている短い指示をAIへ送ります。
+    </p>
+    <div id="prompt-list-container"></div>
+    <button class="sub-btn" onclick="savePromptSettings()">プロンプト設定を保存</button>
   </div>
 </div>
 
-<!-- 🎭 キャラ基本表現モーダル -->
-<div class="modal-overlay" id="modal-expressions" style="display:none;">
-  <div class="modal-content">
-    <div class="modal-close" onclick="cancelExpressionModal()">✕</div>
-    <div class="modal-title">🎭 キャラ基本表現（バランス調整・全20種）</div>
-    <div style="font-size:11px; color:#475569; line-height:1.35;">
-      上のタブで「🎲サイコロ箱型」と「🦴3D骨組み（◯関節と線のマッチ棒）」を選び、左のボタンでしぐさ選択、右の欄でAIの連想ワードを調整できます。ルール外の行動時は自動で「🌀模索・奮闘」します。
+<!-- ③ ⚙️ 設定モーダル（初期 display: none;） -->
+<div id="settings-modal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title">⚙️ AI通信＆ワールド設定</h2>
+      <button class="close-btn" onclick="closeModal('settings-modal')">✕</button>
     </div>
-    <div class="rig-tab-bar">
-      <div class="rig-tab-btn active" id="tab-rig-box" onclick="selectTempRigTab('box')">🎲 サイコロ箱型(基本)</div>
-      <div class="rig-tab-btn" id="tab-rig-stick" onclick="selectTempRigTab('stick')">🦴 3D骨組み(◯と線)</div>
-    </div>
-    <div style="display:flex; justify-content:space-between; font-size:10.5px; font-weight:800; color:#64748b; padding:0 4px;">
-      <span>👈 表現ボタン（20種類）</span>
-      <span>🤖 AI連想ワード（状態・道具・動作）</span>
-    </div>
-    <div class="expr-list-container" id="expr-list-container"></div>
-    <div class="modal-footer-btns">
-      <button class="btn-sub" onclick="cancelExpressionModal()">キャンセル</button>
-      <button class="btn-primary" onclick="confirmExpressionModal()">✅ 確定（水槽へ反映）</button>
-    </div>
+
+    <label style="font-size:12px; font-weight:bold;">Gemini APIキー</label>
+    <input type="password" id="api-key-input" class="input-field" placeholder="AIzaSy...">
+
+    <label style="font-size:12px; font-weight:bold;">使用モデル（gemini-3.8-flash以上必須）</label>
+    <select id="model-select" class="input-field">
+      <option value="gemini-3.8-flash">gemini-3.8-flash（推奨・高速）</option>
+      <option value="gemini-3.8-pro">gemini-3.8-pro（高精度）</option>
+    </select>
+
+    <button class="sub-btn" onclick="saveApiSettings()">設定を保存する</button>
+    <hr style="border:none; border-top:1px solid #e2e8f0; margin:16px 0;">
+    <button class="sub-btn" style="background:#ef4444;" onclick="nextGenerationReset()">🔄 世代交代して新しい島で始める</button>
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="brain.js"></script>
-<script src="world.js"></script>
+<script>
+/* =========================================================
+   1. 状態管理（5つの夢ゲージ・4つのモード・記憶・物理環境）
+========================================================= */
+const GRID_SIZE = 5;
+const MAX_ITEMS = 3; // スマホが重くならない厳格なアイテム上限
+
+let state = {
+  generation: 1,
+  day: 1,
+  turnCount: 0,
+  energy: 80,
+  mode: 'wild', // 'wild' | 'rescue' | 'trial' | 'ai'
+  stonesHeld: 0,
+  traumas: [],
+  aiMemory: [], // AI搭載モード用の記憶リスト
+  stats: {
+    adventure: 30, // 🗡️ ぼうけん
+    art: 20,       // 🎵 げいじゅつ
+    smart: 25,     // 💡 かしこさ
+    power: 25,     // 💪 ちから
+    kindness: 30   // 💖 やさしさ
+  },
+  prompts: {
+    fall:   { enabled: true, label: '崖から落ちた時', text: '高い段差から落ちてお尻をぶつけた！ユーモアたっぷりに痛がって言い訳して。' },
+    wall:   { enabled: true, label: '高い壁にぶつかった時', text: '目の前の壁が高すぎて登れない！悔しがるか、石を積むアイデアを呟いて。' },
+    narrow: { enabled: true, label: '狭い隙間に挟まった時', text: '両側が壁で体が太くてお腹がつかえた！ドタバタした心の声を叫んで。' },
+    eat:    { enabled: true, label: 'リンゴを食べた時', text: 'リンゴを食べて元気百倍！今の夢に合わせて喜びを表現して。' },
+    god:    { enabled: true, label: 'AI搭載モードの交信', text: '空から見守る神様（プレイヤー）に向かって、今の島の状況や欲しい助けをおねだりして。' }
+  },
+  apiKey: localStorage.getItem('HAKONIWA_API_KEY') || '',
+  modelName: localStorage.getItem('HAKONIWA_MODEL') || 'gemini-3.8-flash'
+};
+
+// 5×5マスの高さデータ（1〜5段）とブロック種類（'grass' | 'dirt' | 'stone'）
+let worldGrid = [];
+let worldItems = []; // { id, type: 'apple'|'stone', gx, gz, mesh }
+
+// ロボットの物理座標とターゲット（滑らか補間用）
+let robot = {
+  gx: 2, gz: 2,
+  dir: 0, // 0:南, 1:東, 2:北, 3:西
+  reqWidth: 1.0, // 太さ判定用
+  pos: new THREE.Vector3(0, 1, 0),
+  targetPos: new THREE.Vector3(0, 1, 0),
+  targetRotY: 0,
+  pose: 'idle', // 'idle' | 'walk' | 'fall' | 'stuck' | 'dance' | 'dig' | 'sleep'
+  poseTimer: 0,
+  bulbColor: 0x38bdf8
+};
+
+/* =========================================================
+   2. Three.js 3D水槽の構築（画面全体・軽量ボクセル）
+========================================================= */
+let scene, camera, renderer, controls;
+let terrainGroup, itemGroup, robotGroup, leftArm, rightArm, bulbMat, waterMesh;
+
+function initThreeJS() {
+  const container = document.getElementById('canvas-container');
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1e293b);
+
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(6.5, 7.5, 8.5);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  container.appendChild(renderer.domElement);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.target.set(0, 1.0, 0);
+  controls.maxPolarAngle = Math.PI / 2 - 0.05;
+  controls.minDistance = 4;
+  controls.maxDistance = 18;
+
+  const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+  scene.add(ambient);
+
+  const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.9);
+  dirLight.position.set(5, 12, 6);
+  dirLight.castShadow = true;
+  scene.add(dirLight);
+
+  // 外枠の海（水槽）
+  const waterGeo = new THREE.BoxGeometry(7.6, 0.5, 7.6);
+  const waterMat = new THREE.MeshLambertMaterial({ color: 0x0284c7, transparent: true, opacity: 0.78 });
+  waterMesh = new THREE.Mesh(waterGeo, waterMat);
+  waterMesh.position.set(0, -0.2, 0);
+  scene.add(waterMesh);
+
+  terrainGroup = new THREE.Group();
+  itemGroup = new THREE.Group();
+  scene.add(terrainGroup);
+  scene.add(itemGroup);
+
+  createRobotMesh();
+  initWorldData();
+  rebuildTerrainMeshes();
+  syncRobotWorldTarget();
+  robot.pos.copy(robot.targetPos);
+
+  window.addEventListener('resize', onWindowResize);
+  animate();
+}
+
+function createRobotMesh() {
+  robotGroup = new THREE.Group();
+
+  // サイコロ箱型の胴体
+  const bodyGeo = new THREE.BoxGeometry(0.68, 0.65, 0.58);
+  const bodyMat = new THREE.MeshLambertMaterial({ color: 0xf8fafc });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 0.35;
+  body.castShadow = true;
+  robotGroup.add(body);
+
+  // 目（正面）
+  const eyeGeo = new THREE.BoxGeometry(0.12, 0.12, 0.05);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+  const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+  leftEye.position.set(-0.15, 0.45, 0.3);
+  const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+  rightEye.position.set(0.15, 0.45, 0.3);
+  robotGroup.add(leftEye, rightEye);
+
+  // 頭の感情電球
+  const bulbGeo = new THREE.SphereGeometry(0.14, 12, 12);
+  bulbMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+  const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+  bulb.position.set(0, 0.82, 0);
+  robotGroup.add(bulb);
+
+  // 両腕
+  const armGeo = new THREE.BoxGeometry(0.16, 0.42, 0.16);
+  const armMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
+  leftArm = new THREE.Mesh(armGeo, armMat);
+  leftArm.position.set(-0.44, 0.35, 0);
+  rightArm = new THREE.Mesh(armGeo, armMat);
+  rightArm.position.set(0.44, 0.35, 0);
+  robotGroup.add(leftArm, rightArm);
+
+  scene.add(robotGroup);
+}
+
+/* =========================================================
+   3. 5×5 ステージ生成と描画
+========================================================= */
+function initWorldData() {
+  worldGrid = [];
+  for (let x = 0; x < GRID_SIZE; x++) {
+    worldGrid[x] = [];
+    for (let z = 0; z < GRID_SIZE; z++) {
+      let h = 1;
+      let type = 'grass';
+      if ((x === 0 && z === 0) || (x === 4 && z === 4)) { h = 3; type = 'stone'; }
+      else if (x === 1 && z === 3) { h = 2; type = 'grass'; }
+      else if (x === 3 && z === 1) { h = 2; type = 'dirt'; }
+      worldGrid[x][z] = { height: h, type: type };
+    }
+  }
+  // 初期アイテム（リンゴ1個、石1個）
+  clearAllItems();
+  spawnItemAt('apple', 0, 4);
+  spawnItemAt('stone', 4, 0);
+}
+
+function gridToWorldX(gx) { return (gx - 2) * 1.1; }
+function gridToWorldZ(gz) { return (gz - 2) * 1.1; }
+function heightToWorldY(h) { return h * 0.55; }
+
+function rebuildTerrainMeshes() {
+  while (terrainGroup.children.length > 0) {
+    const m = terrainGroup.children[0];
+    m.geometry.dispose();
+    terrainGroup.remove(m);
+  }
+  for (let x = 0; x < GRID_SIZE; x++) {
+    for (let z = 0; z < GRID_SIZE; z++) {
+      const cell = worldGrid[x][z];
+      const h = cell.height;
+      const boxH = h * 0.55;
+      const geo = new THREE.BoxGeometry(1.04, boxH, 1.04);
+      let color = 0x86efac; // 緑の土
+      if (cell.type === 'dirt') color = 0xd97706;
+      if (cell.type === 'stone') color = 0x94a3b8;
+      const mat = new THREE.MeshLambertMaterial({ color });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(gridToWorldX(x), boxH / 2, gridToWorldZ(z));
+      mesh.receiveShadow = true;
+      terrainGroup.add(mesh);
+    }
+  }
+  updateItemPositions();
+}
+
+function clearAllItems() {
+  while (itemGroup.children.length > 0) {
+    itemGroup.remove(itemGroup.children[0]);
+  }
+  worldItems = [];
+}
+
+function spawnItemAt(type, gx, gz) {
+  // 同じマスの既存アイテムは潰れる（メモリ肥大防止）
+  const idx = worldItems.findIndex(it => it.gx === gx && it.gz === gz);
+  if (idx !== -1) {
+    itemGroup.remove(worldItems[idx].mesh);
+    worldItems.splice(idx, 1);
+  }
+  // 島全体のアイテム上限（最大3個）を超える場合は一番古いものを消す
+  if (worldItems.length >= MAX_ITEMS) {
+    const oldest = worldItems.shift();
+    itemGroup.remove(oldest.mesh);
+  }
+
+  let mesh;
+  if (type === 'apple') {
+    const geo = new THREE.SphereGeometry(0.24, 12, 12);
+    const mat = new THREE.MeshLambertMaterial({ color: 0xef4444 });
+    mesh = new THREE.Mesh(geo, mat);
+  } else {
+    const geo = new THREE.DodecahedronGeometry(0.25);
+    const mat = new THREE.MeshLambertMaterial({ color: 0x64748b });
+    mesh = new THREE.Mesh(geo, mat);
+  }
+  itemGroup.add(mesh);
+  worldItems.push({ type, gx, gz, mesh });
+  updateItemPositions();
+}
+
+function updateItemPositions() {
+  for (const it of worldItems) {
+    const h = worldGrid[it.gx][it.gz].height;
+    it.mesh.position.set(gridToWorldX(it.gx), heightToWorldY(h) + 0.25, gridToWorldZ(it.gz));
+  }
+}
+
+function syncRobotWorldTarget() {
+  const h = worldGrid[robot.gx][robot.gz].height;
+  robot.targetPos.set(gridToWorldX(robot.gx), heightToWorldY(h), gridToWorldZ(robot.gz));
+  const angles = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+  robot.targetRotY = angles[robot.dir] || 0;
+}
+
+/* =========================================================
+   4. 厳格な物理ルール＆1歩すすむシミュレーション
+========================================================= */
+async function stepSimulation() {
+  robot.turnCount++;
+  state.turnCount++;
+  if (state.turnCount % 10 === 0) {
+    state.day++;
+    addDiaryLog(`🌅 ${state.day}日目の朝がやってきた。`);
+  }
+
+  // エネルギー消費
+  state.energy = Math.max(0, state.energy - 3);
+  if (state.energy === 0) {
+    robot.pose = 'sleep';
+    robot.bulbColor = 0x94a3b8;
+    setBubble('💤 電池切れ…すこし居眠りして回復するよ。');
+    state.energy = 35 + Math.floor(state.stats.kindness * 0.3);
+    updateUI();
+    return;
+  }
+
+  // AI搭載モードの場合、または近くにアイテムがある場合の方向決定
+  let chosenDir = chooseDirectionByInstinct();
+
+  // もしAI搭載モードで3ターンに1回なら、AIの判断（移動方向や感情）を最優先で反映
+  if (state.mode === 'ai' && state.apiKey && state.turnCount % 3 === 0) {
+    const aiDecision = await askAIDecisionAndReaction('god', '神様が見守っています。次にどの方向へ動くか、何が欲しいか考えて！');
+    if (aiDecision && typeof aiDecision.moveDir === 'number') {
+      chosenDir = aiDecision.moveDir;
+    }
+  }
+
+  robot.dir = chosenDir;
+  const dirs = [
+    { dx: 0, dz: 1 },  // 0:南
+    { dx: 1, dz: 0 },  // 1:東
+    { dx: 0, dz: -1 }, // 2:北
+    { dx: -1, dz: 0 }  // 3:西
+  ];
+  const d = dirs[robot.dir];
+  const nx = robot.gx + d.dx;
+  const nz = robot.gz + d.dz;
+
+  // ① 海（5×5の外）の境界チェック
+  if (nx < 0 || nx >= GRID_SIZE || nz < 0 || nz >= GRID_SIZE) {
+    if (state.stats.adventure < 50) {
+      robot.pose = 'stuck';
+      robot.bulbColor = 0x3b82f6;
+      gainStat('adventure', 3);
+      setBubble('🌊 うわっ、ここから先は海だ！落っこちないように引き返そう。');
+    } else {
+      robot.pose = 'dance';
+      robot.bulbColor = 0xfbbf24;
+      gainStat('art', 3);
+      setBubble('🌊 海の波がキレイだな〜！潮風が気持ちいいぞ！');
+    }
+    syncRobotWorldTarget();
+    updateUI();
+    return;
+  }
+
+  const currH = worldGrid[robot.gx][robot.gz].height;
+  const nextCell = worldGrid[nx][nz];
+  const diffH = nextCell.height - currH;
+
+  // ② 横幅（太さ）と狭い谷間の挟まりチェック
+  if (isNarrowPassage(nx, nz, nextCell.height) && robot.reqWidth >= 1.0) {
+    robot.pose = 'stuck';
+    robot.bulbColor = 0xef4444;
+    gainStat('power', 2);
+    await triggerPhysicalHappening('narrow', `座標(${nx},${nz})の両側が高い壁で、お腹がつかえて通れなかった！`);
+    syncRobotWorldTarget();
+    updateUI();
+    return;
+  }
+
+  // ③ 高い段差（2段以上高いカベ）の物理チェック
+  if (diffH >= 2) {
+    // 💡かしこさが高く、石を持っていれば階段を作って突破！
+    if (state.stonesHeld > 0 && state.stats.smart >= 30) {
+      state.stonesHeld--;
+      worldGrid[robot.gx][robot.gz].height += 1;
+      worldGrid[robot.gx][robot.gz].type = 'stone';
+      rebuildTerrainMeshes();
+      gainStat('smart', 5);
+      robot.pose = 'dance';
+      robot.bulbColor = 0x10b981;
+      setBubble('💡 ひらめいた！足元に石を積んで階段を作ったぞ！');
+      addDiaryLog('💡 石を積んで高いカベを攻略した！');
+      syncRobotWorldTarget();
+      updateUI();
+      return;
+    }
+
+    // 💪ちからが高ければカベを掘って削る！
+    if (state.stats.power >= 45) {
+      nextCell.height = Math.max(1, nextCell.height - 1);
+      rebuildTerrainMeshes();
+      gainStat('power', 4);
+      robot.pose = 'dig';
+      robot.bulbColor = 0xf97316;
+      setBubble('💪 おりゃー！カベをツルハシで削って低くしたぞ！');
+      addDiaryLog('💪 固いカベを力で削り取った！');
+      syncRobotWorldTarget();
+      updateUI();
+      return;
+    }
+
+    // 登れず激突！
+    robot.pose = 'stuck';
+    robot.bulbColor = 0xef4444;
+    gainStat('smart', 3);
+    gainStat('power', 2);
+    await triggerPhysicalHappening('wall', `高さ${nextCell.height}段のカベに阻まれて登れなかった！`);
+    syncRobotWorldTarget();
+    updateUI();
+    return;
+  }
+
+  // ④ 移動成功！座標を更新
+  robot.gx = nx;
+  robot.gz = nz;
+  robot.pose = 'walk';
+  robot.bulbColor = 0x38bdf8;
+  gainStat('adventure', 1);
+
+  // ⑤ 高い崖からの落下（2段以上低い場所へ落ちた）チェック
+  if (diffH <= -2) {
+    robot.pose = 'fall';
+    robot.bulbColor = 0xef4444;
+    if (state.stats.adventure < 60 && !state.traumas.includes('高所恐怖症')) {
+      state.traumas.push('高所恐怖症');
+      addDiaryLog('😭 高い崖から落ちて「高所恐怖症」になった…');
+    }
+    gainStat('kindness', 3);
+    await triggerPhysicalHappening('fall', `${Math.abs(diffH)}段の高さから落下してお尻を強くぶつけた！`);
+  } else {
+    // 平穏な移動時のセリフ
+    if (state.stats.art >= 45 && Math.random() < 0.35) {
+      robot.pose = 'dance';
+      robot.bulbColor = 0xec4899;
+      setBubble('🎵 ラララ〜♪ いい風だなあ、歌いたくなっちゃう！');
+    } else {
+      setBubble('てくてく…島のパトロール順調！');
+    }
+  }
+
+  // ⑥ 足元のアイテム回収チェック（高さが一致しているので確実に拾える）
+  checkItemPickup();
+
+  syncRobotWorldTarget();
+  updateUI();
+}
+
+function chooseDirectionByInstinct() {
+  // 近くにアイテムがあればそちらへ向かう
+  if (worldItems.length > 0) {
+    const target = worldItems[0];
+    const dx = target.gx - robot.gx;
+    const dz = target.gz - robot.gz;
+    if (Math.abs(dx) > Math.abs(dz)) {
+      return dx > 0 ? 1 : 3;
+    } else if (dz !== 0) {
+      return dz > 0 ? 0 : 2;
+    }
+  }
+  return Math.floor(Math.random() * 4);
+}
+
+function isNarrowPassage(gx, gz, h) {
+  // 左右または前後が自分より2段以上高い壁に挟まれているか判定
+  const leftH  = gx > 0 ? worldGrid[gx - 1][gz].height : 0;
+  const rightH = gx < GRID_SIZE - 1 ? worldGrid[gx + 1][gz].height : 0;
+  if (leftH - h >= 2 && rightH - h >= 2) return true;
+  const upH   = gz > 0 ? worldGrid[gx][gz - 1].height : 0;
+  const downH = gz < GRID_SIZE - 1 ? worldGrid[gx][gz + 1].height : 0;
+  if (upH - h >= 2 && downH - h >= 2) return true;
+  return false;
+}
+
+async function checkItemPickup() {
+  const idx = worldItems.findIndex(it => it.gx === robot.gx && it.gz === robot.gz);
+  if (idx === -1) return;
+
+  const item = worldItems[idx];
+  itemGroup.remove(item.mesh);
+  worldItems.splice(idx, 1);
+
+  if (item.type === 'apple') {
+    state.energy = Math.min(100, state.energy + 35);
+    gainStat('art', 4);
+    gainStat('kindness', 4);
+    // やさしさが高いとトラウマが治る
+    if (state.traumas.length > 0) {
+      const cured = state.traumas.pop();
+      addDiaryLog(`💖 おいしいリンゴで「${cured}」を克服した！`);
+    }
+    robot.pose = 'dance';
+    robot.bulbColor = 0x10b981;
+    await triggerPhysicalHappening('eat', '甘くておいしいリンゴを食べてエネルギーが回復した！');
+  } else if (item.type === 'stone') {
+    state.stonesHeld++;
+    gainStat('smart', 4);
+    gainStat('power', 3);
+    robot.bulbColor = 0xfbbf24;
+    setBubble(`🪨 石を拾ったぞ！（カバンの中：${state.stonesHeld}個）高いカベで使えそう！`);
+    addDiaryLog('🪨 便利な石を拾ってカバンに入れた。');
+  }
+}
+
+/* =========================================================
+   5. プレイヤーの介入（救援モード・試練モード・AI搭載モード）
+========================================================= */
+function changeObservationMode() {
+  const sel = document.getElementById('mode-select');
+  state.mode = sel.value;
+
+  const rescueBtns = document.querySelectorAll('.mode-btn-rescue');
+  const trialBtns  = document.querySelectorAll('.mode-btn-trial');
+
+  rescueBtns.forEach(b => b.style.display = (state.mode === 'rescue' || state.mode === 'ai') ? 'flex' : 'none');
+  trialBtns.forEach(b => b.style.display = (state.mode === 'trial' || state.mode === 'ai') ? 'flex' : 'none');
+
+  if (state.mode === 'wild') {
+    setBubble('🌿【野生モード】自分の力だけでこの5×5の島を生き抜くぞ！');
+  } else if (state.mode === 'rescue') {
+    setBubble('🚑【救援モード】空からアイテムを落としてこっそり助けられます。');
+  } else if (state.mode === 'trial') {
+    setBubble('⚡【試練モード】カベや穴を作って、どう乗り越えるか観察できます。');
+  } else if (state.mode === 'ai') {
+    setBubble('🤖【AI搭載モード】あっ！空から神様が見守ってくれてる！よろしくね！');
+  }
+}
+
+async function dropItem(type) {
+  // ロボットの目の前または空きマスに落とす
+  const dirs = [{ dx: 0, dz: 1 }, { dx: 1, dz: 0 }, { dx: 0, dz: -1 }, { dx: -1, dz: 0 }];
+  const d = dirs[robot.dir];
+  let tx = Math.min(GRID_SIZE - 1, Math.max(0, robot.gx + d.dx));
+  let tz = Math.min(GRID_SIZE - 1, Math.max(0, robot.gz + d.dz));
+
+  spawnItemAt(type, tx, tz);
+  const name = type === 'apple' ? '🍎リンゴ' : '🪨石';
+
+  if (state.mode === 'ai') {
+    state.aiMemory.push(`神様が(${tx},${tz})に${name}をプレゼントしてくれた`);
+    await askAIDecisionAndReaction('god', `神様が目の前に${name}を落としてくれた！お礼を言ってどう使うか教えて。`);
+  } else {
+    setBubble(`わあっ！空から偶然${name}が降ってきたぞ！ラッキー！`);
+  }
+  addDiaryLog(`🎁 空から(${tx},${tz})に${name}が落ちてきた。`);
+  updateUI();
+}
+
+async function makeObstacle(kind) {
+  const dirs = [{ dx: 0, dz: 1 }, { dx: 1, dz: 0 }, { dx: 0, dz: -1 }, { dx: -1, dz: 0 }];
+  const d = dirs[robot.dir];
+  let tx = Math.min(GRID_SIZE - 1, Math.max(0, robot.gx + d.dx));
+  let tz = Math.min(GRID_SIZE - 1, Math.max(0, robot.gz + d.dz));
+
+  if (tx === robot.gx && tz === robot.gz) {
+    tx = (robot.gx + 1) % GRID_SIZE;
+  }
+
+  if (kind === 'wall') {
+    worldGrid[tx][tz].height = Math.min(5, worldGrid[tx][tz].height + 2);
+    worldGrid[tx][tz].type = 'stone';
+    rebuildTerrainMeshes();
+    if (state.mode === 'ai') {
+      state.aiMemory.push(`神様が(${tx},${tz})に高い石のカベを作って試練を与えた`);
+      await askAIDecisionAndReaction('wall', '神様が目の前に高い石のカベを作った！驚いてどう乗り越えるか宣言して。');
+    } else {
+      setBubble('⚡ うわっ！急に地面が盛り上がって高いカベができたぞ！？');
+    }
+    addDiaryLog(`🧱 (${tx},${tz})に突然高いカベが出現した！`);
+  } else {
+    worldGrid[tx][tz].height = 1;
+    worldGrid[tx][tz].type = 'dirt';
+    rebuildTerrainMeshes();
+    setBubble('🕳️ ズズズ…目の前の地面がへこんで穴になったぞ！');
+    addDiaryLog(`🕳️ (${tx},${tz})の地面が深く削れた。`);
+  }
+  updateUI();
+}
+
+/* =========================================================
+   6. Gemini API 通信（gemini-3.8-flash以上・AI判断を実際に反映）
+========================================================= */
+async function triggerPhysicalHappening(promptKey, factText) {
+  const p = state.prompts[promptKey];
+  if (!p || !p.enabled) {
+    setBubble(`💥 ${factText}`);
+    return;
+  }
+  if (!state.apiKey) {
+    setBubble(`💥 ${factText}（※右上の⚙️からAPIキーを入れるとAIが喋ります）`);
+    return;
+  }
+  await askAIDecisionAndReaction(promptKey, `${factText} 指示:${p.text}`);
+}
+
+async function askAIDecisionAndReaction(promptKey, situationText) {
+  setBubble('💭 AIが思考中…');
+  const dreamTitle = getCurrentDreamTitle();
+  const isAIMode = (state.mode === 'ai');
+  const memoryText = isAIMode
+    ? `【過去の記憶】${state.aiMemory.slice(-4).join(' / ') || 'まだなし'} ※あなたは空から見守る神様（プレイヤー）の存在を知っています。欲しいアイテムをおねだりしたり相談できます。`
+    : `※あなたは無人島に一人で生きています。プレイヤー（神様）の存在は知りません。`;
+
+  const systemPrompt = `
+あなたは5×5ブロックの小さな島で暮らすサイコロ型ロボット（${state.generation}号機・${state.day}日目）です。
+現在のあなたの夢（一番高い才能）は「${dreamTitle}」です。
+能力値: ぼうけん=${state.stats.adventure}, げいじゅつ=${state.stats.art}, かしこさ=${state.stats.smart}, ちから=${state.stats.power}, やさしさ=${state.stats.kindness}
+所持している石:${state.stonesHeld}個 / トラウマ:${state.traumas.join(',') || 'なし'}
+${memoryText}
+
+【起きた事実】
+${situationText}
+
+以下のJSON形式のみで返答してください（マークダウン記号は不要）：
+{
+  "speech": "小学生にもわかるユーモアたっぷりのセリフ（45文字以内）",
+  "emotion": "happy または sad または angry または surprise",
+  "boostStat": "adventure または art または smart または power または kindness のうち今回の経験で一番伸びたもの1つ",
+  "moveDir": 0から3の整数（0:南, 1:東, 2:北, 3:西 で次に進みたい方向）
+}`;
+
+  try {
+    const model = state.modelName.startsWith('gemini-3.8') ? state.modelName : 'gemini-3.8-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${state.apiKey}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: systemPrompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      })
+    });
+    const data = await res.json();
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!raw) throw new Error('No response');
+    const parsed = JSON.parse(raw);
+
+    // 張りぼて禁止：AIが判断した感情・成長ステータス・セリフを実際のキャラに反映
+    if (parsed.speech) {
+      setBubble(`💬 ${parsed.speech}`);
+      addDiaryLog(`🤖「${parsed.speech}」`);
+      if (isAIMode) state.aiMemory.push(`自分の発言:${parsed.speech}`);
+    }
+    if (parsed.boostStat && state.stats[parsed.boostStat] !== undefined) {
+      gainStat(parsed.boostStat, 4);
+    }
+    if (parsed.emotion === 'happy') {
+      robot.pose = 'dance';
+      robot.bulbColor = 0x10b981;
+    } else if (parsed.emotion === 'sad') {
+      robot.pose = 'stuck';
+      robot.bulbColor = 0x3b82f6;
+    } else if (parsed.emotion === 'angry') {
+      robot.pose = 'dig';
+      robot.bulbColor = 0xef4444;
+    } else {
+      robot.bulbColor = 0xfbbf24;
+    }
+    updateUI();
+    return parsed;
+  } catch (e) {
+    setBubble(`💥 ${situationText}`);
+    return null;
+  }
+}
+
+// 現実の出来事を送って5つの夢ゲージを伸ばす
+async function sendRealWorldEvent() {
+  const input = document.getElementById('real-event-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  if (!state.apiKey) {
+    // APIキー未設定でもローカル判定でしっかり育つフォールバック
+    gainStat('art', 6);
+    gainStat('kindness', 5);
+    setBubble(`💌「${text}」を教えてくれてありがとう！夢ゲージが伸びたよ！`);
+    addDiaryLog(`💌 現実の出来事「${text}」を共有した！`);
+    updateUI();
+    return;
+  }
+
+  await askAIDecisionAndReaction('god', `プレイヤーが現実の出来事「${text}」を教えてくれた！それに共感して喜んで。`);
+}
+
+/* =========================================================
+   7. UI更新・称号判定・モーダル制御
+========================================================= */
+function gainStat(key, amount) {
+  if (state.stats[key] === undefined) return;
+  state.stats[key] = Math.min(100, Math.max(0, state.stats[key] + amount));
+}
+
+function getCurrentDreamTitle() {
+  const entries = [
+    { key: 'adventure', title: '🧭 探検家・勇者', val: state.stats.adventure },
+    { key: 'art',       title: '🎶 音楽家・アーティスト', val: state.stats.art },
+    { key: 'smart',     title: '👓 学者・発明家', val: state.stats.smart },
+    { key: 'power',     title: '🔨 たのもしい大工さん', val: state.stats.power },
+    { key: 'kindness',  title: '🌷 優しいお花屋さん', val: state.stats.kindness }
+  ];
+  entries.sort((a, b) => b.val - a.val);
+  return entries[0].title;
+}
+
+function updateUI() {
+  document.getElementById('gen-day-text').textContent = `🤖 ${state.generation}号機 (${state.day}日目)`;
+  document.getElementById('energy-text').textContent = state.energy;
+  document.getElementById('notebook-robot-info').textContent = `🤖 ${state.generation}号機（生存 ${state.day}日目）`;
+
+  const dream = getCurrentDreamTitle();
+  document.getElementById('dream-title-text').textContent = `いまの夢：『${dream}』`;
+
+  const keys = ['adventure', 'art', 'smart', 'power', 'kindness'];
+  keys.forEach(k => {
+    const v = state.stats[k];
+    document.getElementById(`val-${k}`).textContent = v;
+    document.getElementById(`bar-${k}`).style.width = `${v}%`;
+  });
+
+  const traumaHtml = state.traumas.length > 0
+    ? state.traumas.map(t => `<span class="tag-badge">⚠️ ${t}</span>`).join('')
+    : 'トラウマなし✨';
+  document.getElementById('bag-and-trauma').innerHTML = `🪨 所持している石: <b>${state.stonesHeld}個</b> ／ ${traumaHtml}`;
+
+  if (bulbMat) bulbMat.color.setHex(robot.bulbColor);
+}
+
+function setBubble(text) {
+  const el = document.getElementById('speech-bubble');
+  el.textContent = text;
+}
+
+function addDiaryLog(text) {
+  const box = document.getElementById('diary-log');
+  const div = document.createElement('div');
+  div.textContent = `[${state.day}日目] ${text}`;
+  box.prepend(div);
+}
+
+function openModal(id) {
+  if (id === 'prompt-modal') renderPromptList();
+  if (id === 'settings-modal') {
+    document.getElementById('api-key-input').value = state.apiKey;
+    document.getElementById('model-select').value = state.modelName;
+  }
+  updateUI();
+  document.getElementById(id).style.display = 'flex';
+}
+
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+function renderPromptList() {
+  const container = document.getElementById('prompt-list-container');
+  container.innerHTML = '';
+  Object.keys(state.prompts).forEach(key => {
+    const item = state.prompts[key];
+    const row = document.createElement('div');
+    row.className = 'prompt-item';
+    row.innerHTML = `
+      <input type="checkbox" id="chk-${key}" ${item.enabled ? 'checked' : ''}>
+      <div style="flex:1;">
+        <div style="font-size:12px; font-weight:bold;">${item.label}</div>
+        <input type="text" id="txt-${key}" class="input-field" style="margin:4px 0 0 0;" value="${item.text}">
+      </div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function savePromptSettings() {
+  Object.keys(state.prompts).forEach(key => {
+    state.prompts[key].enabled = document.getElementById(`chk-${key}`).checked;
+    state.prompts[key].text = document.getElementById(`txt-${key}`).value;
+  });
+  closeModal('prompt-modal');
+  setBubble('🌀 プロンプト一覧の設定を保存したよ！');
+}
+
+function saveApiSettings() {
+  state.apiKey = document.getElementById('api-key-input').value.trim();
+  state.modelName = document.getElementById('model-select').value;
+  localStorage.setItem('HAKONIWA_API_KEY', state.apiKey);
+  localStorage.setItem('HAKONIWA_MODEL', state.modelName);
+  closeModal('settings-modal');
+  setBubble('⚙️ AI通信の設定を保存したよ！');
+}
+
+function nextGenerationReset() {
+  state.generation++;
+  state.day = 1;
+  state.turnCount = 0;
+  state.energy = 80;
+  state.stonesHeld = 0;
+  state.traumas = [];
+  state.aiMemory = [];
+  state.stats = { adventure: 30, art: 20, smart: 25, power: 25, kindness: 30 };
+  robot.gx = 2; robot.gz = 2;
+  initWorldData();
+  rebuildTerrainMeshes();
+  syncRobotWorldTarget();
+  closeModal('settings-modal');
+  addDiaryLog(`🎉 ${state.generation}号機が新しい島に誕生した！`);
+  setBubble(`🤖 ${state.generation}号機、起動完了！どんな夢に向かって育つかな？`);
+  updateUI();
+}
+
+/* =========================================================
+   8. 毎フレームの滑らかな3Dアニメーション（Lerp移動＆ポーズ）
+========================================================= */
+let clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // 滑らかな移動（ワープや壁めり込みを防ぐLerp補間）
+  robot.pos.lerp(robot.targetPos, 0.14);
+  robotGroup.position.copy(robot.pos);
+  robotGroup.rotation.y += (robot.targetRotY - robotGroup.rotation.y) * 0.18;
+
+  // ポーズ別のアニメーション表現
+  if (robot.pose === 'dance') {
+    robotGroup.position.y += Math.abs(Math.sin(t * 10)) * 0.28;
+    leftArm.rotation.x = Math.sin(t * 12) * 1.2;
+    rightArm.rotation.x = -Math.sin(t * 12) * 1.2;
+  } else if (robot.pose === 'stuck' || robot.pose === 'fall') {
+    robotGroup.rotation.z = Math.sin(t * 18) * 0.15;
+    leftArm.rotation.x = 0.8;
+    rightArm.rotation.x = 0.8;
+  } else if (robot.pose === 'dig') {
+    rightArm.rotation.x = Math.sin(t * 16) * 1.4;
+    leftArm.rotation.x = 0;
+    robotGroup.rotation.z = 0;
+  } else {
+    robotGroup.rotation.z = 0;
+    leftArm.rotation.x = Math.sin(t * 4) * 0.25;
+    rightArm.rotation.x = -Math.sin(t * 4) * 0.25;
+  }
+
+  // 海のゆらぎとアイテムの回転
+  if (waterMesh) {
+    waterMesh.position.y = -0.2 + Math.sin(t * 2) * 0.04;
+  }
+  for (const it of worldItems) {
+    it.mesh.rotation.y += 0.03;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  initThreeJS();
+  addDiaryLog('🌱 5×5の箱庭島で観察スタート！');
+  updateUI();
+});
+</script>
 </body>
 </html>
