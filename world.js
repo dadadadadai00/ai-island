@@ -15,6 +15,10 @@ let activeCamera = followCam;
 let manualCameraMode = null;
 let fpvYawOffset = 0, fpvPitch = -0.06, fpvZoomFactor = 1.0;
 
+// 🛡️ ワープ防止（Lerp補間）用の現在描画座標
+let currentVisualPos = new THREE.Vector3(0, 0, 0);
+let visualPosInitialized = false;
+
 function resetFpvToRobotFront() {
   fpvYawOffset = 0;
   fpvPitch = (ROBOT.posture === 'crawl') ? -0.03 : -0.06;
@@ -513,14 +517,22 @@ const stickFootR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.15), matSt
 stickFootR.position.set(0, -0.02, 0.03);
 SB.ankleR.add(stickFootR);
 
-function syncRobot3DPosition() {
+// 🛡️ ワープ防止：instant === true（初回起動・リセット・世代交代）の時だけ瞬間配置し、通常移動はLerpで滑らかに動かす
+function syncRobot3DPosition(instant = false) {
   const gx = ROBOT.pos.x, gz = ROBOT.pos.z;
   const subX = ((ROBOT.pos.sx ?? 2) - 2) * 0.20, subZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.20;
   const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.tiny;
   const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
   const baseY = getSurfaceYAt(gx, gz, ROBOT.pos.lv, bSpec.reqWidth);
-  robotGroup.position.set(gx + subX, baseY, gz + subZ);
-  robotGroup.rotation.y = ROBOT.rotY || 0;
+  const targetX = gx + subX;
+  const targetZ = gz + subZ;
+
+  if (instant || !visualPosInitialized) {
+    currentVisualPos.set(targetX, baseY, targetZ);
+    robotGroup.position.copy(currentVisualPos);
+    robotGroup.rotation.y = ROBOT.rotY || 0;
+    visualPosInitialized = true;
+  }
 
   const isStick = (ROBOT.rigType === 'stick');
   stickRigGroup.visible = isStick;
@@ -540,11 +552,42 @@ function syncRobot3DPosition() {
     robotPoseGroup.position.set(0, 0, 0);
   }
 
-  const eSpec = getExpressionSpec(ROBOT.emotion);
-  sharedBulbMat.color.setHex(eSpec.bulb);
+  if (typeof applyRobotBulbColor === 'function') {
+    applyRobotBulbColor();
+  } else {
+    const eSpec = getExpressionSpec(ROBOT.emotion);
+    sharedBulbMat.color.setHex(eSpec.bulb);
+  }
 }
 
 function updateRobotUnifiedAnimation(t) {
+  // 🪜 Lerp（線形補間）による段差上り下り・落下の滑らか移動処理（ワープ防止）
+  const gx = ROBOT.pos.x, gz = ROBOT.pos.z;
+  const subX = ((ROBOT.pos.sx ?? 2) - 2) * 0.20, subZ = ((ROBOT.pos.sz ?? 2) - 2) * 0.20;
+  const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
+  const targetY = getSurfaceYAt(gx, gz, ROBOT.pos.lv, bSpec.reqWidth);
+  const targetX = gx + subX;
+  const targetZ = gz + subZ;
+
+  if (!visualPosInitialized) {
+    currentVisualPos.set(targetX, targetY, targetZ);
+    visualPosInitialized = true;
+  } else {
+    const dist = Math.abs(targetX - currentVisualPos.x) + Math.abs(targetY - currentVisualPos.y) + Math.abs(targetZ - currentVisualPos.z);
+    currentVisualPos.x += (targetX - currentVisualPos.x) * 0.14;
+    currentVisualPos.y += (targetY - currentVisualPos.y) * 0.14;
+    currentVisualPos.z += (targetZ - currentVisualPos.z) * 0.14;
+    if (dist > 0.002) cameraDirty = true;
+  }
+  robotGroup.position.copy(currentVisualPos);
+
+  // 回転の最短距離Lerp補間
+  let targetRotY = ROBOT.rotY || 0;
+  let diffRot = targetRotY - robotGroup.rotation.y;
+  while (diffRot > Math.PI) diffRot -= Math.PI * 2;
+  while (diffRot < -Math.PI) diffRot += Math.PI * 2;
+  robotGroup.rotation.y += diffRot * 0.18;
+
   const emoKey = POSE_TABLE[ROBOT.emotion] ? ROBOT.emotion : 'normal';
   const p = POSE_TABLE[emoKey];
   const eSpec = getExpressionSpec(emoKey);
@@ -922,6 +965,7 @@ function updateEnvironmentAndUI() {
         : `🤖追従(${getStyleShortName()})`));
   document.getElementById('history-loc').innerText = `${camBadge}・${formatHeightText(hLevel)}`;
   document.getElementById('ai-status').innerText = getActiveBrainBadgeText();
+  if (typeof updateModeUI === 'function') updateModeUI();
 }
 
 // ============================================================================
@@ -1057,7 +1101,7 @@ document.getElementById('btn-spin').onclick = () => {
     { type: 'apple', icon: '🍎', name: 'おいしいリンゴ（島に配置！）' },
     { type: 'stone', icon: '🪨', name: '踏み台・段差ブロック（カバンに追加！）' },
     { type: 'oil',   icon: '🧴', name: 'ツルツル・スライムオイル（狭所突破＆ケア用！）' },
-    { type: 'grass', icon: '🌿', name: '星見の草ブロック（カバンに追加！）' }
+    { type: 'grass', icon: '🌿', name: '草ブロック（カバンに追加！）' }
   ];
   const picked = pool[Math.floor(Math.random() * pool.length)];
   if (picked.type === 'apple') WORLD_ITEMS.push({ type: 'apple', x: Math.floor(Math.random() * 5) - 2, z: Math.floor(Math.random() * 5) - 2 });
@@ -1069,6 +1113,10 @@ document.getElementById('btn-spin').onclick = () => {
   showToast(`${picked.icon} ゲット！1号機も大喜び！`);
 };
 
+const obsModeEl = document.getElementById('setting-obs-mode');
+if (obsModeEl && typeof OBS_MODE !== 'undefined') {
+  obsModeEl.value = OBS_MODE;
+}
 document.getElementById('setting-cam-style').value = CAM_VISUAL_STYLE;
 document.getElementById('setting-size-level').value = ROBOT.sizeLevel;
 document.getElementById('setting-body-type').value = ROBOT.bodyType;
@@ -1078,7 +1126,7 @@ document.getElementById('setting-groq-key').value = safeStorage.getItem('api_gro
 document.getElementById('setting-speed').value = String(ROBOT.speed || 3);
 
 rebuildTerrainAndItems();
-syncRobot3DPosition();
+syncRobot3DPosition(true);
 updateAllCamerasTransform();
 updateEnvironmentAndUI();
 loadCloudWorldState();
@@ -1088,6 +1136,8 @@ const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const t = clock.getElapsedTime();
+
+  updateRobotUnifiedAnimation(t);
 
   if (cameraDirty) {
     updateAllCamerasTransform();
@@ -1100,7 +1150,6 @@ function animate() {
   turtleGroup.position.y = -10.4 + Math.sin(t * 0.7) * 0.18; turtleGroup.rotation.y = Math.sin(t * 0.25) * 0.06;
   skyGroup.rotation.y = t * 0.015;
 
-  updateRobotUnifiedAnimation(t);
   renderer.render(scene, activeCamera);
 }
 requestAnimationFrame(animate);
@@ -1111,4 +1160,3 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   cameraDirty = true;
 });
-
