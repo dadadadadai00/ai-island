@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0b1528">
-  <title>ボクセルAI自律思考水槽 v29</title>
+  <title>ボクセルAI自律思考水槽 v30（全16エリア＆仲間）</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1528; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; touch-action: none; }
@@ -19,7 +19,10 @@
     #bar-stamina { background: #ef4444; }
     #bar-life { background: #eab308; }
     #bar-mental { background: #10b981; }
-    .robot-status-row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 6px; border-top: 1px solid #f1f5f9; gap: 4px; flex-wrap: nowrap; }
+    .robot-status-row { display: flex; justify-content: space-between; align-items: center; margin-top: 7px; padding-top: 6px; border-top: 1px solid #f1f5f9; gap: 4px; flex-wrap: nowrap; }
+    .area-info-row { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; padding-top: 5px; border-top: 1px dashed #e2e8f0; gap: 6px; font-size: 10.5px; font-weight: 800; }
+    .area-pill { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 999px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65%; }
+    .pet-pill { background: #fdf2f8; color: #be185d; border: 1px solid #fbcfe8; padding: 2px 8px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
     .status-left-group { display: flex; align-items: center; gap: 5px; flex-shrink: 1; min-width: 0; }
     .status-right-group { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
     .robot-id-tag { font-size: 11px; font-weight: 900; color: #334155; white-space: nowrap; }
@@ -28,7 +31,7 @@
     .badge-time { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
     .badge-mood { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; cursor: pointer; }
     .btn-icon { width: 26px; height: 26px; border-radius: 50%; background: #f1f5f9; display: flex; justify-content: center; align-items: center; font-size: 14px; cursor: pointer; border: 1px solid #cbd5e1; flex-shrink: 0; }
-    #side-icon-column { position: fixed; top: 122px; right: 14px; display: flex; flex-direction: column; gap: 10px; z-index: 12; }
+    #side-icon-column { position: fixed; top: 148px; right: 14px; display: flex; flex-direction: column; gap: 10px; z-index: 12; }
     .side-circle-btn { width: 46px; height: 46px; background: rgba(255,255,255,0.96); border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex; justify-content: center; align-items: center; font-size: 21px; cursor: pointer; border: 2.5px solid #e2e8f0; position: relative; transition: transform 0.18s, background-color 0.18s, border-color 0.18s; }
     .side-circle-btn:active { transform: scale(0.92); }
     .side-circle-btn.cam-active { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-color: #fde047; box-shadow: 0 0 0 3px rgba(253,224,71,0.55), 0 6px 14px rgba(29,78,216,0.5); transform: scale(1.08); }
@@ -49,12 +52,13 @@
     .panel-header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 800; color: #475569; }
     .ai-badge { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: bold; }
     #message-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 600; color: #1e293b; height: 64px; overflow-y: auto; line-height: 1.45; }
-    .action-history { font-size: 11px; color: #64748b; display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
-    .history-tag { background: #f1f5f9; padding: 2px 8px; border-radius: 8px; color: #334155; }
+    .action-history { font-size: 11px; color: #64748b; display: flex; justify-content: space-between; align-items: center; font-weight: 700; gap: 6px; }
+    .history-tag { background: #f1f5f9; padding: 2px 8px; border-radius: 8px; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
     .btn-think { background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%); color: #fff; border: none; border-radius: 12px; padding: 12px; font-size: 15px; font-weight: 900; text-align: center; box-shadow: 0 4px 0 #2563eb; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; }
     .btn-think:active { transform: translateY(3px); box-shadow: 0 1px 0 #2563eb; }
     .btn-think:disabled { opacity: 0.6; pointer-events: none; }
-    #toast { position: fixed; top: 82px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,0.92); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 100; white-space: nowrap; }
+    #toast { position: fixed; top: 106px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,0.92); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 100; white-space: nowrap; }
+    #area-fade { position: fixed; inset: 0; background: #020617; opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 90; }
     .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.75); z-index: 50; display: none; justify-content: center; align-items: center; }
     .modal-overlay.active { display: flex; }
     .modal-content { background: #fff; width: 94%; max-width: 416px; max-height: 90vh; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); position: relative; overflow-y: auto; }
@@ -63,6 +67,8 @@
     .dream-banner-box { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1.5px solid #f59e0b; border-radius: 11px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; }
     .dream-banner-label { font-size: 10.5px; font-weight: 900; color: #92400e; }
     .dream-banner-val { font-size: 13px; font-weight: 900; color: #b45309; }
+    .area-diary-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 6px 10px; font-size: 11px; font-weight: 800; color: #1e3a8a; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+    .btn-mini-home { background: #2563eb; color: #fff; border: none; border-radius: 7px; padding: 4px 8px; font-size: 10px; font-weight: 900; cursor: pointer; flex-shrink: 0; }
     .spec-switch-row-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
     .spec-chip { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 5px 2px; font-size: 10px; font-weight: 800; text-align: center; background: #f8fafc; color: #475569; cursor: pointer; line-height: 1.2; }
     .spec-chip.active { background: #fef9c3; border-color: #eab308; color: #854d0e; box-shadow: 0 0 0 1.5px rgba(234,179,8,0.25); }
@@ -119,6 +125,7 @@
 <body>
 
 <div id="canvas-container"></div>
+<div id="area-fade"></div>
 
 <div id="status-panel">
   <div class="gauge-container">
@@ -142,17 +149,21 @@
       <div class="badge badge-time" id="ui-time">☀️ 朝</div>
     </div>
     <div class="status-right-group">
-      <div class="badge badge-mood" id="ui-mood" onclick="cycleBodyAndCrawlTest()" title="タップで極小×やせっちょ等へ順番に切り替え">🙂通常(極小1・やせっちょ1)</div>
+      <div class="badge badge-mood" id="ui-mood" onclick="cycleBodyAndCrawlTest()" title="タップで体格切替">🙂通常(極小1・やせっちょ1)</div>
       <button class="btn-icon" id="btn-settings" aria-label="設定">⚙️</button>
     </div>
+  </div>
+  <div class="area-info-row">
+    <span class="area-pill" id="ui-area-name">🏠 マイホーム（住居・創作アトリエ）</span>
+    <span class="pet-pill" id="ui-pet-badge">🐾 相棒：なし</span>
   </div>
 </div>
 
 <div id="side-icon-column">
-  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳（5つの夢ゲージ・5段階体格・カバン）">📖</div>
+  <div class="side-circle-btn" id="diary-btn" title="ロボット手帳（夢ゲージ・現在エリア・ペット・カバン）">📖</div>
   <div class="side-circle-btn" id="cam-ground-btn" title="外カメラ（地上・全体固定）">🌌</div>
   <div class="side-circle-btn" id="cam-ug-btn" title="外カメラ（地下・全体固定）">⛏️</div>
-  <div class="side-circle-btn" id="cam-fpv-btn" title="内カメラ（キャラ視点・1ブロック広角＆ほふくズーム）">🤖</div>
+  <div class="side-circle-btn" id="cam-fpv-btn" title="内カメラ（キャラ視点）">🤖</div>
 </div>
 
 <div id="fan-menu-wrapper">
@@ -167,42 +178,49 @@
 
 <div id="bottom-panel">
   <div class="panel-header">
-    <span id="panel-header-title">💭 ロボのきもち・心のさけび【v29 4モード＆5つの夢ゲージ】</span>
+    <span id="panel-header-title">🌿 野生モード（AI記憶なし・自力のみ）</span>
     <div class="ai-badge" id="ai-status">🟩 アルゴン待機中</div>
   </div>
-  <div id="message-box">【v29完成】元のデザインはそのまま！⚙️設定で「4つの観察モード（野生・救援・試練・AI搭載）」を切り替えられ、📖手帳の「5つの夢ゲージ」で将来の夢（称号）が育つよ！</div>
+  <div id="message-box">【v30 全16エリア＆住人・ペット対応】住居（マイホーム）から「光の階段（天5）」「地下の穴（地5）」「育成ワープ（左右5）」へロボが自分で旅して育つよ！</div>
   <div class="action-history">
     <span class="history-tag" id="history-action">👟 やった事 待機中</span>
-    <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従(観察窓)・地下2層目</span>
+    <span id="history-loc" style="color:#2563eb; font-weight:800;">🤖追従(観察窓)・地下1層目</span>
   </div>
   <button class="btn-think" id="btn-action">⚡ 今すぐ考える</button>
 </div>
 
 <div id="toast">💾 データを保存したよ</div>
 
-<!-- 📖 ロボット手帳モーダル（いまの夢＋5つの夢ゲージ＋5段階体格＋トラウマ＋カバン） -->
+<!-- 📖 ロボット手帳モーダル -->
 <div class="modal-overlay" id="modal-diary" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-diary')">✕</div>
-    <div class="modal-title">📖 1号機の手帳（5つの夢・5段階体格・カバン）</div>
+    <div class="modal-title">📖 1号機の手帳（全16エリア・夢・ペット・カバン）</div>
     <div style="display:flex; align-items:center; gap:10px; background:#f8fafc; padding:7px 10px; border-radius:12px; border:1px solid #e2e8f0;">
       <div style="font-size:28px;" id="diary-emo-icon">🙂</div>
       <div style="flex:1; min-width:0;">
         <div style="font-weight:900; font-size:12.5px; color:#1e293b;" id="diary-robo-name">1号機（🎲サイコロ箱型・生存 1日目）</div>
-        <div style="font-size:10px; color:#64748b;" id="diary-robo-height">現在：地下2層目 / 高さ：極小(1) / 太さ：やせっちょ(1)</div>
-        <div style="font-size:10px; color:#0f766e; font-weight:800;" id="diary-step-rule">🪜 階段:0段 / 🧗 よじ登り・安全着地:分割1ブロック / 🐛 ほふく高:1</div>
+        <div style="font-size:10px; color:#64748b;" id="diary-robo-height">現在：地下1層目 / 高さ：極小(1) / 太さ：やせっちょ(1)</div>
+        <div style="font-size:10px; color:#0f766e; font-weight:800;" id="diary-step-rule">🪜 階段:0段 / 🧗 よじ登り:1段 / 🐛 ほふく高:1</div>
       </div>
     </div>
 
-    <!-- 🌟 いまの夢（一番高い夢ゲージで自動変化） -->
     <div class="dream-banner-box">
       <span class="dream-banner-label">🌟 いまの夢（称号）</span>
       <span class="dream-banner-val" id="diary-dream-title">『🧭 探検家・勇者』</span>
     </div>
 
+    <div class="area-diary-box">
+      <div style="min-width:0;">
+        <div id="diary-area-label">📍 🏠 マイホーム（創作保存ON）</div>
+        <div id="diary-pet-label" style="font-size:10px; color:#be185d;">🐾 ついてくる相棒：まだいません</div>
+      </div>
+      <button type="button" class="btn-mini-home" onclick="switchAreaById('home', true); closeModal('modal-diary');">🏠 住居へ戻る</button>
+    </div>
+
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <span style="font-size:11px; font-weight:900; color:#0f766e;">📏 大きさ(高さ：分割1〜5ブロック)</span>
-      <button type="button" onclick="setTinySlimPreset()" style="font-size:9.5px; font-weight:900; padding:2px 7px; border-radius:6px; border:1px solid #14b8a6; background:#f0fdfa; color:#0f766e; cursor:pointer;">🧚 極小×やせっちょ(1×1)にする</button>
+      <button type="button" onclick="setTinySlimPreset()" style="font-size:9.5px; font-weight:900; padding:2px 7px; border-radius:6px; border:1px solid #14b8a6; background:#f0fdfa; color:#0f766e; cursor:pointer;">🧚 極小×やせっちょ(1×1)</button>
     </div>
     <div class="spec-switch-row-5">
       <div class="spec-chip" id="size-chip-giant" onclick="changeRobotSizeFromDiary('giant')">巨大<br>(高5)</div>
@@ -226,7 +244,6 @@
       <div class="rig-tab-btn" id="tab-diary-hidden" onclick="switchDiaryParamTab('hidden')">🔴 裏ゲージ＆トラウマ(裏)</div>
     </div>
 
-    <!-- 🟢 表タブ：5つの夢ゲージ -->
     <div class="lab-panel" id="diary-panel-base">
       <div style="font-size:10.5px; font-weight:900; color:#1e3a8a; display:flex; justify-content:space-between;">
         <span>🌈 行動で育つ「5つの夢ゲージ」</span>
@@ -257,7 +274,7 @@
         <input type="range" min="0" max="100" id="param-logic" class="param-slider" oninput="onParamSliderInput('logic', this.value)">
         <span class="param-val" id="val-param-logic">50</span>
       </div>
-      <div class="param-row locked-dark" title="予備パラメータ（現在は暗転ロック中）">
+      <div class="param-row locked-dark">
         <span class="param-label">🔒 忠誠心(予備)</span>
         <input type="range" min="0" max="100" value="50" disabled class="param-slider">
         <span class="param-val">50</span>
@@ -268,7 +285,6 @@
       </div>
     </div>
 
-    <!-- 🔴 裏タブ：トラウマ補正後の夢ゲージ -->
     <div class="lab-panel hidden-tab" id="diary-panel-hidden" style="display:none;">
       <div style="font-size:10.5px; font-weight:900; color:#9f1239; display:flex; justify-content:space-between;">
         <span>🧠 AIが実際に使う「裏の夢ゲージ（最終値）」</span>
@@ -305,13 +321,13 @@
         <span class="eff-val-box">50 (ロック)</span>
       </div>
       <div style="font-size:10px; font-weight:900; color:#9f1239; margin-top:2px; display:flex; justify-content:space-between; align-items:center;">
-        <span>⚡ トラウマ発症スイッチ（複数ONで裏の数字が歪む！）</span>
+        <span>⚡ トラウマ発症スイッチ</span>
         <button type="button" onclick="clearAllTraumas()" style="font-size:9px; font-weight:800; padding:2px 6px; border-radius:5px; border:1px solid #fda4af; background:#fff; color:#be123c; cursor:pointer;">全クリア</button>
       </div>
       <div class="trauma-btn-grid" id="trauma-btn-grid"></div>
     </div>
 
-    <div style="font-size:11.5px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ・素材」（🪨小段差積み / 🧴オイル滑り抜け / 🍎食事）</div>
+    <div style="font-size:11.5px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ・素材」（🪨段差/パズル / 🧴オイル / 🍎食事 / 🌿草）</div>
     <div class="bag-grid" id="bag-grid"></div>
     <div style="font-size:11.5px; font-weight:bold; color:#475569;">📝 世代のきろく・思い出</div>
     <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px; font-size:10.5px; color:#334155; max-height:70px; overflow-y:auto; line-height:1.4;"></div>
@@ -341,7 +357,7 @@
   </div>
 </div>
 
-<!-- ⚙️ システム設定モーダル（4つの観察モード切替を追加） -->
+<!-- ⚙️ システム設定モーダル -->
 <div class="modal-overlay" id="modal-settings" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-settings')">✕</div>
@@ -357,7 +373,29 @@
       </select>
     </div>
     <div class="setting-group">
-      <label class="setting-label">🎥 追従カメラの観察窓（スポット透過）・分割線</label>
+      <label class="setting-label">🗺️ テスト用エリア移動（全16エリア切替）</label>
+      <select id="setting-jump-area" class="setting-input">
+        <option value="">── 今いるエリアのまま ──</option>
+        <option value="home">🏠 マイホーム（住居・創作保存）</option>
+        <option value="sky_1">☀️ 天1：そよ風の丘</option>
+        <option value="sky_2">☁️ 天2：わたぐもテラス</option>
+        <option value="sky_3">🌈 天3：にじの段々畑</option>
+        <option value="sky_4">🌠 天4：ほしぞら展望台</option>
+        <option value="sky_5">👑 天5：天空のいただき</option>
+        <option value="earth_1">⛏️ 地1：しめり土の入り口</option>
+        <option value="earth_2">🍄 地2：ひかり苔のほら穴</option>
+        <option value="earth_3">💎 地3：パステル水晶の鉱脈</option>
+        <option value="earth_4">🦴 地4：こだい化石のねむる層</option>
+        <option value="earth_5">🐢 地5：巨大ガメのせなか</option>
+        <option value="side_1">🗡️ 育成1：ぼうけんアスレチック</option>
+        <option value="side_2">🎵 育成2：おんがく星空テラス</option>
+        <option value="side_3">💪 育成3：だいくの岩場道場</option>
+        <option value="side_4">💖 育成4：おはな畑の農園</option>
+        <option value="side_5">💡 育成5：なぞとき発明ラボ</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">🎥 追従カメラの観察窓・分割線</label>
       <select id="setting-cam-style" class="setting-input">
         <option value="hide">③ 観察窓くっきり消去＋削り断面のみ立体表示（推奨）</option>
         <option value="glass_noline">① 観察窓すりガラス透過（分割線なし）</option>
@@ -365,7 +403,7 @@
       </select>
     </div>
     <div class="setting-group">
-      <label class="setting-label">📏 1号機の大きさ（高さ5段階：分割1〜5ブロック）</label>
+      <label class="setting-label">📏 1号機の大きさ（高さ5段階）</label>
       <select id="setting-size-level" class="setting-input">
         <option value="giant">巨大（分割5ブロック＝1ブロック高）</option>
         <option value="large">大（分割4ブロック）</option>
@@ -375,7 +413,7 @@
       </select>
     </div>
     <div class="setting-group">
-      <label class="setting-label">🐛 1号機の太さ（横幅5段階：分割1〜5ブロック）</label>
+      <label class="setting-label">🐛 1号機の太さ（横幅5段階）</label>
       <select id="setting-body-type" class="setting-input">
         <option value="fat5">でぶっちょ（分割5ブロック＝1ブロック幅）</option>
         <option value="fat4">ちょいでぶ（分割4ブロック）</option>
@@ -385,18 +423,18 @@
       </select>
     </div>
     <div class="setting-group">
-      <label class="setting-label">🤖 使う頭脳（AIの判断をゲームに反映）</label>
+      <label class="setting-label">🤖 使う頭脳</label>
       <select id="setting-ai-type" class="setting-input">
-        <option value="none">🟩 アルゴンさん（通信なし・5段階物理＆トラウマ本能）</option>
-        <option value="gemini">🟦 3.8 / Gemini（gemini-3.8-flash 通信最優先）</option>
-        <option value="groq">🟪 3.1 / Groq（爆速AI通信）</option>
+        <option value="none">🟩 アルゴンさん（通信なし・物理＆自律探索）</option>
+        <option value="gemini">🟦 Gemini（gemini-3.8-flash 通信最優先）</option>
+        <option value="groq">🟪 Groq（爆速AI通信）</option>
       </select>
     </div>
     <div class="setting-group">
       <label class="setting-label">⚡ 移動スピード</label>
       <select id="setting-speed" class="setting-input">
-        <option value="3">速度 3（通常・マスの中央に安全停止）</option>
-        <option value="5">速度 5（猛ダッシュ・海へ飛び出し＆海トラウマ発生注意！）</option>
+        <option value="3">速度 3（通常・安全停止）</option>
+        <option value="5">速度 5（猛ダッシュ・海飛び出し注意）</option>
       </select>
     </div>
     <div class="setting-group">
@@ -419,7 +457,7 @@
     <div class="modal-close" onclick="cancelExpressionModal()">✕</div>
     <div class="modal-title">🎭 キャラ基本表現（バランス調整・全20種）</div>
     <div style="font-size:11px; color:#475569; line-height:1.35;">
-      上のタブで「🎲サイコロ箱型」と「🦴3D骨組み（◯関節と線のマッチ棒）」を選び、左のボタンでしぐさ選択、右の欄でAIの連想ワードを調整できます。ルール外の行動時は自動で「🌀模索・奮闘」します。
+      「🎲サイコロ箱型」と「🦴3D骨組み」を選び、しぐさとAI連想ワードを調整できます。
     </div>
     <div class="rig-tab-bar">
       <div class="rig-tab-btn active" id="tab-rig-box" onclick="selectTempRigTab('box')">🎲 サイコロ箱型(基本)</div>
@@ -427,7 +465,7 @@
     </div>
     <div style="display:flex; justify-content:space-between; font-size:10.5px; font-weight:800; color:#64748b; padding:0 4px;">
       <span>👈 表現ボタン（20種類）</span>
-      <span>🤖 AI連想ワード（状態・道具・動作）</span>
+      <span>🤖 AI連想ワード</span>
     </div>
     <div class="expr-list-container" id="expr-list-container"></div>
     <div class="modal-footer-btns">
@@ -440,6 +478,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="area_sky.js"></script>
+<script src="area_earth.js"></script>
+<script src="area_side.js"></script>
+<script src="entities.js"></script>
 <script src="brain.js"></script>
 <script src="world.js"></script>
 </body>
