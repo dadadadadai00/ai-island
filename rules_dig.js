@@ -1,11 +1,11 @@
 // ============================================================================
-// 【掘削・歩幅移動・体積ポケット・木箱収納ルール：rules_dig.js（1分割欠け描画対応版）】
+// 【掘削・歩幅移動・体積ポケット・木箱収納ルール：rules_dig.js（CHIP_MAP直結版）】
 // ※ brain.js / world.js / ai_comm.js / index.html は無改造のまま接続します
 // ============================================================================
 (function initDigRulesModule() {
   if (window.DigRulesModule) return;
 
-  const STORAGE_KEY = 'rules_dig_state_v1';
+  const STORAGE_KEY = 'rules_dig_state_v2';
   const SUB_SIZE = 0.2; // 大ブロック(1.0)の1/5
 
   const HEIGHT_RANK = { tiny: 1, small: 2, medium: 3, large: 4, giant: 5 };
@@ -56,6 +56,20 @@
     } catch (e) {}
   }
 
+  // DIG_STATE.dugCells の内容を world.js 本体の CHIP_MAP へ同期反映
+  function syncDugCellsToChipMap() {
+    if (typeof CHIP_MAP === 'undefined') return;
+    const areaId = getCurAreaId();
+    Object.keys(DIG_STATE.dugCells).forEach(k => {
+      if (!k.startsWith(areaId + '|')) return;
+      const chipKey = k.slice(areaId.length + 1); // "x,z,lv"
+      const list = DIG_STATE.dugCells[k];
+      if (!Array.isArray(list) || !list.length) return;
+      if (!CHIP_MAP[chipKey]) CHIP_MAP[chipKey] = {};
+      list.forEach(tag => { CHIP_MAP[chipKey][tag] = true; });
+    });
+  }
+
   function loadDigState() {
     try {
       if (typeof safeStorage !== 'undefined') {
@@ -81,10 +95,12 @@
       saveDigState();
       if (typeof saveWorldState === 'function') saveWorldState();
     }
+
+    syncDugCellsToChipMap();
   }
 
   // --------------------------------------------------------------------------
-  // 0. 旧ボタンイベント（addEventListener）の完全除去＆通信エラー診断フック
+  // 0. 旧ボタンイベント（addEventListener）の完全除去
   // --------------------------------------------------------------------------
   (function rebindActionButtonCleanly() {
     const oldBtn = document.getElementById('btn-action');
@@ -95,138 +111,22 @@
         if (typeof window.executeTurn === 'function') window.executeTurn();
       });
     }
-
-    // Groq通信失敗時に旧サイコロ思考へ落ちた理由をメッセージ欄にも残す
-    if (typeof showToast === 'function') {
-      const _origToast = showToast;
-      showToast = function(msg) {
-        _origToast(msg);
-        if (typeof msg === 'string' && (msg.includes('Groq通信失敗') || msg.includes('キー未設定'))) {
-          setTimeout(() => {
-            const actEl = document.getElementById('history-action');
-            if (actEl) actEl.innerText = msg;
-          }, 50);
-        }
-      };
-    }
   })();
 
   // --------------------------------------------------------------------------
-  // 1. 3D描画（3×3×3木箱・置いた1分割土・1個だけ欠けた5×5×5削りブロック）
+  // 1. 3D描画（3×3×3木箱 ＆ 地面に置いた1分割土ブロック）
+  // ※掘削の1分割欠け自体は world.js 本体の CHIP_MAP でネイティブ描画されます
   // --------------------------------------------------------------------------
   const digVisualGroup = new THREE.Group();
   digVisualGroup.name = 'dig_rules_visual_group';
   if (typeof scene !== 'undefined' && scene) scene.add(digVisualGroup);
 
-  const unitBoxGeo = new THREE.BoxGeometry(SUB_SIZE * 0.985, SUB_SIZE * 0.985, SUB_SIZE * 0.985);
+  const unitBoxGeo = new THREE.BoxGeometry(SUB_SIZE * 0.98, SUB_SIZE * 0.98, SUB_SIZE * 0.98);
   const unitEdgeGeo = new THREE.EdgesGeometry(unitBoxGeo);
-  const hiddenOrigMeshes = [];
-
-  function restoreHiddenOrigMeshes() {
-    while (hiddenOrigMeshes.length) {
-      const m = hiddenOrigMeshes.pop();
-      if (m) m.visible = true;
-    }
-  }
-
-  function isProtectedObject(obj) {
-    let p = obj;
-    while (p) {
-      if (p === digVisualGroup) return true;
-      if (typeof robotGroup !== 'undefined' && p === robotGroup) return true;
-      if (typeof followPetMesh !== 'undefined' && p === followPetMesh) return true;
-      if (typeof pastelExtraGroup !== 'undefined' && p === pastelExtraGroup) return true;
-      p = p.parent;
-    }
-    return false;
-  }
-
-  // 指定ブロック(bx, bz, blv)の上面Yと底面Yを既存world.jsの座標系から取得
-  function getBlockVerticalBounds(bx, bz, blv) {
-    const surfaceY = (typeof getSurfaceYAt === 'function')
-      ? getSurfaceYAt(bx, bz, blv)
-      : (blv + 1);
-    const topY = Math.round(surfaceY * 5) / 5;
-    const bottomY = topY - 1.0;
-    return { bottomY, topY };
-  }
-
-  // 元の1ブロック（または層スライス）を非表示にし、欠けた1分割だけ抜いた5×5×5を描画
-  function replaceDugBlockWithVoxelGrid(bx, bz, blv, dugSet) {
-    const { bottomY, topY } = getBlockVerticalBounds(bx, bz, blv);
-    const worldPos = new THREE.Vector3();
-    const box3 = new THREE.Box3();
-    const size3 = new THREE.Vector3();
-
-    if (typeof scene !== 'undefined' && scene) {
-      scene.traverse(obj => {
-        if (!obj.isMesh || !obj.visible || isProtectedObject(obj)) return;
-        obj.getWorldPosition(worldPos);
-        if (Math.abs(worldPos.x - bx) > 0.48 || Math.abs(worldPos.z - bz) > 0.48) return;
-        if (worldPos.y < bottomY - 0.05 || worldPos.y > topY + 0.05) return;
-
-        box3.setFromObject(obj);
-        box3.getSize(size3);
-        // 地形ブロック本体（幅0.15〜1.08、高さ0.15〜1.08）のみ非表示化
-        if (size3.x >= 0.15 && size3.x <= 1.08 && size3.z >= 0.15 && size3.z <= 1.08 && size3.y >= 0.15 && size3.y <= 1.08) {
-          obj.visible = false;
-          hiddenOrigMeshes.push(obj);
-        }
-      });
-    }
-
-    const topCol  = (typeof SPACE_COLORS !== 'undefined' && SPACE_COLORS.pastelGreenTop) || 0xa7f3d0;
-    const midCol  = (typeof SPACE_COLORS !== 'undefined' && SPACE_COLORS.pastelGreenMid) || 0x86efac;
-    const soilCol = (typeof SPACE_COLORS !== 'undefined' && SPACE_COLORS.dryPastelSoil)  || 0xd4a373;
-    const wetCol  = (typeof SPACE_COLORS !== 'undefined' && SPACE_COLORS.wetSoilLv2)     || 0xb07d56;
-    const isSurfaceBlock = (typeof HEIGHT_MAP !== 'undefined' && HEIGHT_MAP[`${bx},${bz}`] === blv);
-
-    // 残っている小ブロック一覧を抽出し、InstancedMesh 1回で軽量描画
-    const remaining = [];
-    for (let sx = 0; sx < 5; sx++) {
-      for (let sy = 0; sy < 5; sy++) {
-        for (let sz = 0; sz < 5; sz++) {
-          if (dugSet.has(`${sx},${sy},${sz}`)) continue;
-          remaining.push({ sx, sy, sz });
-        }
-      }
-    }
-    if (!remaining.length) return;
-
-    const mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-    const inst = new THREE.InstancedMesh(unitBoxGeo, mat, remaining.length);
-    const dummy = new THREE.Object3D();
-    const cTop = new THREE.Color(topCol);
-    const cMid = new THREE.Color(midCol);
-    const cSoil = new THREE.Color(soilCol);
-    const cWet = new THREE.Color(wetCol);
-    const cLightSoil = cSoil.clone().offsetHSL(0, 0, 0.05);
-
-    remaining.forEach((cell, idx) => {
-      dummy.position.set(
-        bx + (cell.sx - 2) * SUB_SIZE,
-        bottomY + cell.sy * SUB_SIZE + SUB_SIZE * 0.5,
-        bz + (cell.sz - 2) * SUB_SIZE
-      );
-      dummy.updateMatrix();
-      inst.setMatrixAt(idx, dummy.matrix);
-
-      const checker = ((cell.sx + cell.sz) % 2 === 0);
-      let col = checker ? cSoil : cLightSoil;
-      if (isSurfaceBlock && cell.sy === 4) col = cTop;
-      else if (isSurfaceBlock && cell.sy === 3) col = cMid;
-      else if (blv < 0) col = cWet;
-      inst.setColorAt(idx, col);
-    });
-
-    inst.instanceMatrix.needsUpdate = true;
-    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
-    digVisualGroup.add(inst);
-  }
 
   function buildCrateMesh(crate) {
     const grp = new THREE.Group();
-    const boxSize = SUB_SIZE * 3; // 分割ブロック 3×3×3
+    const boxSize = SUB_SIZE * 3; // 分割ブロック 3×3×3 (= 0.6)
     const yBase = (typeof getSurfaceYAt === 'function') ? getSurfaceYAt(crate.x, crate.z, null, 3) : 0;
     grp.position.set(crate.x, yBase, crate.z);
 
@@ -254,7 +154,6 @@
   }
 
   function renderDigVisuals() {
-    restoreHiddenOrigMeshes();
     while (digVisualGroup.children.length) digVisualGroup.remove(digVisualGroup.children[0]);
     const areaId = getCurAreaId();
 
@@ -285,81 +184,102 @@
         digVisualGroup.add(m);
       }
     });
-
-    // ③ 1分割単位で削ったブロックの5×5×5差し替え描画
-    Object.keys(DIG_STATE.dugCells).forEach(k => {
-      if (!k.startsWith(areaId + '|')) return;
-      const list = DIG_STATE.dugCells[k];
-      if (!Array.isArray(list) || !list.length) return;
-      const [bx, bz, blv] = k.split('|')[1].split(',').map(Number);
-      replaceDugBlockWithVoxelGrid(bx, bz, blv, new Set(list));
-    });
   }
 
   // --------------------------------------------------------------------------
-  // 2. 掘削ロジック（高さ1〜5 × 幅1〜5 × 奥行き1・1ターン分割1個のみ）
+  // 2. 厳密サブ座標変換 ＆ 掘削ロジック（CHIP_MAPへ1分割ブロックを直接くり抜き）
+  // world.jsの式: wy = (lv - 1) * 1.0 + sy * 0.20 + 0.10
   // --------------------------------------------------------------------------
-  function getFrontSubCoord(dir, offsetW, offsetH) {
+  function subYToLvSy(totalSubY) {
+    const lv = Math.floor(totalSubY / 5) + 1;
+    const sy = ((totalSubY % 5) + 5) % 5;
+    return { lv, sy };
+  }
+
+  function hasSolidSubVoxel(tx, tz, lv, sx, sy, sz) {
+    if (tx < -2 || tx > 2 || tz < -2 || tz > 2) return false;
+    const minLv = (typeof AREA1_MIN_UNDER_LV !== 'undefined') ? AREA1_MIN_UNDER_LV : -4;
+    const topLv = (typeof HEIGHT_MAP !== 'undefined' && HEIGHT_MAP[`${tx},${tz}`] !== undefined)
+      ? HEIGHT_MAP[`${tx},${tz}`]
+      : 0;
+    if (lv < minLv || lv > topLv) return false;
+    if (typeof CHIP_MAP !== 'undefined') {
+      const ch = CHIP_MAP[`${tx},${tz},${lv}`];
+      if (ch && ch[`${sx},${sy},${sz}`]) return false;
+    }
+    return true;
+  }
+
+  function getRobotBaseSubY() {
+    const bSpec = (typeof BODY_SPECS !== 'undefined' && BODY_SPECS[ROBOT.bodyType]) || { reqWidth: 1 };
+    const baseY = (typeof getSurfaceYAt === 'function')
+      ? getSurfaceYAt(ROBOT.pos.x, ROBOT.pos.z, ROBOT.pos.lv, bSpec.reqWidth)
+      : (ROBOT.pos.lv || 0);
+    return Math.round(baseY * 5);
+  }
+
+  function findDigTargetInDirection(dir, thought) {
+    const stats = getSizeStats();
     const curSx = Number.isFinite(ROBOT.pos.sx) ? ROBOT.pos.sx : 2;
     const curSz = Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2;
+    const curAbsX = ROBOT.pos.x * 5 + curSx;
+    const curAbsZ = ROBOT.pos.z * 5 + curSz;
+    const baseSubY = getRobotBaseSubY();
+
     const dx = Math.sign(dir.dx || 0);
     const dz = Math.sign(dir.dz || 0);
-
-    // 目の前が壁（隣接大ブロックが高い）なら、隣接大ブロックの手前1列目を狙う
-    const adjX = ROBOT.pos.x + dx;
-    const adjZ = ROBOT.pos.z + dz;
-    const curLv = (typeof getRobotHeightLevel === 'function') ? getRobotHeightLevel() : (ROBOT.pos.lv || 0);
-    const adjH = (typeof HEIGHT_MAP !== 'undefined' && HEIGHT_MAP[`${adjX},${adjZ}`] !== undefined)
-      ? HEIGHT_MAP[`${adjX},${adjZ}`]
-      : curLv;
-
     let px = -dz, pz = dx;
     if (dx !== 0 && dz !== 0) { px = -dz; pz = 0; }
 
-    let tx, tz, tsx, tsz, targetLv;
-    if (adjX >= -2 && adjX <= 2 && adjZ >= -2 && adjZ <= 2 && adjH > curLv) {
-      // 目の前の壁（1段上のブロック）のキャラ側手前1列目（奥行き1）
-      tx = adjX;
-      tz = adjZ;
-      targetLv = curLv + 1;
-      const baseSx = dx > 0 ? 0 : (dx < 0 ? 4 : curSx);
-      const baseSz = dz > 0 ? 0 : (dz < 0 ? 4 : curSz);
-      tsx = Math.max(0, Math.min(4, baseSx + px * offsetW));
-      tsz = Math.max(0, Math.min(4, baseSz + pz * offsetW));
-    } else {
-      // 同じ高さのサブ座標1マス先（または足元ブロック）
-      const absSx = ROBOT.pos.x * 5 + curSx + dx + px * offsetW;
-      const absSz = ROBOT.pos.z * 5 + curSz + dz + pz * offsetW;
-      tx = Math.floor(absSx / 5);
-      tz = Math.floor(absSz / 5);
-      tsx = ((absSx % 5) + 5) % 5;
-      tsz = ((absSz % 5) + 5) % 5;
-      targetLv = (typeof HEIGHT_MAP !== 'undefined' && HEIGHT_MAP[`${tx},${tz}`] !== undefined)
-        ? Math.min(HEIGHT_MAP[`${tx},${tz}`], curLv)
-        : curLv;
-    }
-
-    const tsy = Math.max(0, Math.min(4, offsetH));
-    return { tx, tz, tsx, tsy, tsz, targetLv };
-  }
-
-  function pickTargetOrderFromThought(thought, reachW, reachH) {
+    // 横幅の探索順（左/右指定があれば優先、なければ中央から）
     const t = String(thought || '');
-    const halfW = Math.floor(reachW / 2);
+    const halfW = Math.floor(stats.reachW / 2);
     const wList = [];
-    for (let i = 0; i < reachW; i++) wList.push(i - halfW);
+    for (let i = 0; i < stats.reachW; i++) wList.push(i - halfW);
     if (t.includes('左')) wList.sort((a, b) => a - b);
     else if (t.includes('右')) wList.sort((a, b) => b - a);
     else wList.sort((a, b) => Math.abs(a) - Math.abs(b));
 
+    // 高さの探索順（上/下指定があれば優先、なければ視認しやすい上から下へ）
     const hList = [];
-    for (let y = 0; y < reachH; y++) hList.push(y);
-    if (t.includes('上') || t.includes('高')) hList.sort((a, b) => b - a);
-    else if (t.includes('下') || t.includes('足元')) hList.sort((a, b) => a - b);
+    for (let y = 0; y < stats.reachH; y++) hList.push(y);
+    if (t.includes('下') || t.includes('足元')) hList.sort((a, b) => a - b);
+    else hList.sort((a, b) => b - a);
 
-    const pairs = [];
-    hList.forEach(h => wList.forEach(w => pairs.push({ w, h })));
-    return pairs;
+    // 体の前縁のすぐ1列目（奥行き1）
+    const frontDist = Math.floor(stats.reachW / 2) + 1;
+
+    // 1) 目の前1列目の壁（高さ 0〜reachH-1 × 幅 reachW）を探す
+    for (let hi = 0; hi < hList.length; hi++) {
+      const { lv, sy } = subYToLvSy(baseSubY + hList[hi]);
+      for (let wi = 0; wi < wList.length; wi++) {
+        const absX = curAbsX + dx * frontDist + px * wList[wi];
+        const absZ = curAbsZ + dz * frontDist + pz * wList[wi];
+        const tx = Math.floor(absX / 5);
+        const tz = Math.floor(absZ / 5);
+        const tsx = ((absX % 5) + 5) % 5;
+        const tsz = ((absZ % 5) + 5) % 5;
+        if (hasSolidSubVoxel(tx, tz, lv, tsx, sy, tsz)) {
+          return { tx, tz, lv, tsx, tsy: sy, tsz, relH: hList[hi] + 1, kind: '壁' };
+        }
+      }
+    }
+
+    // 2) 目の前1列目に壁がなければ、目の前1列目の地面表面（足元1段下）を1個掘る
+    const { lv: floorLv, sy: floorSy } = subYToLvSy(baseSubY - 1);
+    for (let wi = 0; wi < wList.length; wi++) {
+      const absX = curAbsX + dx * frontDist + px * wList[wi];
+      const absZ = curAbsZ + dz * frontDist + pz * wList[wi];
+      const tx = Math.floor(absX / 5);
+      const tz = Math.floor(absZ / 5);
+      const tsx = ((absX % 5) + 5) % 5;
+      const tsz = ((absZ % 5) + 5) % 5;
+      if (hasSolidSubVoxel(tx, tz, floorLv, tsx, floorSy, tsz)) {
+        return { tx, tz, lv: floorLv, tsx, tsy: floorSy, tsz, relH: 0, kind: '地面' };
+      }
+    }
+
+    return null;
   }
 
   function runSubDig(dir, thought) {
@@ -372,43 +292,37 @@
       };
     }
 
-    const areaId = getCurAreaId();
     ROBOT.rotY = dir.rot;
-
-    const order = pickTargetOrderFromThought(thought, stats.reachW, stats.reachH);
-    let chosen = null;
-
-    for (let i = 0; i < order.length; i++) {
-      const c = getFrontSubCoord(dir, order[i].w, order[i].h);
-      if (c.tx < -2 || c.tx > 2 || c.tz < -2 || c.tz > 2) continue;
-
-      const cellKey = `${areaId}|${c.tx},${c.tz},${c.targetLv}`;
-      const dugArr = DIG_STATE.dugCells[cellKey] || [];
-      const tag = `${c.tsx},${c.tsy},${c.tsz}`;
-      if (!dugArr.includes(tag)) {
-        chosen = { ...c, cellKey, tag };
-        break;
-      }
-    }
-
-    if (!chosen) {
+    const target = findDigTargetInDirection(dir, thought);
+    if (!target) {
       return {
-        actionLabel: `⛏️ ${dir.name}の届く範囲(高${stats.reachH}×幅${stats.reachW}×奥1)は掘削済み`,
-        thoughtAppend: '（届く範囲はもう空っぽ！一歩動いてから掘ろう）'
+        actionLabel: `⛏️ ${dir.name}の目の前1列(高${stats.reachH}×幅${stats.reachW})に掘れる土がない`,
+        thoughtAppend: '（目の前1列目は空っぽ！別の位置へ移動してから掘ろう）'
       };
     }
 
-    if (!DIG_STATE.dugCells[chosen.cellKey]) DIG_STATE.dugCells[chosen.cellKey] = [];
-    DIG_STATE.dugCells[chosen.cellKey].push(chosen.tag);
-    DIG_STATE.pocketSoil += 1;
+    // world.js 本体の CHIP_MAP へ1分割ブロックだけ直接くり抜き登録
+    const chipKey = `${target.tx},${target.tz},${target.lv}`;
+    const tag = `${target.tsx},${target.tsy},${target.tsz}`;
+    if (typeof CHIP_MAP !== 'undefined') {
+      if (!CHIP_MAP[chipKey]) CHIP_MAP[chipKey] = {};
+      CHIP_MAP[chipKey][tag] = true;
+    }
 
+    // 自前セーブにも記録
+    const areaId = getCurAreaId();
+    const stateKey = `${areaId}|${chipKey}`;
+    if (!DIG_STATE.dugCells[stateKey]) DIG_STATE.dugCells[stateKey] = [];
+    if (!DIG_STATE.dugCells[stateKey].includes(tag)) DIG_STATE.dugCells[stateKey].push(tag);
+
+    DIG_STATE.pocketSoil += 1;
     life.stamina = Math.max(0, life.stamina - 4);
     life.mental = Math.min(100, life.mental + 4);
     ROBOT.params.power = Math.min(100, (ROBOT.params.power || 50) + 2);
     saveDigState();
 
     return {
-      actionLabel: `⛏️ 分割ブロック1個掘削(${dir.name} 高${chosen.tsy + 1}) ポケット${getPocketTotalCount()}/${stats.pocketCap}`
+      actionLabel: `⛏️ ${dir.name}の${target.kind}を1分割掘削 ポケット${getPocketTotalCount()}/${stats.pocketCap}`
     };
   }
 
@@ -427,6 +341,8 @@
     let curLv = (typeof getRobotHeightLevel === 'function') ? getRobotHeightLevel() : (ROBOT.pos.lv || 0);
     let curSx = Number.isFinite(ROBOT.pos.sx) ? ROBOT.pos.sx : 2;
     let curSz = Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2;
+    const baseSubY = getRobotBaseSubY();
+    const { lv: footLv, sy: footSy } = subYToLvSy(baseSubY);
 
     let movedSteps = 0;
     let stopReason = '';
@@ -459,6 +375,9 @@
         }
         curLv = chk.targetLv;
         ROBOT.posture = chk.posture;
+      } else if (hasSolidSubVoxel(nextX, nextZ, footLv, nextSx, footSy, nextSz)) {
+        stopReason = '土の壁';
+        break;
       }
 
       curX = nextX; curZ = nextZ; curSx = nextSx; curSz = nextSz;
@@ -622,11 +541,12 @@
   }
 
   // --------------------------------------------------------------------------
-  // 6. 既存フックへの安全な接続
+  // 6. 既存フックへの接続
   // --------------------------------------------------------------------------
   if (typeof rebuildTerrainAndItems === 'function') {
     const _origRebuild = rebuildTerrainAndItems;
     rebuildTerrainAndItems = function() {
+      syncDugCellsToChipMap();
       _origRebuild();
       renderDigVisuals();
     };
@@ -667,9 +587,15 @@
       const curSx = Number.isFinite(ROBOT.pos.sx) ? ROBOT.pos.sx : 2;
       const curSz = Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2;
 
+      // 4方向の目の前1列目に掘れる土があるかAIへ知らせる
+      const digHints = (typeof ALL_DIRS !== 'undefined' ? ALL_DIRS.slice(0, 4) : []).map(d => {
+        const hit = findDigTargetInDirection(d, '');
+        return `${d.name.replace('(斜め)', '')}:${hit ? `${hit.kind}掘削可` : '空'}`;
+      }).join(' / ');
+
       return [
         `サブ位置:(sx=${curSx},sz=${curSz}) 1ターン最大歩幅:分割${stats.moveStep}ブロック`,
-        `掘削到達範囲:高さ${stats.reachH}×幅${stats.reachW}×奥行き1(1ターン分割1個のみ)`,
+        `掘削到達範囲:高さ${stats.reachH}×幅${stats.reachW}×奥行き1(1ターン分割1個のみ) 掘削可能方向:[${digHints}]`,
         `ポケット:土${DIG_STATE.pocketSoil}個(合計${getPocketTotalCount()}/${stats.pocketCap}個)`,
         `設置木箱(3x3x3):${crateList}`
       ].join('\n');
@@ -701,7 +627,8 @@
   }
 
   loadDigState();
-  renderDigVisuals();
+  if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
+  else renderDigVisuals();
   renderPocketAndCrateDiaryUI();
 
   window.DigRulesModule = Object.freeze({
