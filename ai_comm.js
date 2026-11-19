@@ -1,22 +1,24 @@
 // ============================================================================
-// 【不変通信コア：ai_comm.js（Groq自律行動決定・プラグイン登録型・上書きロック）】
-// ※新ルール・新行動を追加する際は、このファイルを書き換えず
-//   他ファイルから AICommCore.registerAction / registerSensor を呼ぶだけで自動反映されます。
+// 【不変通信コア：ai_comm.js（Groq専用・サイコロ完全廃止・モデル自動検出）】
+// ※通信できない時・通信OFF時は一切行動せず停止します。
+// ※新ルールは他ファイルから AICommCore.registerAction / registerSensor で登録します。
 // ============================================================================
 (function initImmutableAICommCore() {
-  if (window.AICommCore) return; // 二重読み込み・上書き防止
+  if (window.AICommCore) return;
 
-  const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
-  const GROQ_MODEL    = 'llama-3.3-70b-versatile';
-  const TIMEOUT_MS    = 12000;
+  const GROQ_CHAT_URL   = 'https://api.groq.com/openai/v1/chat/completions';
+  const GROQ_MODELS_URL = 'https://api.groq.com/openai/v1/models';
+  const TIMEOUT_MS      = 15000;
+  const MODEL_CACHE_KEY = 'groq_active_model_cache_v2';
 
   let commEnabled = (typeof safeStorage !== 'undefined') && (safeStorage.getItem('ai_comm_enabled') === '1');
+  let cachedModels = [];
   const actionMap = new Map();
   const sensors   = [];
   const postHooks = [];
 
   // --------------------------------------------------------------------------
-  // 1. プラグイン登録API（外部ファイルから新ルールを無改造で差し込む口）
+  // 1. プラグイン登録API（外部ルールファイルからの接続口）
   // --------------------------------------------------------------------------
   function registerAction(spec) {
     if (!spec || !spec.id || typeof spec.run !== 'function') return false;
@@ -47,8 +49,8 @@
     const label = document.getElementById('comm-toggle-label');
     if (label) {
       label.innerText = commEnabled
-        ? '📡 通信 ON（Groqが行動を決定）'
-        : '🎲 通信 OFF（サイコロ行動思考）';
+        ? '📡 通信 ON（Groq自律行動）'
+        : '⏸️ 通信 OFF（完全停止・サイコロ廃止）';
     }
     if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
   }
@@ -56,7 +58,76 @@
   function isEnabled() { return commEnabled; }
 
   // --------------------------------------------------------------------------
-  // 2. 状況収集 ＆ Groq API 通信（タイムアウト＆JSON防御付き）
+  // 2. Groq利用可能モデルの自動取得（404防止）
+  // --------------------------------------------------------------------------
+  function isUsableChatModel(id) {
+    const s = String(id || '').toLowerCase();
+    if (!s) return false;
+    const ng = ['whisper', 'tts', 'playai', 'orpheus', 'guard', 'safeguard', 'moderation', 'embed', 'rerank', 'compound-beta'];
+    return !ng.some(w => s.includes(w));
+  }
+
+  function scoreModelPriority(id) {
+    const s = String(id || '').toLowerCase();
+    if (s.includes('llama-3.3') && s.includes('70b')) return 100;
+    if (s.includes('llama-4')) return 95;
+    if (s.includes('llama-3.1') && s.includes('8b')) return 90;
+    if (s.includes('gpt-oss')) return 85;
+    if (s.includes('qwen')) return 80;
+    if (s.includes('llama')) return 75;
+    if (s.includes('gemma')) return 70;
+    return 50;
+  }
+
+  async function fetchAvailableGroqModels(key, forceRefresh = false) {
+    if (!forceRefresh && cachedModels.length) return cachedModels;
+
+    const savedModel = (!forceRefresh && typeof safeStorage !== 'undefined')
+      ? (safeStorage.getItem(MODEL_CACHE_KEY) || '').trim()
+      : '';
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(GROQ_MODELS_URL, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${key}` },
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      if (res.ok) {
+        const json = await res.json();
+        const ids = (Array.isArray(json.data) ? json.data : [])
+          .filter(m => m && m.id && m.active !== false && isUsableChatModel(m.id))
+          .map(m => m.id)
+          .sort((a, b) => scoreModelPriority(b) - scoreModelPriority(a));
+        if (ids.length) {
+          cachedModels = savedModel && ids.includes(savedModel)
+            ? [savedModel, ...ids.filter(x => x !== savedModel)]
+            : ids;
+          return cachedModels;
+        }
+      }
+    } catch (e) {
+      clearTimeout(timer);
+    }
+
+    // モデル一覧取得に失敗した場合の予備リスト
+    const fallbackIds = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile', 'openai/gpt-oss-20b', 'qwen/qwen3-32b'];
+    cachedModels = savedModel ? [savedModel, ...fallbackIds.filter(x => x !== savedModel)] : fallbackIds;
+    return cachedModels;
+  }
+
+  function extractJsonFromText(raw) {
+    if (!raw || typeof raw !== 'string') return null;
+    try { return JSON.parse(raw); } catch (e) {}
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try { return JSON.parse(match[0]); } catch (e) { return null; }
+  }
+
+  // --------------------------------------------------------------------------
+  // 3. 状況収集 ＆ Groq API 通信
   // --------------------------------------------------------------------------
   function collectObservationText() {
     const lines = [];
@@ -71,12 +142,61 @@
     return lines.join('\n');
   }
 
+  async function callGroqWithModel(key, modelId, prompt, useJsonFormat = true) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const body = {
+        model: modelId,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 200,
+        temperature: 0.8
+      };
+      if (useJsonFormat) body.response_format = { type: 'json_object' };
+
+      const res = await fetch(GROQ_CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        let errDetail = '';
+        try {
+          const errJson = await res.json();
+          errDetail = errJson?.error?.message || '';
+        } catch (e) {}
+        return { ok: false, status: res.status, detail: errDetail };
+      }
+
+      const data = await res.json();
+      const raw = data.choices?.[0]?.message?.content;
+      const parsed = extractJsonFromText(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        return { ok: false, status: 200, detail: 'JSON解析失敗' };
+      }
+      return { ok: true, data: parsed, modelId };
+    } catch (e) {
+      clearTimeout(timer);
+      return {
+        ok: false,
+        status: 0,
+        detail: e.name === 'AbortError' ? 'タイムアウト' : (e.message || '通信エラー')
+      };
+    }
+  }
+
   async function requestDecision() {
-    const key = (typeof safeStorage !== 'undefined') ? safeStorage.getItem('api_groq') : '';
-    if (!key) return { ok: false, reason: 'no_key' };
+    const key = (typeof safeStorage !== 'undefined') ? (safeStorage.getItem('api_groq') || '').trim() : '';
+    if (!key) return { ok: false, reason: 'Groq APIキー未設定' };
 
     const actions = Array.from(actionMap.values());
-    if (!actions.length) return { ok: false, reason: 'no_actions' };
+    if (!actions.length) return { ok: false, reason: '実行可能なアクション未登録' };
 
     const actionIds   = actions.map(a => a.id).join('/');
     const actionsText = actions.map(a => `- ${a.id}: ${a.desc}`).join('\n');
@@ -97,37 +217,37 @@ ${actionsText}
 以下のJSON形式のみで返答してください（前置き・解説禁止）:
 {"action":"${actionIds}のいずれか","dir":"北/南/東/西/北西/北東/南西/南東のいずれか","emotion":"normal/joy/anger/sad/fun/fear/think/surprise/wave/sleep/swing_v/pickup/carry/push/run/peek/struggleのいずれか","thought":"その行動を選んだ理由や心の声(1文)"}`;
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    try {
-      const res = await fetch(GROQ_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${key}`
-        },
-        body: JSON.stringify({
-          model: GROQ_MODEL,
-          messages: [{ role: 'user', content: prompt }],
-          response_format: { type: 'json_object' },
-          max_tokens: 180,
-          temperature: 0.85
-        }),
-        signal: controller.signal
-      });
-      clearTimeout(timer);
-      if (!res.ok) return { ok: false, reason: `http_${res.status}` };
-      const data = await res.json();
-      const raw = data.choices?.[0]?.message?.content;
-      if (!raw) return { ok: false, reason: 'empty' };
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return { ok: false, reason: 'invalid_json' };
-      return { ok: true, data: parsed };
-    } catch (e) {
-      clearTimeout(timer);
-      console.warn('AICommCore Groq error:', e);
-      return { ok: false, reason: e.name === 'AbortError' ? 'timeout' : 'network' };
+    let models = await fetchAvailableGroqModels(key, false);
+    let lastError = '';
+
+    // 最大3モデルまで自動リトライ（404や400時に次の利用可能モデルへ切替）
+    for (let i = 0; i < Math.min(models.length, 3); i++) {
+      const mId = models[i];
+      let res = await callGroqWithModel(key, mId, prompt, true);
+
+      // json_object非対応モデルによる400エラー時はフォーマット指定なしで再試行
+      if (!res.ok && res.status === 400) {
+        res = await callGroqWithModel(key, mId, prompt, false);
+      }
+
+      if (res.ok) {
+        if (typeof safeStorage !== 'undefined') safeStorage.setItem(MODEL_CACHE_KEY, mId);
+        return res;
+      }
+
+      lastError = `HTTP ${res.status}${res.detail ? ': ' + res.detail : ''}`;
+
+      // 認証エラー(401)や回数制限(429)はモデルを変えても解決しないため即終了
+      if (res.status === 401 || res.status === 429) break;
+
+      // 初回404ならモデル一覧を強制再取得してやり直す
+      if (res.status === 404 && i === 0) {
+        if (typeof safeStorage !== 'undefined') safeStorage.removeItem(MODEL_CACHE_KEY);
+        models = await fetchAvailableGroqModels(key, true);
+      }
     }
+
+    return { ok: false, reason: lastError || '通信失敗' };
   }
 
   function findDirByShortName(name) {
@@ -135,14 +255,26 @@ ${actionsText}
     return ALL_DIRS.find(d => d.name.replace('(斜め)', '') === name || d.name === name) || ALL_DIRS[0];
   }
 
-  // --------------------------------------------------------------------------
-  // 3. ターン実行制御（ON: Groq判断 / OFF: 元のサイコロ思考へフォールバック）
-  // --------------------------------------------------------------------------
-  const fallbackTurnFn = (typeof executeTurn === 'function') ? executeTurn : null;
+  function showStopMessage(title, detail) {
+    const actEl = document.getElementById('history-action');
+    const msgEl = document.getElementById('message-box');
+    const stEl  = document.getElementById('ai-status');
+    if (actEl) actEl.innerText = title;
+    if (msgEl) msgEl.innerText = detail;
+    if (stEl)  stEl.innerText  = getActiveBrainBadgeText();
+    if (typeof showToast === 'function') showToast(title);
+  }
 
+  // --------------------------------------------------------------------------
+  // 4. ターン実行制御（Groq通信専用・通信不可時は一切動かず停止）
+  // --------------------------------------------------------------------------
   async function runTurn() {
     if (!commEnabled) {
-      return fallbackTurnFn ? await fallbackTurnFn() : undefined;
+      showStopMessage(
+        '⏸️ 通信OFF（待機中）',
+        '通信がOFFのため行動せず待機しています（サイコロ自動行動は廃止済みです）。動かすには⚙️設定で通信をONにしてください。'
+      );
+      return;
     }
 
     const btn  = document.getElementById('btn-action');
@@ -150,108 +282,100 @@ ${actionsText}
     if (btn) btn.disabled = true;
     if (stEl) stEl.innerText = '🟪 Groq思考中...';
 
-    // ※通信成功までは TIME_STEP を進めない（フォールバック時の二重加算防止）
-    const res = await requestDecision();
-    if (!res.ok) {
-      if (btn) btn.disabled = false;
-      const msg = res.reason === 'no_key'
-        ? '⚠️ Groq APIキー未設定のためサイコロ思考で実行'
-        : `⚠️ Groq通信失敗(${res.reason})：サイコロ思考へ切替`;
-      if (typeof showToast === 'function') showToast(msg);
-      return fallbackTurnFn ? await fallbackTurnFn() : undefined;
-    }
-
-    if (++TIME_STEP >= 20) {
-      TIME_STEP = 0;
-      GAME_DAY++;
-      DIARY_LOGS.push(`🌅 ${GAME_DAY}日目の朝を迎えたよ！`);
-    }
-
-    const dec = res.data;
-    const prevPos = { x: ROBOT.pos.x, z: ROBOT.pos.z, lv: ROBOT.pos.lv };
-    const dir = findDirByShortName(dec.dir);
-    const chosenAction = actionMap.get(dec.action) || actionMap.get('rest') || Array.from(actionMap.values())[0];
-
-    let thoughtText = (typeof dec.thought === 'string' && dec.thought.trim())
-      ? dec.thought.trim()
-      : '自分で考えて行動したよ！';
-    let actionLabel = `🟪 Groq判断：${chosenAction.id}`;
-
     try {
-      const out = chosenAction.run({ dec, dir, prevPos });
-      if (out && out.actionLabel) actionLabel = out.actionLabel;
-      if (out && out.thoughtAppend) thoughtText += out.thoughtAppend;
-    } catch (e) {
-      console.warn('AICommCore action execution error:', e);
-    }
-
-    ROBOT.emotion = (typeof POSE_TABLE !== 'undefined' && POSE_TABLE[dec.emotion]) ? dec.emotion : 'normal';
-    ROBOT.bulbEmotion = null;
-    if (OBS_MODE === 'ai_mode') AI_MEMORY.push(`${actionLabel}:${thoughtText}`);
-    DIARY_LOGS.push(`🟪 ${GAME_DAY}日目：${thoughtText}`);
-
-    const actEl = document.getElementById('history-action');
-    const msgEl = document.getElementById('message-box');
-    if (actEl) actEl.innerText = actionLabel;
-    if (msgEl) msgEl.innerText = thoughtText;
-
-    // ターン後フック（アイテム拾得・パズル・住人・敵・ペット・ポータル等）
-    let switchedArea = false;
-    for (let i = 0; i < postHooks.length; i++) {
-      try {
-        const hookRes = postHooks[i]({ dec, dir, prevPos });
-        if (hookRes && hookRes.switchedArea) { switchedArea = true; break; }
-      } catch (e) {
-        console.warn('AICommCore postHook error:', e);
+      const res = await requestDecision();
+      if (!res.ok) {
+        showStopMessage(
+          `⚠️ Groq通信停止（行動なし）`,
+          `通信できなかったためロボットは動かずに待機しました。\n理由：${res.reason}`
+        );
+        return;
       }
-    }
 
-    if (switchedArea) {
-      if (btn) btn.disabled = false;
-      return;
-    }
+      if (++TIME_STEP >= 20) {
+        TIME_STEP = 0;
+        GAME_DAY++;
+        DIARY_LOGS.push(`🌅 ${GAME_DAY}日目の朝を迎えたよ！`);
+      }
 
-    if (typeof manualCameraMode !== 'undefined' && manualCameraMode === 'robot' && typeof resetFpvToRobotFront === 'function') {
-      resetFpvToRobotFront();
-    }
-    if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
-    if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition();
-    if (typeof applyRobotBulbColor === 'function') applyRobotBulbColor();
-    if (typeof cameraDirty !== 'undefined') cameraDirty = true;
-    if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
-    if (typeof saveWorldState === 'function') saveWorldState();
+      const dec = res.data;
+      const prevPos = { x: ROBOT.pos.x, z: ROBOT.pos.z, lv: ROBOT.pos.lv };
+      const dir = findDirByShortName(dec.dir);
+      const chosenAction = actionMap.get(dec.action) || actionMap.get('rest') || Array.from(actionMap.values())[0];
 
-    // 体力・おなか0での世代交代チェック
-    if (life.getState().mode === 'DEAD') {
-      ROBOT.emotion = 'sad';
-      if (msgEl) msgEl.innerText = `力尽きてしまった…。記憶と夢を引き継ぎ、第${ROBOT.gen + 1}世代が誕生します！`;
-      setTimeout(() => {
-        ROBOT.gen += 1;
-        life = new LifeCore();
-        GAME_DAY = 1; TIME_STEP = 0; AI_MEMORY = [];
-        DIARY_LOGS.push(`📖 記憶を引き継いで第${ROBOT.gen}世代が誕生した！`);
-        if (typeof window.switchAreaById === 'function') {
-          window.switchAreaById('home', true);
-        } else {
-          ROBOT.pos = { x: 0, z: 0, lv: -1, sx: 2, sz: 2 };
-          if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
-          if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition(true);
-          if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
-          if (typeof saveWorldState === 'function') saveWorldState();
+      let thoughtText = (typeof dec.thought === 'string' && dec.thought.trim())
+        ? dec.thought.trim()
+        : '自分で考えて行動したよ！';
+      let actionLabel = `🟪 Groq判断：${chosenAction.id}`;
+
+      try {
+        const out = chosenAction.run({ dec, dir, prevPos });
+        if (out && out.actionLabel) actionLabel = out.actionLabel;
+        if (out && out.thoughtAppend) thoughtText += out.thoughtAppend;
+      } catch (e) {
+        console.warn('AICommCore action execution error:', e);
+      }
+
+      ROBOT.emotion = (typeof POSE_TABLE !== 'undefined' && POSE_TABLE[dec.emotion]) ? dec.emotion : 'normal';
+      ROBOT.bulbEmotion = null;
+      if (OBS_MODE === 'ai_mode') AI_MEMORY.push(`${actionLabel}:${thoughtText}`);
+      DIARY_LOGS.push(`🟪 ${GAME_DAY}日目：${thoughtText}`);
+
+      const actEl = document.getElementById('history-action');
+      const msgEl = document.getElementById('message-box');
+      if (actEl) actEl.innerText = actionLabel;
+      if (msgEl) msgEl.innerText = thoughtText;
+
+      let switchedArea = false;
+      for (let i = 0; i < postHooks.length; i++) {
+        try {
+          const hookRes = postHooks[i]({ dec, dir, prevPos });
+          if (hookRes && hookRes.switchedArea) { switchedArea = true; break; }
+        } catch (e) {
+          console.warn('AICommCore postHook error:', e);
         }
-        if (btn) btn.disabled = false;
-      }, 1800);
-      return;
-    }
+      }
+      if (switchedArea) return;
 
-    setTimeout(() => {
-      if (stEl) stEl.innerText = getActiveBrainBadgeText();
+      if (typeof manualCameraMode !== 'undefined' && manualCameraMode === 'robot' && typeof resetFpvToRobotFront === 'function') {
+        resetFpvToRobotFront();
+      }
+      if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
+      if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition();
       if (typeof applyRobotBulbColor === 'function') applyRobotBulbColor();
-      if (btn) btn.disabled = false;
-    }, 220);
+      if (typeof cameraDirty !== 'undefined') cameraDirty = true;
+      if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
+      if (typeof saveWorldState === 'function') saveWorldState();
+
+      if (life.getState().mode === 'DEAD') {
+        ROBOT.emotion = 'sad';
+        if (msgEl) msgEl.innerText = `力尽きてしまった…。記憶と夢を引き継ぎ、第${ROBOT.gen + 1}世代が誕生します！`;
+        setTimeout(() => {
+          ROBOT.gen += 1;
+          life = new LifeCore();
+          GAME_DAY = 1; TIME_STEP = 0; AI_MEMORY = [];
+          DIARY_LOGS.push(`📖 記憶を引き継いで第${ROBOT.gen}世代が誕生した！`);
+          if (typeof window.switchAreaById === 'function') {
+            window.switchAreaById('home', true);
+          } else {
+            ROBOT.pos = { x: 0, z: 0, lv: -1, sx: 2, sz: 2 };
+            if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
+            if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition(true);
+            if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
+            if (typeof saveWorldState === 'function') saveWorldState();
+          }
+        }, 1800);
+      }
+    } finally {
+      setTimeout(() => {
+        if (stEl) stEl.innerText = getActiveBrainBadgeText();
+        if (typeof applyRobotBulbColor === 'function') applyRobotBulbColor();
+        if (btn) btn.disabled = false;
+      }, 220);
+    }
   }
 
-  // グローバル配線（world.js で固定されていた btn-action のクリック先を動的に張り替える）
+  // グローバル配線（サイコロ思考への抜け道を完全に塞ぐ）
   window.executeTurn = runTurn;
   if (typeof executeTurn !== 'undefined') executeTurn = runTurn;
   const actionBtn = document.getElementById('btn-action');
@@ -259,16 +383,16 @@ ${actionsText}
 
   if (typeof getActiveBrainBadgeText === 'function') {
     getActiveBrainBadgeText = function() {
-      if (commEnabled && safeStorage.getItem('api_groq')) return '🟪 Groq自律通信ON';
+      if (commEnabled && (safeStorage.getItem('api_groq') || '').trim()) return '🟪 Groq自律通信ON';
       if (commEnabled) return '⚠️ Groqキー未設定';
-      return '🎲 通信OFF(サイコロ思考)';
+      return '⏸️ 通信OFF(停止)';
     };
   }
   window.toggleAiCommSwitch = setEnabled;
 
   // 不変コアAPIを上書き不可で公開
   const coreApi = Object.freeze({
-    version: '1.0-locked',
+    version: '2.0-groq-only-locked',
     isEnabled,
     setEnabled,
     registerAction,
@@ -283,7 +407,7 @@ ${actionsText}
   });
 
   // ==========================================================================
-  // 4. 標準センサー ＆ 標準アクション ＆ 標準ターン後フックの初期登録
+  // 5. 標準センサー ＆ 標準アクション ＆ 標準ターン後フック
   // ==========================================================================
   registerSensor(() => {
     const curH  = getRobotHeightLevel();
@@ -313,7 +437,7 @@ ${actionsText}
 
   registerAction({
     id: 'move',
-    desc: '指定した方角(北/南/東/西/北西/北東/南西/南東)へ1マス移動する',
+    desc: '指定した方角(北/南/東/西/北西/北東/南西/南東)へ移動する',
     run: ({ dir }) => {
       const chk = checkMoveAndPosture(ROBOT.pos.x, ROBOT.pos.z, getRobotHeightLevel(), dir);
       ROBOT.rotY = dir.rot;
@@ -330,7 +454,7 @@ ${actionsText}
 
   registerAction({
     id: 'dig_front',
-    desc: '指定した方角の目の前の壁や土を削る・掘る',
+    desc: '指定した方角の目の前の壁や土を掘る',
     run: ({ dir }) => {
       ROBOT.rotY = dir.rot;
       const res = digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, getRobotHeightLevel(), dir, ROBOT.posture === 'crawl', getEffectiveParams().power);
@@ -338,60 +462,6 @@ ${actionsText}
       ROBOT.params.power = Math.min(100, (ROBOT.params.power || 50) + 2);
       if (res.completedLevel && BAG.length < 10) BAG.push('stone');
       return { actionLabel: `🟪 Groq判断：${dir.name}の壁を掘削` };
-    }
-  });
-
-  registerAction({
-    id: 'dig_down',
-    desc: '自分の足元を掘って下の層へ降りる（落下する）',
-    run: () => {
-      const res = digUnderneathAndFall();
-      life.stamina -= 7;
-      ROBOT.params.power = Math.min(100, (ROBOT.params.power || 50) + 2);
-      return { actionLabel: `🟪 Groq判断：足元掘り(${res ? res.dropSub : 0}段落下)` };
-    }
-  });
-
-  registerAction({
-    id: 'stack_step',
-    desc: 'カバンの🪨石を使って足元に小段差(踏み台)を積む',
-    run: () => {
-      const idx = BAG.indexOf('stone');
-      if (idx !== -1 && addSubStepFootholdAt(ROBOT.pos.x, ROBOT.pos.z, 1)) {
-        BAG.splice(idx, 1);
-        ROBOT.params.logic = Math.min(100, (ROBOT.params.logic || 50) + 3);
-        return { actionLabel: '🟪 Groq判断：🪨石で足元に段差を積んだ' };
-      }
-      return { actionLabel: '🟪 Groq判断：石を積もうとしたが石がない' };
-    }
-  });
-
-  registerAction({
-    id: 'use_oil',
-    desc: 'カバンの🧴オイルを使って狭い穴対策やトラウマ解消をする',
-    run: () => {
-      const idx = BAG.indexOf('oil');
-      if (idx !== -1) {
-        BAG.splice(idx, 1);
-        ROBOT.traumas = (ROBOT.traumas || []).filter(t => t !== 'narrow');
-        return { actionLabel: '🟪 Groq判断：🧴オイルを使用' };
-      }
-      return { actionLabel: '🟪 Groq判断：オイルを持っていなかった' };
-    }
-  });
-
-  registerAction({
-    id: 'use_grass',
-    desc: 'カバンの🌿草ブロックを使ってごきげん回復＆夜空の星座を見る',
-    run: () => {
-      const idx = BAG.indexOf('grass');
-      if (idx !== -1) {
-        BAG.splice(idx, 1);
-        life.mental = Math.min(100, life.mental + 25);
-        ROBOT.params.cautionLimiter = Math.min(100, (ROBOT.params.cautionLimiter || 50) + 3);
-        return { actionLabel: '🟪 Groq判断：🌿草ブロックで気分転換' };
-      }
-      return { actionLabel: '🟪 Groq判断：草ブロックを持っていなかった' };
     }
   });
 
@@ -406,7 +476,6 @@ ${actionsText}
     }
   });
 
-  // 標準ターン後フック：アイテム拾得・ペット追従・パズル・住人・敵・野生ペット・ポータル
   registerPostTurnHook(({ prevPos }) => {
     const itemIdx = WORLD_ITEMS.findIndex(it => it.x === ROBOT.pos.x && it.z === ROBOT.pos.z);
     if (itemIdx !== -1) {
