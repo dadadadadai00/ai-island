@@ -3,7 +3,7 @@
 // ・A案(記号マップ)／B案(3Dカメラ画像) 設定切替（デフォルトA案）
 // ・停止時180度パノラマ視野（3連60度合成＋方位ラベル）／移動時狭い前方視野の自動切替
 // ・直近4ターンの短期記憶（意図＋物理結果）保持による脱線・記憶喪失防止
-// ・全モーダルウィンドウの2本指ピンチ拡大縮小（3Dカメラビュー無変更）
+// ・全モーダルウィンドウの非崩れピンチ拡大縮小（100%〜250%・開閉時自動100%リセット・3Dカメラ無変更）
 // ※ index.html / brain.js / world.js は無改造のまま動作します
 // ============================================================================
 (function initImmutableAICommCore() {
@@ -158,14 +158,12 @@
 
       if (typeof robotGroup !== 'undefined') robotGroup.visible = false;
 
-      // 停止時：水平60°×3枚＝180°パノラマ ／ 移動時：狭い前方1枚（水平68°）
       const panelW  = isMoving ? 280 : 240;
       const panelH  = isMoving ? 340 : 300;
       const headerH = 26;
       const panelAspect = panelW / panelH;
       const targetHFovRad = (isMoving ? 68 : 60) * (Math.PI / 180);
 
-      // 画面縦横比に関わらず無歪みで厳密な水平画角を切り出すクロップ＆vFOV算出
       let cropX = 0, cropY = 0, cropW = srcW, cropH = srcH;
       if (srcAspect > panelAspect) {
         cropW = Math.max(1, Math.round(srcH * panelAspect));
@@ -177,7 +175,6 @@
       const fullHalfTanX = Math.tan(targetHFovRad / 2) * (srcW / cropW);
       const vFovDeg = Math.min(135, Math.max(35, 2 * Math.atan(fullHalfTanX / srcAspect) * (180 / Math.PI)));
 
-      // Three.js Y-up右手系: +60°が左、0°が正面、-60°が右
       const shots = isMoving
         ? [{ yaw: baseRot, label: `移動中・正面(${rotToShortDirName(baseRot)})` }]
         : [
@@ -215,7 +212,6 @@
         const destX = idx * panelW;
         ctx.drawImage(renderer.domElement, cropX, cropY, cropW, cropH, destX, headerH, panelW, panelH);
 
-        // 上部方位ラベル帯
         ctx.fillStyle = idx === 1 || isMoving ? '#0c4a6e' : '#1e293b';
         ctx.fillRect(destX, 0, panelW, headerH);
         ctx.fillStyle = '#f8fafc';
@@ -224,7 +220,6 @@
         ctx.textBaseline = 'middle';
         ctx.fillText(shot.label, destX + panelW / 2, headerH / 2);
 
-        // パネル境界の薄いガイド線
         if (idx > 0) {
           ctx.strokeStyle = 'rgba(255,255,255,0.35)';
           ctx.lineWidth = 1.5;
@@ -237,7 +232,6 @@
 
       const dataUrl = outCanvas.toDataURL('image/jpeg', 0.78);
 
-      // 人間側のカメラ表示を即座に復元
       innerRobotCam.fov = prevFov;
       innerRobotCam.aspect = prevAspect;
       innerRobotCam.updateProjectionMatrix();
@@ -612,10 +606,8 @@ ${actionsText}
         physResult = '行動処理中にエラーが発生した';
       }
 
-      // 次ターンの視野モード更新：実際に移動した直後のみ「移動中(狭い前方視野)」、それ以外は「停止中(180°パノラマ)」
       lastTurnWasMoving = Boolean(chosenAction.id === 'move' && out && out.moved === true);
 
-      // 直近4ターンの短期記憶を更新（思考と物理結果のペア）
       shortTermMemory.push({
         action: chosenAction.id,
         dir: dir.name.replace('(斜め)', ''),
@@ -686,77 +678,201 @@ ${actionsText}
   }
 
   // --------------------------------------------------------------------------
-  // 6. 全モーダルウィンドウの2本指ピンチ拡大縮小（3Dカメラビューへ一切非干渉）
+  // 6. 全モーダルウィンドウの非崩れピンチ拡大縮小（transform: scale + 1本指パン）
+  //    ・レイアウト(ボタン/テキスト枠)を一切崩さず100%〜250%で滑らかに拡大・縮小
+  //    ・開閉・縦並びアイコン再タップ時に必ず100%の元サイズへ自動リセット
+  //    ・3Dカメラビュー操作へは一切干渉しない
   // --------------------------------------------------------------------------
+  const modalResetFns = [];
+
+  function resetAllModalZooms() {
+    modalResetFns.forEach(fn => {
+      try { fn(); } catch (e) {}
+    });
+  }
+
   function attachPinchZoomToModal(overlay) {
-    if (!overlay || overlay.dataset.pinchBound === '1') return;
+    if (!overlay || overlay.dataset.pinchBound === '2') return;
     const content = overlay.querySelector('.modal-content');
     if (!content) return;
-    overlay.dataset.pinchBound = '1';
+    overlay.dataset.pinchBound = '2';
+
+    const MIN_SCALE = 1.0;
+    const MAX_SCALE = 2.5;
 
     let scale = 1.0;
-    let startDist = null;
-    let startScale = 1.0;
+    let panX  = 0;
+    let panY  = 0;
 
-    // 拡大率リセット用の小型バッジ（100%時は非表示）
+    // 2本指ピンチ用状態
+    let pinchActive = false;
+    let startDist = 0;
+    let startScale = 1.0;
+    let startPanX = 0;
+    let startPanY = 0;
+    let startMidX = 0;
+    let startMidY = 0;
+
+    // 拡大中の1本指パン用状態
+    let panDragActive = false;
+    let panDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragInitPanX = 0;
+    let dragInitPanY = 0;
+
+    content.style.transformOrigin = 'center center';
+    content.style.willChange = 'transform';
+
+    // 拡大中のみ表示されるリセットバッジ（100%時は非表示）
     const badge = document.createElement('button');
     badge.type = 'button';
-    badge.style.cssText = 'position:fixed; bottom:18px; right:18px; z-index:9999; display:none; padding:5px 10px; border-radius:999px; border:1px solid #38bdf8; background:rgba(15,23,42,0.88); color:#f8fafc; font-size:11px; font-weight:900; box-shadow:0 3px 10px rgba(0,0,0,0.3); cursor:pointer;';
-    badge.title = 'タップで100%へ戻す';
+    badge.style.cssText = 'position:fixed; bottom:18px; right:18px; z-index:9999; display:none; padding:6px 12px; border-radius:999px; border:1.5px solid #38bdf8; background:rgba(15,23,42,0.92); color:#f8fafc; font-size:11.5px; font-weight:900; box-shadow:0 4px 14px rgba(0,0,0,0.35); cursor:pointer;';
+    badge.title = 'タップで元の100%サイズへ戻す';
     overlay.appendChild(badge);
 
-    function applyScale(nextScale) {
-      scale = Math.max(0.75, Math.min(2.4, Math.round(nextScale * 100) / 100));
-      content.style.zoom = String(scale);
-      content.style.overflow = 'auto';
-      if (Math.abs(scale - 1.0) > 0.03) {
-        badge.style.display = 'block';
-        badge.innerText = `🔍 ${Math.round(scale * 100)}%（戻す）`;
-      } else {
-        badge.style.display = 'none';
-      }
+    function clampPan(nextPanX, nextPanY, nextScale) {
+      if (nextScale <= 1.001) return { x: 0, y: 0 };
+      const baseW = content.offsetWidth || Math.min(window.innerWidth * 0.92, 420);
+      const baseH = content.offsetHeight || (window.innerHeight * 0.85);
+      const maxX = Math.max(20, (baseW * nextScale - window.innerWidth) / 2 + 28);
+      const maxY = Math.max(20, (baseH * nextScale - window.innerHeight) / 2 + 48);
+      return {
+        x: Math.max(-maxX, Math.min(maxX, nextPanX)),
+        y: Math.max(-maxY, Math.min(maxY, nextPanY))
+      };
     }
+
+    function applyTransform(nextScale, nextPanX, nextPanY) {
+      let s = Math.max(MIN_SCALE, Math.min(MAX_SCALE, nextScale));
+      if (s < 1.03) {
+        scale = 1.0;
+        panX = 0;
+        panY = 0;
+        content.style.zoom = '';
+        content.style.transform = '';
+        badge.style.display = 'none';
+        return;
+      }
+      const clamped = clampPan(nextPanX, nextPanY, s);
+      scale = s;
+      panX = clamped.x;
+      panY = clamped.y;
+      content.style.zoom = '';
+      content.style.transform = `translate3d(${panX.toFixed(1)}px, ${panY.toFixed(1)}px, 0) scale(${scale.toFixed(3)})`;
+      badge.style.display = 'block';
+      badge.innerText = `🔍 ${Math.round(scale * 100)}%（元に戻す）`;
+    }
+
+    function resetZoom() {
+      pinchActive = false;
+      panDragActive = false;
+      panDragging = false;
+      applyTransform(1.0, 0, 0);
+    }
+
+    modalResetFns.push(resetZoom);
 
     badge.addEventListener('click', (e) => {
       e.stopPropagation();
-      applyScale(1.0);
+      resetZoom();
     });
 
-    // 3Dキャンバス側へのイベント伝播を遮断
+    // モーダルの表示・非表示が切り替わったら必ず元の100%サイズへ自動リセット
+    let prevVisible = overlay.classList.contains('active') || (overlay.style.display && overlay.style.display !== 'none');
+    const visObserver = new MutationObserver(() => {
+      const nowVisible = overlay.classList.contains('active') || (overlay.style.display && overlay.style.display !== 'none');
+      if (nowVisible !== prevVisible) {
+        prevVisible = nowVisible;
+        resetZoom();
+      }
+    });
+    visObserver.observe(overlay, { attributes: true, attributeFilter: ['style', 'class'] });
+
+    // 3Dキャンバス側へのポインター・ホイール伝播を遮断（カメラビュー保護）
     overlay.addEventListener('pointerdown', (e) => e.stopPropagation());
     overlay.addEventListener('pointermove', (e) => e.stopPropagation());
+    overlay.addEventListener('pointerup',   (e) => e.stopPropagation());
+    overlay.addEventListener('wheel',       (e) => e.stopPropagation(), { passive: true });
 
     overlay.addEventListener('touchstart', (e) => {
       if (e.touches.length === 2) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        startDist = Math.hypot(dx, dy);
+        pinchActive = true;
+        panDragActive = false;
+        panDragging = false;
+        const t0 = e.touches[0], t1 = e.touches[1];
+        startDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY) || 1;
+        startMidX = (t0.clientX + t1.clientX) / 2;
+        startMidY = (t0.clientY + t1.clientY) / 2;
         startScale = scale;
+        startPanX = panX;
+        startPanY = panY;
+      } else if (e.touches.length === 1 && scale > 1.01) {
+        // 拡大中のみ1本指パン待機（ボタンタップ自体は妨げない）
+        const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+        if (tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA') return;
+        panDragActive = true;
+        panDragging = false;
+        dragStartX = e.touches[0].clientX;
+        dragStartY = e.touches[0].clientY;
+        dragInitPanX = panX;
+        dragInitPanY = panY;
       }
     }, { passive: true });
 
     overlay.addEventListener('touchmove', (e) => {
-      if (e.touches.length === 2 && startDist) {
+      if (e.touches.length === 2 && pinchActive) {
         e.preventDefault();
         e.stopPropagation();
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        const dist = Math.hypot(dx, dy);
-        if (startDist > 10) {
-          applyScale(startScale * (dist / startDist));
+        const t0 = e.touches[0], t1 = e.touches[1];
+        const dist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+        const curMidX = (t0.clientX + t1.clientX) / 2;
+        const curMidY = (t0.clientY + t1.clientY) / 2;
+        const nextScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, startScale * (dist / startDist)));
+        const ratio = nextScale / startScale;
+
+        const cx = window.innerWidth / 2;
+        const cy = window.innerHeight / 2;
+        const nextPanX = (curMidX - cx) - ((startMidX - cx) - startPanX) * ratio;
+        const nextPanY = (curMidY - cy) - ((startMidY - cy) - startPanY) * ratio;
+
+        applyTransform(nextScale, nextPanX, nextPanY);
+        return;
+      }
+
+      if (e.touches.length === 1 && panDragActive && scale > 1.01) {
+        const dx = e.touches[0].clientX - dragStartX;
+        const dy = e.touches[0].clientY - dragStartY;
+        if (!panDragging && Math.hypot(dx, dy) > 8) {
+          panDragging = true;
+        }
+        if (panDragging) {
+          e.preventDefault();
+          e.stopPropagation();
+          applyTransform(scale, dragInitPanX + dx, dragInitPanY + dy);
         }
       }
     }, { passive: false });
 
-    const endPinch = (e) => {
-      if (!e.touches || e.touches.length < 2) startDist = null;
+    const endTouch = (e) => {
+      if (!e.touches || e.touches.length < 2) pinchActive = false;
+      if (!e.touches || e.touches.length === 0) {
+        panDragActive = false;
+        panDragging = false;
+      }
     };
-    overlay.addEventListener('touchend', endPinch, { passive: true });
-    overlay.addEventListener('touchcancel', endPinch, { passive: true });
+    overlay.addEventListener('touchend', endTouch, { passive: true });
+    overlay.addEventListener('touchcancel', endTouch, { passive: true });
   }
 
   function enablePinchZoomOnAllModals() {
     document.querySelectorAll('.modal-overlay').forEach(attachPinchZoomToModal);
+    // 縦並びサイドアイコンを押した際も念のため全モーダル倍率を100%へリセット
+    const sideCol = document.getElementById('side-icon-column');
+    if (sideCol && sideCol.dataset.resetHookBound !== '1') {
+      sideCol.dataset.resetHookBound = '1';
+      sideCol.addEventListener('click', () => resetAllModalZooms(), true);
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -816,6 +932,7 @@ ${actionsText}
   function openVisionMonitor(previewNow = true) {
     const modal = document.getElementById('modal-ai-vision');
     if (!modal) return;
+    resetAllModalZooms();
     renderVisionMonitorContent(previewNow);
     modal.style.display = 'flex';
     modal.classList.add('active');
@@ -824,6 +941,7 @@ ${actionsText}
   function closeVisionMonitor() {
     const modal = document.getElementById('modal-ai-vision');
     if (!modal) return;
+    resetAllModalZooms();
     modal.style.display = 'none';
     modal.classList.remove('active');
   }
@@ -911,7 +1029,6 @@ ${actionsText}
   }
 
   injectVisionControlsUI();
-  // 他モジュールが後から追加したモーダルにも自動適用
   setTimeout(enablePinchZoomOnAllModals, 500);
 
   // グローバル配線
@@ -932,7 +1049,7 @@ ${actionsText}
 
   // 不変コアAPI公開
   const coreApi = Object.freeze({
-    version: '3.1-panorama-turn-memory',
+    version: '3.2-panorama-clean-pinch',
     isEnabled,
     setEnabled,
     getVisionMode,
@@ -946,6 +1063,7 @@ ${actionsText}
     resetPhysicalHistory,
     openVisionMonitor,
     enablePinchZoomOnAllModals,
+    resetAllModalZooms,
     getLastInspection: () => lastInspection,
     listActions: () => Array.from(actionMap.values()).map(a => ({ id: a.id, desc: a.desc }))
   });
