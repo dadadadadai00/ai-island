@@ -1,7 +1,9 @@
 // ============================================================================
-// 【純粋知覚・不変通信コア：ai_comm.js（A案マップ／B案3D画像切替・サイコロ廃止）】
-// ・神様目線の座標・行動ヒント・演技誘導を全廃し、キャラ視点の知覚のみをGroqへ送信
-// ・設定モーダルへ「AIキャラ視点情報(A案/B案)」切替と「👁️ AI視界モニター」を自動追加
+// 【純粋知覚・不変通信コア：ai_comm.js】
+// ・A案(記号マップ)／B案(3Dカメラ画像) 設定切替（デフォルトA案）
+// ・停止時180度パノラマ視野（3連60度合成＋方位ラベル）／移動時狭い前方視野の自動切替
+// ・直近4ターンの短期記憶（意図＋物理結果）保持による脱線・記憶喪失防止
+// ・全モーダルウィンドウの2本指ピンチ拡大縮小（3Dカメラビュー無変更）
 // ※ index.html / brain.js / world.js は無改造のまま動作します
 // ============================================================================
 (function initImmutableAICommCore() {
@@ -9,28 +11,31 @@
 
   const GROQ_CHAT_URL   = 'https://api.groq.com/openai/v1/chat/completions';
   const GROQ_MODELS_URL = 'https://api.groq.com/openai/v1/models';
-  const TIMEOUT_MS      = 20000;
-  const TEXT_MODEL_CACHE_KEY   = 'groq_text_model_cache_v3';
-  const VISION_MODEL_CACHE_KEY = 'groq_vision_model_cache_v3';
-  const VISION_MODE_KEY        = 'ai_vision_mode_v1'; // 'map' (A案) | 'image' (B案)
+  const TIMEOUT_MS      = 22000;
+  const TEXT_MODEL_CACHE_KEY   = 'groq_text_model_cache_v4';
+  const VISION_MODEL_CACHE_KEY = 'groq_vision_model_cache_v4';
+  const VISION_MODE_KEY        = 'ai_vision_mode_v1'; // 'map' | 'image'
+  const MAX_SHORT_MEMORY       = 4;
 
   let commEnabled = (typeof safeStorage !== 'undefined') && (safeStorage.getItem('ai_comm_enabled') === '1');
   let visionMode  = (typeof safeStorage !== 'undefined' && safeStorage.getItem(VISION_MODE_KEY) === 'image') ? 'image' : 'map';
 
   let cachedTextModels   = [];
   let cachedVisionModels = [];
-  let lastPhysicalResult = 'なし（開始直後）';
+  let lastTurnWasMoving  = false; // false: 停止中(180°パノラマ), true: 移動直後(狭い前方)
+  let shortTermMemory    = [];    // [{ action, dir, thought, result }]
 
-  const actionMap = new Map();
+  const actionMap   = new Map();
   const bodySensors = [];
-  const postHooks = [];
+  const postHooks   = [];
   let visionProvider = null;
 
   let lastInspection = {
     time: '未実行',
     mode: visionMode,
+    isMoving: false,
     modelId: '-',
-    promptText: 'まだ通信していません（下の「今の視界をプレビュー」で通信なし確認できます）',
+    promptText: 'まだ通信していません（下の「今の視界を更新」で通信なしプレビューできます）',
     imageDataUrl: null,
     rawResponse: '-',
     parsedJson: null,
@@ -54,7 +59,6 @@
     if (typeof fn === 'function') bodySensors.push(fn);
   }
 
-  // 後方互換エイリアス
   function registerSensor(fn) {
     registerBodySensor(fn);
   }
@@ -97,15 +101,38 @@
   }
 
   function getVisionMode() { return visionMode; }
+  function isMovingVision() { return lastTurnWasMoving; }
 
   function resetPhysicalHistory() {
-    lastPhysicalResult = 'なし（開始直後）';
+    shortTermMemory = [];
+    lastTurnWasMoving = false;
   }
 
   // --------------------------------------------------------------------------
-  // 2. B案：キャラ視点3Dカメラ（innerRobotCam）のオフスクリーン風キャプチャ
+  // 2. B案：キャラ視点3Dカメラ描画（停止時: 180度3連パノラマ / 移動時: 前方1枚）
   // --------------------------------------------------------------------------
-  function captureRobotFirstPersonImage() {
+  function rotToShortDirName(rot) {
+    const x = Math.sin(rot);
+    const z = Math.cos(rot);
+    const dirs = [
+      { name: '北',   x: 0,       z: -1 },
+      { name: '北東', x: 0.7071,  z: -0.7071 },
+      { name: '東',   x: 1,       z: 0 },
+      { name: '南東', x: 0.7071,  z: 0.7071 },
+      { name: '南',   x: 0,       z: 1 },
+      { name: '南西', x: -0.7071, z: 0.7071 },
+      { name: '西',   x: -1,      z: 0 },
+      { name: '北西', x: -0.7071, z: -0.7071 }
+    ];
+    let best = dirs[0], maxDot = -99;
+    dirs.forEach(d => {
+      const dot = d.x * x + d.z * z;
+      if (dot > maxDot) { maxDot = dot; best = d; }
+    });
+    return best.name;
+  }
+
+  function captureRobotFirstPersonImage(isMoving = lastTurnWasMoving) {
     if (typeof renderer === 'undefined' || typeof scene === 'undefined' || typeof innerRobotCam === 'undefined') {
       return null;
     }
@@ -118,54 +145,99 @@
       const sSpec = (typeof SIZE_SPECS !== 'undefined' && SIZE_SPECS[ROBOT.sizeLevel]) || { scaleY: 0.25 };
       const isCrawl = (ROBOT.posture === 'crawl');
 
-      const rot = ROBOT.rotY || 0;
-      const lookDirX = Math.sin(rot);
-      const lookDirZ = Math.cos(rot);
-
+      const baseRot = ROBOT.rotY || 0;
       const eyeH = isCrawl ? (0.18 * sSpec.scaleY) : Math.max(0.14, 0.52 * sSpec.scaleY);
-      const forwardOffset = isCrawl ? 0.06 : -0.18;
+      const forwardOffset = isCrawl ? 0.04 : -0.14;
       const rx = (typeof robotGroup !== 'undefined') ? robotGroup.position.x : ROBOT.pos.x;
       const ry = (typeof robotGroup !== 'undefined') ? robotGroup.position.y : 0;
       const rz = (typeof robotGroup !== 'undefined') ? robotGroup.position.z : ROBOT.pos.z;
 
-      const eyeX = rx + lookDirX * forwardOffset;
-      const eyeY = ry + eyeH;
-      const eyeZ = rz + lookDirZ * forwardOffset;
+      const srcW = renderer.domElement.width || 360;
+      const srcH = renderer.domElement.height || 640;
+      const srcAspect = srcW / Math.max(1, srcH);
 
       if (typeof robotGroup !== 'undefined') robotGroup.visible = false;
 
-      innerRobotCam.fov = isCrawl ? 78 : 96;
-      innerRobotCam.aspect = renderer.domElement.width / Math.max(1, renderer.domElement.height);
-      innerRobotCam.updateProjectionMatrix();
-      innerRobotCam.position.set(eyeX, eyeY, eyeZ);
-      innerRobotCam.lookAt(
-        eyeX + 20 * lookDirX,
-        eyeY - 2.6, // 目の前の壁と足元の床・土が同時に収まる少し下向き目線
-        eyeZ + 20 * lookDirZ
-      );
+      // 停止時：水平60°×3枚＝180°パノラマ ／ 移動時：狭い前方1枚（水平68°）
+      const panelW  = isMoving ? 280 : 240;
+      const panelH  = isMoving ? 340 : 300;
+      const headerH = 26;
+      const panelAspect = panelW / panelH;
+      const targetHFovRad = (isMoving ? 68 : 60) * (Math.PI / 180);
 
-      if (typeof updateTransparencyAndOcclusion === 'function') {
-        updateTransparencyAndOcclusion('robot_fpv', innerRobotCam.position, rx, ry, rz, h, lookDirX, lookDirZ);
+      // 画面縦横比に関わらず無歪みで厳密な水平画角を切り出すクロップ＆vFOV算出
+      let cropX = 0, cropY = 0, cropW = srcW, cropH = srcH;
+      if (srcAspect > panelAspect) {
+        cropW = Math.max(1, Math.round(srcH * panelAspect));
+        cropX = Math.floor((srcW - cropW) / 2);
+      } else {
+        cropH = Math.max(1, Math.round(srcW / panelAspect));
+        cropY = Math.floor((srcH - cropH) / 2);
       }
+      const fullHalfTanX = Math.tan(targetHFovRad / 2) * (srcW / cropW);
+      const vFovDeg = Math.min(135, Math.max(35, 2 * Math.atan(fullHalfTanX / srcAspect) * (180 / Math.PI)));
 
-      // キャラ視点で1フレーム描画 → 同一フレーム内で即座に軽量リサイズJPEG化
-      renderer.render(scene, innerRobotCam);
+      // Three.js Y-up右手系: +60°が左、0°が正面、-60°が右
+      const shots = isMoving
+        ? [{ yaw: baseRot, label: `移動中・正面(${rotToShortDirName(baseRot)})` }]
+        : [
+            { yaw: baseRot + Math.PI / 3, label: `左60°(${rotToShortDirName(baseRot + Math.PI / 3)})` },
+            { yaw: baseRot,               label: `正面(${rotToShortDirName(baseRot)})` },
+            { yaw: baseRot - Math.PI / 3, label: `右60°(${rotToShortDirName(baseRot - Math.PI / 3)})` }
+          ];
 
-      const srcW = renderer.domElement.width || 360;
-      const srcH = renderer.domElement.height || 640;
-      const maxEdge = 512;
-      const scale = Math.min(1, maxEdge / Math.max(srcW, srcH));
-      const outW = Math.max(64, Math.round(srcW * scale));
-      const outH = Math.max(64, Math.round(srcH * scale));
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width  = panelW * shots.length;
+      outCanvas.height = panelH + headerH;
+      const ctx = outCanvas.getContext('2d');
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, outCanvas.width, outCanvas.height);
 
-      const tmpCanvas = document.createElement('canvas');
-      tmpCanvas.width = outW;
-      tmpCanvas.height = outH;
-      const ctx = tmpCanvas.getContext('2d');
-      ctx.drawImage(renderer.domElement, 0, 0, outW, outH);
-      const dataUrl = tmpCanvas.toDataURL('image/jpeg', 0.78);
+      innerRobotCam.fov = vFovDeg;
+      innerRobotCam.aspect = srcAspect;
+      innerRobotCam.updateProjectionMatrix();
 
-      // 人間側のカメラ表示を即座に元へ戻す
+      shots.forEach((shot, idx) => {
+        const lx = Math.sin(shot.yaw);
+        const lz = Math.cos(shot.yaw);
+        const eyeX = rx + Math.sin(baseRot) * forwardOffset;
+        const eyeY = ry + eyeH;
+        const eyeZ = rz + Math.cos(baseRot) * forwardOffset;
+
+        innerRobotCam.position.set(eyeX, eyeY, eyeZ);
+        innerRobotCam.lookAt(eyeX + 20 * lx, eyeY - 2.6, eyeZ + 20 * lz);
+
+        if (typeof updateTransparencyAndOcclusion === 'function') {
+          updateTransparencyAndOcclusion('robot_fpv', innerRobotCam.position, rx, ry, rz, h, lx, lz);
+        }
+        renderer.render(scene, innerRobotCam);
+
+        const destX = idx * panelW;
+        ctx.drawImage(renderer.domElement, cropX, cropY, cropW, cropH, destX, headerH, panelW, panelH);
+
+        // 上部方位ラベル帯
+        ctx.fillStyle = idx === 1 || isMoving ? '#0c4a6e' : '#1e293b';
+        ctx.fillRect(destX, 0, panelW, headerH);
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(shot.label, destX + panelW / 2, headerH / 2);
+
+        // パネル境界の薄いガイド線
+        if (idx > 0) {
+          ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(destX, 0);
+          ctx.lineTo(destX, outCanvas.height);
+          ctx.stroke();
+        }
+      });
+
+      const dataUrl = outCanvas.toDataURL('image/jpeg', 0.78);
+
+      // 人間側のカメラ表示を即座に復元
       innerRobotCam.fov = prevFov;
       innerRobotCam.aspect = prevAspect;
       innerRobotCam.updateProjectionMatrix();
@@ -181,7 +253,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 3. Groqモデル自動検出（A案: テキスト / B案: Vision画像対応）
+  // 3. Groqモデル自動検出（A案: テキスト / B案: Vision対応）
   // --------------------------------------------------------------------------
   function isUsableChatModel(id) {
     const s = String(id || '').toLowerCase();
@@ -279,7 +351,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 4. 純粋知覚プロンプト組み立て（誘導・神様目線ゼロ）
+  // 4. 純粋知覚プロンプト組み立て（視覚＋身体感覚＋直近4ターン記憶）
   // --------------------------------------------------------------------------
   function collectBodyText() {
     const lines = [];
@@ -294,28 +366,42 @@
     return lines.join('\n');
   }
 
-  function buildPerceptionPayload(targetMode = visionMode) {
+  function formatShortTermMemory() {
+    if (!shortTermMemory.length) return 'なし（開始直後）';
+    return shortTermMemory.map((m, idx) => {
+      const ago = shortTermMemory.length - idx;
+      const tag = ago === 1 ? '直前' : `${ago}ターン前`;
+      return `- ${tag}: [${m.action}(${m.dir})] 思考「${m.thought}」→ 結果: ${m.result}`;
+    }).join('\n');
+  }
+
+  function buildPerceptionPayload(targetMode = visionMode, isMoving = lastTurnWasMoving) {
     const actions = Array.from(actionMap.values());
     const actionIds   = actions.map(a => a.id).join('/');
     const actionsText = actions.map(a => `- ${a.id}: ${a.desc}`).join('\n');
     const bodyText    = collectBodyText();
+    const memoryText  = formatShortTermMemory();
 
     let visionSection = '';
     let imageDataUrl  = null;
 
     if (targetMode === 'image') {
-      imageDataUrl = captureRobotFirstPersonImage();
-      visionSection = imageDataUrl
-        ? '添付の1人称カメラ画像が、今あなたの目に見えている視界のすべてです。'
-        : '（1人称カメラ画像の取得に失敗しました）';
+      imageDataUrl = captureRobotFirstPersonImage(isMoving);
+      if (imageDataUrl) {
+        visionSection = isMoving
+          ? '【移動直後・狭い前方視野】添付の1人称カメラ画像（正面1枚）が、今あなたの目に見えている視界のすべてです。'
+          : '【停止中・180度パノラマ視野】首を左右に振って見渡した「左60°・正面・右60°」の3連180度パノラマ画像が、今あなたの目に見えている視界のすべてです（背後は死角）。';
+      } else {
+        visionSection = '（1人称カメラ画像の取得に失敗しました）';
+      }
     } else {
       visionSection = (typeof visionProvider === 'function')
-        ? String(visionProvider() || '（視界データなし）')
+        ? String(visionProvider({ isMoving }) || '（視界データなし）')
         : '（視界モジュール未接続）';
     }
 
     const promptText = `あなたはこの3Dブロック空間の中にいる1体の存在です。
-以下の知覚情報（視覚・身体感覚・直前の物理結果）だけをもとに、次の行動を1つ自分で決めてください。
+以下の知覚情報（視覚・身体感覚・直近の記憶）だけをもとに、次の行動を1つ自分で決めてください。
 
 【視覚（今見えている範囲のみ）】
 ${visionSection}
@@ -323,8 +409,8 @@ ${visionSection}
 【身体感覚・所持状態】
 ${bodyText}
 
-【直前の物理結果】
-${lastPhysicalResult}
+【直近の記憶（自分の思考と物理結果）】
+${memoryText}
 
 【物理アクション】
 ${actionsText}
@@ -332,7 +418,7 @@ ${actionsText}
 以下のJSON形式のみで返答してください（前置き・解説禁止）:
 {"action":"${actionIds}","dir":"北/南/東/西/北西/北東/南西/南東","emotion":"normal/joy/anger/sad/fun/fear/think/surprise/wave/sleep/swing_v/pickup/carry/push/run/peek/struggle","thought":"知覚した事実や意図を短い1文で"}`;
 
-    return { promptText, imageDataUrl, mode: targetMode, actionsCount: actions.length };
+    return { promptText, imageDataUrl, mode: targetMode, isMoving, actionsCount: actions.length };
   }
 
   async function callGroqApi(key, modelId, promptText, imageDataUrl, useJsonFormat) {
@@ -397,7 +483,7 @@ ${actionsText}
     const key = (typeof safeStorage !== 'undefined') ? (safeStorage.getItem('api_groq') || '').trim() : '';
     if (!key) return { ok: false, reason: 'Groq APIキー未設定' };
 
-    const payload = buildPerceptionPayload(visionMode);
+    const payload = buildPerceptionPayload(visionMode, lastTurnWasMoving);
     if (!payload.actionsCount) return { ok: false, reason: '実行可能なアクション未登録' };
     if (visionMode === 'image' && !payload.imageDataUrl) {
       return { ok: false, reason: 'B案(3Dカメラ画像)のキャプチャに失敗しました' };
@@ -421,6 +507,7 @@ ${actionsText}
         lastInspection = {
           time: new Date().toLocaleTimeString('ja-JP'),
           mode: visionMode,
+          isMoving: payload.isMoving,
           modelId: mId,
           promptText: payload.promptText,
           imageDataUrl: payload.imageDataUrl,
@@ -444,6 +531,7 @@ ${actionsText}
     lastInspection = {
       time: new Date().toLocaleTimeString('ja-JP'),
       mode: visionMode,
+      isMoving: payload.isMoving,
       modelId: models[0] || '-',
       promptText: payload.promptText,
       imageDataUrl: payload.imageDataUrl,
@@ -511,10 +599,11 @@ ${actionsText}
         ? dec.thought.trim()
         : '（無言で行動した）';
       let actionLabel = `🟪 ${chosenAction.id}`;
-      let physResult  = `${chosenAction.id}(${dir.name})を実行した`;
+      let physResult  = `${chosenAction.id}(${dir.name.replace('(斜め)', '')})を実行した`;
+      let out = null;
 
       try {
-        const out = chosenAction.run({ dec, dir, prevPos });
+        out = chosenAction.run({ dec, dir, prevPos });
         if (out && out.actionLabel) actionLabel = out.actionLabel;
         if (out && out.physicalResult) physResult = out.physicalResult;
         else if (out && out.actionLabel) physResult = out.actionLabel;
@@ -523,8 +612,19 @@ ${actionsText}
         physResult = '行動処理中にエラーが発生した';
       }
 
-      // 次ターンへ渡す「直前の物理結果（触覚）」のみを保存
-      lastPhysicalResult = physResult;
+      // 次ターンの視野モード更新：実際に移動した直後のみ「移動中(狭い前方視野)」、それ以外は「停止中(180°パノラマ)」
+      lastTurnWasMoving = Boolean(chosenAction.id === 'move' && out && out.moved === true);
+
+      // 直近4ターンの短期記憶を更新（思考と物理結果のペア）
+      shortTermMemory.push({
+        action: chosenAction.id,
+        dir: dir.name.replace('(斜め)', ''),
+        thought: thoughtText,
+        result: physResult
+      });
+      if (shortTermMemory.length > MAX_SHORT_MEMORY) {
+        shortTermMemory.shift();
+      }
 
       ROBOT.emotion = (typeof POSE_TABLE !== 'undefined' && POSE_TABLE[dec.emotion]) ? dec.emotion : 'normal';
       ROBOT.bulbEmotion = null;
@@ -539,7 +639,7 @@ ${actionsText}
       let switchedArea = false;
       for (let i = 0; i < postHooks.length; i++) {
         try {
-          const hookRes = postHooks[i]({ dec, dir, prevPos });
+          const hookRes = postHooks[i]({ dec, dir, prevPos, out });
           if (hookRes && hookRes.switchedArea) { switchedArea = true; break; }
         } catch (e) {
           console.warn('AICommCore postHook error:', e);
@@ -586,15 +686,91 @@ ${actionsText}
   }
 
   // --------------------------------------------------------------------------
-  // 6. 設定UI（A案/B案切替）＆ 👁️ AI視界モニターモーダル自動注入
+  // 6. 全モーダルウィンドウの2本指ピンチ拡大縮小（3Dカメラビューへ一切非干渉）
   // --------------------------------------------------------------------------
-  function renderVisionMonitorContent(previewOnly = false) {
+  function attachPinchZoomToModal(overlay) {
+    if (!overlay || overlay.dataset.pinchBound === '1') return;
+    const content = overlay.querySelector('.modal-content');
+    if (!content) return;
+    overlay.dataset.pinchBound = '1';
+
+    let scale = 1.0;
+    let startDist = null;
+    let startScale = 1.0;
+
+    // 拡大率リセット用の小型バッジ（100%時は非表示）
+    const badge = document.createElement('button');
+    badge.type = 'button';
+    badge.style.cssText = 'position:fixed; bottom:18px; right:18px; z-index:9999; display:none; padding:5px 10px; border-radius:999px; border:1px solid #38bdf8; background:rgba(15,23,42,0.88); color:#f8fafc; font-size:11px; font-weight:900; box-shadow:0 3px 10px rgba(0,0,0,0.3); cursor:pointer;';
+    badge.title = 'タップで100%へ戻す';
+    overlay.appendChild(badge);
+
+    function applyScale(nextScale) {
+      scale = Math.max(0.75, Math.min(2.4, Math.round(nextScale * 100) / 100));
+      content.style.zoom = String(scale);
+      content.style.overflow = 'auto';
+      if (Math.abs(scale - 1.0) > 0.03) {
+        badge.style.display = 'block';
+        badge.innerText = `🔍 ${Math.round(scale * 100)}%（戻す）`;
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      applyScale(1.0);
+    });
+
+    // 3Dキャンバス側へのイベント伝播を遮断
+    overlay.addEventListener('pointerdown', (e) => e.stopPropagation());
+    overlay.addEventListener('pointermove', (e) => e.stopPropagation());
+
+    overlay.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        startDist = Math.hypot(dx, dy);
+        startScale = scale;
+      }
+    }, { passive: true });
+
+    overlay.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2 && startDist) {
+        e.preventDefault();
+        e.stopPropagation();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.hypot(dx, dy);
+        if (startDist > 10) {
+          applyScale(startScale * (dist / startDist));
+        }
+      }
+    }, { passive: false });
+
+    const endPinch = (e) => {
+      if (!e.touches || e.touches.length < 2) startDist = null;
+    };
+    overlay.addEventListener('touchend', endPinch, { passive: true });
+    overlay.addEventListener('touchcancel', endPinch, { passive: true });
+  }
+
+  function enablePinchZoomOnAllModals() {
+    document.querySelectorAll('.modal-overlay').forEach(attachPinchZoomToModal);
+  }
+
+  // --------------------------------------------------------------------------
+  // 7. 設定UI（A案/B案切替）＆ 👁️ AI視界モニター自動注入
+  // --------------------------------------------------------------------------
+  function renderVisionMonitorContent(previewOnly = false, forceMovingOverride = null) {
     let data = lastInspection;
     if (previewOnly) {
-      const p = buildPerceptionPayload(visionMode);
+      const useMoving = (forceMovingOverride === null) ? lastTurnWasMoving : Boolean(forceMovingOverride);
+      const p = buildPerceptionPayload(visionMode, useMoving);
       data = {
         time: `${new Date().toLocaleTimeString('ja-JP')}（通信なしプレビュー）`,
         mode: p.mode,
+        isMoving: p.isMoving,
         modelId: lastInspection.modelId,
         promptText: p.promptText,
         imageDataUrl: p.imageDataUrl,
@@ -604,19 +780,26 @@ ${actionsText}
       };
     }
 
-    const metaEl = document.getElementById('vision-mon-meta');
-    const imgWrap = document.getElementById('vision-mon-img-wrap');
-    const imgEl = document.getElementById('vision-mon-img');
+    const metaEl   = document.getElementById('vision-mon-meta');
+    const imgWrap  = document.getElementById('vision-mon-img-wrap');
+    const imgLabel = document.getElementById('vision-mon-img-label');
+    const imgEl    = document.getElementById('vision-mon-img');
     const promptEl = document.getElementById('vision-mon-prompt');
-    const respEl = document.getElementById('vision-mon-resp');
+    const respEl   = document.getElementById('vision-mon-resp');
 
     if (metaEl) {
-      const modeLabel = data.mode === 'image' ? 'B案：3Dカメラ画像' : 'A案：前方視野記号マップ';
-      metaEl.innerText = `モード: ${modeLabel} ／ モデル: ${data.modelId} ／ 更新: ${data.time}`;
+      const modeLabel  = data.mode === 'image' ? 'B案：3Dカメラ画像' : 'A案：記号マップ';
+      const stateLabel = data.isMoving ? '🏃移動中(前方視野)' : '🧍停止中(180°パノラマ)';
+      metaEl.innerText = `${modeLabel} ／ ${stateLabel} ／ モデル: ${data.modelId} ／ ${data.time}`;
     }
     if (imgWrap && imgEl) {
       if (data.imageDataUrl) {
         imgWrap.style.display = 'block';
+        if (imgLabel) {
+          imgLabel.innerText = data.isMoving
+            ? '📷 B案：移動中・前方視野（狭い1枚）'
+            : '📷 B案：停止中・180°パノラマ視野（左60°＋正面＋右60°合成）';
+        }
         imgEl.src = data.imageDataUrl;
       } else {
         imgWrap.style.display = 'none';
@@ -646,7 +829,6 @@ ${actionsText}
   }
 
   function injectVisionControlsUI() {
-    // ① 設定モーダルへ「AIキャラ視点情報(A案/B案)」切替を自動挿入
     const settingsModal = document.getElementById('modal-settings');
     if (settingsModal && !document.getElementById('setting-ai-vision-mode')) {
       const commCard = settingsModal.querySelector('.comm-toggle-card');
@@ -657,7 +839,7 @@ ${actionsText}
         <label class="setting-label" style="color:#0369a1;">👁️ AIキャラ視点情報（送信方式の切替）</label>
         <select id="setting-ai-vision-mode" class="setting-input">
           <option value="map">A案：前方視野の記号マップ（デフォルト・距離正確）</option>
-          <option value="image">B案：キャラ視点3Dカメラ画像（Visionモデルへ直接送信）</option>
+          <option value="image">B案：キャラ視点3Dカメラ画像（停止180°パノラマ／移動前方）</option>
         </select>
         <button type="button" id="btn-open-vision-mon-from-settings" class="btn-sub" style="padding:6px; font-size:11px;">👁️ いまAIに見えている視界を確認する</button>
       `;
@@ -678,7 +860,6 @@ ${actionsText}
       }
     }
 
-    // ② 右サイドアイコン列にワンタップ視界モニターボタンを追加
     const sideCol = document.getElementById('side-icon-column');
     if (sideCol && !document.getElementById('ai-vision-btn')) {
       const btn = document.createElement('div');
@@ -690,7 +871,6 @@ ${actionsText}
       sideCol.appendChild(btn);
     }
 
-    // ③ AI視界モニターモーダルを生成
     if (!document.getElementById('modal-ai-vision')) {
       const overlay = document.createElement('div');
       overlay.id = 'modal-ai-vision';
@@ -699,18 +879,22 @@ ${actionsText}
       overlay.innerHTML = `
         <div class="modal-content" style="max-height:92vh;">
           <div class="modal-close" id="btn-close-vision-mon-x">✕</div>
-          <div class="modal-title">👁️ AI視界モニター（生の知覚 ＆ 返答）</div>
+          <div class="modal-title">👁️ AI視界モニター（2本指ピンチ拡大対応）</div>
           <div id="vision-mon-meta" style="font-size:10.5px; font-weight:800; color:#0369a1; background:#f0f9ff; padding:6px 8px; border-radius:8px; border:1px solid #bae6fd;"></div>
           <div id="vision-mon-img-wrap" style="display:none; text-align:center; background:#0f172a; padding:6px; border-radius:10px;">
-            <div style="font-size:10px; color:#cbd5e1; font-weight:800; margin-bottom:4px;">📷 B案：AIへ送るキャラ視点3D画像</div>
-            <img id="vision-mon-img" style="max-width:100%; max-height:220px; border-radius:8px; border:1px solid #38bdf8;" alt="AI視点画像">
+            <div id="vision-mon-img-label" style="font-size:10px; color:#cbd5e1; font-weight:800; margin-bottom:4px;"></div>
+            <img id="vision-mon-img" style="max-width:100%; max-height:240px; border-radius:8px; border:1px solid #38bdf8;" alt="AI視点画像">
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+            <button type="button" id="btn-prev-stop-180" class="btn-sub" style="padding:5px; font-size:10.5px;">🧍 停止180°をプレビュー</button>
+            <button type="button" id="btn-prev-move-fwd" class="btn-sub" style="padding:5px; font-size:10.5px;">🏃 移動前方をプレビュー</button>
           </div>
           <div style="font-size:11px; font-weight:900; color:#334155;">📤 AIへ渡す知覚テキスト（誘導なし）</div>
           <pre id="vision-mon-prompt" style="background:#0f172a; color:#e2e8f0; padding:8px; border-radius:10px; font-size:10.5px; line-height:1.35; overflow:auto; max-height:220px; white-space:pre-wrap; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
           <div style="font-size:11px; font-weight:900; color:#334155;">📥 直前のGroq生返答JSON</div>
           <pre id="vision-mon-resp" style="background:#f8fafc; color:#1e293b; border:1px solid #cbd5e1; padding:8px; border-radius:10px; font-size:10.5px; line-height:1.35; overflow:auto; max-height:110px; white-space:pre-wrap; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-            <button type="button" id="btn-refresh-vision-mon" class="btn-primary" style="font-size:11.5px;">🔄 今の視界を更新</button>
+            <button type="button" id="btn-refresh-vision-mon" class="btn-primary" style="font-size:11.5px;">🔄 現在の状態で更新</button>
             <button type="button" id="btn-close-vision-mon" class="btn-sub" style="font-size:11.5px;">閉じる</button>
           </div>
         </div>
@@ -718,11 +902,17 @@ ${actionsText}
       document.body.appendChild(overlay);
       document.getElementById('btn-close-vision-mon-x').onclick = closeVisionMonitor;
       document.getElementById('btn-close-vision-mon').onclick = closeVisionMonitor;
-      document.getElementById('btn-refresh-vision-mon').onclick = () => renderVisionMonitorContent(true);
+      document.getElementById('btn-refresh-vision-mon').onclick = () => renderVisionMonitorContent(true, null);
+      document.getElementById('btn-prev-stop-180').onclick = () => renderVisionMonitorContent(true, false);
+      document.getElementById('btn-prev-move-fwd').onclick = () => renderVisionMonitorContent(true, true);
     }
+
+    enablePinchZoomOnAllModals();
   }
 
   injectVisionControlsUI();
+  // 他モジュールが後から追加したモーダルにも自動適用
+  setTimeout(enablePinchZoomOnAllModals, 500);
 
   // グローバル配線
   window.executeTurn = runTurn;
@@ -742,11 +932,12 @@ ${actionsText}
 
   // 不変コアAPI公開
   const coreApi = Object.freeze({
-    version: '3.0-pure-perception-ab',
+    version: '3.1-panorama-turn-memory',
     isEnabled,
     setEnabled,
     getVisionMode,
     setVisionMode,
+    isMovingVision,
     registerAction,
     registerSensor,
     registerBodySensor,
@@ -754,6 +945,7 @@ ${actionsText}
     registerPostTurnHook,
     resetPhysicalHistory,
     openVisionMonitor,
+    enablePinchZoomOnAllModals,
     getLastInspection: () => lastInspection,
     listActions: () => Array.from(actionMap.values()).map(a => ({ id: a.id, desc: a.desc }))
   });
@@ -763,7 +955,7 @@ ${actionsText}
     configurable: false
   });
 
-  // 最小限の標準休憩アクション（物理ルール側は rules_dig.js が登録）
+  // 標準休憩アクション
   registerAction({
     id: 'rest',
     desc: 'その場で休む',
@@ -773,12 +965,13 @@ ${actionsText}
       ROBOT.params.eco = Math.min(100, (ROBOT.params.eco || 40) + 2);
       return {
         actionLabel: '💤 その場で休んだ',
-        physicalResult: 'その場で休み、体力が回復した'
+        physicalResult: 'その場で休み、体力が回復した',
+        moved: false
       };
     }
   });
 
-  // 標準ターン後フック（アイテム接触・エリア移動など物理接触のみ）
+  // 標準ターン後フック（物理接触のみ）
   registerPostTurnHook(({ prevPos }) => {
     const itemIdx = WORLD_ITEMS.findIndex(it => it.x === ROBOT.pos.x && it.z === ROBOT.pos.z);
     if (itemIdx !== -1) {
