@@ -1,10 +1,11 @@
 // ============================================================================
-// 【純粋知覚・不変通信コア：ai_comm.js（1ターン答え合わせ＆コピペ・B案一時停止版）】
-// ・設定ページでB案(画像AI送信)を暗転・使用停止し、A案(記号マップ)固定で検証（B案機能は内部温存）
-// ・キャラ視点カメラ専用「1ターン答え合わせウィンドウ」（行動前3D画像＋送信文＋AI返答＋行動後3D画像）
-// ・チャット貼り付け用「1ターン答え合わせコピペ」ボタン搭載（通常スクショと併用可能）
+// 【純粋知覚・不変通信コア：ai_comm.js（統一2タブ・クリア/移動視点切替・下部コピペ版）】
+// ・両タブ（⏪今すぐ考える前／⏩考えた結果）を完全同一レイアウト・同一サイズ枠で統一
+// ・3Dプレビューは常に3連180°サイズ固定、移動視点時は左右1/3を薄暗く表示（右トグルで切替可）
+// ・コピペボタンを下部「閉じる」の直上へ配置（通常スクショと併用）
+// ・設定ページでB案(画像AI送信)は暗転・使用停止（内部コード温存）
 // ・キャラ視点（🤖視点＆検証カメラ共通）では未削り分割ブロックを全表示
-// ・全モーダルウィンドウの非崩れピンチ拡大縮小（100%〜250%・開閉時自動100%リセット・3Dカメラ無変更）
+// ・全モーダルウィンドウの非崩れピンチ拡大縮小（100%〜250%・開閉時自動100%リセット）
 // ※ index.html / brain.js / world.js / rules_dig.js は無改造のまま動作します
 // ============================================================================
 (function initImmutableAICommCore() {
@@ -43,7 +44,7 @@
   const postHooks   = [];
   let visionProvider = null;
 
-  // 直前1ターンの完全凍結スナップショット（送信前〜AI回答〜実行後をズレなく保持）
+  // 直前1ターンの完全凍結スナップショット
   let lastTurnAudit = {
     hasData: false,
     turnNo: 0,
@@ -70,11 +71,19 @@
     error: ''
   };
 
-  let currentMonitorTab = 'audit'; // 'audit' | 'preview'
+  let currentMonitorTab = 'before'; // 'before' | 'after'
+  let currentDimMoving  = false;    // false: クリア / true: 移動視点（左右を薄暗く）
+
+  function escapeHtml(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
 
   // --------------------------------------------------------------------------
   // 0. キャラ視点カメラの「未削り分割ブロック全表示」＆めり込み防止フック
-  //    ※ 通常追従カメラ・外カメラ（地上/地下）の透過ルールには一切触れません
   // --------------------------------------------------------------------------
   function getSafeRobotEyeHeight() {
     const sSpec = (typeof SIZE_SPECS !== 'undefined' && SIZE_SPECS[ROBOT.sizeLevel]) || { scaleY: 0.25 };
@@ -207,7 +216,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 2. キャラ視点3Dカメラ撮影（検証基準＆将来のB案送信兼用・未削りブロック全表示）
+  // 2. キャラ視点3Dカメラ撮影（常に3連180°統一サイズ・未削りブロック全表示）
   // --------------------------------------------------------------------------
   function rotToShortDirName(rot) {
     const x = Math.sin(rot);
@@ -242,7 +251,8 @@
     return { rx, ry, rz };
   }
 
-  function captureRobotFirstPersonImage(isMoving = lastTurnWasMoving, useLogicalPos = false) {
+  // alwaysPanorama=true なら常に3連180°サイズで撮影（移動時の暗転はUIオーバーレイで統一表現）
+  function captureRobotFirstPersonImage(isMoving = lastTurnWasMoving, useLogicalPos = false, alwaysPanorama = true) {
     if (typeof renderer === 'undefined' || typeof scene === 'undefined' || typeof innerRobotCam === 'undefined') {
       return null;
     }
@@ -271,11 +281,12 @@
 
       if (typeof robotGroup !== 'undefined') robotGroup.visible = false;
 
-      const panelW  = isMoving ? 280 : 240;
-      const panelH  = isMoving ? 340 : 300;
+      const singleOnly = (!alwaysPanorama && isMoving);
+      const panelW  = singleOnly ? 280 : 240;
+      const panelH  = singleOnly ? 340 : 300;
       const headerH = 26;
       const panelAspect = panelW / panelH;
-      const targetHFovRad = (isMoving ? 68 : 60) * (Math.PI / 180);
+      const targetHFovRad = (singleOnly ? 68 : 60) * (Math.PI / 180);
 
       let cropX = 0, cropY = 0, cropW = srcW, cropH = srcH;
       if (srcAspect > panelAspect) {
@@ -288,7 +299,7 @@
       const fullHalfTanX = Math.tan(targetHFovRad / 2) * (srcW / cropW);
       const vFovDeg = Math.min(135, Math.max(35, 2 * Math.atan(fullHalfTanX / srcAspect) * (180 / Math.PI)));
 
-      const shots = isMoving
+      const shots = singleOnly
         ? [{ yaw: baseRot, label: `移動中・正面(${rotToShortDirName(baseRot)})` }]
         : [
             { yaw: baseRot + Math.PI / 3, label: `左60°(${rotToShortDirName(baseRot + Math.PI / 3)})` },
@@ -326,7 +337,7 @@
         const destX = idx * panelW;
         ctx.drawImage(renderer.domElement, cropX, cropY, cropW, cropH, destX, headerH, panelW, panelH);
 
-        ctx.fillStyle = idx === 1 || isMoving ? '#0c4a6e' : '#1e293b';
+        ctx.fillStyle = idx === 1 || singleOnly ? '#0c4a6e' : '#1e293b';
         ctx.fillRect(destX, 0, panelW, headerH);
         ctx.fillStyle = '#f8fafc';
         ctx.font = 'bold 13px sans-serif';
@@ -517,13 +528,13 @@
     const bodyText    = collectBodyText();
     const memoryText  = formatShortTermMemory();
 
-    // 検証用のキャラ視点3D画像はA案時でも答え合わせ基準として撮影（AIへはB案解放時のみ送信）
-    const fpvImageUrl = captureRobotFirstPersonImage(isMoving, true);
+    // 確認用の3D視点は常に3連180°統一サイズで撮影
+    const fpvImageUrl = captureRobotFirstPersonImage(isMoving, true, true);
     let visionSection = '';
     let sendImageUrl  = null;
 
     if (effectiveMode === 'image') {
-      sendImageUrl = fpvImageUrl;
+      sendImageUrl = captureRobotFirstPersonImage(isMoving, true, false);
       if (sendImageUrl) {
         visionSection = isMoving
           ? '【移動直後・狭い前方視野】添付の1人称カメラ画像（正面1枚）が、今あなたの目に見えている視界のすべてです。'
@@ -730,7 +741,7 @@ ${actionsText}
           facingBefore,
           facingAfter: facingBefore,
           beforeImageUrl: payload.fpvImageUrl,
-          afterImageUrl: null,
+          afterImageUrl: payload.fpvImageUrl,
           promptText: payload.promptText,
           rawResponse: res.lastRaw || '-',
           parsedJson: null,
@@ -827,8 +838,8 @@ ${actionsText}
         if (typeof saveWorldState === 'function') saveWorldState();
       }
 
-      // 行動後の最新地形・最新位置から答え合わせ用のキャラ視点3D画像を撮影
-      const afterImageUrl = captureRobotFirstPersonImage(lastTurnWasMoving, true);
+      // 行動後の3D画像も同一3連180°サイズで撮影
+      const afterImageUrl = captureRobotFirstPersonImage(lastTurnWasMoving, true, true);
       const facingAfter = rotToShortDirName(ROBOT.rotY || 0);
 
       lastTurnAudit = {
@@ -895,7 +906,7 @@ ${actionsText}
       const p = buildPerceptionPayload('map', lastTurnWasMoving);
       return [
         '=== 【通信前プレビュー（まだ1ターン未実行）】 ===',
-        `視野状態: ${p.isMoving ? '移動直後(狭い前方視野)' : '停止中(180°パノラマ視野)'}`,
+        `視野状態: ${p.isMoving ? '移動視点(前方視野)' : 'クリア(停止180°)'}`,
         `向いている方角: ${rotToShortDirName(ROBOT.rotY || 0)}`,
         '',
         '【送信予定の情報文】',
@@ -907,12 +918,12 @@ ${actionsText}
     const lines = [
       `=== 【1ターン答え合わせレポート】第${a.turnNo}ターン（${a.day}日目 / ${a.time}）===`,
       `通信方式: A案(記号マップ送信) / 使用モデル: ${a.modelId}`,
-      `視野状態: 行動前=${a.isMovingBefore ? '移動直後(前方視野)' : '停止中(180°パノラマ)'}（向き:${a.facingBefore}） → 行動後=${a.isMovingAfter ? '移動直後(前方視野)' : '停止中(180°パノラマ)'}（向き:${a.facingAfter}）`,
+      `視野状態: 行動前=${a.isMovingBefore ? '移動視点' : 'クリア(停止180°)'}（向き:${a.facingBefore}） → 行動後=${a.isMovingAfter ? '移動視点' : 'クリア(停止180°)'}（向き:${a.facingAfter}）`,
       '',
-      '--- [1] AIへ送信した情報文（行動前） ---',
+      '--- [1] AIへ送信した情報文（今すぐ考える前） ---',
       a.promptText || '(なし)',
       '',
-      '--- [2] AIからの返答（判断・しゃべり・動き） ---'
+      '--- [2] AIからの返答（しゃべり・判断・動き） ---'
     ];
 
     if (a.error) {
@@ -1146,142 +1157,121 @@ ${actionsText}
   }
 
   // --------------------------------------------------------------------------
-  // 8. 設定UI（B案暗転・使用停止）＆ 👁️ キャラ視点1ターン答え合わせモーダル
+  // 8. 統一2タブ式「キャラ視点・1ターン答え合わせ」モーダル ＆ 設定UI
   // --------------------------------------------------------------------------
-  function renderMonitorModal(tab = currentMonitorTab, previewMovingOverride = null) {
-    currentMonitorTab = tab;
+  function applyDimOverlayState(isMovingDim) {
+    currentDimMoving = Boolean(isMovingDim);
+    const leftMask  = document.getElementById('mon-dim-left');
+    const rightMask = document.getElementById('mon-dim-right');
+    const clearBtn  = document.getElementById('btn-dim-clear');
+    const moveBtn   = document.getElementById('btn-dim-move');
 
-    const tabAuditBtn   = document.getElementById('btn-tab-audit');
-    const tabPreviewBtn = document.getElementById('btn-tab-preview');
-    const auditPane     = document.getElementById('vision-pane-audit');
-    const previewPane   = document.getElementById('vision-pane-preview');
+    if (leftMask)  leftMask.style.opacity  = currentDimMoving ? '1' : '0';
+    if (rightMask) rightMask.style.opacity = currentDimMoving ? '1' : '0';
 
-    if (tabAuditBtn && tabPreviewBtn) {
-      const isAudit = (tab === 'audit');
-      tabAuditBtn.style.background   = isAudit ? '#0284c7' : '#e2e8f0';
-      tabAuditBtn.style.color        = isAudit ? '#ffffff' : '#334155';
-      tabPreviewBtn.style.background = !isAudit ? '#0284c7' : '#e2e8f0';
-      tabPreviewBtn.style.color      = !isAudit ? '#ffffff' : '#334155';
+    if (clearBtn && moveBtn) {
+      clearBtn.style.background = !currentDimMoving ? '#38bdf8' : 'transparent';
+      clearBtn.style.color      = !currentDimMoving ? '#0f172a' : '#94a3b8';
+      moveBtn.style.background  = currentDimMoving  ? '#f59e0b' : 'transparent';
+      moveBtn.style.color       = currentDimMoving  ? '#0f172a' : '#94a3b8';
     }
-    if (auditPane)   auditPane.style.display   = (tab === 'audit') ? 'flex' : 'none';
-    if (previewPane) previewPane.style.display = (tab === 'preview') ? 'flex' : 'none';
+  }
 
-    // --- タブ1：直前1ターンの答え合わせ ---
-    if (tab === 'audit') {
-      const metaEl     = document.getElementById('audit-meta');
-      const emptyEl    = document.getElementById('audit-empty-notice');
-      const bodyEl     = document.getElementById('audit-body');
-      const beforeWrap = document.getElementById('audit-before-img-wrap');
-      const beforeLbl  = document.getElementById('audit-before-img-label');
-      const beforeImg  = document.getElementById('audit-before-img');
-      const promptEl   = document.getElementById('audit-prompt');
-      const summaryEl  = document.getElementById('audit-reply-summary');
-      const rawEl      = document.getElementById('audit-raw-json');
-      const resultEl   = document.getElementById('audit-phys-result');
-      const afterWrap  = document.getElementById('audit-after-img-wrap');
-      const afterLbl   = document.getElementById('audit-after-img-label');
-      const afterImg   = document.getElementById('audit-after-img');
+  function renderUnifiedMonitor(tab = currentMonitorTab) {
+    currentMonitorTab = tab;
+    const isBefore = (tab === 'before');
 
-      if (!lastTurnAudit.hasData) {
-        if (metaEl)  metaEl.innerText = 'まだ通信ターンが実行されていません（「⚡ 今すぐ考える」を押すと1ターン分の答え合わせが記録されます）';
-        if (emptyEl) emptyEl.style.display = 'block';
-        if (bodyEl)  bodyEl.style.display  = 'none';
+    const tabBeforeBtn = document.getElementById('btn-tab-before');
+    const tabAfterBtn  = document.getElementById('btn-tab-after');
+    if (tabBeforeBtn && tabAfterBtn) {
+      tabBeforeBtn.style.background = isBefore ? '#0284c7' : '#e2e8f0';
+      tabBeforeBtn.style.color      = isBefore ? '#ffffff' : '#334155';
+      tabAfterBtn.style.background  = !isBefore ? '#0284c7' : '#e2e8f0';
+      tabAfterBtn.style.color       = !isBefore ? '#ffffff' : '#334155';
+    }
+
+    const metaEl        = document.getElementById('mon-meta');
+    const imgEl         = document.getElementById('mon-img');
+    const promptLabelEl = document.getElementById('mon-prompt-label');
+    const promptEl      = document.getElementById('mon-prompt');
+    const replyLabelEl  = document.getElementById('mon-reply-label');
+    const replySumEl    = document.getElementById('mon-reply-summary');
+    const rawEl         = document.getElementById('mon-raw-json');
+    const resultEl      = document.getElementById('mon-phys-result');
+
+    const a = lastTurnAudit;
+
+    // 共通：AI返答（緑枠＋灰枠＋黄枠）の組み立て
+    function fillReplySection(headerText) {
+      if (replyLabelEl) replyLabelEl.innerText = headerText;
+      if (!a.hasData) {
+        if (replySumEl) replySumEl.innerHTML = '<div style="color:#64748b;">まだ「⚡ 今すぐ考える」が実行されていません</div>';
+        if (rawEl)      rawEl.textContent = '-';
+        if (resultEl)   resultEl.innerHTML = '<div style="color:#78350f;">物理結果：未実行</div>';
         return;
       }
-
-      if (emptyEl) emptyEl.style.display = 'none';
-      if (bodyEl)  bodyEl.style.display  = 'flex';
-
-      const a = lastTurnAudit;
-      if (metaEl) {
-        const beforeState = a.isMovingBefore ? '🏃移動前方' : '🧍停止180°';
-        const afterState  = a.isMovingAfter  ? '🏃移動前方' : '🧍停止180°';
-        metaEl.innerText = `第${a.turnNo}ターン(${a.day}日目 ${a.time}) ／ A案送信 ／ ${a.modelId} ／ 視野:${beforeState}(${a.facingBefore})→${afterState}(${a.facingAfter})`;
-      }
-
-      if (beforeWrap && beforeImg) {
-        if (a.beforeImageUrl) {
-          beforeWrap.style.display = 'block';
-          if (beforeLbl) {
-            beforeLbl.innerText = `📷 送信前のキャラ視点3D（確認用・AI未送信 ／ ${a.isMovingBefore ? '移動前方' : '停止180°'}・向き:${a.facingBefore}）`;
-          }
-          beforeImg.src = a.beforeImageUrl;
-        } else {
-          beforeWrap.style.display = 'none';
+      if (a.error) {
+        if (replySumEl) {
+          replySumEl.innerHTML = `<div style="color:#dc2626; font-weight:900;">⚠️ 通信エラー：${escapeHtml(a.error).replace(/\n/g, '<br>')}</div>`;
         }
-      }
-
-      if (promptEl) promptEl.textContent = a.promptText || '';
-
-      if (summaryEl) {
-        if (a.error) {
-          summaryEl.innerHTML = `<div style="color:#dc2626; font-weight:900;">⚠️ 通信エラー：${a.error.replace(/\n/g, '<br>')}</div>`;
-        } else {
-          summaryEl.innerHTML = `
-            <div><strong>💬 思考・しゃべり：</strong>${a.thoughtText}</div>
-            <div><strong>🎯 行動 / 方角：</strong><code>${a.actionId}</code> ／ <strong>${a.dirName}</strong></div>
-            <div><strong>🤖 動き・モーション：</strong>${a.motionLabel}</div>
+      } else {
+        if (replySumEl) {
+          replySumEl.innerHTML = `
+            <div><strong>💬 思考・しゃべり：</strong>${escapeHtml(a.thoughtText)}</div>
+            <div><strong>🎯 行動 / 方角：</strong><code>${escapeHtml(a.actionId)}</code> ／ <strong>${escapeHtml(a.dirName)}</strong>　<strong>🤖 動き：</strong>${escapeHtml(a.motionLabel)}</div>
           `;
         }
       }
-
-      if (rawEl) rawEl.textContent = a.rawResponse || '-';
+      if (rawEl) {
+        rawEl.textContent = a.rawResponse || '-';
+        rawEl.scrollTop = 0;
+      }
       if (resultEl) {
-        resultEl.innerHTML = `
-          <div><strong>📌 画面ログ：</strong>${a.actionLabel}</div>
-          <div><strong>🧱 物理結果：</strong>${a.physicalResult}</div>
-        `;
-      }
-
-      if (afterWrap && afterImg) {
-        if (a.afterImageUrl) {
-          afterWrap.style.display = 'block';
-          if (afterLbl) {
-            afterLbl.innerText = `📷 実行後のキャラ視点3D（確認用・AI未送信 ／ ${a.isMovingAfter ? '移動前方' : '停止180°'}・向き:${a.facingAfter}）`;
-          }
-          afterImg.src = a.afterImageUrl;
-        } else {
-          afterWrap.style.display = 'none';
-        }
-      }
-      return;
-    }
-
-    // --- タブ2：次の送信プレビュー（通信前チェック） ---
-    const useMoving = (previewMovingOverride === null) ? lastTurnWasMoving : Boolean(previewMovingOverride);
-    const p = buildPerceptionPayload('map', useMoving);
-    const pMeta   = document.getElementById('preview-meta');
-    const pImgWr  = document.getElementById('preview-img-wrap');
-    const pImgLbl = document.getElementById('preview-img-label');
-    const pImg    = document.getElementById('preview-img');
-    const pPrompt = document.getElementById('preview-prompt');
-
-    if (pMeta) {
-      const stateLabel = p.isMoving ? '🏃移動中(狭い前方視野)' : '🧍停止中(180°パノラマ)';
-      pMeta.innerText = `通信なしプレビュー ／ A案送信予定 ／ ${stateLabel} ／ 向き:${rotToShortDirName(ROBOT.rotY || 0)}`;
-    }
-    if (pImgWr && pImg) {
-      if (p.fpvImageUrl) {
-        pImgWr.style.display = 'block';
-        if (pImgLbl) {
-          pImgLbl.innerText = p.isMoving
-            ? '📷 現在のキャラ視点3D（確認用・AI未送信 ／ 移動前方・未削り全表示）'
-            : '📷 現在のキャラ視点3D（確認用・AI未送信 ／ 停止180°・未削り全表示）';
-        }
-        pImg.src = p.fpvImageUrl;
-      } else {
-        pImgWr.style.display = 'none';
+        resultEl.innerHTML = `<div><strong>🧱 結果：</strong>${escapeHtml(a.actionLabel)} ／ ${escapeHtml(a.physicalResult)}</div>`;
       }
     }
-    if (pPrompt) pPrompt.textContent = p.promptText || '';
+
+    if (isBefore) {
+      if (!a.hasData) {
+        const live = buildPerceptionPayload('map', lastTurnWasMoving);
+        if (metaEl) metaEl.innerText = `未実行（通信前） ／ 向き:${rotToShortDirName(ROBOT.rotY || 0)} ／ 状態:${live.isMoving ? '移動視点' : 'クリア'}`;
+        if (imgEl && live.fpvImageUrl) imgEl.src = live.fpvImageUrl;
+        applyDimOverlayState(live.isMoving);
+        if (promptLabelEl) promptLabelEl.innerText = '📤 AIへ送る予定の情報文（まだ送信前）';
+        if (promptEl) { promptEl.textContent = live.promptText || ''; promptEl.scrollTop = 0; }
+        fillReplySection('📥 AIからの返答（しゃべり・判断・動き）');
+        return;
+      }
+
+      if (metaEl) {
+        metaEl.innerText = `第${a.turnNo}ターン(${a.day}日目 ${a.time}) ／ 行動前 ／ ${a.modelId} ／ 向き:${a.facingBefore}`;
+      }
+      if (imgEl && a.beforeImageUrl) imgEl.src = a.beforeImageUrl;
+      applyDimOverlayState(a.isMovingBefore);
+      if (promptLabelEl) promptLabelEl.innerText = '📤 AIへ送信した情報文（今すぐ考える前）';
+      if (promptEl) { promptEl.textContent = a.promptText || ''; promptEl.scrollTop = 0; }
+      fillReplySection('📥 AIからの返答（しゃべり・判断・動き）');
+    } else {
+      const live = buildPerceptionPayload('map', lastTurnWasMoving);
+      const curFacing = rotToShortDirName(ROBOT.rotY || 0);
+      if (metaEl) {
+        const turnTag = a.hasData ? `第${a.turnNo}ターン後(${a.day}日目 ${a.time})` : '現在状態（未実行）';
+        metaEl.innerText = `${turnTag} ／ 次の送信状態 ／ ${a.hasData ? a.modelId : '待機中'} ／ 向き:${curFacing}`;
+      }
+      if (imgEl && live.fpvImageUrl) imgEl.src = live.fpvImageUrl;
+      applyDimOverlayState(live.isMoving);
+      if (promptLabelEl) promptLabelEl.innerText = '📤 現在の状態文（次に送る予定の情報）';
+      if (promptEl) { promptEl.textContent = live.promptText || ''; promptEl.scrollTop = 0; }
+      fillReplySection('📥 直前ターンのAI返答（しゃべり・判断・動き）');
+    }
   }
 
   function openVisionMonitor(initialTab = null) {
     const modal = document.getElementById('modal-ai-vision');
     if (!modal) return;
     resetAllModalZooms();
-    const tab = initialTab || (lastTurnAudit.hasData ? 'audit' : 'preview');
-    renderMonitorModal(tab, null);
+    const tab = initialTab || (lastTurnAudit.hasData ? 'before' : 'after');
+    renderUnifiedMonitor(tab);
     modal.style.display = 'flex';
     modal.classList.add('active');
   }
@@ -1350,7 +1340,7 @@ ${actionsText}
       const btn = document.createElement('div');
       btn.id = 'ai-vision-btn';
       btn.className = 'side-circle-btn';
-      btn.title = '👁️ キャラ視点＆1ターン答え合わせ（送信前・AI返答・実行後・コピペ）';
+      btn.title = '👁️ キャラ視点＆1ターン答え合わせ';
       btn.innerText = '👁️';
       btn.addEventListener('click', () => openVisionMonitor());
       sideCol.appendChild(btn);
@@ -1362,65 +1352,47 @@ ${actionsText}
       overlay.className = 'modal-overlay';
       overlay.style.display = 'none';
       overlay.innerHTML = `
-        <div class="modal-content" style="max-height:92vh; gap:8px;">
+        <div class="modal-content" style="max-height:92vh; gap:7px;">
           <div class="modal-close" id="btn-close-vision-mon-x">✕</div>
           <div class="modal-title" style="font-size:14px;">👁️ キャラ視点・1ターン答え合わせ</div>
 
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-            <button type="button" id="btn-tab-audit" style="padding:7px 6px; border:none; border-radius:8px; font-size:11px; font-weight:900; cursor:pointer;">📌 直前ターンの答え合わせ</button>
-            <button type="button" id="btn-tab-preview" style="padding:7px 6px; border:none; border-radius:8px; font-size:11px; font-weight:900; cursor:pointer;">👁️ 次の送信プレビュー</button>
+            <button type="button" id="btn-tab-before" style="padding:7px 6px; border:none; border-radius:8px; font-size:11px; font-weight:900; cursor:pointer;">⏪ 今すぐ考える前</button>
+            <button type="button" id="btn-tab-after"  style="padding:7px 6px; border:none; border-radius:8px; font-size:11px; font-weight:900; cursor:pointer;">⏩ 考えた結果</button>
           </div>
 
-          <button type="button" id="btn-copy-turn-report" class="btn-primary" style="padding:8px; font-size:12px; font-weight:900; background:#0ea5e9;">
+          <div id="mon-meta" style="font-size:10px; font-weight:800; color:#0369a1; background:#f0f9ff; padding:5px 8px; border-radius:8px; border:1px solid #bae6fd;"></div>
+
+          <!-- 統一サイズ枠①：キャラの視点3D（右にクリア／移動視点トグル） -->
+          <div id="mon-img-wrap" style="background:#0f172a; padding:6px; border-radius:10px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:5px;">
+              <span style="font-size:11px; color:#f8fafc; font-weight:900;">📷 キャラの視点3D</span>
+              <div style="display:inline-flex; background:#1e293b; border:1px solid #334155; border-radius:999px; padding:2px; gap:2px;">
+                <button type="button" id="btn-dim-clear" style="border:none; border-radius:999px; padding:2px 8px; font-size:10px; font-weight:900; cursor:pointer;">クリア</button>
+                <button type="button" id="btn-dim-move"  style="border:none; border-radius:999px; padding:2px 8px; font-size:10px; font-weight:900; cursor:pointer;">移動視点</button>
+              </div>
+            </div>
+            <div style="position:relative; width:100%; overflow:hidden; border-radius:8px; border:1px solid #38bdf8; background:#020617;">
+              <img id="mon-img" style="display:block; width:100%; height:auto;" alt="キャラの視点3D">
+              <div id="mon-dim-left"  style="position:absolute; top:0; left:0; width:33.333%; height:100%; background:rgba(15,23,42,0.55); pointer-events:none; opacity:0; transition:opacity 0.16s ease;"></div>
+              <div id="mon-dim-right" style="position:absolute; top:0; right:0; width:33.333%; height:100%; background:rgba(15,23,42,0.55); pointer-events:none; opacity:0; transition:opacity 0.16s ease;"></div>
+            </div>
+          </div>
+
+          <!-- 統一サイズ枠②：情報文（固定高） -->
+          <div id="mon-prompt-label" style="font-size:11px; font-weight:900; color:#334155;"></div>
+          <pre id="mon-prompt" style="background:#0f172a; color:#e2e8f0; padding:8px; border-radius:10px; font-size:10px; line-height:1.35; overflow:auto; height:145px; white-space:pre-wrap; margin:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
+
+          <!-- 統一サイズ枠③：AI返答（緑枠＋灰枠＋結果・固定構成） -->
+          <div id="mon-reply-label" style="font-size:11px; font-weight:900; color:#334155;"></div>
+          <div id="mon-reply-summary" style="background:#f0fdf4; border:1.5px solid #86efac; color:#14532d; padding:6px 8px; border-radius:9px; font-size:10.5px; line-height:1.4; min-height:48px;"></div>
+          <pre id="mon-raw-json" style="background:#f8fafc; color:#1e293b; border:1px solid #cbd5e1; padding:6px 7px; border-radius:8px; font-size:9.5px; line-height:1.3; overflow:auto; height:56px; white-space:pre-wrap; margin:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
+          <div id="mon-phys-result" style="background:#fffbeb; border:1.5px solid #fcd34d; color:#78350f; padding:5px 8px; border-radius:8px; font-size:10.5px; line-height:1.35;"></div>
+
+          <!-- 下部固定エリア：コピペボタン → 閉じる -->
+          <button type="button" id="btn-copy-turn-report" class="btn-primary" style="padding:8px; font-size:11.5px; font-weight:900; background:#0ea5e9; margin-top:2px;">
             📋 1ターン答え合わせをコピペ（送信文＋AI返答＋結果）
           </button>
-
-          <!-- ===== タブ1：直前ターンの答え合わせ ===== -->
-          <div id="vision-pane-audit" style="display:flex; flex-direction:column; gap:7px;">
-            <div id="audit-meta" style="font-size:10.5px; font-weight:800; color:#0369a1; background:#f0f9ff; padding:6px 8px; border-radius:8px; border:1px solid #bae6fd;"></div>
-            <div id="audit-empty-notice" style="display:none; font-size:11.5px; color:#475569; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:10px; padding:12px; text-align:center; font-weight:700;">
-              まだ通信ターンが実行されていません。<br>「⚡ 今すぐ考える」を1回押すと、送信前のキャラ視点・送信文・AI返答・実行後のキャラ視点がここに凍結表示されます。
-            </div>
-
-            <div id="audit-body" style="display:none; flex-direction:column; gap:7px;">
-              <div id="audit-before-img-wrap" style="display:none; text-align:center; background:#0f172a; padding:6px; border-radius:10px;">
-                <div id="audit-before-img-label" style="font-size:10px; color:#7dd3fc; font-weight:800; margin-bottom:4px;"></div>
-                <img id="audit-before-img" style="max-width:100%; max-height:220px; border-radius:8px; border:1px solid #38bdf8;" alt="行動前のキャラ視点">
-              </div>
-
-              <div style="font-size:11px; font-weight:900; color:#334155;">📤 [1] AIへ送信した情報文（行動前）</div>
-              <pre id="audit-prompt" style="background:#0f172a; color:#e2e8f0; padding:8px; border-radius:10px; font-size:10.5px; line-height:1.35; overflow:auto; max-height:190px; white-space:pre-wrap; margin:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
-
-              <div style="font-size:11px; font-weight:900; color:#334155;">📥 [2] AIからの返答（しゃべり・判断・動き）</div>
-              <div id="audit-reply-summary" style="background:#f0fdf4; border:1.5px solid #86efac; color:#14532d; padding:7px 9px; border-radius:10px; font-size:11px; line-height:1.45;"></div>
-              <pre id="audit-raw-json" style="background:#f8fafc; color:#1e293b; border:1px solid #cbd5e1; padding:7px; border-radius:8px; font-size:10px; line-height:1.35; overflow:auto; max-height:95px; white-space:pre-wrap; margin:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
-
-              <div style="font-size:11px; font-weight:900; color:#334155;">🧱 [3] 実行後の物理結果 ＆ 行動後キャラ視点</div>
-              <div id="audit-phys-result" style="background:#fffbeb; border:1.5px solid #fcd34d; color:#78350f; padding:7px 9px; border-radius:10px; font-size:11px; line-height:1.45;"></div>
-
-              <div id="audit-after-img-wrap" style="display:none; text-align:center; background:#0f172a; padding:6px; border-radius:10px;">
-                <div id="audit-after-img-label" style="font-size:10px; color:#fcd34d; font-weight:800; margin-bottom:4px;"></div>
-                <img id="audit-after-img" style="max-width:100%; max-height:220px; border-radius:8px; border:1px solid #f59e0b;" alt="行動後のキャラ視点">
-              </div>
-            </div>
-          </div>
-
-          <!-- ===== タブ2：次の送信プレビュー（通信前） ===== -->
-          <div id="vision-pane-preview" style="display:none; flex-direction:column; gap:7px;">
-            <div id="preview-meta" style="font-size:10.5px; font-weight:800; color:#0369a1; background:#f0f9ff; padding:6px 8px; border-radius:8px; border:1px solid #bae6fd;"></div>
-            <div id="preview-img-wrap" style="display:none; text-align:center; background:#0f172a; padding:6px; border-radius:10px;">
-              <div id="preview-img-label" style="font-size:10px; color:#cbd5e1; font-weight:800; margin-bottom:4px;"></div>
-              <img id="preview-img" style="max-width:100%; max-height:220px; border-radius:8px; border:1px solid #38bdf8;" alt="現在のキャラ視点">
-            </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-              <button type="button" id="btn-prev-stop-180" class="btn-sub" style="padding:5px; font-size:10.5px;">🧍 停止180°をプレビュー</button>
-              <button type="button" id="btn-prev-move-fwd" class="btn-sub" style="padding:5px; font-size:10.5px;">🏃 移動前方をプレビュー</button>
-            </div>
-            <div style="font-size:11px; font-weight:900; color:#334155;">📤 次にAIへ送る情報文（A案）</div>
-            <pre id="preview-prompt" style="background:#0f172a; color:#e2e8f0; padding:8px; border-radius:10px; font-size:10.5px; line-height:1.35; overflow:auto; max-height:220px; white-space:pre-wrap; margin:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
-            <button type="button" id="btn-refresh-preview" class="btn-sub" style="padding:6px; font-size:11px;">🔄 現在の状態で再取得</button>
-          </div>
-
           <button type="button" id="btn-close-vision-mon" class="btn-sub" style="font-size:11.5px;">閉じる</button>
         </div>
       `;
@@ -1428,11 +1400,10 @@ ${actionsText}
 
       document.getElementById('btn-close-vision-mon-x').onclick = closeVisionMonitor;
       document.getElementById('btn-close-vision-mon').onclick = closeVisionMonitor;
-      document.getElementById('btn-tab-audit').onclick = () => renderMonitorModal('audit', null);
-      document.getElementById('btn-tab-preview').onclick = () => renderMonitorModal('preview', null);
-      document.getElementById('btn-refresh-preview').onclick = () => renderMonitorModal('preview', null);
-      document.getElementById('btn-prev-stop-180').onclick = () => renderMonitorModal('preview', false);
-      document.getElementById('btn-prev-move-fwd').onclick = () => renderMonitorModal('preview', true);
+      document.getElementById('btn-tab-before').onclick = () => renderUnifiedMonitor('before');
+      document.getElementById('btn-tab-after').onclick  = () => renderUnifiedMonitor('after');
+      document.getElementById('btn-dim-clear').onclick  = () => applyDimOverlayState(false);
+      document.getElementById('btn-dim-move').onclick   = () => applyDimOverlayState(true);
 
       const copyBtn = document.getElementById('btn-copy-turn-report');
       if (copyBtn) {
@@ -1478,7 +1449,7 @@ ${actionsText}
 
   // 不変コアAPI公開
   const coreApi = Object.freeze({
-    version: '3.5-audit-copy-b-locked',
+    version: '3.6-unified-tabs-dim-toggle',
     isEnabled,
     setEnabled,
     getVisionMode,
