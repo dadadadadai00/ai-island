@@ -1,11 +1,10 @@
 // ============================================================================
-// 【純粋知覚・不変通信コア：ai_comm.js（統一2タブ・クリア/移動視点切替・下部コピペ版）】
+// 【純粋知覚・不変通信コア：ai_comm.js（移動視点自動連動・拡大中スクロール対応版）】
+// ・キャラ座標変化の直接検知により、移動直後は自動で左右薄暗化（移動視点）へ連動
 // ・両タブ（⏪今すぐ考える前／⏩考えた結果）を完全同一レイアウト・同一サイズ枠で統一
-// ・3Dプレビューは常に3連180°サイズ固定、移動視点時は左右1/3を薄暗く表示（右トグルで切替可）
-// ・コピペボタンを下部「閉じる」の直上へ配置（通常スクショと併用）
+// ・ピンチ拡大中でも情報文枠・JSON枠の上下スクロールを阻害しない操作判定へ改修
 // ・設定ページでB案(画像AI送信)は暗転・使用停止（内部コード温存）
 // ・キャラ視点（🤖視点＆検証カメラ共通）では未削り分割ブロックを全表示
-// ・全モーダルウィンドウの非崩れピンチ拡大縮小（100%〜250%・開閉時自動100%リセット）
 // ※ index.html / brain.js / world.js / rules_dig.js は無改造のまま動作します
 // ============================================================================
 (function initImmutableAICommCore() {
@@ -251,7 +250,6 @@
     return { rx, ry, rz };
   }
 
-  // alwaysPanorama=true なら常に3連180°サイズで撮影（移動時の暗転はUIオーバーレイで統一表現）
   function captureRobotFirstPersonImage(isMoving = lastTurnWasMoving, useLogicalPos = false, alwaysPanorama = true) {
     if (typeof renderer === 'undefined' || typeof scene === 'undefined' || typeof innerRobotCam === 'undefined') {
       return null;
@@ -528,7 +526,7 @@
     const bodyText    = collectBodyText();
     const memoryText  = formatShortTermMemory();
 
-    // 確認用の3D視点は常に3連180°統一サイズで撮影
+    // 確認用の3D視点は常に3連180°統一サイズで撮影（移動時の暗転はUI側で自動連動）
     const fpvImageUrl = captureRobotFirstPersonImage(isMoving, true, true);
     let visionSection = '';
     let sendImageUrl  = null;
@@ -706,7 +704,7 @@ ${actionsText}
   }
 
   // --------------------------------------------------------------------------
-  // 5. ターン実行制御（送信前・AI返答・実行後の1ターン完全スナップショット保存）
+  // 5. ターン実行制御（実座標変化から移動を直接検知し、移動視点へ自動連動）
   // --------------------------------------------------------------------------
   async function runTurn() {
     if (!commEnabled) {
@@ -769,7 +767,13 @@ ${actionsText}
       }
 
       const dec = res.data;
-      const prevPos = { x: ROBOT.pos.x, z: ROBOT.pos.z, lv: ROBOT.pos.lv };
+      const prevPos = {
+        x: ROBOT.pos.x,
+        z: ROBOT.pos.z,
+        lv: ROBOT.pos.lv,
+        sx: Number.isFinite(ROBOT.pos.sx) ? ROBOT.pos.sx : 2,
+        sz: Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2
+      };
       const dir = findDirByShortName(dec.dir);
       const dirShort = dir.name.replace('(斜め)', '');
       const chosenAction = actionMap.get(dec.action) || actionMap.get('rest') || Array.from(actionMap.values())[0];
@@ -791,7 +795,20 @@ ${actionsText}
         physResult = '行動処理中にエラーが発生した';
       }
 
-      lastTurnWasMoving = Boolean(chosenAction.id === 'move' && out && out.moved === true);
+      // rules_dig.js の版に関わらず、実座標の変化から「実際に移動したか」を確実に自動判定
+      const curSx = Number.isFinite(ROBOT.pos.sx) ? ROBOT.pos.sx : 2;
+      const curSz = Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2;
+      const posActuallyChanged =
+        (ROBOT.pos.x !== prevPos.x) ||
+        (ROBOT.pos.z !== prevPos.z) ||
+        (curSx !== prevPos.sx) ||
+        (curSz !== prevPos.sz) ||
+        (ROBOT.pos.lv !== prevPos.lv);
+
+      lastTurnWasMoving = Boolean(
+        chosenAction.id === 'move' &&
+        ((out && out.moved === true) || posActuallyChanged)
+      );
 
       shortTermMemory.push({
         action: chosenAction.id,
@@ -838,7 +855,6 @@ ${actionsText}
         if (typeof saveWorldState === 'function') saveWorldState();
       }
 
-      // 行動後の3D画像も同一3連180°サイズで撮影
       const afterImageUrl = captureRobotFirstPersonImage(lastTurnWasMoving, true, true);
       const facingAfter = rotToShortDirName(ROBOT.rotY || 0);
 
@@ -969,7 +985,8 @@ ${actionsText}
   }
 
   // --------------------------------------------------------------------------
-  // 7. 全モーダルウィンドウの非崩れピンチ拡大縮小（transform: scale + 1本指パン）
+  // 7. 全モーダルウィンドウの非崩れピンチ拡大縮小
+  //    ・拡大中でも内部スクロール枠（情報文・JSON枠等）の縦スクロールを最優先解放
   // --------------------------------------------------------------------------
   const modalResetFns = [];
 
@@ -979,11 +996,29 @@ ${actionsText}
     });
   }
 
+  function findInnerScrollableBox(startEl, stopEl) {
+    let el = startEl;
+    while (el && el !== stopEl && el !== document.body) {
+      if (el.dataset && el.dataset.allowInnerScroll === '1') {
+        return el;
+      }
+      try {
+        const style = window.getComputedStyle(el);
+        const oy = style ? style.overflowY : '';
+        if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 2) {
+          return el;
+        }
+      } catch (e) {}
+      el = el.parentElement;
+    }
+    return null;
+  }
+
   function attachPinchZoomToModal(overlay) {
-    if (!overlay || overlay.dataset.pinchBound === '2') return;
+    if (!overlay || overlay.dataset.pinchBound === '3') return;
     const content = overlay.querySelector('.modal-content');
     if (!content) return;
-    overlay.dataset.pinchBound = '2';
+    overlay.dataset.pinchBound = '3';
 
     const MIN_SCALE = 1.0;
     const MAX_SCALE = 2.5;
@@ -1000,10 +1035,12 @@ ${actionsText}
     let startMidX = 0;
     let startMidY = 0;
 
-    let panDragActive = false;
-    let panDragging = false;
+    // 1本指ジェスチャー状態: 'none' | 'undecided' | 'inner-scroll' | 'pan'
+    let dragMode = 'none';
+    let innerScrollEl = null;
     let dragStartX = 0;
     let dragStartY = 0;
+    let dragLastY  = 0;
     let dragInitPanX = 0;
     let dragInitPanY = 0;
 
@@ -1051,8 +1088,8 @@ ${actionsText}
 
     function resetZoom() {
       pinchActive = false;
-      panDragActive = false;
-      panDragging = false;
+      dragMode = 'none';
+      innerScrollEl = null;
       applyTransform(1.0, 0, 0);
     }
 
@@ -1081,8 +1118,8 @@ ${actionsText}
     overlay.addEventListener('touchstart', (e) => {
       if (e.touches.length === 2) {
         pinchActive = true;
-        panDragActive = false;
-        panDragging = false;
+        dragMode = 'none';
+        innerScrollEl = null;
         const t0 = e.touches[0], t1 = e.touches[1];
         startDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY) || 1;
         startMidX = (t0.clientX + t1.clientX) / 2;
@@ -1092,11 +1129,15 @@ ${actionsText}
         startPanY = panY;
       } else if (e.touches.length === 1 && scale > 1.01) {
         const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
-        if (tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA') return;
-        panDragActive = true;
-        panDragging = false;
+        if (tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA') {
+          dragMode = 'none';
+          return;
+        }
+        innerScrollEl = findInnerScrollableBox(e.target, content);
+        dragMode = 'undecided';
         dragStartX = e.touches[0].clientX;
         dragStartY = e.touches[0].clientY;
+        dragLastY  = dragStartY;
         dragInitPanX = panX;
         dragInitPanY = panY;
       }
@@ -1122,13 +1163,34 @@ ${actionsText}
         return;
       }
 
-      if (e.touches.length === 1 && panDragActive && scale > 1.01) {
-        const dx = e.touches[0].clientX - dragStartX;
-        const dy = e.touches[0].clientY - dragStartY;
-        if (!panDragging && Math.hypot(dx, dy) > 8) {
-          panDragging = true;
+      if (e.touches.length === 1 && scale > 1.01 && dragMode !== 'none') {
+        const curX = e.touches[0].clientX;
+        const curY = e.touches[0].clientY;
+        const dx = curX - dragStartX;
+        const dy = curY - dragStartY;
+
+        if (dragMode === 'undecided') {
+          if (Math.hypot(dx, dy) < 6) return;
+          if (innerScrollEl && Math.abs(dy) >= Math.abs(dx)) {
+            // 情報文枠などの内部スクロール枠上で縦スワイプ → 枠内スクロール専用にする
+            dragMode = 'inner-scroll';
+            dragLastY = curY;
+          } else {
+            dragMode = 'pan';
+          }
         }
-        if (panDragging) {
+
+        if (dragMode === 'inner-scroll' && innerScrollEl) {
+          // 拡大倍率(scale)に合わせて確実に枠内を上下スクロール（固定ロックを完全解除）
+          const stepY = curY - dragLastY;
+          dragLastY = curY;
+          e.preventDefault();
+          e.stopPropagation();
+          innerScrollEl.scrollTop -= stepY / scale;
+          return;
+        }
+
+        if (dragMode === 'pan') {
           e.preventDefault();
           e.stopPropagation();
           applyTransform(scale, dragInitPanX + dx, dragInitPanY + dy);
@@ -1139,8 +1201,8 @@ ${actionsText}
     const endTouch = (e) => {
       if (!e.touches || e.touches.length < 2) pinchActive = false;
       if (!e.touches || e.touches.length === 0) {
-        panDragActive = false;
-        panDragging = false;
+        dragMode = 'none';
+        innerScrollEl = null;
       }
     };
     overlay.addEventListener('touchend', endTouch, { passive: true });
@@ -1201,7 +1263,6 @@ ${actionsText}
 
     const a = lastTurnAudit;
 
-    // 共通：AI返答（緑枠＋灰枠＋黄枠）の組み立て
     function fillReplySection(headerText) {
       if (replyLabelEl) replyLabelEl.innerText = headerText;
       if (!a.hasData) {
@@ -1234,7 +1295,7 @@ ${actionsText}
     if (isBefore) {
       if (!a.hasData) {
         const live = buildPerceptionPayload('map', lastTurnWasMoving);
-        if (metaEl) metaEl.innerText = `未実行（通信前） ／ 向き:${rotToShortDirName(ROBOT.rotY || 0)} ／ 状態:${live.isMoving ? '移動視点' : 'クリア'}`;
+        if (metaEl) metaEl.innerText = `未実行（通信前） ／ 向き:${rotToShortDirName(ROBOT.rotY || 0)} ／ 自動視野:${live.isMoving ? '移動視点' : 'クリア'}`;
         if (imgEl && live.fpvImageUrl) imgEl.src = live.fpvImageUrl;
         applyDimOverlayState(live.isMoving);
         if (promptLabelEl) promptLabelEl.innerText = '📤 AIへ送る予定の情報文（まだ送信前）';
@@ -1244,7 +1305,8 @@ ${actionsText}
       }
 
       if (metaEl) {
-        metaEl.innerText = `第${a.turnNo}ターン(${a.day}日目 ${a.time}) ／ 行動前 ／ ${a.modelId} ／ 向き:${a.facingBefore}`;
+        const viewTag = a.isMovingBefore ? '🏃移動視点(自動)' : '🧍クリア(自動)';
+        metaEl.innerText = `第${a.turnNo}ターン(${a.day}日目 ${a.time}) ／ 行動前 ／ ${viewTag} ／ 向き:${a.facingBefore}`;
       }
       if (imgEl && a.beforeImageUrl) imgEl.src = a.beforeImageUrl;
       applyDimOverlayState(a.isMovingBefore);
@@ -1256,7 +1318,8 @@ ${actionsText}
       const curFacing = rotToShortDirName(ROBOT.rotY || 0);
       if (metaEl) {
         const turnTag = a.hasData ? `第${a.turnNo}ターン後(${a.day}日目 ${a.time})` : '現在状態（未実行）';
-        metaEl.innerText = `${turnTag} ／ 次の送信状態 ／ ${a.hasData ? a.modelId : '待機中'} ／ 向き:${curFacing}`;
+        const viewTag = live.isMoving ? '🏃移動視点(自動)' : '🧍クリア(自動)';
+        metaEl.innerText = `${turnTag} ／ 次の送信状態 ／ ${viewTag} ／ 向き:${curFacing}`;
       }
       if (imgEl && live.fpvImageUrl) imgEl.src = live.fpvImageUrl;
       applyDimOverlayState(live.isMoving);
@@ -1363,7 +1426,7 @@ ${actionsText}
 
           <div id="mon-meta" style="font-size:10px; font-weight:800; color:#0369a1; background:#f0f9ff; padding:5px 8px; border-radius:8px; border:1px solid #bae6fd;"></div>
 
-          <!-- 統一サイズ枠①：キャラの視点3D（右にクリア／移動視点トグル） -->
+          <!-- 統一サイズ枠①：キャラの視点3D（キャラ移動で自動連動＋右トグルで手動確認可） -->
           <div id="mon-img-wrap" style="background:#0f172a; padding:6px; border-radius:10px;">
             <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:5px;">
               <span style="font-size:11px; color:#f8fafc; font-weight:900;">📷 キャラの視点3D</span>
@@ -1379,14 +1442,14 @@ ${actionsText}
             </div>
           </div>
 
-          <!-- 統一サイズ枠②：情報文（固定高） -->
+          <!-- 統一サイズ枠②：情報文（拡大中でも縦ドラッグで上下スクロール可能） -->
           <div id="mon-prompt-label" style="font-size:11px; font-weight:900; color:#334155;"></div>
-          <pre id="mon-prompt" style="background:#0f172a; color:#e2e8f0; padding:8px; border-radius:10px; font-size:10px; line-height:1.35; overflow:auto; height:145px; white-space:pre-wrap; margin:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
+          <pre id="mon-prompt" data-allow-inner-scroll="1" style="background:#0f172a; color:#e2e8f0; padding:8px; border-radius:10px; font-size:10px; line-height:1.35; overflow-y:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y; overscroll-behavior:contain; height:145px; white-space:pre-wrap; margin:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
 
           <!-- 統一サイズ枠③：AI返答（緑枠＋灰枠＋結果・固定構成） -->
           <div id="mon-reply-label" style="font-size:11px; font-weight:900; color:#334155;"></div>
           <div id="mon-reply-summary" style="background:#f0fdf4; border:1.5px solid #86efac; color:#14532d; padding:6px 8px; border-radius:9px; font-size:10.5px; line-height:1.4; min-height:48px;"></div>
-          <pre id="mon-raw-json" style="background:#f8fafc; color:#1e293b; border:1px solid #cbd5e1; padding:6px 7px; border-radius:8px; font-size:9.5px; line-height:1.3; overflow:auto; height:56px; white-space:pre-wrap; margin:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
+          <pre id="mon-raw-json" data-allow-inner-scroll="1" style="background:#f8fafc; color:#1e293b; border:1px solid #cbd5e1; padding:6px 7px; border-radius:8px; font-size:9.5px; line-height:1.3; overflow-y:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y; overscroll-behavior:contain; height:56px; white-space:pre-wrap; margin:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
           <div id="mon-phys-result" style="background:#fffbeb; border:1.5px solid #fcd34d; color:#78350f; padding:5px 8px; border-radius:8px; font-size:10.5px; line-height:1.35;"></div>
 
           <!-- 下部固定エリア：コピペボタン → 閉じる -->
@@ -1449,7 +1512,7 @@ ${actionsText}
 
   // 不変コアAPI公開
   const coreApi = Object.freeze({
-    version: '3.6-unified-tabs-dim-toggle',
+    version: '3.7-auto-move-dim-inner-scroll',
     isEnabled,
     setEnabled,
     getVisionMode,
