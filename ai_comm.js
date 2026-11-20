@@ -2,6 +2,7 @@
 // 【純粋知覚・不変通信コア：ai_comm.js】
 // ・A案(記号マップ)／B案(3Dカメラ画像) 設定切替（デフォルトA案）
 // ・停止時180度パノラマ視野（3連60度合成＋方位ラベル）／移動時狭い前方視野の自動切替
+// ・キャラ視点（🤖視点 ＆ AI B案共通）では未削り分割ブロックを一切非表示にせず実体通り表示
 // ・直近4ターンの短期記憶（意図＋物理結果）保持による脱線・記憶喪失防止
 // ・全モーダルウィンドウの非崩れピンチ拡大縮小（100%〜250%・開閉時自動100%リセット・3Dカメラ無変更）
 // ※ index.html / brain.js / world.js は無改造のまま動作します
@@ -41,6 +42,74 @@
     parsedJson: null,
     error: ''
   };
+
+  // --------------------------------------------------------------------------
+  // 0. キャラ視点カメラの「未削り分割ブロック全表示」＆めり込み防止フック
+  //    ※ 追従カメラ・外カメラ（地上/地下）の透過ルールは一切変更しません
+  // --------------------------------------------------------------------------
+  function getSafeRobotEyeHeight() {
+    const sSpec = (typeof SIZE_SPECS !== 'undefined' && SIZE_SPECS[ROBOT.sizeLevel]) || { scaleY: 0.25 };
+    if (ROBOT.posture === 'crawl') {
+      return Math.max(0.10, Math.min(0.15, 0.18 * sSpec.scaleY));
+    }
+    return Math.max(0.12, Math.min(0.84, 0.52 * sSpec.scaleY));
+  }
+
+  if (typeof updateTransparencyAndOcclusion === 'function') {
+    const _origUpdateTransparency = updateTransparencyAndOcclusion;
+    updateTransparencyAndOcclusion = function(modeType, refCamPos, focusX, focusY, focusZ, targetFloorLv, lookDirX = 0, lookDirZ = 0) {
+      if (modeType === 'robot_fpv') {
+        const showLines = (typeof CAM_VISUAL_STYLE !== 'undefined' && CAM_VISUAL_STYLE === 'glass_line');
+        if (typeof macroOutlineGroup !== 'undefined') macroOutlineGroup.visible = showLines;
+        const inUndergroundFpv = (targetFloorLv < 0 || ROBOT.posture === 'crawl');
+        if (typeof waterfallMesh !== 'undefined') waterfallMesh.visible = !inUndergroundFpv;
+        if (typeof seaMesh !== 'undefined') seaMesh.visible = !inUndergroundFpv;
+        if (typeof glassDepthMesh !== 'undefined') glassDepthMesh.visible = false;
+        if (typeof glassSubMesh !== 'undefined') glassSubMesh.visible = false;
+
+        // 削られていない分割ブロックは1個も非表示にせず、すべて実体通り表示
+        let opaqueChanged = false;
+        if (typeof subVoxelsMeta !== 'undefined' && typeof applyVoxelVisState === 'function') {
+          for (let i = 0; i < subVoxelsMeta.length; i++) {
+            if (applyVoxelVisState(subVoxelsMeta[i], 0, false)) opaqueChanged = true;
+          }
+        }
+        if (typeof lastAppliedFrostedState !== 'undefined') lastAppliedFrostedState = false;
+        if (opaqueChanged && typeof opaqueSubMesh !== 'undefined') {
+          opaqueSubMesh.instanceMatrix.needsUpdate = true;
+        }
+        return;
+      }
+      return _origUpdateTransparency.apply(this, arguments);
+    };
+  }
+
+  if (typeof updateAllCamerasTransform === 'function') {
+    const _origUpdateAllCams = updateAllCamerasTransform;
+    updateAllCamerasTransform = function() {
+      _origUpdateAllCams.apply(this, arguments);
+      // 人間の🤖キャラ視点カメラも壁めり込み防止のためキャラ中心の目の位置へ補正
+      if (typeof manualCameraMode !== 'undefined' && manualCameraMode === 'robot' &&
+          typeof innerRobotCam !== 'undefined' && typeof robotGroup !== 'undefined') {
+        const rot = ROBOT.rotY || 0;
+        const lookYaw = rot + (typeof fpvYawOffset === 'number' ? fpvYawOffset : 0);
+        const pitch = (typeof fpvPitch === 'number') ? fpvPitch : -0.06;
+        const lookDirX = Math.sin(lookYaw);
+        const lookDirZ = Math.cos(lookYaw);
+
+        const eyeX = robotGroup.position.x;
+        const eyeY = robotGroup.position.y + getSafeRobotEyeHeight();
+        const eyeZ = robotGroup.position.z;
+
+        innerRobotCam.position.set(eyeX, eyeY, eyeZ);
+        innerRobotCam.lookAt(
+          eyeX + 20 * Math.cos(pitch) * lookDirX,
+          eyeY + 20 * Math.sin(pitch),
+          eyeZ + 20 * Math.cos(pitch) * lookDirZ
+        );
+      }
+    };
+  }
 
   // --------------------------------------------------------------------------
   // 1. プラグイン登録API
@@ -109,7 +178,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 2. B案：キャラ視点3Dカメラ描画（停止時: 180度3連パノラマ / 移動時: 前方1枚）
+  // 2. B案：キャラ視点3Dカメラ描画（未削りブロック全表示・停止時180°/移動時前方）
   // --------------------------------------------------------------------------
   function rotToShortDirName(rot) {
     const x = Math.sin(rot);
@@ -142,12 +211,8 @@
       const prevAspect = innerRobotCam.aspect;
 
       const h = (typeof getRobotHeightLevel === 'function') ? getRobotHeightLevel() : (ROBOT.pos.lv || 0);
-      const sSpec = (typeof SIZE_SPECS !== 'undefined' && SIZE_SPECS[ROBOT.sizeLevel]) || { scaleY: 0.25 };
-      const isCrawl = (ROBOT.posture === 'crawl');
-
       const baseRot = ROBOT.rotY || 0;
-      const eyeH = isCrawl ? (0.18 * sSpec.scaleY) : Math.max(0.14, 0.52 * sSpec.scaleY);
-      const forwardOffset = isCrawl ? 0.04 : -0.14;
+      const eyeH = getSafeRobotEyeHeight();
       const rx = (typeof robotGroup !== 'undefined') ? robotGroup.position.x : ROBOT.pos.x;
       const ry = (typeof robotGroup !== 'undefined') ? robotGroup.position.y : 0;
       const rz = (typeof robotGroup !== 'undefined') ? robotGroup.position.z : ROBOT.pos.z;
@@ -194,12 +259,14 @@
       innerRobotCam.aspect = srcAspect;
       innerRobotCam.updateProjectionMatrix();
 
+      // キャラ視点では未削り分割ブロックをすべて表示して撮影
+      const eyeX = rx;
+      const eyeY = ry + eyeH;
+      const eyeZ = rz;
+
       shots.forEach((shot, idx) => {
         const lx = Math.sin(shot.yaw);
         const lz = Math.cos(shot.yaw);
-        const eyeX = rx + Math.sin(baseRot) * forwardOffset;
-        const eyeY = ry + eyeH;
-        const eyeZ = rz + Math.cos(baseRot) * forwardOffset;
 
         innerRobotCam.position.set(eyeX, eyeY, eyeZ);
         innerRobotCam.lookAt(eyeX + 20 * lx, eyeY - 2.6, eyeZ + 20 * lz);
@@ -679,9 +746,6 @@ ${actionsText}
 
   // --------------------------------------------------------------------------
   // 6. 全モーダルウィンドウの非崩れピンチ拡大縮小（transform: scale + 1本指パン）
-  //    ・レイアウト(ボタン/テキスト枠)を一切崩さず100%〜250%で滑らかに拡大・縮小
-  //    ・開閉・縦並びアイコン再タップ時に必ず100%の元サイズへ自動リセット
-  //    ・3Dカメラビュー操作へは一切干渉しない
   // --------------------------------------------------------------------------
   const modalResetFns = [];
 
@@ -704,7 +768,6 @@ ${actionsText}
     let panX  = 0;
     let panY  = 0;
 
-    // 2本指ピンチ用状態
     let pinchActive = false;
     let startDist = 0;
     let startScale = 1.0;
@@ -713,7 +776,6 @@ ${actionsText}
     let startMidX = 0;
     let startMidY = 0;
 
-    // 拡大中の1本指パン用状態
     let panDragActive = false;
     let panDragging = false;
     let dragStartX = 0;
@@ -724,7 +786,6 @@ ${actionsText}
     content.style.transformOrigin = 'center center';
     content.style.willChange = 'transform';
 
-    // 拡大中のみ表示されるリセットバッジ（100%時は非表示）
     const badge = document.createElement('button');
     badge.type = 'button';
     badge.style.cssText = 'position:fixed; bottom:18px; right:18px; z-index:9999; display:none; padding:6px 12px; border-radius:999px; border:1.5px solid #38bdf8; background:rgba(15,23,42,0.92); color:#f8fafc; font-size:11.5px; font-weight:900; box-shadow:0 4px 14px rgba(0,0,0,0.35); cursor:pointer;';
@@ -778,7 +839,6 @@ ${actionsText}
       resetZoom();
     });
 
-    // モーダルの表示・非表示が切り替わったら必ず元の100%サイズへ自動リセット
     let prevVisible = overlay.classList.contains('active') || (overlay.style.display && overlay.style.display !== 'none');
     const visObserver = new MutationObserver(() => {
       const nowVisible = overlay.classList.contains('active') || (overlay.style.display && overlay.style.display !== 'none');
@@ -789,7 +849,6 @@ ${actionsText}
     });
     visObserver.observe(overlay, { attributes: true, attributeFilter: ['style', 'class'] });
 
-    // 3Dキャンバス側へのポインター・ホイール伝播を遮断（カメラビュー保護）
     overlay.addEventListener('pointerdown', (e) => e.stopPropagation());
     overlay.addEventListener('pointermove', (e) => e.stopPropagation());
     overlay.addEventListener('pointerup',   (e) => e.stopPropagation());
@@ -808,7 +867,6 @@ ${actionsText}
         startPanX = panX;
         startPanY = panY;
       } else if (e.touches.length === 1 && scale > 1.01) {
-        // 拡大中のみ1本指パン待機（ボタンタップ自体は妨げない）
         const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
         if (tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA') return;
         panDragActive = true;
@@ -867,7 +925,6 @@ ${actionsText}
 
   function enablePinchZoomOnAllModals() {
     document.querySelectorAll('.modal-overlay').forEach(attachPinchZoomToModal);
-    // 縦並びサイドアイコンを押した際も念のため全モーダル倍率を100%へリセット
     const sideCol = document.getElementById('side-icon-column');
     if (sideCol && sideCol.dataset.resetHookBound !== '1') {
       sideCol.dataset.resetHookBound = '1';
@@ -913,8 +970,8 @@ ${actionsText}
         imgWrap.style.display = 'block';
         if (imgLabel) {
           imgLabel.innerText = data.isMoving
-            ? '📷 B案：移動中・前方視野（狭い1枚）'
-            : '📷 B案：停止中・180°パノラマ視野（左60°＋正面＋右60°合成）';
+            ? '📷 B案：移動中・前方視野（狭い1枚・未削り全表示）'
+            : '📷 B案：停止中・180°パノラマ視野（左60°＋正面＋右60°・未削り全表示）';
         }
         imgEl.src = data.imageDataUrl;
       } else {
@@ -1049,7 +1106,7 @@ ${actionsText}
 
   // 不変コアAPI公開
   const coreApi = Object.freeze({
-    version: '3.2-panorama-clean-pinch',
+    version: '3.3-solid-fpv-terrain',
     isEnabled,
     setEnabled,
     getVisionMode,
@@ -1117,4 +1174,5 @@ ${actionsText}
 
   setEnabled(commEnabled);
   setVisionMode(visionMode);
+  if (typeof cameraDirty !== 'undefined') cameraDirty = true;
 })();
