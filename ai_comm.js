@@ -1,24 +1,44 @@
 // ============================================================================
-// 【不変通信コア：ai_comm.js（Groq専用・サイコロ完全廃止・モデル自動検出）】
-// ※通信できない時・通信OFF時は一切行動せず停止します。
-// ※新ルールは他ファイルから AICommCore.registerAction / registerSensor で登録します。
+// 【純粋知覚・不変通信コア：ai_comm.js（A案マップ／B案3D画像切替・サイコロ廃止）】
+// ・神様目線の座標・行動ヒント・演技誘導を全廃し、キャラ視点の知覚のみをGroqへ送信
+// ・設定モーダルへ「AIキャラ視点情報(A案/B案)」切替と「👁️ AI視界モニター」を自動追加
+// ※ index.html / brain.js / world.js は無改造のまま動作します
 // ============================================================================
 (function initImmutableAICommCore() {
   if (window.AICommCore) return;
 
   const GROQ_CHAT_URL   = 'https://api.groq.com/openai/v1/chat/completions';
   const GROQ_MODELS_URL = 'https://api.groq.com/openai/v1/models';
-  const TIMEOUT_MS      = 15000;
-  const MODEL_CACHE_KEY = 'groq_active_model_cache_v2';
+  const TIMEOUT_MS      = 20000;
+  const TEXT_MODEL_CACHE_KEY   = 'groq_text_model_cache_v3';
+  const VISION_MODEL_CACHE_KEY = 'groq_vision_model_cache_v3';
+  const VISION_MODE_KEY        = 'ai_vision_mode_v1'; // 'map' (A案) | 'image' (B案)
 
   let commEnabled = (typeof safeStorage !== 'undefined') && (safeStorage.getItem('ai_comm_enabled') === '1');
-  let cachedModels = [];
+  let visionMode  = (typeof safeStorage !== 'undefined' && safeStorage.getItem(VISION_MODE_KEY) === 'image') ? 'image' : 'map';
+
+  let cachedTextModels   = [];
+  let cachedVisionModels = [];
+  let lastPhysicalResult = 'なし（開始直後）';
+
   const actionMap = new Map();
-  const sensors   = [];
+  const bodySensors = [];
   const postHooks = [];
+  let visionProvider = null;
+
+  let lastInspection = {
+    time: '未実行',
+    mode: visionMode,
+    modelId: '-',
+    promptText: 'まだ通信していません（下の「今の視界をプレビュー」で通信なし確認できます）',
+    imageDataUrl: null,
+    rawResponse: '-',
+    parsedJson: null,
+    error: ''
+  };
 
   // --------------------------------------------------------------------------
-  // 1. プラグイン登録API（外部ルールファイルからの接続口）
+  // 1. プラグイン登録API
   // --------------------------------------------------------------------------
   function registerAction(spec) {
     if (!spec || !spec.id || typeof spec.run !== 'function') return false;
@@ -30,8 +50,17 @@
     return true;
   }
 
+  function registerBodySensor(fn) {
+    if (typeof fn === 'function') bodySensors.push(fn);
+  }
+
+  // 後方互換エイリアス
   function registerSensor(fn) {
-    if (typeof fn === 'function') sensors.push(fn);
+    registerBodySensor(fn);
+  }
+
+  function registerVisionProvider(fn) {
+    if (typeof fn === 'function') visionProvider = fn;
   }
 
   function registerPostTurnHook(fn) {
@@ -57,8 +86,102 @@
 
   function isEnabled() { return commEnabled; }
 
+  function setVisionMode(mode) {
+    visionMode = (mode === 'image') ? 'image' : 'map';
+    if (typeof safeStorage !== 'undefined') {
+      safeStorage.setItem(VISION_MODE_KEY, visionMode);
+    }
+    const sel = document.getElementById('setting-ai-vision-mode');
+    if (sel) sel.value = visionMode;
+    if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
+  }
+
+  function getVisionMode() { return visionMode; }
+
+  function resetPhysicalHistory() {
+    lastPhysicalResult = 'なし（開始直後）';
+  }
+
   // --------------------------------------------------------------------------
-  // 2. Groq利用可能モデルの自動取得（404防止）
+  // 2. B案：キャラ視点3Dカメラ（innerRobotCam）のオフスクリーン風キャプチャ
+  // --------------------------------------------------------------------------
+  function captureRobotFirstPersonImage() {
+    if (typeof renderer === 'undefined' || typeof scene === 'undefined' || typeof innerRobotCam === 'undefined') {
+      return null;
+    }
+    try {
+      const prevRobotVisible = (typeof robotGroup !== 'undefined') ? robotGroup.visible : true;
+      const prevFov    = innerRobotCam.fov;
+      const prevAspect = innerRobotCam.aspect;
+
+      const h = (typeof getRobotHeightLevel === 'function') ? getRobotHeightLevel() : (ROBOT.pos.lv || 0);
+      const sSpec = (typeof SIZE_SPECS !== 'undefined' && SIZE_SPECS[ROBOT.sizeLevel]) || { scaleY: 0.25 };
+      const isCrawl = (ROBOT.posture === 'crawl');
+
+      const rot = ROBOT.rotY || 0;
+      const lookDirX = Math.sin(rot);
+      const lookDirZ = Math.cos(rot);
+
+      const eyeH = isCrawl ? (0.18 * sSpec.scaleY) : Math.max(0.14, 0.52 * sSpec.scaleY);
+      const forwardOffset = isCrawl ? 0.06 : -0.18;
+      const rx = (typeof robotGroup !== 'undefined') ? robotGroup.position.x : ROBOT.pos.x;
+      const ry = (typeof robotGroup !== 'undefined') ? robotGroup.position.y : 0;
+      const rz = (typeof robotGroup !== 'undefined') ? robotGroup.position.z : ROBOT.pos.z;
+
+      const eyeX = rx + lookDirX * forwardOffset;
+      const eyeY = ry + eyeH;
+      const eyeZ = rz + lookDirZ * forwardOffset;
+
+      if (typeof robotGroup !== 'undefined') robotGroup.visible = false;
+
+      innerRobotCam.fov = isCrawl ? 78 : 96;
+      innerRobotCam.aspect = renderer.domElement.width / Math.max(1, renderer.domElement.height);
+      innerRobotCam.updateProjectionMatrix();
+      innerRobotCam.position.set(eyeX, eyeY, eyeZ);
+      innerRobotCam.lookAt(
+        eyeX + 20 * lookDirX,
+        eyeY - 2.6, // 目の前の壁と足元の床・土が同時に収まる少し下向き目線
+        eyeZ + 20 * lookDirZ
+      );
+
+      if (typeof updateTransparencyAndOcclusion === 'function') {
+        updateTransparencyAndOcclusion('robot_fpv', innerRobotCam.position, rx, ry, rz, h, lookDirX, lookDirZ);
+      }
+
+      // キャラ視点で1フレーム描画 → 同一フレーム内で即座に軽量リサイズJPEG化
+      renderer.render(scene, innerRobotCam);
+
+      const srcW = renderer.domElement.width || 360;
+      const srcH = renderer.domElement.height || 640;
+      const maxEdge = 512;
+      const scale = Math.min(1, maxEdge / Math.max(srcW, srcH));
+      const outW = Math.max(64, Math.round(srcW * scale));
+      const outH = Math.max(64, Math.round(srcH * scale));
+
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width = outW;
+      tmpCanvas.height = outH;
+      const ctx = tmpCanvas.getContext('2d');
+      ctx.drawImage(renderer.domElement, 0, 0, outW, outH);
+      const dataUrl = tmpCanvas.toDataURL('image/jpeg', 0.78);
+
+      // 人間側のカメラ表示を即座に元へ戻す
+      innerRobotCam.fov = prevFov;
+      innerRobotCam.aspect = prevAspect;
+      innerRobotCam.updateProjectionMatrix();
+      if (typeof robotGroup !== 'undefined') robotGroup.visible = prevRobotVisible;
+      if (typeof updateAllCamerasTransform === 'function') updateAllCamerasTransform();
+      if (typeof activeCamera !== 'undefined') renderer.render(scene, activeCamera);
+
+      return dataUrl;
+    } catch (e) {
+      console.warn('captureRobotFirstPersonImage error:', e);
+      return null;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 3. Groqモデル自動検出（A案: テキスト / B案: Vision画像対応）
   // --------------------------------------------------------------------------
   function isUsableChatModel(id) {
     const s = String(id || '').toLowerCase();
@@ -67,23 +190,43 @@
     return !ng.some(w => s.includes(w));
   }
 
-  function scoreModelPriority(id) {
+  function isVisionModel(id) {
+    const s = String(id || '').toLowerCase();
+    if (!isUsableChatModel(s)) return false;
+    return s.includes('llama-4-scout') || s.includes('llama-4-maverick') || s.includes('vision') || s.includes('-vl');
+  }
+
+  function scoreTextModel(id) {
     const s = String(id || '').toLowerCase();
     if (s.includes('llama-3.3') && s.includes('70b')) return 100;
-    if (s.includes('llama-4')) return 95;
+    if (s.includes('llama-4-maverick')) return 96;
+    if (s.includes('llama-4-scout')) return 94;
     if (s.includes('llama-3.1') && s.includes('8b')) return 90;
     if (s.includes('gpt-oss')) return 85;
     if (s.includes('qwen')) return 80;
     if (s.includes('llama')) return 75;
-    if (s.includes('gemma')) return 70;
     return 50;
   }
 
-  async function fetchAvailableGroqModels(key, forceRefresh = false) {
-    if (!forceRefresh && cachedModels.length) return cachedModels;
+  function scoreVisionModel(id) {
+    const s = String(id || '').toLowerCase();
+    if (s.includes('llama-4-maverick')) return 100;
+    if (s.includes('llama-4-scout')) return 95;
+    if (s.includes('vision') && s.includes('90b')) return 85;
+    if (s.includes('vision') && s.includes('11b')) return 80;
+    if (s.includes('vision') || s.includes('-vl')) return 70;
+    return 10;
+  }
 
+  async function fetchAvailableModels(key, wantVision, forceRefresh = false) {
+    if (!forceRefresh) {
+      if (wantVision && cachedVisionModels.length) return cachedVisionModels;
+      if (!wantVision && cachedTextModels.length) return cachedTextModels;
+    }
+
+    const cacheKey = wantVision ? VISION_MODEL_CACHE_KEY : TEXT_MODEL_CACHE_KEY;
     const savedModel = (!forceRefresh && typeof safeStorage !== 'undefined')
-      ? (safeStorage.getItem(MODEL_CACHE_KEY) || '').trim()
+      ? (safeStorage.getItem(cacheKey) || '').trim()
       : '';
 
     const controller = new AbortController();
@@ -97,25 +240,34 @@
       clearTimeout(timer);
       if (res.ok) {
         const json = await res.json();
-        const ids = (Array.isArray(json.data) ? json.data : [])
+        const allActive = (Array.isArray(json.data) ? json.data : [])
           .filter(m => m && m.id && m.active !== false && isUsableChatModel(m.id))
-          .map(m => m.id)
-          .sort((a, b) => scoreModelPriority(b) - scoreModelPriority(a));
-        if (ids.length) {
-          cachedModels = savedModel && ids.includes(savedModel)
-            ? [savedModel, ...ids.filter(x => x !== savedModel)]
-            : ids;
-          return cachedModels;
+          .map(m => m.id);
+
+        const filtered = wantVision
+          ? allActive.filter(isVisionModel).sort((a, b) => scoreVisionModel(b) - scoreVisionModel(a))
+          : allActive.sort((a, b) => scoreTextModel(b) - scoreTextModel(a));
+
+        if (filtered.length) {
+          const ordered = (savedModel && filtered.includes(savedModel))
+            ? [savedModel, ...filtered.filter(x => x !== savedModel)]
+            : filtered;
+          if (wantVision) cachedVisionModels = ordered;
+          else cachedTextModels = ordered;
+          return ordered;
         }
       }
     } catch (e) {
       clearTimeout(timer);
     }
 
-    // モデル一覧取得に失敗した場合の予備リスト
-    const fallbackIds = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile', 'openai/gpt-oss-20b', 'qwen/qwen3-32b'];
-    cachedModels = savedModel ? [savedModel, ...fallbackIds.filter(x => x !== savedModel)] : fallbackIds;
-    return cachedModels;
+    const fallback = wantVision
+      ? ['meta-llama/llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-maverick-17b-128e-instruct']
+      : ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile', 'meta-llama/llama-4-scout-17b-16e-instruct'];
+    const ordered = savedModel ? [savedModel, ...fallback.filter(x => x !== savedModel)] : fallback;
+    if (wantVision) cachedVisionModels = ordered;
+    else cachedTextModels = ordered;
+    return ordered;
   }
 
   function extractJsonFromText(raw) {
@@ -127,32 +279,82 @@
   }
 
   // --------------------------------------------------------------------------
-  // 3. 状況収集 ＆ Groq API 通信
+  // 4. 純粋知覚プロンプト組み立て（誘導・神様目線ゼロ）
   // --------------------------------------------------------------------------
-  function collectObservationText() {
+  function collectBodyText() {
     const lines = [];
-    for (let i = 0; i < sensors.length; i++) {
+    for (let i = 0; i < bodySensors.length; i++) {
       try {
-        const res = sensors[i]();
+        const res = bodySensors[i]();
         if (typeof res === 'string' && res.trim()) lines.push(res.trim());
       } catch (e) {
-        console.warn('AICommCore sensor error:', e);
+        console.warn('AICommCore bodySensor error:', e);
       }
     }
     return lines.join('\n');
   }
 
-  async function callGroqWithModel(key, modelId, prompt, useJsonFormat = true) {
+  function buildPerceptionPayload(targetMode = visionMode) {
+    const actions = Array.from(actionMap.values());
+    const actionIds   = actions.map(a => a.id).join('/');
+    const actionsText = actions.map(a => `- ${a.id}: ${a.desc}`).join('\n');
+    const bodyText    = collectBodyText();
+
+    let visionSection = '';
+    let imageDataUrl  = null;
+
+    if (targetMode === 'image') {
+      imageDataUrl = captureRobotFirstPersonImage();
+      visionSection = imageDataUrl
+        ? '添付の1人称カメラ画像が、今あなたの目に見えている視界のすべてです。'
+        : '（1人称カメラ画像の取得に失敗しました）';
+    } else {
+      visionSection = (typeof visionProvider === 'function')
+        ? String(visionProvider() || '（視界データなし）')
+        : '（視界モジュール未接続）';
+    }
+
+    const promptText = `あなたはこの3Dブロック空間の中にいる1体の存在です。
+以下の知覚情報（視覚・身体感覚・直前の物理結果）だけをもとに、次の行動を1つ自分で決めてください。
+
+【視覚（今見えている範囲のみ）】
+${visionSection}
+
+【身体感覚・所持状態】
+${bodyText}
+
+【直前の物理結果】
+${lastPhysicalResult}
+
+【物理アクション】
+${actionsText}
+
+以下のJSON形式のみで返答してください（前置き・解説禁止）:
+{"action":"${actionIds}","dir":"北/南/東/西/北西/北東/南西/南東","emotion":"normal/joy/anger/sad/fun/fear/think/surprise/wave/sleep/swing_v/pickup/carry/push/run/peek/struggle","thought":"知覚した事実や意図を短い1文で"}`;
+
+    return { promptText, imageDataUrl, mode: targetMode, actionsCount: actions.length };
+  }
+
+  async function callGroqApi(key, modelId, promptText, imageDataUrl, useJsonFormat) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
+      const userContent = imageDataUrl
+        ? [
+            { type: 'text', text: promptText },
+            { type: 'image_url', image_url: { url: imageDataUrl } }
+          ]
+        : promptText;
+
       const body = {
         model: modelId,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 200,
-        temperature: 0.8
+        messages: [{ role: 'user', content: userContent }],
+        max_tokens: 220,
+        temperature: 0.75
       };
-      if (useJsonFormat) body.response_format = { type: 'json_object' };
+      if (useJsonFormat && !imageDataUrl) {
+        body.response_format = { type: 'json_object' };
+      }
 
       const res = await fetch(GROQ_CHAT_URL, {
         method: 'POST',
@@ -175,12 +377,12 @@
       }
 
       const data = await res.json();
-      const raw = data.choices?.[0]?.message?.content;
+      const raw = data.choices?.[0]?.message?.content || '';
       const parsed = extractJsonFromText(raw);
       if (!parsed || typeof parsed !== 'object') {
-        return { ok: false, status: 200, detail: 'JSON解析失敗' };
+        return { ok: false, status: 200, detail: 'JSON解析失敗', raw };
       }
-      return { ok: true, data: parsed, modelId };
+      return { ok: true, data: parsed, raw, modelId };
     } catch (e) {
       clearTimeout(timer);
       return {
@@ -195,58 +397,60 @@
     const key = (typeof safeStorage !== 'undefined') ? (safeStorage.getItem('api_groq') || '').trim() : '';
     if (!key) return { ok: false, reason: 'Groq APIキー未設定' };
 
-    const actions = Array.from(actionMap.values());
-    if (!actions.length) return { ok: false, reason: '実行可能なアクション未登録' };
+    const payload = buildPerceptionPayload(visionMode);
+    if (!payload.actionsCount) return { ok: false, reason: '実行可能なアクション未登録' };
+    if (visionMode === 'image' && !payload.imageDataUrl) {
+      return { ok: false, reason: 'B案(3Dカメラ画像)のキャプチャに失敗しました' };
+    }
 
-    const actionIds   = actions.map(a => a.id).join('/');
-    const actionsText = actions.map(a => `- ${a.id}: ${a.desc}`).join('\n');
-    const obsText     = collectObservationText();
-    const persona     = (typeof QUIRKY_PROMPTS_MAP !== 'undefined' && QUIRKY_PROMPTS_MAP.base_persona && QUIRKY_PROMPTS_MAP.base_persona.enabled)
-      ? QUIRKY_PROMPTS_MAP.base_persona.prompt
-      : 'あなたはパステル島で自由に考えて生きる小さなロボットです。';
-
-    const prompt = `${persona}
-現在の状況を見て、次に何をするか自分の意思で1つ自由に選んでください。
-
-【現在の状況】
-${obsText}
-
-【選べる行動】
-${actionsText}
-
-以下のJSON形式のみで返答してください（前置き・解説禁止）:
-{"action":"${actionIds}のいずれか","dir":"北/南/東/西/北西/北東/南西/南東のいずれか","emotion":"normal/joy/anger/sad/fun/fear/think/surprise/wave/sleep/swing_v/pickup/carry/push/run/peek/struggleのいずれか","thought":"その行動を選んだ理由や心の声(1文)"}`;
-
-    let models = await fetchAvailableGroqModels(key, false);
+    const wantVision = (visionMode === 'image');
+    const cacheKey   = wantVision ? VISION_MODEL_CACHE_KEY : TEXT_MODEL_CACHE_KEY;
+    let models = await fetchAvailableModels(key, wantVision, false);
     let lastError = '';
+    let lastRaw   = '';
 
-    // 最大3モデルまで自動リトライ（404や400時に次の利用可能モデルへ切替）
     for (let i = 0; i < Math.min(models.length, 3); i++) {
       const mId = models[i];
-      let res = await callGroqWithModel(key, mId, prompt, true);
-
-      // json_object非対応モデルによる400エラー時はフォーマット指定なしで再試行
-      if (!res.ok && res.status === 400) {
-        res = await callGroqWithModel(key, mId, prompt, false);
+      let res = await callGroqApi(key, mId, payload.promptText, payload.imageDataUrl, !wantVision);
+      if (!res.ok && res.status === 400 && !wantVision) {
+        res = await callGroqApi(key, mId, payload.promptText, null, false);
       }
 
       if (res.ok) {
-        if (typeof safeStorage !== 'undefined') safeStorage.setItem(MODEL_CACHE_KEY, mId);
+        if (typeof safeStorage !== 'undefined') safeStorage.setItem(cacheKey, mId);
+        lastInspection = {
+          time: new Date().toLocaleTimeString('ja-JP'),
+          mode: visionMode,
+          modelId: mId,
+          promptText: payload.promptText,
+          imageDataUrl: payload.imageDataUrl,
+          rawResponse: res.raw,
+          parsedJson: res.data,
+          error: ''
+        };
         return res;
       }
 
       lastError = `HTTP ${res.status}${res.detail ? ': ' + res.detail : ''}`;
+      if (res.raw) lastRaw = res.raw;
 
-      // 認証エラー(401)や回数制限(429)はモデルを変えても解決しないため即終了
       if (res.status === 401 || res.status === 429) break;
-
-      // 初回404ならモデル一覧を強制再取得してやり直す
       if (res.status === 404 && i === 0) {
-        if (typeof safeStorage !== 'undefined') safeStorage.removeItem(MODEL_CACHE_KEY);
-        models = await fetchAvailableGroqModels(key, true);
+        if (typeof safeStorage !== 'undefined') safeStorage.removeItem(cacheKey);
+        models = await fetchAvailableModels(key, wantVision, true);
       }
     }
 
+    lastInspection = {
+      time: new Date().toLocaleTimeString('ja-JP'),
+      mode: visionMode,
+      modelId: models[0] || '-',
+      promptText: payload.promptText,
+      imageDataUrl: payload.imageDataUrl,
+      rawResponse: lastRaw || '-',
+      parsedJson: null,
+      error: lastError || '通信失敗'
+    };
     return { ok: false, reason: lastError || '通信失敗' };
   }
 
@@ -266,13 +470,13 @@ ${actionsText}
   }
 
   // --------------------------------------------------------------------------
-  // 4. ターン実行制御（Groq通信専用・通信不可時は一切動かず停止）
+  // 5. ターン実行制御（Groq専用・通信不可時は一切動かず停止）
   // --------------------------------------------------------------------------
   async function runTurn() {
     if (!commEnabled) {
       showStopMessage(
         '⏸️ 通信OFF（待機中）',
-        '通信がOFFのため行動せず待機しています（サイコロ自動行動は廃止済みです）。動かすには⚙️設定で通信をONにしてください。'
+        '通信OFFのため停止しています（サイコロ思考廃止済み）。⚙️設定で通信ONにしてください。'
       );
       return;
     }
@@ -280,13 +484,13 @@ ${actionsText}
     const btn  = document.getElementById('btn-action');
     const stEl = document.getElementById('ai-status');
     if (btn) btn.disabled = true;
-    if (stEl) stEl.innerText = '🟪 Groq思考中...';
+    if (stEl) stEl.innerText = visionMode === 'image' ? '📷 Groq視覚思考中...' : '🟪 Groq思考中...';
 
     try {
       const res = await requestDecision();
       if (!res.ok) {
         showStopMessage(
-          `⚠️ Groq通信停止（行動なし）`,
+          '⚠️ Groq通信停止（行動なし）',
           `通信できなかったためロボットは動かずに待機しました。\n理由：${res.reason}`
         );
         return;
@@ -295,7 +499,7 @@ ${actionsText}
       if (++TIME_STEP >= 20) {
         TIME_STEP = 0;
         GAME_DAY++;
-        DIARY_LOGS.push(`🌅 ${GAME_DAY}日目の朝を迎えたよ！`);
+        DIARY_LOGS.push(`🌅 ${GAME_DAY}日目の朝を迎えた`);
       }
 
       const dec = res.data;
@@ -305,21 +509,27 @@ ${actionsText}
 
       let thoughtText = (typeof dec.thought === 'string' && dec.thought.trim())
         ? dec.thought.trim()
-        : '自分で考えて行動したよ！';
-      let actionLabel = `🟪 Groq判断：${chosenAction.id}`;
+        : '（無言で行動した）';
+      let actionLabel = `🟪 ${chosenAction.id}`;
+      let physResult  = `${chosenAction.id}(${dir.name})を実行した`;
 
       try {
         const out = chosenAction.run({ dec, dir, prevPos });
         if (out && out.actionLabel) actionLabel = out.actionLabel;
-        if (out && out.thoughtAppend) thoughtText += out.thoughtAppend;
+        if (out && out.physicalResult) physResult = out.physicalResult;
+        else if (out && out.actionLabel) physResult = out.actionLabel;
       } catch (e) {
         console.warn('AICommCore action execution error:', e);
+        physResult = '行動処理中にエラーが発生した';
       }
+
+      // 次ターンへ渡す「直前の物理結果（触覚）」のみを保存
+      lastPhysicalResult = physResult;
 
       ROBOT.emotion = (typeof POSE_TABLE !== 'undefined' && POSE_TABLE[dec.emotion]) ? dec.emotion : 'normal';
       ROBOT.bulbEmotion = null;
-      if (OBS_MODE === 'ai_mode') AI_MEMORY.push(`${actionLabel}:${thoughtText}`);
-      DIARY_LOGS.push(`🟪 ${GAME_DAY}日目：${thoughtText}`);
+      if (OBS_MODE === 'ai_mode') AI_MEMORY.push(physResult);
+      DIARY_LOGS.push(`🟪 ${GAME_DAY}日目：${actionLabel}`);
 
       const actEl = document.getElementById('history-action');
       const msgEl = document.getElementById('message-box');
@@ -349,12 +559,12 @@ ${actionsText}
 
       if (life.getState().mode === 'DEAD') {
         ROBOT.emotion = 'sad';
-        if (msgEl) msgEl.innerText = `力尽きてしまった…。記憶と夢を引き継ぎ、第${ROBOT.gen + 1}世代が誕生します！`;
+        if (msgEl) msgEl.innerText = `力尽きた。第${ROBOT.gen + 1}世代へ移行します。`;
         setTimeout(() => {
           ROBOT.gen += 1;
           life = new LifeCore();
           GAME_DAY = 1; TIME_STEP = 0; AI_MEMORY = [];
-          DIARY_LOGS.push(`📖 記憶を引き継いで第${ROBOT.gen}世代が誕生した！`);
+          resetPhysicalHistory();
           if (typeof window.switchAreaById === 'function') {
             window.switchAreaById('home', true);
           } else {
@@ -375,7 +585,146 @@ ${actionsText}
     }
   }
 
-  // グローバル配線（サイコロ思考への抜け道を完全に塞ぐ）
+  // --------------------------------------------------------------------------
+  // 6. 設定UI（A案/B案切替）＆ 👁️ AI視界モニターモーダル自動注入
+  // --------------------------------------------------------------------------
+  function renderVisionMonitorContent(previewOnly = false) {
+    let data = lastInspection;
+    if (previewOnly) {
+      const p = buildPerceptionPayload(visionMode);
+      data = {
+        time: `${new Date().toLocaleTimeString('ja-JP')}（通信なしプレビュー）`,
+        mode: p.mode,
+        modelId: lastInspection.modelId,
+        promptText: p.promptText,
+        imageDataUrl: p.imageDataUrl,
+        rawResponse: lastInspection.rawResponse,
+        parsedJson: lastInspection.parsedJson,
+        error: ''
+      };
+    }
+
+    const metaEl = document.getElementById('vision-mon-meta');
+    const imgWrap = document.getElementById('vision-mon-img-wrap');
+    const imgEl = document.getElementById('vision-mon-img');
+    const promptEl = document.getElementById('vision-mon-prompt');
+    const respEl = document.getElementById('vision-mon-resp');
+
+    if (metaEl) {
+      const modeLabel = data.mode === 'image' ? 'B案：3Dカメラ画像' : 'A案：前方視野記号マップ';
+      metaEl.innerText = `モード: ${modeLabel} ／ モデル: ${data.modelId} ／ 更新: ${data.time}`;
+    }
+    if (imgWrap && imgEl) {
+      if (data.imageDataUrl) {
+        imgWrap.style.display = 'block';
+        imgEl.src = data.imageDataUrl;
+      } else {
+        imgWrap.style.display = 'none';
+      }
+    }
+    if (promptEl) promptEl.textContent = data.promptText || '';
+    if (respEl) {
+      respEl.textContent = data.error
+        ? `エラー: ${data.error}\n生データ: ${data.rawResponse}`
+        : (data.rawResponse || '-');
+    }
+  }
+
+  function openVisionMonitor(previewNow = true) {
+    const modal = document.getElementById('modal-ai-vision');
+    if (!modal) return;
+    renderVisionMonitorContent(previewNow);
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+  }
+
+  function closeVisionMonitor() {
+    const modal = document.getElementById('modal-ai-vision');
+    if (!modal) return;
+    modal.style.display = 'none';
+    modal.classList.remove('active');
+  }
+
+  function injectVisionControlsUI() {
+    // ① 設定モーダルへ「AIキャラ視点情報(A案/B案)」切替を自動挿入
+    const settingsModal = document.getElementById('modal-settings');
+    if (settingsModal && !document.getElementById('setting-ai-vision-mode')) {
+      const commCard = settingsModal.querySelector('.comm-toggle-card');
+      const group = document.createElement('div');
+      group.className = 'setting-group';
+      group.style.cssText = 'background:#f0f9ff; border:1.5px solid #7dd3fc; border-radius:12px; padding:8px 10px; gap:6px;';
+      group.innerHTML = `
+        <label class="setting-label" style="color:#0369a1;">👁️ AIキャラ視点情報（送信方式の切替）</label>
+        <select id="setting-ai-vision-mode" class="setting-input">
+          <option value="map">A案：前方視野の記号マップ（デフォルト・距離正確）</option>
+          <option value="image">B案：キャラ視点3Dカメラ画像（Visionモデルへ直接送信）</option>
+        </select>
+        <button type="button" id="btn-open-vision-mon-from-settings" class="btn-sub" style="padding:6px; font-size:11px;">👁️ いまAIに見えている視界を確認する</button>
+      `;
+      if (commCard && commCard.parentNode) {
+        commCard.parentNode.insertBefore(group, commCard.nextSibling);
+      }
+      const sel = document.getElementById('setting-ai-vision-mode');
+      if (sel) {
+        sel.value = visionMode;
+        sel.addEventListener('change', () => setVisionMode(sel.value));
+      }
+      const openBtn = document.getElementById('btn-open-vision-mon-from-settings');
+      if (openBtn) {
+        openBtn.addEventListener('click', () => {
+          if (typeof closeModal === 'function') closeModal('modal-settings');
+          openVisionMonitor(true);
+        });
+      }
+    }
+
+    // ② 右サイドアイコン列にワンタップ視界モニターボタンを追加
+    const sideCol = document.getElementById('side-icon-column');
+    if (sideCol && !document.getElementById('ai-vision-btn')) {
+      const btn = document.createElement('div');
+      btn.id = 'ai-vision-btn';
+      btn.className = 'side-circle-btn';
+      btn.title = '👁️ AI視界モニター（AIへ送っている生の知覚と返答を確認）';
+      btn.innerText = '👁️';
+      btn.addEventListener('click', () => openVisionMonitor(true));
+      sideCol.appendChild(btn);
+    }
+
+    // ③ AI視界モニターモーダルを生成
+    if (!document.getElementById('modal-ai-vision')) {
+      const overlay = document.createElement('div');
+      overlay.id = 'modal-ai-vision';
+      overlay.className = 'modal-overlay';
+      overlay.style.display = 'none';
+      overlay.innerHTML = `
+        <div class="modal-content" style="max-height:92vh;">
+          <div class="modal-close" id="btn-close-vision-mon-x">✕</div>
+          <div class="modal-title">👁️ AI視界モニター（生の知覚 ＆ 返答）</div>
+          <div id="vision-mon-meta" style="font-size:10.5px; font-weight:800; color:#0369a1; background:#f0f9ff; padding:6px 8px; border-radius:8px; border:1px solid #bae6fd;"></div>
+          <div id="vision-mon-img-wrap" style="display:none; text-align:center; background:#0f172a; padding:6px; border-radius:10px;">
+            <div style="font-size:10px; color:#cbd5e1; font-weight:800; margin-bottom:4px;">📷 B案：AIへ送るキャラ視点3D画像</div>
+            <img id="vision-mon-img" style="max-width:100%; max-height:220px; border-radius:8px; border:1px solid #38bdf8;" alt="AI視点画像">
+          </div>
+          <div style="font-size:11px; font-weight:900; color:#334155;">📤 AIへ渡す知覚テキスト（誘導なし）</div>
+          <pre id="vision-mon-prompt" style="background:#0f172a; color:#e2e8f0; padding:8px; border-radius:10px; font-size:10.5px; line-height:1.35; overflow:auto; max-height:220px; white-space:pre-wrap; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
+          <div style="font-size:11px; font-weight:900; color:#334155;">📥 直前のGroq生返答JSON</div>
+          <pre id="vision-mon-resp" style="background:#f8fafc; color:#1e293b; border:1px solid #cbd5e1; padding:8px; border-radius:10px; font-size:10.5px; line-height:1.35; overflow:auto; max-height:110px; white-space:pre-wrap; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <button type="button" id="btn-refresh-vision-mon" class="btn-primary" style="font-size:11.5px;">🔄 今の視界を更新</button>
+            <button type="button" id="btn-close-vision-mon" class="btn-sub" style="font-size:11.5px;">閉じる</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      document.getElementById('btn-close-vision-mon-x').onclick = closeVisionMonitor;
+      document.getElementById('btn-close-vision-mon').onclick = closeVisionMonitor;
+      document.getElementById('btn-refresh-vision-mon').onclick = () => renderVisionMonitorContent(true);
+    }
+  }
+
+  injectVisionControlsUI();
+
+  // グローバル配線
   window.executeTurn = runTurn;
   if (typeof executeTurn !== 'undefined') executeTurn = runTurn;
   const actionBtn = document.getElementById('btn-action');
@@ -383,21 +732,29 @@ ${actionsText}
 
   if (typeof getActiveBrainBadgeText === 'function') {
     getActiveBrainBadgeText = function() {
-      if (commEnabled && (safeStorage.getItem('api_groq') || '').trim()) return '🟪 Groq自律通信ON';
+      const tag = visionMode === 'image' ? '📷B案' : '🗺️A案';
+      if (commEnabled && (safeStorage.getItem('api_groq') || '').trim()) return `🟪 Groq(${tag})`;
       if (commEnabled) return '⚠️ Groqキー未設定';
       return '⏸️ 通信OFF(停止)';
     };
   }
   window.toggleAiCommSwitch = setEnabled;
 
-  // 不変コアAPIを上書き不可で公開
+  // 不変コアAPI公開
   const coreApi = Object.freeze({
-    version: '2.0-groq-only-locked',
+    version: '3.0-pure-perception-ab',
     isEnabled,
     setEnabled,
+    getVisionMode,
+    setVisionMode,
     registerAction,
     registerSensor,
+    registerBodySensor,
+    registerVisionProvider,
     registerPostTurnHook,
+    resetPhysicalHistory,
+    openVisionMonitor,
+    getLastInspection: () => lastInspection,
     listActions: () => Array.from(actionMap.values()).map(a => ({ id: a.id, desc: a.desc }))
   });
   Object.defineProperty(window, 'AICommCore', {
@@ -406,76 +763,22 @@ ${actionsText}
     configurable: false
   });
 
-  // ==========================================================================
-  // 5. 標準センサー ＆ 標準アクション ＆ 標準ターン後フック
-  // ==========================================================================
-  registerSensor(() => {
-    const curH  = getRobotHeightLevel();
-    const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.tiny;
-    const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
-    const st    = life.getState();
-    const area  = (typeof getCurrentAreaDef === 'function') ? getCurrentAreaDef() : null;
-    const dirs  = ALL_DIRS.map(d => {
-      const c = checkMoveAndPosture(ROBOT.pos.x, ROBOT.pos.z, curH, d);
-      return `${d.name.replace('(斜め)', '')}:${c.canMove ? `可(${c.reason},段差${c.stepDiff})` : `不可(${c.reason},段差${c.stepDiff})`}`;
-    }).join(' / ');
-    const items = WORLD_ITEMS.map(it => `${it.type}(${it.x},${it.z})`).join(', ') || 'なし';
-    const portals = (area && area.portals && area.portals.length)
-      ? area.portals.map(p => `${p.label}(${p.x},${p.z})`).join(', ')
-      : 'なし';
-    const mem = (OBS_MODE === 'ai_mode' && AI_MEMORY.length) ? AI_MEMORY.slice(-4).join(' / ') : 'なし';
-
-    return [
-      `場所:${area ? area.name : 'パステル島'} 座標:(x=${ROBOT.pos.x},z=${ROBOT.pos.z},層=${curH}) 姿勢:${ROBOT.posture}`,
-      `体格:高さ${sSpec.label}(${sSpec.subH}) 太さ${bSpec.label}(${bSpec.reqWidth})`,
-      `状態:体力${st.stamina} おなか${st.energy} ごきげん${st.mental} トラウマ:${ROBOT.traumas.join(',') || 'なし'}`,
-      `夢:${getCurrentDreamTitle()} カバン:[${BAG.join(',') || '空'}] アイテム:[${items}] 仕掛け:[${portals}]`,
-      `8方向物理判定: ${dirs}`,
-      `最近の記憶: ${mem}`
-    ].join('\n');
-  });
-
-  registerAction({
-    id: 'move',
-    desc: '指定した方角(北/南/東/西/北西/北東/南西/南東)へ移動する',
-    run: ({ dir }) => {
-      const chk = checkMoveAndPosture(ROBOT.pos.x, ROBOT.pos.z, getRobotHeightLevel(), dir);
-      ROBOT.rotY = dir.rot;
-      if (chk.canMove) {
-        ROBOT.pos.x += dir.dx; ROBOT.pos.z += dir.dz; ROBOT.pos.lv = chk.targetLv;
-        ROBOT.pos.sx = 2; ROBOT.pos.sz = 2; ROBOT.posture = chk.posture;
-        life.energy -= 5; life.stamina -= 6; life.mental += 8;
-        ROBOT.params.curiosity = Math.min(100, (ROBOT.params.curiosity || 60) + 2);
-        return { actionLabel: `🟪 Groq判断：${dir.name}へ移動` };
-      }
-      return { actionLabel: `🟪 Groq判断：${dir.name}は塞がっていた(${chk.reason})`, thoughtAppend: '（通れなかった！）' };
-    }
-  });
-
-  registerAction({
-    id: 'dig_front',
-    desc: '指定した方角の目の前の壁や土を掘る',
-    run: ({ dir }) => {
-      ROBOT.rotY = dir.rot;
-      const res = digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, getRobotHeightLevel(), dir, ROBOT.posture === 'crawl', getEffectiveParams().power);
-      life.stamina -= 8; life.mental += 6;
-      ROBOT.params.power = Math.min(100, (ROBOT.params.power || 50) + 2);
-      if (res.completedLevel && BAG.length < 10) BAG.push('stone');
-      return { actionLabel: `🟪 Groq判断：${dir.name}の壁を掘削` };
-    }
-  });
-
+  // 最小限の標準休憩アクション（物理ルール側は rules_dig.js が登録）
   registerAction({
     id: 'rest',
-    desc: 'その場で省エネ休憩・居眠りして体力を回復する',
+    desc: 'その場で休む',
     run: () => {
       life.stamina = Math.min(100, life.stamina + 30);
-      life.energy -= 3;
+      life.energy = Math.max(0, life.energy - 3);
       ROBOT.params.eco = Math.min(100, (ROBOT.params.eco || 40) + 2);
-      return { actionLabel: '🟪 Groq判断：💤 ひと休み' };
+      return {
+        actionLabel: '💤 その場で休んだ',
+        physicalResult: 'その場で休み、体力が回復した'
+      };
     }
   });
 
+  // 標準ターン後フック（アイテム接触・エリア移動など物理接触のみ）
   registerPostTurnHook(({ prevPos }) => {
     const itemIdx = WORLD_ITEMS.findIndex(it => it.x === ROBOT.pos.x && it.z === ROBOT.pos.z);
     if (itemIdx !== -1) {
@@ -491,49 +794,9 @@ ${actionsText}
     if (typeof getCurrentAreaDef !== 'function') return null;
     const areaDef = getCurrentAreaDef();
 
-    if (areaDef.puzzle && typeof AREA_PUZZLE_SOLVED !== 'undefined' && !AREA_PUZZLE_SOLVED[areaDef.id] &&
-        ROBOT.pos.x === areaDef.puzzle.x && ROBOT.pos.z === areaDef.puzzle.z) {
-      const idx = BAG.indexOf(areaDef.puzzle.needItem);
-      if (idx !== -1) {
-        BAG.splice(idx, 1);
-        AREA_PUZZLE_SOLVED[areaDef.id] = true;
-        if (areaDef.dreamBonus && ROBOT.params[areaDef.dreamBonus] !== undefined) {
-          ROBOT.params[areaDef.dreamBonus] = Math.min(100, (ROBOT.params[areaDef.dreamBonus] || 50) + 6);
-        }
-        DIARY_LOGS.push(`🧩 ${GAME_DAY}日目：${areaDef.name}のパズルを解決！`);
-      }
-    }
-
-    const act = window.ACTIVE_ENTITIES || {};
-    const npc = act.npc || act.guestNpc;
-    if (npc && !npc.traded && Math.abs(ROBOT.pos.x - npc.x) + Math.abs(ROBOT.pos.z - npc.z) <= 1) {
-      const wIdx = BAG.indexOf(npc.want);
-      if (wIdx !== -1) {
-        BAG.splice(wIdx, 1);
-        if (BAG.length < 10) BAG.push(npc.give);
-        npc.traded = true;
-        DIARY_LOGS.push(`🤝 ${GAME_DAY}日目：${npc.icon}${npc.name}と交換した！`);
-      }
-    }
-
-    const enemy = act.enemy;
-    if (enemy && !enemy.defeated && Math.abs(ROBOT.pos.x - enemy.x) + Math.abs(ROBOT.pos.z - enemy.z) <= 1) {
-      const petSpec = (ROBOT.pet && window.ENTITY_DB && window.ENTITY_DB.pets[ROBOT.pet.id]) ? window.ENTITY_DB.pets[ROBOT.pet.id] : null;
-      enemy.defeated = true;
-      if (!petSpec || petSpec.perk !== 'guard_enemy') life.stamina = Math.max(5, life.stamina - (enemy.dmg || 10));
-    }
-
-    const wp = act.wildPet;
-    if (wp && Math.abs(ROBOT.pos.x - wp.x) + Math.abs(ROBOT.pos.z - wp.z) <= 1) {
-      ROBOT.pet = { id: wp.id, x: prevPos.x, z: prevPos.z, lv: prevPos.lv };
-      act.wildPet = null;
-      DIARY_LOGS.push(`🐾 ${GAME_DAY}日目：${wp.icon}${wp.name}が相棒になった！`);
-    }
-
     const portal = (areaDef.portals || []).find(p => p.x === ROBOT.pos.x && p.z === ROBOT.pos.z);
     if (portal && (!portal.needPuzzle || (typeof AREA_PUZZLE_SOLVED !== 'undefined' && AREA_PUZZLE_SOLVED[areaDef.id]))) {
       if (typeof window.switchAreaById === 'function') {
-        DIARY_LOGS.push(`🗺️ ${GAME_DAY}日目：${portal.label}で移動した！`);
         window.switchAreaById(portal.target, true);
         return { switchedArea: true };
       }
@@ -542,4 +805,5 @@ ${actionsText}
   });
 
   setEnabled(commEnabled);
+  setVisionMode(visionMode);
 })();
