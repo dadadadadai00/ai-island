@@ -1,8 +1,10 @@
 // ============================================================================
-// 【純粋知覚・不変通信コア：ai_comm.js（移動視点自動連動・拡大中スクロール対応版）】
+// 【純粋知覚・不変通信コア：ai_comm.js（v3.8 エリア移動記憶同期・移動視点自動連動・拡大中スクロール対応版）】
+// ・ポータル等によるエリア移動時、別エリア到着の物理事実を短期記憶・結果ログへ確実に反映＆180°クリア視野へ切替
+// ・エリア移動時に旧エリアの床高さキャッシュ(ROBOT.pos.subY)を自動リセット
 // ・キャラ座標変化の直接検知により、移動直後は自動で左右薄暗化（移動視点）へ連動
 // ・両タブ（⏪今すぐ考える前／⏩考えた結果）を完全同一レイアウト・同一サイズ枠で統一
-// ・ピンチ拡大中でも情報文枠・JSON枠の上下スクロールを阻害しない操作判定へ改修
+// ・ピンチ拡大中でも情報文枠・JSON枠の上下スクロールを阻害しない操作判定を維持
 // ・設定ページでB案(画像AI送信)は暗転・使用停止（内部コード温存）
 // ・キャラ視点（🤖視点＆検証カメラ共通）では未削り分割ブロックを全表示
 // ※ index.html / brain.js / world.js / rules_dig.js は無改造のまま動作します
@@ -704,7 +706,7 @@ ${actionsText}
   }
 
   // --------------------------------------------------------------------------
-  // 5. ターン実行制御（実座標変化から移動を直接検知し、移動視点へ自動連動）
+  // 5. ターン実行制御（実座標変化から移動を直接検知＋エリア移動を記憶へ正確に反映）
   // --------------------------------------------------------------------------
   async function runTurn() {
     if (!commEnabled) {
@@ -810,6 +812,31 @@ ${actionsText}
         ((out && out.moved === true) || posActuallyChanged)
       );
 
+      ROBOT.emotion = (typeof POSE_TABLE !== 'undefined' && POSE_TABLE[dec.emotion]) ? dec.emotion : 'normal';
+      ROBOT.bulbEmotion = null;
+
+      let switchedArea = false;
+      let switchedAreaName = '';
+      for (let i = 0; i < postHooks.length; i++) {
+        try {
+          const hookRes = postHooks[i]({ dec, dir, prevPos, out });
+          if (hookRes && hookRes.switchedArea) {
+            switchedArea = true;
+            if (hookRes.areaName) switchedAreaName = String(hookRes.areaName);
+          }
+        } catch (e) {
+          console.warn('AICommCore postHook error:', e);
+        }
+      }
+
+      // ポータル等で別エリアへ移動した場合：記憶・結果ログへ確実に反映＆180°クリア視野へ戻す
+      if (switchedArea) {
+        const areaLabel = switchedAreaName || '別エリア';
+        physResult = `${physResult}。その地点の入口から別の空間「${areaLabel}」へ移動した（周囲の地形が変わった）`;
+        actionLabel = `${actionLabel} → 🚪「${areaLabel}」へ移動`;
+        lastTurnWasMoving = false;
+      }
+
       shortTermMemory.push({
         action: chosenAction.id,
         dir: dirShort,
@@ -820,8 +847,6 @@ ${actionsText}
         shortTermMemory.shift();
       }
 
-      ROBOT.emotion = (typeof POSE_TABLE !== 'undefined' && POSE_TABLE[dec.emotion]) ? dec.emotion : 'normal';
-      ROBOT.bulbEmotion = null;
       if (OBS_MODE === 'ai_mode') AI_MEMORY.push(physResult);
       DIARY_LOGS.push(`🟪 ${GAME_DAY}日目：${actionLabel}`);
 
@@ -829,16 +854,6 @@ ${actionsText}
       const msgEl = document.getElementById('message-box');
       if (actEl) actEl.innerText = actionLabel;
       if (msgEl) msgEl.innerText = thoughtText;
-
-      let switchedArea = false;
-      for (let i = 0; i < postHooks.length; i++) {
-        try {
-          const hookRes = postHooks[i]({ dec, dir, prevPos, out });
-          if (hookRes && hookRes.switchedArea) { switchedArea = true; break; }
-        } catch (e) {
-          console.warn('AICommCore postHook error:', e);
-        }
-      }
 
       const finalEmotionId = ROBOT.emotion || dec.emotion || 'normal';
       const motionLabel = getMotionDisplayName(finalEmotionId);
@@ -895,7 +910,9 @@ ${actionsText}
           GAME_DAY = 1; TIME_STEP = 0; AI_MEMORY = [];
           resetPhysicalHistory();
           if (typeof window.switchAreaById === 'function') {
+            if (ROBOT && ROBOT.pos) delete ROBOT.pos.subY;
             window.switchAreaById('home', true);
+            if (ROBOT && ROBOT.pos) delete ROBOT.pos.subY;
           } else {
             ROBOT.pos = { x: 0, z: 0, lv: -1, sx: 2, sz: 2 };
             if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
@@ -1172,7 +1189,6 @@ ${actionsText}
         if (dragMode === 'undecided') {
           if (Math.hypot(dx, dy) < 6) return;
           if (innerScrollEl && Math.abs(dy) >= Math.abs(dx)) {
-            // 情報文枠などの内部スクロール枠上で縦スワイプ → 枠内スクロール専用にする
             dragMode = 'inner-scroll';
             dragLastY = curY;
           } else {
@@ -1181,7 +1197,6 @@ ${actionsText}
         }
 
         if (dragMode === 'inner-scroll' && innerScrollEl) {
-          // 拡大倍率(scale)に合わせて確実に枠内を上下スクロール（固定ロックを完全解除）
           const stepY = curY - dragLastY;
           dragLastY = curY;
           e.preventDefault();
@@ -1512,7 +1527,7 @@ ${actionsText}
 
   // 不変コアAPI公開
   const coreApi = Object.freeze({
-    version: '3.7-auto-move-dim-inner-scroll',
+    version: '3.8-portal-memory-sync',
     isEnabled,
     setEnabled,
     getVisionMode,
@@ -1554,7 +1569,7 @@ ${actionsText}
     }
   });
 
-  // 標準ターン後フック（物理接触のみ）
+  // 標準ターン後フック（物理接触・ポータル移動）
   registerPostTurnHook(({ prevPos }) => {
     const itemIdx = WORLD_ITEMS.findIndex(it => it.x === ROBOT.pos.x && it.z === ROBOT.pos.z);
     if (itemIdx !== -1) {
@@ -1573,8 +1588,12 @@ ${actionsText}
     const portal = (areaDef.portals || []).find(p => p.x === ROBOT.pos.x && p.z === ROBOT.pos.z);
     if (portal && (!portal.needPuzzle || (typeof AREA_PUZZLE_SOLVED !== 'undefined' && AREA_PUZZLE_SOLVED[areaDef.id]))) {
       if (typeof window.switchAreaById === 'function') {
+        if (ROBOT && ROBOT.pos) delete ROBOT.pos.subY;
         window.switchAreaById(portal.target, true);
-        return { switchedArea: true };
+        if (ROBOT && ROBOT.pos) delete ROBOT.pos.subY;
+        const nextArea = (typeof getCurrentAreaDef === 'function') ? getCurrentAreaDef() : null;
+        const areaName = (nextArea && nextArea.name) ? nextArea.name : String(portal.target || '別エリア');
+        return { switchedArea: true, areaName };
       }
     }
     return null;
