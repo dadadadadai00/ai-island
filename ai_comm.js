@@ -1,13 +1,13 @@
 // ============================================================================
-// 【純粋知覚・不変通信コア：ai_comm.js（v3.8 エリア移動記憶同期・移動視点自動連動・拡大中スクロール対応版）】
-// ・ポータル等によるエリア移動時、別エリア到着の物理事実を短期記憶・結果ログへ確実に反映＆180°クリア視野へ切替
-// ・エリア移動時に旧エリアの床高さキャッシュ(ROBOT.pos.subY)を自動リセット
+// 【純粋知覚・不変通信コア：ai_comm.js（v3.9 クリーン再接続・ポータル停止・旧アイテム回収削除版）】
+// ・別エリアへのポータル移動を完全停止（初期エリアのみで基本動作検証）
+// ・旧WORLD_ITEMS自動回収（石・オイル・リンゴ・草のBAG混入）を完全削除
 // ・キャラ座標変化の直接検知により、移動直後は自動で左右薄暗化（移動視点）へ連動
 // ・両タブ（⏪今すぐ考える前／⏩考えた結果）を完全同一レイアウト・同一サイズ枠で統一
 // ・ピンチ拡大中でも情報文枠・JSON枠の上下スクロールを阻害しない操作判定を維持
 // ・設定ページでB案(画像AI送信)は暗転・使用停止（内部コード温存）
 // ・キャラ視点（🤖視点＆検証カメラ共通）では未削り分割ブロックを全表示
-// ※ index.html / brain.js / world.js / rules_dig.js は無改造のまま動作します
+// ※ index.html / brain.js / world.js は無改造のまま動作します
 // ============================================================================
 (function initImmutableAICommCore() {
   if (window.AICommCore) return;
@@ -21,8 +21,10 @@
   const VISION_MODE_KEY        = 'ai_vision_mode_v1';
   const MAX_SHORT_MEMORY       = 4;
 
-  // B案（画像AI送信）はA案の挙動が安定するまで一時停止（falseに戻すだけで即復活）
+  // B案（画像AI送信）はA案の挙動が安定するまで一時停止
   const B_MODE_LOCKED = true;
+  // 初期エリアのみの基本動作検証のため、ポータル遷移は完全停止
+  const PORTAL_TRAVEL_DISABLED = true;
 
   let commEnabled = (typeof safeStorage !== 'undefined') && (safeStorage.getItem('ai_comm_enabled') === '1');
   let visionMode  = B_MODE_LOCKED
@@ -486,7 +488,7 @@
     try {
       if (typeof getExpressionSpec === 'function') {
         const spec = getExpressionSpec(emotionId);
-        if (spec && spec.name) return `${spec.name} (${emotionId})`;
+        if (spec && spec.label) return `${spec.label} (${emotionId})`;
       }
       if (typeof POSE_TABLE !== 'undefined' && POSE_TABLE[emotionId] && POSE_TABLE[emotionId].name) {
         return `${POSE_TABLE[emotionId].name} (${emotionId})`;
@@ -528,7 +530,6 @@
     const bodyText    = collectBodyText();
     const memoryText  = formatShortTermMemory();
 
-    // 確認用の3D視点は常に3連180°統一サイズで撮影（移動時の暗転はUI側で自動連動）
     const fpvImageUrl = captureRobotFirstPersonImage(isMoving, true, true);
     let visionSection = '';
     let sendImageUrl  = null;
@@ -706,7 +707,7 @@ ${actionsText}
   }
 
   // --------------------------------------------------------------------------
-  // 5. ターン実行制御（実座標変化から移動を直接検知＋エリア移動を記憶へ正確に反映）
+  // 5. ターン実行制御（ポータル移動・旧アイテム自動回収は停止し純粋物理のみ実行）
   // --------------------------------------------------------------------------
   async function runTurn() {
     if (!commEnabled) {
@@ -797,7 +798,6 @@ ${actionsText}
         physResult = '行動処理中にエラーが発生した';
       }
 
-      // rules_dig.js の版に関わらず、実座標の変化から「実際に移動したか」を確実に自動判定
       const curSx = Number.isFinite(ROBOT.pos.sx) ? ROBOT.pos.sx : 2;
       const curSz = Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2;
       const posActuallyChanged =
@@ -815,26 +815,12 @@ ${actionsText}
       ROBOT.emotion = (typeof POSE_TABLE !== 'undefined' && POSE_TABLE[dec.emotion]) ? dec.emotion : 'normal';
       ROBOT.bulbEmotion = null;
 
-      let switchedArea = false;
-      let switchedAreaName = '';
       for (let i = 0; i < postHooks.length; i++) {
         try {
-          const hookRes = postHooks[i]({ dec, dir, prevPos, out });
-          if (hookRes && hookRes.switchedArea) {
-            switchedArea = true;
-            if (hookRes.areaName) switchedAreaName = String(hookRes.areaName);
-          }
+          postHooks[i]({ dec, dir, prevPos, out });
         } catch (e) {
           console.warn('AICommCore postHook error:', e);
         }
-      }
-
-      // ポータル等で別エリアへ移動した場合：記憶・結果ログへ確実に反映＆180°クリア視野へ戻す
-      if (switchedArea) {
-        const areaLabel = switchedAreaName || '別エリア';
-        physResult = `${physResult}。その地点の入口から別の空間「${areaLabel}」へ移動した（周囲の地形が変わった）`;
-        actionLabel = `${actionLabel} → 🚪「${areaLabel}」へ移動`;
-        lastTurnWasMoving = false;
       }
 
       shortTermMemory.push({
@@ -858,17 +844,15 @@ ${actionsText}
       const finalEmotionId = ROBOT.emotion || dec.emotion || 'normal';
       const motionLabel = getMotionDisplayName(finalEmotionId);
 
-      if (!switchedArea) {
-        if (typeof manualCameraMode !== 'undefined' && manualCameraMode === 'robot' && typeof resetFpvToRobotFront === 'function') {
-          resetFpvToRobotFront();
-        }
-        if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
-        if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition();
-        if (typeof applyRobotBulbColor === 'function') applyRobotBulbColor();
-        if (typeof cameraDirty !== 'undefined') cameraDirty = true;
-        if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
-        if (typeof saveWorldState === 'function') saveWorldState();
+      if (typeof manualCameraMode !== 'undefined' && manualCameraMode === 'robot' && typeof resetFpvToRobotFront === 'function') {
+        resetFpvToRobotFront();
       }
+      if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
+      if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition();
+      if (typeof applyRobotBulbColor === 'function') applyRobotBulbColor();
+      if (typeof cameraDirty !== 'undefined') cameraDirty = true;
+      if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
+      if (typeof saveWorldState === 'function') saveWorldState();
 
       const afterImageUrl = captureRobotFirstPersonImage(lastTurnWasMoving, true, true);
       const facingAfter = rotToShortDirName(ROBOT.rotY || 0);
@@ -899,8 +883,6 @@ ${actionsText}
         error: ''
       };
 
-      if (switchedArea) return;
-
       if (life.getState().mode === 'DEAD') {
         ROBOT.emotion = 'sad';
         if (msgEl) msgEl.innerText = `力尽きた。第${ROBOT.gen + 1}世代へ移行します。`;
@@ -909,17 +891,13 @@ ${actionsText}
           life = new LifeCore();
           GAME_DAY = 1; TIME_STEP = 0; AI_MEMORY = [];
           resetPhysicalHistory();
-          if (typeof window.switchAreaById === 'function') {
-            if (ROBOT && ROBOT.pos) delete ROBOT.pos.subY;
-            window.switchAreaById('home', true);
-            if (ROBOT && ROBOT.pos) delete ROBOT.pos.subY;
-          } else {
-            ROBOT.pos = { x: 0, z: 0, lv: -1, sx: 2, sz: 2 };
-            if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
-            if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition(true);
-            if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
-            if (typeof saveWorldState === 'function') saveWorldState();
-          }
+          ROBOT.pos = { x: 0, z: 0, lv: 0, sx: 2, sz: 2, subY: 0 };
+          ROBOT.rotY = Math.PI;
+          ROBOT.posture = 'stand';
+          if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
+          if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition(true);
+          if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
+          if (typeof saveWorldState === 'function') saveWorldState();
         }, 1800);
       }
     } finally {
@@ -1003,7 +981,6 @@ ${actionsText}
 
   // --------------------------------------------------------------------------
   // 7. 全モーダルウィンドウの非崩れピンチ拡大縮小
-  //    ・拡大中でも内部スクロール枠（情報文・JSON枠等）の縦スクロールを最優先解放
   // --------------------------------------------------------------------------
   const modalResetFns = [];
 
@@ -1052,7 +1029,6 @@ ${actionsText}
     let startMidX = 0;
     let startMidY = 0;
 
-    // 1本指ジェスチャー状態: 'none' | 'undecided' | 'inner-scroll' | 'pan'
     let dragMode = 'none';
     let innerScrollEl = null;
     let dragStartX = 0;
@@ -1441,7 +1417,6 @@ ${actionsText}
 
           <div id="mon-meta" style="font-size:10px; font-weight:800; color:#0369a1; background:#f0f9ff; padding:5px 8px; border-radius:8px; border:1px solid #bae6fd;"></div>
 
-          <!-- 統一サイズ枠①：キャラの視点3D（キャラ移動で自動連動＋右トグルで手動確認可） -->
           <div id="mon-img-wrap" style="background:#0f172a; padding:6px; border-radius:10px;">
             <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:5px;">
               <span style="font-size:11px; color:#f8fafc; font-weight:900;">📷 キャラの視点3D</span>
@@ -1457,17 +1432,14 @@ ${actionsText}
             </div>
           </div>
 
-          <!-- 統一サイズ枠②：情報文（拡大中でも縦ドラッグで上下スクロール可能） -->
           <div id="mon-prompt-label" style="font-size:11px; font-weight:900; color:#334155;"></div>
           <pre id="mon-prompt" data-allow-inner-scroll="1" style="background:#0f172a; color:#e2e8f0; padding:8px; border-radius:10px; font-size:10px; line-height:1.35; overflow-y:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y; overscroll-behavior:contain; height:145px; white-space:pre-wrap; margin:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
 
-          <!-- 統一サイズ枠③：AI返答（緑枠＋灰枠＋結果・固定構成） -->
           <div id="mon-reply-label" style="font-size:11px; font-weight:900; color:#334155;"></div>
           <div id="mon-reply-summary" style="background:#f0fdf4; border:1.5px solid #86efac; color:#14532d; padding:6px 8px; border-radius:9px; font-size:10.5px; line-height:1.4; min-height:48px;"></div>
           <pre id="mon-raw-json" data-allow-inner-scroll="1" style="background:#f8fafc; color:#1e293b; border:1px solid #cbd5e1; padding:6px 7px; border-radius:8px; font-size:9.5px; line-height:1.3; overflow-y:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y; overscroll-behavior:contain; height:56px; white-space:pre-wrap; margin:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
           <div id="mon-phys-result" style="background:#fffbeb; border:1.5px solid #fcd34d; color:#78350f; padding:5px 8px; border-radius:8px; font-size:10.5px; line-height:1.35;"></div>
 
-          <!-- 下部固定エリア：コピペボタン → 閉じる -->
           <button type="button" id="btn-copy-turn-report" class="btn-primary" style="padding:8px; font-size:11.5px; font-weight:900; background:#0ea5e9; margin-top:2px;">
             📋 1ターン答え合わせをコピペ（送信文＋AI返答＋結果）
           </button>
@@ -1527,7 +1499,8 @@ ${actionsText}
 
   // 不変コアAPI公開
   const coreApi = Object.freeze({
-    version: '3.8-portal-memory-sync',
+    version: '3.9-clean-reconnect-no-portal',
+    portalTravelDisabled: PORTAL_TRAVEL_DISABLED,
     isEnabled,
     setEnabled,
     getVisionMode,
@@ -1569,32 +1542,10 @@ ${actionsText}
     }
   });
 
-  // 標準ターン後フック（物理接触・ポータル移動）
+  // ターン後フック：旧アイテム自動回収・ポータル移動は完全停止（ペット追従のみ温存）
   registerPostTurnHook(({ prevPos }) => {
-    const itemIdx = WORLD_ITEMS.findIndex(it => it.x === ROBOT.pos.x && it.z === ROBOT.pos.z);
-    if (itemIdx !== -1) {
-      const picked = WORLD_ITEMS.splice(itemIdx, 1)[0];
-      if (picked.type === 'apple') { life.energy += 40; life.mental += 12; }
-      else if (BAG.length < 10) BAG.push(picked.type);
-    }
-
     if (ROBOT.pet && ROBOT.pet.id) {
       ROBOT.pet.x = prevPos.x; ROBOT.pet.z = prevPos.z; ROBOT.pet.lv = prevPos.lv;
-    }
-
-    if (typeof getCurrentAreaDef !== 'function') return null;
-    const areaDef = getCurrentAreaDef();
-
-    const portal = (areaDef.portals || []).find(p => p.x === ROBOT.pos.x && p.z === ROBOT.pos.z);
-    if (portal && (!portal.needPuzzle || (typeof AREA_PUZZLE_SOLVED !== 'undefined' && AREA_PUZZLE_SOLVED[areaDef.id]))) {
-      if (typeof window.switchAreaById === 'function') {
-        if (ROBOT && ROBOT.pos) delete ROBOT.pos.subY;
-        window.switchAreaById(portal.target, true);
-        if (ROBOT && ROBOT.pos) delete ROBOT.pos.subY;
-        const nextArea = (typeof getCurrentAreaDef === 'function') ? getCurrentAreaDef() : null;
-        const areaName = (nextArea && nextArea.name) ? nextArea.name : String(portal.target || '別エリア');
-        return { switchedArea: true, areaName };
-      }
     }
     return null;
   });
