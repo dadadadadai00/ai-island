@@ -1,20 +1,17 @@
 // ============================================================================
-// 【レゴ物理環境＆1人称純粋知覚モジュール：rules_dig.js（v6.1 最終矛盾解消・再スタート完全版）】
-// ・水際外周の保護壁(isWaterFacingOuterSubVoxel)を掘削対象から除外（無限土増殖を完全防止）
-// ・圧縮木箱の収納判定をサブ座標距離1分割＆高さ一致へ厳密化（遠距離・地下ワープ収納を防止）
-// ・全25体格×全8方向で占有端基準の「目の前1列目」計算へ統一（偶数幅の北/西1マス飛び越え修正）
-// ・パノラマ視野の段差上散らばり土の高さ誤認を修正＆圧縮木箱による視線遮蔽を追加
-// ・dig_up を占有範囲の真上天井専用に統一（背後天井の無回転掘削を解消）
-// ・体格切替時の小数座標ズレ防止(clampCharSubPosForBodySizeラップ)で3D見た目と物理を完全一致
-// ・初期エリア(home)固定・地下全埋め・地上5段階段(0,-1)＋高台(0,-2)・圧縮木箱(-1,0)・端ポータル(-2,-2)
-// ・ポケット内旧アイテム全削除・こども用シャベル全削除・SIZE_SPECS原本リンク維持
-// ※ index.html / brain.js / world.js / ai_comm.js(v3.9) は無改造のまま動作します
+// 【レゴ物理環境＆1人称純粋知覚モジュール：rules_dig.js（v6.2 上書き復元完全遮断・再スタート確定版）】
+// ・entities.js の遅延フェード復元(HOME_SAVE_DATA)＆クラウド旧データ巻き戻りを完全遮断
+// ・初期エリア(home)固定・地下全埋め平坦地上・地上5段階段(0,-1)＋高台1ブロック(0,-2)・圧縮木箱(-1,0)
+// ・ポータル移動停止＆既存パステル入口アイコンを北西端(-2,-2)に1つだけ退避配置（二重表示解消）
+// ・ポケット内旧アイテム全削除・こども用シャベル全削除・1日目/体力100のまっさら再スタート
+// ・水際外周保護壁の掘削除外・木箱の距離1分割厳密判定・全25体格×8方向占有端基準・SIZE_SPECS原本リンク
+// ※ index.html / brain.js / world.js / entities.js / ai_comm.js(v3.9) は無改造のまま動作します
 // ============================================================================
 (function initDigRulesModule() {
   if (window.DigRulesModule) return;
 
-  const STORAGE_KEY       = 'rules_dig_state_v6_clean';
-  const CLOUD_SYNC_FLAG   = 'rules_dig_clean_v6_synced';
+  const STORAGE_KEY       = 'rules_dig_state_v6_2_clean';
+  const CLEAN_ENV_TAG     = 'clean_flat_stairs_v6_2';
   const SUB_SIZE          = 0.2;
   const CRATE_CAPACITY    = 220;
   const PORTAL_CORNER_POS = { x: -2, z: -2 }; // ポータル入口アイコン退避先（北西の端）
@@ -35,7 +32,7 @@
 
   function createDefaultState() {
     return {
-      initializedCleanV6: false,
+      envTag: CLEAN_ENV_TAG,
       pocketSoil: 0,
       headSoil: 0,
       crates: [
@@ -134,13 +131,19 @@
     };
   }
 
-  // ポケット内は純粋に分割土のみ（旧BAG / WORLD_ITEMS は常に空）
+  // ポケット内は純粋に分割土のみ（旧BAG / WORLD_ITEMS / フィールド生き物は常に空）
   function purgeLegacyItems() {
     if (typeof BAG !== 'undefined' && Array.isArray(BAG) && BAG.length > 0) {
       BAG.length = 0;
     }
     if (typeof WORLD_ITEMS !== 'undefined' && Array.isArray(WORLD_ITEMS) && WORLD_ITEMS.length > 0) {
       WORLD_ITEMS.length = 0;
+    }
+    if (window.ACTIVE_ENTITIES) {
+      window.ACTIVE_ENTITIES.npc = null;
+      window.ACTIVE_ENTITIES.enemy = null;
+      window.ACTIVE_ENTITIES.wildPet = null;
+      window.ACTIVE_ENTITIES.guestNpc = null;
     }
   }
 
@@ -170,29 +173,32 @@
   }
 
   // --------------------------------------------------------------------------
-  // 0. シンプル検証環境の構築（平坦地上＋地下全埋め＋5段階段＋高台1ブロック＋木箱1＋端ポータル）
+  // 0. シンプル検証環境の構築（平坦地上＋地下全埋め＋5段階段＋高台1ブロック＋木箱1＋端ポータル1）
   // --------------------------------------------------------------------------
   function relocatePortalsToCorner() {
+    const cornerPortal = {
+      type: 'warp',
+      x: PORTAL_CORNER_POS.x,
+      z: PORTAL_CORNER_POS.z,
+      target: 'home',
+      label: '🚪 ポータル（停止中）',
+      needPuzzle: false
+    };
     try {
+      if (window.AREA_REGISTRY && window.AREA_REGISTRY.home) {
+        window.AREA_REGISTRY.home.portals = [Object.assign({}, cornerPortal)];
+        window.AREA_REGISTRY.home.spawn = { x: 0, z: 0, lv: 0 };
+        window.AREA_REGISTRY.home.items = [];
+        window.AREA_REGISTRY.home.puzzle = null;
+      }
       if (typeof getCurrentAreaDef === 'function') {
         const def = getCurrentAreaDef();
-        if (def && Array.isArray(def.portals)) {
-          def.portals.forEach(p => {
-            p.x = PORTAL_CORNER_POS.x;
-            p.z = PORTAL_CORNER_POS.z;
-          });
+        if (def && def.id === 'home') {
+          def.portals = [Object.assign({}, cornerPortal)];
+          def.spawn = { x: 0, z: 0, lv: 0 };
+          def.items = [];
+          def.puzzle = null;
         }
-      }
-      if (typeof AREA_DEFS !== 'undefined' && AREA_DEFS) {
-        const list = Array.isArray(AREA_DEFS) ? AREA_DEFS : Object.values(AREA_DEFS);
-        list.forEach(a => {
-          if (a && a.id === 'home' && Array.isArray(a.portals)) {
-            a.portals.forEach(p => {
-              p.x = PORTAL_CORNER_POS.x;
-              p.z = PORTAL_CORNER_POS.z;
-            });
-          }
-        });
       }
     } catch (e) {}
   }
@@ -211,9 +217,27 @@
     return tags;
   }
 
-  function applyCleanTestTerrain(resetRobotPose = true) {
-    if (getCurAreaId() !== 'home' && typeof window.switchAreaById === 'function') {
-      try { window.switchAreaById('home', true); } catch (e) {}
+  function isCleanTerrainValid() {
+    if (getCurAreaId() !== 'home') return false;
+    if (typeof HEIGHT_MAP === 'undefined') return false;
+    if (HEIGHT_MAP['0,0'] !== 0) return false;
+    if (HEIGHT_MAP['0,-1'] !== 1) return false;
+    if (HEIGHT_MAP['0,-2'] !== 1) return false;
+    if (HEIGHT_MAP['1,2'] === 1) return false; // 旧初期高台が残っていれば旧データ
+    return true;
+  }
+
+  function applyCleanTestTerrain(resetStatus = true) {
+    relocatePortalsToCorner();
+
+    // 重要：別エリアにいる場合は必ず同期(withFade=false)でhomeへ戻し、遅延上書きを絶対に起こさせない
+    if (getCurAreaId() !== 'home') {
+      if (typeof window.switchAreaById === 'function') {
+        try { window.switchAreaById('home', false); } catch (e) {}
+      }
+      if (typeof CURRENT_AREA_ID !== 'undefined') {
+        try { CURRENT_AREA_ID = 'home'; } catch (e) {}
+      }
     }
 
     relocatePortalsToCorner();
@@ -231,6 +255,7 @@
       HEIGHT_MAP['0,-2'] = 1;
     }
 
+    // 3. 地下穴・旧トンネル・削り跡をすべて消去し、5段階段のみ構築
     if (typeof CHIP_MAP !== 'undefined') {
       Object.keys(CHIP_MAP).forEach(k => delete CHIP_MAP[k]);
       const stairTags = buildStairTagsFor5StepNorth();
@@ -241,27 +266,56 @@
       DIG_STATE.dugCells['home|0,-1,1'] = stairTags.slice();
     }
 
+    DIG_STATE.envTag = CLEAN_ENV_TAG;
     DIG_STATE.pocketSoil = 0;
     DIG_STATE.headSoil = 0;
     DIG_STATE.worldSubSoils = {};
     DIG_STATE.crates = [
       { id: 'crate_1', areaId: 'home', x: -1, z: 0, capacity: CRATE_CAPACITY, soil: 0 }
     ];
-    DIG_STATE.initializedCleanV6 = true;
 
-    if (resetRobotPose && typeof ROBOT !== 'undefined' && ROBOT) {
+    if (resetStatus && typeof ROBOT !== 'undefined' && ROBOT) {
       ROBOT.pos = { x: 0, z: 0, lv: 0, sx: 2, sz: 2, subY: 0 };
       ROBOT.rotY = Math.PI; // 北向き（正面に5段階段、左に圧縮木箱）
       ROBOT.posture = 'stand';
       ROBOT.emotion = 'normal';
       ROBOT.bulbEmotion = null;
+      ROBOT.traumas = [];
+      ROBOT.pet = null;
+      if (typeof life !== 'undefined' && life) {
+        life.energy = 100;
+        life.stamina = 100;
+        life.mental = 100;
+      }
+      if (typeof GAME_DAY !== 'undefined') GAME_DAY = 1;
+      if (typeof TIME_STEP !== 'undefined') TIME_STEP = 0;
+      if (typeof AI_MEMORY !== 'undefined' && Array.isArray(AI_MEMORY)) AI_MEMORY.length = 0;
+      if (typeof DIARY_LOGS !== 'undefined' && Array.isArray(DIARY_LOGS)) {
+        DIARY_LOGS.length = 0;
+        DIARY_LOGS.push('🌱 1日目：平らな島・5段階段・圧縮木箱の検証環境でスタート');
+      }
+      const actEl = document.getElementById('history-action');
+      const msgEl = document.getElementById('message-box');
+      if (actEl) actEl.innerText = '🌱 検証環境を初期化しました';
+      if (msgEl) msgEl.innerText = '平らな島（5段階段＋高台1ブロック＋圧縮木箱）で待機中。「⚡今すぐ考える」でスタートできます。';
+      if (window.AICommCore && typeof window.AICommCore.resetPhysicalHistory === 'function') {
+        window.AICommCore.resetPhysicalHistory();
+      }
+    }
+
+    // entities.js の HOME_SAVE_DATA も新地形で上書き同期
+    if (typeof saveHomeSnapshotIfHome === 'function') {
+      try { saveHomeSnapshotIfHome(); } catch (e) {}
     }
 
     saveDigState();
-    if (typeof safeStorage !== 'undefined') {
-      safeStorage.setItem(CLOUD_SYNC_FLAG, '1');
-    }
     if (typeof saveWorldState === 'function') saveWorldState();
+    if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
+    if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition(true);
+    if (typeof updateAllCamerasTransform === 'function') updateAllCamerasTransform();
+    if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
+    if (typeof updateAreaAndPetBadgeUI === 'function') updateAreaAndPetBadgeUI();
+    renderPocketAndCrateDiaryUI();
   }
 
   // 旧ボタンイベント除去 ＆ 旧ツール完全非表示 ＆ 頭上ピラミッド3D土台
@@ -336,7 +390,6 @@
     };
   }
 
-  // キャラ占有範囲の外側ちょうど1分割目のオフセット（偶数幅の全方向ズレを解消）
   function getFrontEdgeOffset(dx, dz, reachW) {
     const { minOff, maxOff } = getFootprintBounds(reachW);
     return {
@@ -353,7 +406,6 @@
     );
   }
 
-  // brain.js の水際保護外壁判定（自動修復される外縁を掘削させない）
   function isWaterProtectedCell(tx, tz, lv, sx, sy, sz) {
     if (typeof isWaterFacingOuterSubVoxel === 'function') {
       return Boolean(isWaterFacingOuterSubVoxel(tx, tz, lv, sx, sy, sz));
@@ -577,15 +629,6 @@
     return Math.round(yBase * 5);
   }
 
-  function isCrateAtAbs(absX, absZ, areaId = getCurAreaId()) {
-    return DIG_STATE.crates.some(c => {
-      if (c.areaId !== areaId) return false;
-      const cx = c.x * 5 + 2;
-      const cz = c.z * 5 + 2;
-      return Math.abs(absX - cx) <= 2 && Math.abs(absZ - cz) <= 2;
-    });
-  }
-
   function isCrateBlockingAtSubY(absX, totalSubY, absZ, areaId = getCurAreaId()) {
     return DIG_STATE.crates.some(c => {
       if (c.areaId !== areaId) return false;
@@ -604,7 +647,7 @@
         const raw = safeStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object' && parsed.initializedCleanV6) {
+          if (parsed && typeof parsed === 'object' && parsed.envTag === CLEAN_ENV_TAG) {
             DIG_STATE = Object.assign(createDefaultState(), parsed);
             if (!Number.isFinite(DIG_STATE.headSoil)) DIG_STATE.headSoil = 0;
             if (!Number.isFinite(DIG_STATE.pocketSoil)) DIG_STATE.pocketSoil = 0;
@@ -626,7 +669,7 @@
       DIG_STATE = createDefaultState();
     }
 
-    if (!loaded) {
+    if (!loaded || !isCleanTerrainValid()) {
       applyCleanTestTerrain(true);
     } else {
       relocatePortalsToCorner();
@@ -809,7 +852,6 @@
             }
           }
 
-          // 散らばり土は自分の足元高さ以上に飛び出している場合のみ段数表示（下の階の土はv扱い）
           if (loose > 0 && floorHere <= baseSubY + 1 && looseTopY > baseSubY) {
             const relHeight = (floorHere === baseSubY) ? loose : (looseTopY - baseSubY);
             ch = String(Math.min(9, Math.max(1, relHeight)));
@@ -830,7 +872,6 @@
       topRows.push(row.trimEnd());
     }
 
-    // 目の前ちょうど1列目の正面断面図（占有端基準で全25体格・全方向ズレなし）
     const frontEdge = getFrontEdgeOffset(basis.fx, basis.fz, stats.reachW);
     const sliceRows = ['列 : L2 L1 正 R1 R2'];
     for (let h = 4; h >= -1; h--) {
@@ -872,7 +913,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 3. 3D描画（圧縮木箱・散らばり土・頭上ピラミッド・端っこポータル停止目印）
+  // 3. 3D描画（圧縮木箱・散らばり土・頭上ピラミッド ※端っこポータルはentities.js純正を使用）
   // --------------------------------------------------------------------------
   const digVisualGroup = new THREE.Group();
   digVisualGroup.name = 'dig_rules_visual_group';
@@ -919,26 +960,6 @@
     return grp;
   }
 
-  function buildCornerPortalIconMesh() {
-    const grp = new THREE.Group();
-    const yBase = _origGetSurfaceYAt ? _origGetSurfaceYAt(PORTAL_CORNER_POS.x, PORTAL_CORNER_POS.z, null, 5) : 0;
-    grp.position.set(PORTAL_CORNER_POS.x, yBase + 0.015, PORTAL_CORNER_POS.z);
-
-    const basePlate = new THREE.Mesh(
-      new THREE.BoxGeometry(0.68, 0.03, 0.68),
-      new THREE.MeshLambertMaterial({ color: 0x334155 })
-    );
-    grp.add(basePlate);
-
-    const innerRing = new THREE.Mesh(
-      new THREE.BoxGeometry(0.46, 0.04, 0.46),
-      new THREE.MeshLambertMaterial({ color: 0x64748b })
-    );
-    grp.add(innerRing);
-
-    return grp;
-  }
-
   function renderHeadPyramidVisual() {
     while (headPyramidGroup.children.length) headPyramidGroup.remove(headPyramidGroup.children[0]);
     const count = Math.max(0, Math.floor(DIG_STATE.headSoil || 0));
@@ -974,10 +995,6 @@
     while (digVisualGroup.children.length) digVisualGroup.remove(digVisualGroup.children[0]);
     renderHeadPyramidVisual();
     const areaId = getCurAreaId();
-
-    if (areaId === 'home') {
-      digVisualGroup.add(buildCornerPortalIconMesh());
-    }
 
     DIG_STATE.crates.forEach(c => {
       if (c.areaId === areaId) digVisualGroup.add(buildCrateMesh(c));
@@ -1026,7 +1043,6 @@
     };
   }
 
-  // 指定方角の「占有端のちょうど1列目」に並ぶ横幅分のセル座標列を返す（左右ソート対応）
   function buildFrontRowCells(curAbsX, curAbsZ, dir, stats, thought) {
     const dx = Math.sign((dir && dir.dx) || 0);
     const dz = Math.sign((dir && dir.dz) || 0);
@@ -1035,17 +1051,14 @@
     const cells = [];
 
     if (dx === 0 && dz !== 0) {
-      // 南北向き：横幅はX軸の占有範囲そのまま
       for (let ox = minOff; ox <= maxOff; ox++) {
         cells.push({ absX: curAbsX + ox, absZ: curAbsZ + frontEdge.oz });
       }
     } else if (dz === 0 && dx !== 0) {
-      // 東西向き：横幅はZ軸の占有範囲そのまま
       for (let oz = minOff; oz <= maxOff; oz++) {
         cells.push({ absX: curAbsX + frontEdge.ox, absZ: curAbsZ + oz });
       }
     } else {
-      // 斜め向き：占有前端の角を中心に直交する幅分
       const px = -dz;
       const pz = dx;
       for (let w = minOff; w <= maxOff; w++) {
@@ -1056,7 +1069,6 @@
       }
     }
 
-    // 視界の右ベクトル基準で左/右/中央優先にソート
     const rx = -dz;
     const rz = dx;
     const t = String(thought || '');
@@ -1085,7 +1097,6 @@
     return false;
   }
 
-  // 掘削対象探索（モード別厳密分離：水際保護壁は除外）
   function findDigTargetByMode(mode, dir, thought) {
     const stats = getSizeStats();
     const { absX: curAbsX, absZ: curAbsZ } = getRobotAbsPos();
@@ -1110,7 +1121,6 @@
       };
     };
 
-    // 1. 正面の壁専用（占有端ちょうど1列目の高さ1〜reachHのみ）
     if (mode === 'front') {
       const frontCells = buildFrontRowCells(curAbsX, curAbsZ, dir, stats, thought);
       for (let h = stats.reachH - 1; h >= 0; h--) {
@@ -1122,7 +1132,6 @@
       return { target: null, hitWaterProtected };
     }
 
-    // 2. 地面・足元専用（baseSubY - 1 のみ対象）
     if (mode === 'down') {
       const t = String(thought || '');
       const preferUnderFeet = t.includes('真下') || t.includes('足元');
@@ -1150,7 +1159,6 @@
       return { target: null, hitWaterProtected };
     }
 
-    // 3. 天井専用（自分の占有範囲の真上のみ対象：背後無回転掘削を防止）
     if (mode === 'up') {
       const minCeilH = Math.max(1, stats.bodyHeight);
       const maxCeilH = stats.reachH;
@@ -1214,7 +1222,6 @@
       return true;
     }
 
-    // ①-A：掘った真下が空間 → 真下の床または空間底へ重力落下
     if (!hasSolidTerrainAtAbsSubY(target.absX, target.totalSubY - 1, target.absZ)) {
       const fallFloorY = findFloorSubYBelow(target.absX, target.absZ, target.totalSubY - 1);
       const isDeepFall = (fallFloorY < baseSubY);
@@ -1229,7 +1236,6 @@
       }
     }
 
-    // ①-B：奥に抜けた空間 → 奥へ押し出して重力落下
     if (dx !== 0 || dz !== 0) {
       const bx = target.absX + dx;
       const bz = target.absZ + dz;
@@ -1249,7 +1255,6 @@
       }
     }
 
-    // ②：奥が壁塞がり → キャラ周囲（太さ幅・キャラ占有外・掘削対象外）の安定床へ散らばり
     const { minOff, maxOff } = getFootprintBounds(stats.reachW);
     const spreadSpan = stats.reachW;
     const minSearch = minOff - spreadSpan;
@@ -1633,7 +1638,6 @@
     };
   }
 
-  // 圧縮木箱との接触判定（占有端から距離1分割以内＆手が届く高さのみ許可）
   function findNearbyCrate() {
     const areaId = getCurAreaId();
     const { absX, absZ } = getRobotAbsPos();
@@ -2041,7 +2045,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 6. 既存フック接続（整数座標維持・クラウド旧データ遮断・手帳UI維持・1分割高さ同期）
+  // 6. 既存フック接続（クラウド旧データ完全遮断・整数座標維持・手帳UI維持・1分割高さ同期）
   // --------------------------------------------------------------------------
   if (_origGetSurfaceYAt) {
     getSurfaceYAt = function(gx, gz, lvOverride = null, reqWidth = 1) {
@@ -2056,7 +2060,6 @@
     };
   }
 
-  // 体格切替時に brain.js が sx/sz を小数へ書き換えて3D見た目と物理がズレる現象を防止
   if (typeof clampCharSubPosForBodySize === 'function') {
     clampCharSubPosForBodySize = function() {
       if (typeof ROBOT === 'undefined' || !ROBOT || !ROBOT.pos) return;
@@ -2067,23 +2070,41 @@
     };
   }
 
+  // クラウド復元時に旧データ（穴あき・別エリア・旧タグ）が返ってきても即座に弾く
   if (typeof applyLoadedWorldData === 'function') {
     const _origApplyLoaded = applyLoadedWorldData;
     applyLoadedWorldData = function(d) {
-      const hasOldHole = d && d.heightMap && (d.heightMap['0,0'] < 0 || d.heightMap['0,-1'] !== 1 || d.heightMap['0,-2'] !== 1);
-      const syncedFlag = (typeof safeStorage !== 'undefined') && safeStorage.getItem(CLOUD_SYNC_FLAG) === '1';
-      _origApplyLoaded(d);
-      purgeLegacyItems();
-      if (!syncedFlag || hasOldHole) {
-        applyCleanTestTerrain(true);
-      } else {
-        relocatePortalsToCorner();
-        syncDugCellsToChipMap();
-        if (typeof ROBOT !== 'undefined' && ROBOT && ROBOT.pos) {
-          ROBOT.pos.sx = Math.max(0, Math.min(4, Math.round(Number.isFinite(ROBOT.pos.sx) ? ROBOT.pos.sx : 2)));
-          ROBOT.pos.sz = Math.max(0, Math.min(4, Math.round(Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2)));
-          ROBOT.pos.subY = getRobotBaseSubY();
+      const hm = d && d.heightMap;
+      const isOldCloudData = !d ||
+        d.cleanEnvTag !== CLEAN_ENV_TAG ||
+        (d.areaId && d.areaId !== 'home') ||
+        !hm ||
+        hm['0,0'] !== 0 ||
+        hm['0,-1'] !== 1 ||
+        hm['0,-2'] !== 1 ||
+        hm['1,2'] === 1;
+
+      if (isOldCloudData) {
+        // 旧クラウドデータは適用せず、現在のクリーン検証環境をそのまま維持・上書き保存
+        if (!isCleanTerrainValid()) {
+          applyCleanTestTerrain(true);
+        } else {
+          relocatePortalsToCorner();
+          purgeLegacyItems();
+          saveDigState();
+          if (typeof saveWorldState === 'function') saveWorldState();
         }
+        return;
+      }
+
+      _origApplyLoaded(d);
+      relocatePortalsToCorner();
+      purgeLegacyItems();
+      syncDugCellsToChipMap();
+      if (typeof ROBOT !== 'undefined' && ROBOT && ROBOT.pos) {
+        ROBOT.pos.sx = Math.max(0, Math.min(4, Math.round(Number.isFinite(ROBOT.pos.sx) ? ROBOT.pos.sx : 2)));
+        ROBOT.pos.sz = Math.max(0, Math.min(4, Math.round(Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2)));
+        ROBOT.pos.subY = getRobotBaseSubY();
       }
       renderDigVisuals();
       renderPocketAndCrateDiaryUI();
@@ -2094,7 +2115,33 @@
     const _origSaveWorld = saveWorldState;
     saveWorldState = function() {
       purgeLegacyItems();
-      return _origSaveWorld.apply(this, arguments);
+      const res = _origSaveWorld.apply(this, arguments);
+      // 保存データへクリーン環境タグを刻印（次回起動時のクラウド判定用）
+      try {
+        if (typeof safeStorage !== 'undefined') {
+          const raw = safeStorage.getItem('island_spacecore_v15');
+          if (raw) {
+            const obj = JSON.parse(raw);
+            obj.cleanEnvTag = CLEAN_ENV_TAG;
+            obj.areaId = 'home';
+            const updatedStr = JSON.stringify(obj);
+            safeStorage.setItem('island_spacecore_v15', updatedStr);
+            if (typeof firestoreDocRef !== 'undefined' && firestoreDocRef) {
+              firestoreDocRef.set({
+                stateJson: updatedStr,
+                day: obj.day,
+                time: obj.time,
+                life: obj.life,
+                robotGen: obj.robot ? obj.robot.gen : 1,
+                lastMessage: obj.lastMessage || '',
+                logs: obj.logs || [],
+                updatedAt: Date.now()
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (e) {}
+      return res;
     };
   }
 
@@ -2132,7 +2179,6 @@
       try {
         if (typeof safeStorage !== 'undefined') {
           safeStorage.removeItem(STORAGE_KEY);
-          safeStorage.removeItem(CLOUD_SYNC_FLAG);
         }
       } catch (e) {}
       if (window.AICommCore && typeof window.AICommCore.resetPhysicalHistory === 'function') {
