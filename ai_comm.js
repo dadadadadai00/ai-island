@@ -1,5 +1,6 @@
 // ============================================================================
-// 【純粋知覚・不変通信コア：ai_comm.js（v3.9 クリーン再接続・ポータル停止・旧アイテム回収削除版）】
+// 【純粋知覚・不変通信コア：ai_comm.js（v4.0 装備・投擲パラメータ対応／クリーン再接続版）】
+// ・AIの返答JSONに任意パラメータ item("soil"/"shovel"/"none")・count(個数) を追加
 // ・別エリアへのポータル移動を完全停止（初期エリアのみで基本動作検証）
 // ・旧WORLD_ITEMS自動回収（石・オイル・リンゴ・草のBAG混入）を完全削除
 // ・キャラ座標変化の直接検知により、移動直後は自動で左右薄暗化（移動視点）へ連動
@@ -7,7 +8,7 @@
 // ・ピンチ拡大中でも情報文枠・JSON枠の上下スクロールを阻害しない操作判定を維持
 // ・設定ページでB案(画像AI送信)は暗転・使用停止（内部コード温存）
 // ・キャラ視点（🤖視点＆検証カメラ共通）では未削り分割ブロックを全表示
-// ※ index.html / brain.js / world.js は無改造のまま動作します
+// ※ index.html / brain.js / world.js / entities.js は無改造のまま動作します
 // ============================================================================
 (function initImmutableAICommCore() {
   if (window.AICommCore) return;
@@ -66,6 +67,8 @@
     parsedJson: null,
     actionId: '-',
     dirName: '-',
+    itemName: '-',
+    countVal: '-',
     emotionId: '-',
     motionLabel: '-',
     thoughtText: '',
@@ -518,7 +521,8 @@
     return shortTermMemory.map((m, idx) => {
       const ago = shortTermMemory.length - idx;
       const tag = ago === 1 ? '直前' : `${ago}ターン前`;
-      return `- ${tag}: [${m.action}(${m.dir})] 思考「${m.thought}」→ 結果: ${m.result}`;
+      const extra = m.extra ? ` ${m.extra}` : '';
+      return `- ${tag}: [${m.action}(${m.dir}${extra})] 思考「${m.thought}」→ 結果: ${m.result}`;
     }).join('\n');
   }
 
@@ -564,8 +568,8 @@ ${memoryText}
 【物理アクション】
 ${actionsText}
 
-以下のJSON形式のみで返答してください（前置き・解説禁止）:
-{"action":"${actionIds}","dir":"北/南/東/西/北西/北東/南西/南東","emotion":"normal/joy/anger/sad/fun/fear/think/surprise/wave/sleep/swing_v/pickup/carry/push/run/peek/struggle","thought":"知覚した事実や意図を短い1文で"}`;
+以下のJSON形式のみで返答してください（前置き・解説禁止、itemとcountは対象アイテムや個数を指定するアクション時のみ使用し不要時は"none"/0）:
+{"action":"${actionIds}","dir":"北/南/東/西/北西/北東/南西/南東","item":"soil/shovel/none","count":1,"emotion":"normal/joy/anger/sad/fun/fear/think/surprise/wave/sleep/swing_v/pickup/carry/push/run/peek/struggle","thought":"知覚した事実や意図を短い1文で"}`;
 
     return {
       promptText,
@@ -748,6 +752,8 @@ ${actionsText}
           parsedJson: null,
           actionId: '-',
           dirName: '-',
+          itemName: '-',
+          countVal: '-',
           emotionId: '-',
           motionLabel: '-',
           thoughtText: '',
@@ -781,6 +787,16 @@ ${actionsText}
       const dirShort = dir.name.replace('(斜め)', '');
       const chosenAction = actionMap.get(dec.action) || actionMap.get('rest') || Array.from(actionMap.values())[0];
 
+      const itemStr = (typeof dec.item === 'string' && dec.item.trim() && dec.item.trim() !== 'none')
+        ? dec.item.trim()
+        : '';
+      const countNum = Number.isFinite(Number(dec.count)) && Number(dec.count) > 0
+        ? Math.floor(Number(dec.count))
+        : 0;
+      const extraTag = itemStr
+        ? (countNum > 0 ? `${itemStr}×${countNum}` : itemStr)
+        : (countNum > 0 ? `×${countNum}` : '');
+
       let thoughtText = (typeof dec.thought === 'string' && dec.thought.trim())
         ? dec.thought.trim()
         : '（無言で行動した）';
@@ -789,7 +805,7 @@ ${actionsText}
       let out = null;
 
       try {
-        out = chosenAction.run({ dec, dir, prevPos });
+        out = chosenAction.run({ dec, dir, prevPos, item: itemStr, count: countNum });
         if (out && out.actionLabel) actionLabel = out.actionLabel;
         if (out && out.physicalResult) physResult = out.physicalResult;
         else if (out && out.actionLabel) physResult = out.actionLabel;
@@ -826,6 +842,7 @@ ${actionsText}
       shortTermMemory.push({
         action: chosenAction.id,
         dir: dirShort,
+        extra: extraTag,
         thought: thoughtText,
         result: physResult
       });
@@ -875,6 +892,8 @@ ${actionsText}
         parsedJson: dec,
         actionId: chosenAction.id,
         dirName: dirShort,
+        itemName: itemStr || '-',
+        countVal: countNum > 0 ? String(countNum) : '-',
         emotionId: finalEmotionId,
         motionLabel,
         thoughtText,
@@ -944,6 +963,9 @@ ${actionsText}
       lines.push(`思考・しゃべり: ${a.thoughtText}`);
       lines.push(`選んだ行動: ${a.actionId}`);
       lines.push(`選んだ方角: ${a.dirName}`);
+      if (a.itemName !== '-' || a.countVal !== '-') {
+        lines.push(`指定アイテム / 個数: ${a.itemName} / ${a.countVal}`);
+      }
       lines.push(`表情・動き(モーション): ${a.motionLabel}`);
       lines.push(`生返答JSON: ${a.rawResponse}`);
     }
@@ -1267,10 +1289,13 @@ ${actionsText}
           replySumEl.innerHTML = `<div style="color:#dc2626; font-weight:900;">⚠️ 通信エラー：${escapeHtml(a.error).replace(/\n/g, '<br>')}</div>`;
         }
       } else {
+        const itemPart = (a.itemName !== '-' || a.countVal !== '-')
+          ? `　<strong>🎒 指定：</strong>${escapeHtml(a.itemName)}×${escapeHtml(a.countVal)}`
+          : '';
         if (replySumEl) {
           replySumEl.innerHTML = `
             <div><strong>💬 思考・しゃべり：</strong>${escapeHtml(a.thoughtText)}</div>
-            <div><strong>🎯 行動 / 方角：</strong><code>${escapeHtml(a.actionId)}</code> ／ <strong>${escapeHtml(a.dirName)}</strong>　<strong>🤖 動き：</strong>${escapeHtml(a.motionLabel)}</div>
+            <div><strong>🎯 行動 / 方角：</strong><code>${escapeHtml(a.actionId)}</code> ／ <strong>${escapeHtml(a.dirName)}</strong>${itemPart}　<strong>🤖 動き：</strong>${escapeHtml(a.motionLabel)}</div>
           `;
         }
       }
@@ -1499,7 +1524,7 @@ ${actionsText}
 
   // 不変コアAPI公開
   const coreApi = Object.freeze({
-    version: '3.9-clean-reconnect-no-portal',
+    version: '4.0-equip-throw-ready',
     portalTravelDisabled: PORTAL_TRAVEL_DISABLED,
     isEnabled,
     setEnabled,
