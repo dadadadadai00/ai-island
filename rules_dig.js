@@ -1,18 +1,23 @@
 // ============================================================================
-// 【レゴ物理環境＆1人称純粋知覚モジュール：rules_dig.js（v5.2 SIZE_SPECS原本リンク・1分割階段＆脱出修正版）】
-// ・brain.js の SIZE_SPECS（スイスイ階段 stairMax / よじ登り subH / ほふく crawlH）を原本リンク参照
-// ・1分割単位の厳密な段差上り(階段/よじ登り)・下り(階段/安全着地/落下)・自動ほふく・角抜け防止へ統合
-// ・ロボットの3D足元高さを1分割単位で正確に同期（world.js無改造のまま1段穴の上り下りを完全一致）
-// ・1段くぼみの中からでも手が届く高さの周囲安定床へ土を散らばせられるよう修正（満杯誤判定の詰み解消）
-// ・掘削3分離(dig_front/dig_down/dig_up)・DDA視界・低天井記号「^」・頭上ピラミッド・圧縮木箱220を維持
-// ※ brain.js / world.js / index.html / ai_comm.js は無改造のまま動作します
+// 【レゴ物理環境＆1人称純粋知覚モジュール：rules_dig.js（v6.1 最終矛盾解消・再スタート完全版）】
+// ・水際外周の保護壁(isWaterFacingOuterSubVoxel)を掘削対象から除外（無限土増殖を完全防止）
+// ・圧縮木箱の収納判定をサブ座標距離1分割＆高さ一致へ厳密化（遠距離・地下ワープ収納を防止）
+// ・全25体格×全8方向で占有端基準の「目の前1列目」計算へ統一（偶数幅の北/西1マス飛び越え修正）
+// ・パノラマ視野の段差上散らばり土の高さ誤認を修正＆圧縮木箱による視線遮蔽を追加
+// ・dig_up を占有範囲の真上天井専用に統一（背後天井の無回転掘削を解消）
+// ・体格切替時の小数座標ズレ防止(clampCharSubPosForBodySizeラップ)で3D見た目と物理を完全一致
+// ・初期エリア(home)固定・地下全埋め・地上5段階段(0,-1)＋高台(0,-2)・圧縮木箱(-1,0)・端ポータル(-2,-2)
+// ・ポケット内旧アイテム全削除・こども用シャベル全削除・SIZE_SPECS原本リンク維持
+// ※ index.html / brain.js / world.js / ai_comm.js(v3.9) は無改造のまま動作します
 // ============================================================================
 (function initDigRulesModule() {
   if (window.DigRulesModule) return;
 
-  const STORAGE_KEY = 'rules_dig_state_v3';
-  const SUB_SIZE = 0.2;
-  const CRATE_CAPACITY = 220;
+  const STORAGE_KEY       = 'rules_dig_state_v6_clean';
+  const CLOUD_SYNC_FLAG   = 'rules_dig_clean_v6_synced';
+  const SUB_SIZE          = 0.2;
+  const CRATE_CAPACITY    = 220;
+  const PORTAL_CORNER_POS = { x: -2, z: -2 }; // ポータル入口アイコン退避先（北西の端）
 
   const HEIGHT_RANK = { tiny: 1, small: 2, medium: 3, large: 4, giant: 5 };
   const WIDTH_RANK  = { slim1: 1, slim2: 2, normal3: 3, fat4: 4, fat5: 5 };
@@ -30,28 +35,21 @@
 
   function createDefaultState() {
     return {
-      initializedStart: false,
+      initializedCleanV6: false,
       pocketSoil: 0,
       headSoil: 0,
       crates: [
         { id: 'crate_1', areaId: 'home', x: -1, z: 0, capacity: CRATE_CAPACITY, soil: 0 }
       ],
       dugCells: {},
-      worldSubSoils: {}, // key: `${areaId}|${absX},${absZ}|${floorSubY}` -> count
-      shovel: {
-        held: true,
-        areaId: 'home',
-        absX: 2,
-        absZ: 2
-      }
+      worldSubSoils: {} // key: `${areaId}|${absX},${absZ}|${floorSubY}` -> count
     };
   }
 
   let DIG_STATE = createDefaultState();
   let lastTurnActionId = null;
-  let lastMoveVisualKind = null; // 'stairs_up' | 'scramble_climb' | 'stairs_down' | 'safe_landing' | 'high_drop' | null
+  let lastMoveVisualKind = null;
 
-  // world.js / brain.js の元の getSurfaceYAt を退避（外部呼び出し＆フォールバック用）
   const _origGetSurfaceYAt = (typeof getSurfaceYAt === 'function') ? getSurfaceYAt : null;
 
   function getCurAreaId() {
@@ -132,14 +130,22 @@
       climbMax: hRank,
       bodyHeight,
       maxStackHeight: hRank * 2,
-      // ほふく前進中は1段まで、立位は身長(subH)までよじ登り可能（brain.js原本ルール準拠）
       maxStepUpSub: isCrawl ? 1 : hRank
     };
   }
 
+  // ポケット内は純粋に分割土のみ（旧BAG / WORLD_ITEMS は常に空）
+  function purgeLegacyItems() {
+    if (typeof BAG !== 'undefined' && Array.isArray(BAG) && BAG.length > 0) {
+      BAG.length = 0;
+    }
+    if (typeof WORLD_ITEMS !== 'undefined' && Array.isArray(WORLD_ITEMS) && WORLD_ITEMS.length > 0) {
+      WORLD_ITEMS.length = 0;
+    }
+  }
+
   function getResourceTotalCount() {
-    const bagItems = (typeof BAG !== 'undefined' && Array.isArray(BAG)) ? BAG.length : 0;
-    return (DIG_STATE.pocketSoil || 0) + bagItems;
+    return Math.max(0, Math.floor(DIG_STATE.pocketSoil || 0));
   }
 
   function saveDigState() {
@@ -164,9 +170,102 @@
   }
 
   // --------------------------------------------------------------------------
-  // 0. 旧ボタンイベント除去 ＆ こども用シャベル右手装着 ＆ 頭上ピラミッド3D土台
+  // 0. シンプル検証環境の構築（平坦地上＋地下全埋め＋5段階段＋高台1ブロック＋木箱1＋端ポータル）
   // --------------------------------------------------------------------------
-  (function rebindActionButtonCleanly() {
+  function relocatePortalsToCorner() {
+    try {
+      if (typeof getCurrentAreaDef === 'function') {
+        const def = getCurrentAreaDef();
+        if (def && Array.isArray(def.portals)) {
+          def.portals.forEach(p => {
+            p.x = PORTAL_CORNER_POS.x;
+            p.z = PORTAL_CORNER_POS.z;
+          });
+        }
+      }
+      if (typeof AREA_DEFS !== 'undefined' && AREA_DEFS) {
+        const list = Array.isArray(AREA_DEFS) ? AREA_DEFS : Object.values(AREA_DEFS);
+        list.forEach(a => {
+          if (a && a.id === 'home' && Array.isArray(a.portals)) {
+            a.portals.forEach(p => {
+              p.x = PORTAL_CORNER_POS.x;
+              p.z = PORTAL_CORNER_POS.z;
+            });
+          }
+        });
+      }
+    } catch (e) {}
+  }
+
+  function buildStairTagsFor5StepNorth() {
+    // (0, -1, lv=1) を南側(sz=4)から北側(sz=0)へ1分割ずつ上がる5段階段にする
+    const tags = [];
+    for (let sz = 4; sz >= 1; sz--) {
+      const keepHeight = 5 - sz; // sz=4->1段, sz=3->2段, sz=2->3段, sz=1->4段, sz=0->5段
+      for (let sy = keepHeight; sy < 5; sy++) {
+        for (let sx = 0; sx < 5; sx++) {
+          tags.push(`${sx},${sy},${sz}`);
+        }
+      }
+    }
+    return tags;
+  }
+
+  function applyCleanTestTerrain(resetRobotPose = true) {
+    if (getCurAreaId() !== 'home' && typeof window.switchAreaById === 'function') {
+      try { window.switchAreaById('home', true); } catch (e) {}
+    }
+
+    relocatePortalsToCorner();
+    purgeLegacyItems();
+
+    // 1. 地下(-4〜0)まで完全に土で埋め詰まった平坦地上を作成
+    if (typeof HEIGHT_MAP !== 'undefined') {
+      for (let x = -2; x <= 2; x++) {
+        for (let z = -2; z <= 2; z++) {
+          HEIGHT_MAP[`${x},${z}`] = 0;
+        }
+      }
+      // 2. 地上の5段階段 (0,-1) ＋ 階段に繋がる高台1ブロック (0,-2) の計2マスを構築
+      HEIGHT_MAP['0,-1'] = 1;
+      HEIGHT_MAP['0,-2'] = 1;
+    }
+
+    if (typeof CHIP_MAP !== 'undefined') {
+      Object.keys(CHIP_MAP).forEach(k => delete CHIP_MAP[k]);
+      const stairTags = buildStairTagsFor5StepNorth();
+      CHIP_MAP['0,-1,1'] = {};
+      stairTags.forEach(tag => { CHIP_MAP['0,-1,1'][tag] = true; });
+
+      DIG_STATE.dugCells = {};
+      DIG_STATE.dugCells['home|0,-1,1'] = stairTags.slice();
+    }
+
+    DIG_STATE.pocketSoil = 0;
+    DIG_STATE.headSoil = 0;
+    DIG_STATE.worldSubSoils = {};
+    DIG_STATE.crates = [
+      { id: 'crate_1', areaId: 'home', x: -1, z: 0, capacity: CRATE_CAPACITY, soil: 0 }
+    ];
+    DIG_STATE.initializedCleanV6 = true;
+
+    if (resetRobotPose && typeof ROBOT !== 'undefined' && ROBOT) {
+      ROBOT.pos = { x: 0, z: 0, lv: 0, sx: 2, sz: 2, subY: 0 };
+      ROBOT.rotY = Math.PI; // 北向き（正面に5段階段、左に圧縮木箱）
+      ROBOT.posture = 'stand';
+      ROBOT.emotion = 'normal';
+      ROBOT.bulbEmotion = null;
+    }
+
+    saveDigState();
+    if (typeof safeStorage !== 'undefined') {
+      safeStorage.setItem(CLOUD_SYNC_FLAG, '1');
+    }
+    if (typeof saveWorldState === 'function') saveWorldState();
+  }
+
+  // 旧ボタンイベント除去 ＆ 旧ツール完全非表示 ＆ 頭上ピラミッド3D土台
+  (function setupCleanHooksAndVisualRoot() {
     const oldBtn = document.getElementById('btn-action');
     if (oldBtn && oldBtn.parentNode) {
       const newBtn = oldBtn.cloneNode(true);
@@ -175,70 +274,26 @@
         if (typeof window.executeTurn === 'function') window.executeTurn();
       });
     }
+    try {
+      if (typeof boxTool !== 'undefined' && boxTool) {
+        boxTool.children.forEach(ch => { ch.visible = false; });
+        boxTool.visible = false;
+      }
+      if (typeof stickTool !== 'undefined' && stickTool) {
+        stickTool.children.forEach(ch => { ch.visible = false; });
+        stickTool.visible = false;
+      }
+    } catch (e) {}
   })();
 
-  const handShovelMeshes = [];
   const headPyramidGroup = new THREE.Group();
   headPyramidGroup.name = 'dig_head_pyramid_group';
   if (typeof robotGroup !== 'undefined' && robotGroup) {
     robotGroup.add(headPyramidGroup);
   }
 
-  function createKidShovelMesh(scale = 1.0) {
-    const grp = new THREE.Group();
-    const matHandle = new THREE.MeshLambertMaterial({ color: 0xf43f5e });
-    const matGrip   = new THREE.MeshLambertMaterial({ color: 0xfacc15 });
-    const matScoop  = new THREE.MeshLambertMaterial({ color: 0x0ea5e9 });
-
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.022 * scale, 0.022 * scale, 0.28 * scale, 8), matHandle);
-    grp.add(shaft);
-
-    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.10 * scale, 0.036 * scale, 0.036 * scale), matGrip);
-    grip.position.set(0, 0.15 * scale, 0);
-    grp.add(grip);
-
-    const scoop = new THREE.Mesh(new THREE.BoxGeometry(0.14 * scale, 0.16 * scale, 0.035 * scale), matScoop);
-    scoop.position.set(0, -0.18 * scale, 0.02 * scale);
-    scoop.rotation.x = -0.22;
-    grp.add(scoop);
-
-    return grp;
-  }
-
-  function setupKidShovelOnRobotHands() {
-    try {
-      if (typeof boxTool !== 'undefined' && boxTool) {
-        boxTool.children.forEach(ch => { ch.visible = false; });
-      }
-      if (typeof stickTool !== 'undefined' && stickTool) {
-        stickTool.children.forEach(ch => { ch.visible = false; });
-      }
-      if (typeof boxArmRPivot !== 'undefined' && boxArmRPivot) {
-        const sh = createKidShovelMesh(1.25);
-        sh.position.set(0.04, -0.26, 0.18);
-        sh.rotation.x = Math.PI / 2.2;
-        boxArmRPivot.add(sh);
-        handShovelMeshes.push(sh);
-      }
-      if (typeof SB !== 'undefined' && SB && SB.wristR) {
-        const sh = createKidShovelMesh(1.25);
-        sh.position.set(0.02, -0.06, 0.18);
-        sh.rotation.x = Math.PI / 2.2;
-        SB.wristR.add(sh);
-        handShovelMeshes.push(sh);
-      }
-    } catch (e) {}
-  }
-
-  function syncHandShovelVisibility() {
-    const show = Boolean(DIG_STATE.shovel && DIG_STATE.shovel.held);
-    handShovelMeshes.forEach(m => { m.visible = show; });
-  }
-
-  setupKidShovelOnRobotHands();
-
   // --------------------------------------------------------------------------
-  // 1. 厳密5×5×5サブ座標ユーティリティ（重力・床・天井・散らばり土）
+  // 1. 厳密5×5×5サブ座標ユーティリティ（占有端・水際保護・重力・床・天井・木箱）
   // --------------------------------------------------------------------------
   function absToTile(absVal) {
     const n = Math.round(absVal);
@@ -266,7 +321,6 @@
     return Math.max(minLv, lv);
   }
 
-  // 整数正規化（小数混入によるレイキャスト不一致・壁消失を完全に防止）
   function getRobotAbsPos() {
     const gx = Number.isFinite(ROBOT.pos.x) ? Math.round(ROBOT.pos.x) : 0;
     const gz = Number.isFinite(ROBOT.pos.z) ? Math.round(ROBOT.pos.z) : 0;
@@ -282,12 +336,35 @@
     };
   }
 
+  // キャラ占有範囲の外側ちょうど1分割目のオフセット（偶数幅の全方向ズレを解消）
+  function getFrontEdgeOffset(dx, dz, reachW) {
+    const { minOff, maxOff } = getFootprintBounds(reachW);
+    return {
+      ox: dx > 0 ? (maxOff + 1) : (dx < 0 ? (minOff - 1) : 0),
+      oz: dz > 0 ? (maxOff + 1) : (dz < 0 ? (minOff - 1) : 0)
+    };
+  }
+
   function isInsideRobotFootprint(absX, absZ, centerAbsX, centerAbsZ, reachW) {
     const { minOff, maxOff } = getFootprintBounds(reachW);
     return (
       absX >= centerAbsX + minOff && absX <= centerAbsX + maxOff &&
       absZ >= centerAbsZ + minOff && absZ <= centerAbsZ + maxOff
     );
+  }
+
+  // brain.js の水際保護外壁判定（自動修復される外縁を掘削させない）
+  function isWaterProtectedCell(tx, tz, lv, sx, sy, sz) {
+    if (typeof isWaterFacingOuterSubVoxel === 'function') {
+      return Boolean(isWaterFacingOuterSubVoxel(tx, tz, lv, sx, sy, sz));
+    }
+    if (lv > 0) return false;
+    if (lv === 0 && sy >= 3) return false;
+    if (tx === -2 && sx === 0) return true;
+    if (tx === 2  && sx === 4) return true;
+    if (tz === -2 && sz === 0) return true;
+    if (tz === 2  && sz === 4) return true;
+    return false;
   }
 
   function hasSolidTerrainSubVoxel(tx, tz, lv, sx, sy, sz) {
@@ -346,7 +423,6 @@
     return getMinSubY();
   }
 
-  // 指定高さから真下へ探索し、最初に当たる固体地形の直上面（空間底まで落ちる場合は minSubY）を返す
   function findFloorSubYBelow(absX, absZ, startSubY) {
     const minSubY = getMinSubY();
     const maxCheck = Math.max(minSubY, Math.floor(startSubY));
@@ -358,7 +434,6 @@
     return minSubY;
   }
 
-  // 散らばり土（階層floorSubY付きキー: `${areaId}|${absX},${absZ}|${floorSubY}`）
   function makeSoilKey(absX, absZ, floorSubY, areaId = getCurAreaId()) {
     return `${areaId}|${Math.round(absX)},${Math.round(absZ)}|${Math.round(floorSubY)}`;
   }
@@ -398,7 +473,6 @@
     return res;
   }
 
-  // 指定高さに散らばり土が存在するか
   function hasLooseSoilAtSubY(absX, totalSubY, absZ, areaId = getCurAreaId()) {
     const stacks = getLooseSoilStacksInColumn(absX, absZ, areaId);
     for (let i = 0; i < stacks.length; i++) {
@@ -409,7 +483,6 @@
     return false;
   }
 
-  // 下の地形が削られて浮いた散らばり土を重力で下の床（または空間底）へ落とす
   function settleFloatingLooseSoilsAtColumn(absX, absZ, areaId = getCurAreaId()) {
     const stacks = getLooseSoilStacksInColumn(absX, absZ, areaId);
     const minSubY = getMinSubY();
@@ -425,7 +498,6 @@
     });
   }
 
-  // キャラ占有範囲（reachW×reachW）全体で、footSubY から天井まで何分割空いているかを返す
   function getCeilingClearanceSubAt(centerAbsX, centerAbsZ, footSubY, reachW) {
     const { minOff, maxOff } = getFootprintBounds(reachW);
     let minClear = 20;
@@ -445,7 +517,6 @@
     return minClear;
   }
 
-  // キャラの現在の正確な足元サブY（1分割単位・散らばり土の上面も考慮）を取得
   function computeExactFootSubYAt(centerAbsX, centerAbsZ, hintSubY, reachW) {
     const areaId = getCurAreaId();
     const { minOff, maxOff } = getFootprintBounds(reachW);
@@ -455,7 +526,6 @@
         const cx = centerAbsX + ox;
         const cz = centerAbsZ + oz;
         if (!isInsideIslandAbs(cx, cz)) continue;
-        // 埋まり防止のため hintSubY から上に空いている高さを確認（最大+5段）
         let airY = hintSubY;
         let foundAir = false;
         for (let up = 0; up <= 5; up++) {
@@ -502,34 +572,42 @@
     return (lv || 0) * 5;
   }
 
+  function getCrateBaseSubY(crate) {
+    const yBase = _origGetSurfaceYAt ? _origGetSurfaceYAt(crate.x, crate.z, null, 5) : 0;
+    return Math.round(yBase * 5);
+  }
+
   function isCrateAtAbs(absX, absZ, areaId = getCurAreaId()) {
     return DIG_STATE.crates.some(c => {
       if (c.areaId !== areaId) return false;
       const cx = c.x * 5 + 2;
       const cz = c.z * 5 + 2;
-      // 5×5×5圧縮木箱（1大ブロック全体）
       return Math.abs(absX - cx) <= 2 && Math.abs(absZ - cz) <= 2;
     });
   }
 
-  function isWorldItemAtAbs(absX, absZ) {
-    if (typeof WORLD_ITEMS === 'undefined') return null;
-    const tX = absToTile(absX);
-    const tZ = absToTile(absZ);
-    if (tX.sub !== 2 || tZ.sub !== 2) return null;
-    return WORLD_ITEMS.find(it => it.x === tX.tile && it.z === tZ.tile) || null;
+  function isCrateBlockingAtSubY(absX, totalSubY, absZ, areaId = getCurAreaId()) {
+    return DIG_STATE.crates.some(c => {
+      if (c.areaId !== areaId) return false;
+      const cx = c.x * 5 + 2;
+      const cz = c.z * 5 + 2;
+      if (Math.abs(absX - cx) > 2 || Math.abs(absZ - cz) > 2) return false;
+      const cBaseY = getCrateBaseSubY(c);
+      return totalSubY >= cBaseY && totalSubY < cBaseY + 5;
+    });
   }
 
-  // 旧セーブデータの自動マイグレーション（木箱220化・headSoil初期化・散らばり土キー階層化）
   function loadDigState() {
+    let loaded = false;
     try {
       if (typeof safeStorage !== 'undefined') {
         const raw = safeStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object') {
+          if (parsed && typeof parsed === 'object' && parsed.initializedCleanV6) {
             DIG_STATE = Object.assign(createDefaultState(), parsed);
             if (!Number.isFinite(DIG_STATE.headSoil)) DIG_STATE.headSoil = 0;
+            if (!Number.isFinite(DIG_STATE.pocketSoil)) DIG_STATE.pocketSoil = 0;
             if (!Array.isArray(DIG_STATE.crates) || !DIG_STATE.crates.length) {
               DIG_STATE.crates = createDefaultState().crates;
             } else {
@@ -537,12 +615,10 @@
                 if (!c.capacity || c.capacity < CRATE_CAPACITY) c.capacity = CRATE_CAPACITY;
               });
             }
-            if (!DIG_STATE.shovel || typeof DIG_STATE.shovel !== 'object') {
-              DIG_STATE.shovel = createDefaultState().shovel;
-            }
             if (!DIG_STATE.worldSubSoils || typeof DIG_STATE.worldSubSoils !== 'object') {
               DIG_STATE.worldSubSoils = {};
             }
+            loaded = true;
           }
         }
       }
@@ -550,42 +626,22 @@
       DIG_STATE = createDefaultState();
     }
 
-    if (!DIG_STATE.initializedStart) {
-      if (typeof BAG !== 'undefined' && Array.isArray(BAG)) BAG.length = 0;
-      DIG_STATE.pocketSoil = 0;
-      DIG_STATE.headSoil = 0;
-      DIG_STATE.shovel = { held: true, areaId: getCurAreaId(), absX: 2, absZ: 2 };
-      DIG_STATE.initializedStart = true;
-      saveDigState();
-      if (typeof saveWorldState === 'function') saveWorldState();
-    }
-
-    syncDugCellsToChipMap();
-
-    // 旧キー `${areaId}|${absX},${absZ}` を `${areaId}|${absX},${absZ}|${floorSubY}` へ自動変換
-    let migrated = false;
-    const nextSoils = {};
-    Object.keys(DIG_STATE.worldSubSoils).forEach(k => {
-      const cnt = DIG_STATE.worldSubSoils[k] || 0;
-      if (cnt <= 0) return;
-      const p = parseSoilKey(k);
-      if (!p) return;
-      const floorY = (p.floorSubY !== null) ? p.floorSubY : getTerrainColumnTopSubY(p.absX, p.absZ);
-      const nk = makeSoilKey(p.absX, p.absZ, floorY, p.areaId);
-      nextSoils[nk] = (nextSoils[nk] || 0) + cnt;
-      if (p.floorSubY === null) migrated = true;
-    });
-    DIG_STATE.worldSubSoils = nextSoils;
-    if (migrated) saveDigState();
-
-    // 起動時のロボット足元サブYを同期
-    if (typeof ROBOT !== 'undefined' && ROBOT && ROBOT.pos) {
-      ROBOT.pos.subY = getRobotBaseSubY();
+    if (!loaded) {
+      applyCleanTestTerrain(true);
+    } else {
+      relocatePortalsToCorner();
+      purgeLegacyItems();
+      syncDugCellsToChipMap();
+      if (typeof ROBOT !== 'undefined' && ROBOT && ROBOT.pos) {
+        ROBOT.pos.sx = Math.max(0, Math.min(4, Math.round(Number.isFinite(ROBOT.pos.sx) ? ROBOT.pos.sx : 2)));
+        ROBOT.pos.sz = Math.max(0, Math.min(4, Math.round(Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2)));
+        ROBOT.pos.subY = getRobotBaseSubY();
+      }
     }
   }
 
   // --------------------------------------------------------------------------
-  // 2. A案：キャラの1人称視野記号マップ（厳密DDA視線・停止180° / 移動狭い前方視野）
+  // 2. A案：キャラの1人称視野記号マップ（厳密DDA視線・木箱遮蔽・段差高さ整合）
   // --------------------------------------------------------------------------
   function getFacingBasis() {
     const rot = ROBOT.rotY || 0;
@@ -623,7 +679,6 @@
     };
   }
 
-  // 背後（135〜180°）判定（左右45〜90°は即行動OK、背後のみ振り返り1ターン消費）
   function isBehindCurrentFacing(dir) {
     if (!dir) return false;
     const curRot = ROBOT.rotY || 0;
@@ -632,11 +687,9 @@
     const tx = (dir.dx || 0) / len;
     const tz = (dir.dz || 0) / len;
     const dot = cx * tx + cz * tz;
-    // cos(112.5°) ≒ -0.383（90°真横はdot=0で即行動OK、135°は-0.707・180°は-1で背後扱い）
     return dot < -0.38;
   }
 
-  // 厳密2Dグリッド線分（DDA）による視線判定
   function isVisibleFromEye(curAbsX, curAbsZ, eyeSubY, targetAbsX, targetAbsZ) {
     const x0 = Math.round(curAbsX);
     const z0 = Math.round(curAbsZ);
@@ -644,6 +697,7 @@
     const z1 = Math.round(targetAbsZ);
     if (x0 === x1 && z0 === z1) return true;
 
+    const areaId = getCurAreaId();
     const dx = x1 - x0;
     const dz = z1 - z0;
     const stepX = dx > 0 ? 1 : (dx < 0 ? -1 : 0);
@@ -661,7 +715,8 @@
     const isBlockingCell = (mx, mz) => {
       if (!isInsideIslandAbs(mx, mz)) return true;
       if (hasSolidTerrainAtAbsSubY(mx, eyeSubY, mz)) return true;
-      if (hasLooseSoilAtSubY(mx, eyeSubY, mz)) return true;
+      if (hasLooseSoilAtSubY(mx, eyeSubY, mz, areaId)) return true;
+      if (isCrateBlockingAtSubY(mx, eyeSubY, mz, areaId)) return true;
       return false;
     };
 
@@ -736,15 +791,12 @@
         }
 
         let ch = '.';
-        if (DIG_STATE.shovel && !DIG_STATE.shovel.held && DIG_STATE.shovel.areaId === areaId &&
-            DIG_STATE.shovel.absX === tx && DIG_STATE.shovel.absZ === tz) {
-          ch = 'S';
-        } else if (isCrateAtAbs(tx, tz, areaId)) {
+        if (isCrateBlockingAtSubY(tx, baseSubY, tz, areaId) || isCrateBlockingAtSubY(tx, eyeSubY, tz, areaId)) {
           ch = 'B';
         } else {
-          const item = isWorldItemAtAbs(tx, tz);
           const floorHere = findFloorSubYBelow(tx, tz, baseSubY + 1);
           const loose = getLooseSoilAtFloor(tx, tz, floorHere, areaId);
+          const looseTopY = floorHere + loose;
           const solid0 = hasSolidTerrainAtAbsSubY(tx, baseSubY, tz);
           const solid1 = hasSolidTerrainAtAbsSubY(tx, baseSubY + 1, tz);
           let hasLowCeiling = solid1;
@@ -757,17 +809,17 @@
             }
           }
 
-          if (item && item.type === 'apple') {
-            ch = 'A';
-          } else if (loose > 0 && floorHere <= baseSubY + 1) {
-            ch = String(Math.min(9, loose));
+          // 散らばり土は自分の足元高さ以上に飛び出している場合のみ段数表示（下の階の土はv扱い）
+          if (loose > 0 && floorHere <= baseSubY + 1 && looseTopY > baseSubY) {
+            const relHeight = (floorHere === baseSubY) ? loose : (looseTopY - baseSubY);
+            ch = String(Math.min(9, Math.max(1, relHeight)));
           } else if (solid0 && solid1) {
             ch = '#';
           } else if (solid0 && !solid1) {
             ch = '+';
           } else if (!solid0 && hasLowCeiling) {
             ch = '^';
-          } else if (floorHere === baseSubY) {
+          } else if (floorHere === baseSubY || looseTopY === baseSubY) {
             ch = '.';
           } else {
             ch = 'v';
@@ -778,15 +830,15 @@
       topRows.push(row.trimEnd());
     }
 
-    // 目の前1列目の正面断面図（列ラベル付きで真正面と左右を明確化）
-    const frontDist = Math.floor(stats.reachW / 2) + 1;
+    // 目の前ちょうど1列目の正面断面図（占有端基準で全25体格・全方向ズレなし）
+    const frontEdge = getFrontEdgeOffset(basis.fx, basis.fz, stats.reachW);
     const sliceRows = ['列 : L2 L1 正 R1 R2'];
     for (let h = 4; h >= -1; h--) {
       const label = h >= 0 ? `高${h + 1}` : '床 ';
       let row = `${label}: `;
       for (let lat = -2; lat <= 2; lat++) {
-        const tx = absX + basis.fx * frontDist + basis.rx * lat;
-        const tz = absZ + basis.fz * frontDist + basis.rz * lat;
+        const tx = absX + frontEdge.ox + basis.rx * lat;
+        const tz = absZ + frontEdge.oz + basis.rz * lat;
         if (!isInsideIslandAbs(tx, tz)) {
           row += ' ~ ';
           continue;
@@ -796,7 +848,7 @@
           row += ' # ';
         } else if (hasLooseSoilAtSubY(tx, curY, tz, areaId)) {
           row += ' o ';
-        } else if (h >= 0 && h < 5 && isCrateAtAbs(tx, tz, areaId)) {
+        } else if (isCrateBlockingAtSubY(tx, curY, tz, areaId)) {
           row += ' B ';
         } else {
           row += ' . ';
@@ -815,12 +867,12 @@
       ...topRows,
       `[目の前1列目の正面断面 (L2=左2, L1=左1, 正=正面, R1=右1, R2=右2)]`,
       ...sliceRows,
-      `記号: @=自分 #=壁(高1〜高2以上) +=1段高 ^=高1空洞(高2以上に壁/低天井) .=平坦/空間 v=低い床/穴 1-9/o=散らばり土(段数) B=圧縮木箱(5x5x5) S=シャベル A=リンゴ ~=端 ?=死角`
+      `記号: @=自分 #=壁(高2以上) +=1段高 ^=高1空洞(高2以上に壁/低天井) .=平坦/空間 v=低い床/穴 1-9/o=散らばり土(段数) B=圧縮木箱(5x5x5) ~=端 ?=死角`
     ].join('\n');
   }
 
   // --------------------------------------------------------------------------
-  // 3. 3D描画（5×5×5圧縮木箱・散らばり土・地面シャベル・頭上ピラミッド）
+  // 3. 3D描画（圧縮木箱・散らばり土・頭上ピラミッド・端っこポータル停止目印）
   // --------------------------------------------------------------------------
   const digVisualGroup = new THREE.Group();
   digVisualGroup.name = 'dig_rules_visual_group';
@@ -867,6 +919,26 @@
     return grp;
   }
 
+  function buildCornerPortalIconMesh() {
+    const grp = new THREE.Group();
+    const yBase = _origGetSurfaceYAt ? _origGetSurfaceYAt(PORTAL_CORNER_POS.x, PORTAL_CORNER_POS.z, null, 5) : 0;
+    grp.position.set(PORTAL_CORNER_POS.x, yBase + 0.015, PORTAL_CORNER_POS.z);
+
+    const basePlate = new THREE.Mesh(
+      new THREE.BoxGeometry(0.68, 0.03, 0.68),
+      new THREE.MeshLambertMaterial({ color: 0x334155 })
+    );
+    grp.add(basePlate);
+
+    const innerRing = new THREE.Mesh(
+      new THREE.BoxGeometry(0.46, 0.04, 0.46),
+      new THREE.MeshLambertMaterial({ color: 0x64748b })
+    );
+    grp.add(innerRing);
+
+    return grp;
+  }
+
   function renderHeadPyramidVisual() {
     while (headPyramidGroup.children.length) headPyramidGroup.remove(headPyramidGroup.children[0]);
     const count = Math.max(0, Math.floor(DIG_STATE.headSoil || 0));
@@ -900,9 +972,12 @@
 
   function renderDigVisuals() {
     while (digVisualGroup.children.length) digVisualGroup.remove(digVisualGroup.children[0]);
-    syncHandShovelVisibility();
     renderHeadPyramidVisual();
     const areaId = getCurAreaId();
+
+    if (areaId === 'home') {
+      digVisualGroup.add(buildCornerPortalIconMesh());
+    }
 
     DIG_STATE.crates.forEach(c => {
       if (c.areaId === areaId) digVisualGroup.add(buildCrateMesh(c));
@@ -926,20 +1001,10 @@
         digVisualGroup.add(m);
       }
     });
-
-    if (DIG_STATE.shovel && !DIG_STATE.shovel.held && DIG_STATE.shovel.areaId === areaId) {
-      const sh = createKidShovelMesh(1.25);
-      const { wx, wz } = absToWorldXZ(DIG_STATE.shovel.absX, DIG_STATE.shovel.absZ);
-      const floorY = getTerrainColumnTopSubY(DIG_STATE.shovel.absX, DIG_STATE.shovel.absZ);
-      const topSubY = floorY + getLooseSoilAtFloor(DIG_STATE.shovel.absX, DIG_STATE.shovel.absZ, floorY, areaId);
-      sh.position.set(wx, topSubY * SUB_SIZE + 0.06, wz);
-      sh.rotation.set(Math.PI / 2 - 0.12, 0.7, 0.4);
-      digVisualGroup.add(sh);
-    }
   }
 
   // --------------------------------------------------------------------------
-  // 4. 物理アクション実装（純粋な物理結果のみ返却・誘導テキストなし）
+  // 4. 物理アクション実装（純粋な物理結果のみ返却・誘導なし）
   // --------------------------------------------------------------------------
   function runTurnAroundOnly(dir, intendedVerb) {
     ROBOT.rotY = dir.rot;
@@ -961,50 +1026,71 @@
     };
   }
 
-  // 正面距離1に「自分の届く高さより上」の壁だけが残っているかを確認（空振り時の物理事実通知用）
+  // 指定方角の「占有端のちょうど1列目」に並ぶ横幅分のセル座標列を返す（左右ソート対応）
+  function buildFrontRowCells(curAbsX, curAbsZ, dir, stats, thought) {
+    const dx = Math.sign((dir && dir.dx) || 0);
+    const dz = Math.sign((dir && dir.dz) || 0);
+    const { minOff, maxOff } = getFootprintBounds(stats.reachW);
+    const frontEdge = getFrontEdgeOffset(dx, dz, stats.reachW);
+    const cells = [];
+
+    if (dx === 0 && dz !== 0) {
+      // 南北向き：横幅はX軸の占有範囲そのまま
+      for (let ox = minOff; ox <= maxOff; ox++) {
+        cells.push({ absX: curAbsX + ox, absZ: curAbsZ + frontEdge.oz });
+      }
+    } else if (dz === 0 && dx !== 0) {
+      // 東西向き：横幅はZ軸の占有範囲そのまま
+      for (let oz = minOff; oz <= maxOff; oz++) {
+        cells.push({ absX: curAbsX + frontEdge.ox, absZ: curAbsZ + oz });
+      }
+    } else {
+      // 斜め向き：占有前端の角を中心に直交する幅分
+      const px = -dz;
+      const pz = dx;
+      for (let w = minOff; w <= maxOff; w++) {
+        cells.push({
+          absX: curAbsX + frontEdge.ox + px * w,
+          absZ: curAbsZ + frontEdge.oz + pz * w
+        });
+      }
+    }
+
+    // 視界の右ベクトル基準で左/右/中央優先にソート
+    const rx = -dz;
+    const rz = dx;
+    const t = String(thought || '');
+    const lateralScore = (c) => (c.absX - curAbsX) * rx + (c.absZ - curAbsZ) * rz;
+    if (t.includes('左')) {
+      cells.sort((a, b) => lateralScore(a) - lateralScore(b));
+    } else if (t.includes('右')) {
+      cells.sort((a, b) => lateralScore(b) - lateralScore(a));
+    } else {
+      cells.sort((a, b) => Math.abs(lateralScore(a)) - Math.abs(lateralScore(b)));
+    }
+    return cells;
+  }
+
   function hasUnreachableUpperWallInFront(dir, stats) {
     const { absX: curAbsX, absZ: curAbsZ } = getRobotAbsPos();
     const baseSubY = getRobotBaseSubY();
-    const dx = Math.sign((dir && dir.dx) || 0);
-    const dz = Math.sign((dir && dir.dz) || 0);
-    let px = -dz, pz = dx;
-    if (dx !== 0 && dz !== 0) { px = -dz; pz = 0; }
-    if (px === 0 && pz === 0) { px = 1; pz = 0; }
-
-    const halfW = Math.floor(stats.reachW / 2);
-    const maxDist = Math.floor(stats.reachW / 2) + 1;
-    for (let dist = 1; dist <= maxDist; dist++) {
-      for (let i = 0; i < stats.reachW; i++) {
-        const w = i - halfW;
-        const tx = curAbsX + dx * dist + px * w;
-        const tz = curAbsZ + dz * dist + pz * w;
-        for (let h = stats.reachH; h <= 4; h++) {
-          if (hasSolidTerrainAtAbsSubY(tx, baseSubY + h, tz)) return true;
+    const frontCells = buildFrontRowCells(curAbsX, curAbsZ, dir, stats, '');
+    for (let i = 0; i < frontCells.length; i++) {
+      for (let h = stats.reachH; h <= 4; h++) {
+        if (hasSolidTerrainAtAbsSubY(frontCells[i].absX, baseSubY + h, frontCells[i].absZ)) {
+          return true;
         }
       }
     }
     return false;
   }
 
-  // 掘削対象探索（モード別厳密分離：'front'=正面の壁のみ / 'down'=足元・目の前の地面のみ / 'up'=頭上の天井のみ）
+  // 掘削対象探索（モード別厳密分離：水際保護壁は除外）
   function findDigTargetByMode(mode, dir, thought) {
     const stats = getSizeStats();
     const { absX: curAbsX, absZ: curAbsZ } = getRobotAbsPos();
     const baseSubY = getRobotBaseSubY();
-
-    const dx = Math.sign((dir && dir.dx) || 0);
-    const dz = Math.sign((dir && dir.dz) || 0);
-    let px = -dz, pz = dx;
-    if (dx !== 0 && dz !== 0) { px = -dz; pz = 0; }
-    if (px === 0 && pz === 0) { px = 1; pz = 0; }
-
-    const t = String(thought || '');
-    const halfW = Math.floor(stats.reachW / 2);
-    const wList = [];
-    for (let i = 0; i < stats.reachW; i++) wList.push(i - halfW);
-    if (t.includes('左')) wList.sort((a, b) => a - b);
-    else if (t.includes('右')) wList.sort((a, b) => b - a);
-    else wList.sort((a, b) => Math.abs(a) - Math.abs(b));
+    let hitWaterProtected = false;
 
     const checkCell = (absX, totalSubY, absZ, kindLabel) => {
       if (!isInsideIslandAbs(absX, absZ)) return null;
@@ -1013,6 +1099,10 @@
       const yInfo = subYToLvSy(totalSubY);
       if (!hasSolidTerrainSubVoxel(tX.tile, tZ.tile, yInfo.lv, tX.sub, yInfo.sy, tZ.sub)) return null;
       if (!isExposedToAir(tX.tile, tZ.tile, yInfo.lv, tX.sub, yInfo.sy, tZ.sub)) return null;
+      if (isWaterProtectedCell(tX.tile, tZ.tile, yInfo.lv, tX.sub, yInfo.sy, tZ.sub)) {
+        hitWaterProtected = true;
+        return null;
+      }
       return {
         tx: tX.tile, tz: tZ.tile, lv: yInfo.lv,
         tsx: tX.sub, tsy: yInfo.sy, tsz: tZ.sub,
@@ -1020,78 +1110,98 @@
       };
     };
 
-    const maxDist = Math.floor(stats.reachW / 2) + 1;
-    const distList = [];
-    for (let d = 1; d <= maxDist; d++) distList.push(d);
-
-    // 1. 正面の壁専用（地面・天井へは絶対にフォールバックしない）
+    // 1. 正面の壁専用（占有端ちょうど1列目の高さ1〜reachHのみ）
     if (mode === 'front') {
-      const hList = [];
-      for (let y = 0; y < stats.reachH; y++) hList.push(y);
-      hList.sort((a, b) => b - a);
-
-      for (let di = 0; di < distList.length; di++) {
-        const dist = distList[di];
-        for (let hi = 0; hi < hList.length; hi++) {
-          for (let wi = 0; wi < wList.length; wi++) {
-            const hit = checkCell(curAbsX + dx * dist + px * wList[wi], baseSubY + hList[hi], curAbsZ + dz * dist + pz * wList[wi], '壁');
-            if (hit) return hit;
-          }
+      const frontCells = buildFrontRowCells(curAbsX, curAbsZ, dir, stats, thought);
+      for (let h = stats.reachH - 1; h >= 0; h--) {
+        for (let i = 0; i < frontCells.length; i++) {
+          const hit = checkCell(frontCells[i].absX, baseSubY + h, frontCells[i].absZ, '壁');
+          if (hit) return { target: hit, hitWaterProtected: false };
         }
       }
-      return null;
+      return { target: null, hitWaterProtected };
     }
 
     // 2. 地面・足元専用（baseSubY - 1 のみ対象）
     if (mode === 'down') {
+      const t = String(thought || '');
       const preferUnderFeet = t.includes('真下') || t.includes('足元');
-      const dOrder = preferUnderFeet ? [0, ...distList] : [...distList, 0];
-      for (let di = 0; di < dOrder.length; di++) {
-        const dist = dOrder[di];
-        const kindLabel = (dist === 0) ? '足元の床' : '目の前の地面';
-        for (let wi = 0; wi < wList.length; wi++) {
-          const hit = checkCell(curAbsX + dx * dist + px * wList[wi], baseSubY - 1, curAbsZ + dz * dist + pz * wList[wi], kindLabel);
-          if (hit) return hit;
+      const frontCells = buildFrontRowCells(curAbsX, curAbsZ, dir, stats, thought);
+      const { minOff, maxOff } = getFootprintBounds(stats.reachW);
+      const underCells = [];
+      for (let ox = minOff; ox <= maxOff; ox++) {
+        for (let oz = minOff; oz <= maxOff; oz++) {
+          underCells.push({ absX: curAbsX + ox, absZ: curAbsZ + oz, dist: Math.abs(ox) + Math.abs(oz) });
         }
       }
-      return null;
+      underCells.sort((a, b) => a.dist - b.dist);
+
+      const groups = preferUnderFeet
+        ? [{ list: underCells, label: '足元の床' }, { list: frontCells, label: '目の前の地面' }]
+        : [{ list: frontCells, label: '目の前の地面' }, { list: underCells, label: '足元の床' }];
+
+      for (let g = 0; g < groups.length; g++) {
+        const list = groups[g].list;
+        for (let i = 0; i < list.length; i++) {
+          const hit = checkCell(list[i].absX, baseSubY - 1, list[i].absZ, groups[g].label);
+          if (hit) return { target: hit, hitWaterProtected: false };
+        }
+      }
+      return { target: null, hitWaterProtected };
     }
 
-    // 3. 天井専用（現在姿勢の頭上〜届く高さの上面のみ対象）
+    // 3. 天井専用（自分の占有範囲の真上のみ対象：背後無回転掘削を防止）
     if (mode === 'up') {
       const minCeilH = Math.max(1, stats.bodyHeight);
       const maxCeilH = stats.reachH;
-      const dOrder = [0, ...distList];
-      for (let h = minCeilH; h <= maxCeilH; h++) {
-        for (let di = 0; di < dOrder.length; di++) {
-          const dist = dOrder[di];
-          const kindLabel = (dist === 0) ? '頭上の天井' : '前方の天井';
-          for (let wi = 0; wi < wList.length; wi++) {
-            const hit = checkCell(curAbsX + dx * dist + px * wList[wi], baseSubY + h, curAbsZ + dz * dist + pz * wList[wi], kindLabel);
-            if (hit) return hit;
-          }
+      const { minOff, maxOff } = getFootprintBounds(stats.reachW);
+      const topCells = [];
+      for (let ox = minOff; ox <= maxOff; ox++) {
+        for (let oz = minOff; oz <= maxOff; oz++) {
+          topCells.push({ absX: curAbsX + ox, absZ: curAbsZ + oz, dist: Math.abs(ox) + Math.abs(oz) });
         }
       }
-      return null;
+      topCells.sort((a, b) => a.dist - b.dist);
+
+      for (let h = minCeilH; h <= maxCeilH; h++) {
+        for (let i = 0; i < topCells.length; i++) {
+          const hit = checkCell(topCells[i].absX, baseSubY + h, topCells[i].absZ, '頭上の天井');
+          if (hit) return { target: hit, hitWaterProtected: false };
+        }
+      }
+      return { target: null, hitWaterProtected };
     }
 
-    return null;
+    return { target: null, hitWaterProtected: false };
   }
 
-  // 散らばり＆落下先の厳密決定：
-  // ① 掘った真下や奥に抜けた空間があれば押し出し落下（底なしは空間底まで重力落下）
-  // ② 奥が壁塞がりなら、キャラ占有外・掘削対象外・木箱外で太さ幅の周囲安定床（同じ高さ〜届く高さ）へ高さ×2段まで散らばり
-  // ③ 全部埋まっていれば null（置き場不足で掘削停止）
+  function describeRelativeDropPosition(ox, oz, heightDiff) {
+    const basis = getFacingBasis();
+    const fwd = ox * basis.fx + oz * basis.fz;
+    const lat = ox * basis.rx + oz * basis.rz;
+    let posLabel = '周囲';
+    if (fwd > 0 && lat > 0) posLabel = '右前';
+    else if (fwd > 0 && lat < 0) posLabel = '左前';
+    else if (fwd > 0) posLabel = '前方';
+    else if (fwd === 0 && lat > 0) posLabel = '右横';
+    else if (fwd === 0 && lat < 0) posLabel = '左横';
+    else if (fwd < 0 && lat > 0) posLabel = '右後ろ';
+    else if (fwd < 0 && lat < 0) posLabel = '左後ろ';
+    else if (fwd < 0) posLabel = '後ろ';
+    return heightDiff > 0 ? `${posLabel}の${heightDiff}段上の床` : `${posLabel}の床`;
+  }
+
   function findDropSlotForDugSoil(target, dir, stats) {
     const areaId = getCurAreaId();
     const { absX: rAbsX, absZ: rAbsZ } = getRobotAbsPos();
     const baseSubY = getRobotBaseSubY();
     const dx = Math.sign((dir && dir.dx) || 0);
     const dz = Math.sign((dir && dir.dz) || 0);
+    const basis = getFacingBasis();
 
     function canPlaceOnFloor(tx, tz, floorY, ignoreMaxHeightOnDeepFall = false) {
       if (!isInsideIslandAbs(tx, tz)) return false;
-      if (isCrateAtAbs(tx, tz, areaId)) return false;
+      if (isCrateBlockingAtSubY(tx, floorY, tz, areaId)) return false;
       if (isInsideRobotFootprint(tx, tz, rAbsX, rAbsZ, stats.reachW) && Math.abs(floorY - baseSubY) <= stats.reachH) {
         return false;
       }
@@ -1100,6 +1210,7 @@
       if (curStack >= limit) return false;
       const placeY = floorY + curStack;
       if (hasSolidTerrainAtAbsSubY(tx, placeY, tz)) return false;
+      if (isCrateBlockingAtSubY(tx, placeY, tz, areaId)) return false;
       return true;
     }
 
@@ -1118,11 +1229,11 @@
       }
     }
 
-    // ①-B：奥に抜けた空間（●■☆）→ 奥へ押し出して重力落下（底がなければ底まで落下）
+    // ①-B：奥に抜けた空間 → 奥へ押し出して重力落下
     if (dx !== 0 || dz !== 0) {
       const bx = target.absX + dx;
       const bz = target.absZ + dz;
-      if (isInsideIslandAbs(bx, bz) && !isCrateAtAbs(bx, bz, areaId) &&
+      if (isInsideIslandAbs(bx, bz) && !isCrateBlockingAtSubY(bx, target.totalSubY, bz, areaId) &&
           !hasSolidTerrainAtAbsSubY(bx, target.totalSubY, bz)) {
         const behindFloorY = findFloorSubYBelow(bx, bz, target.totalSubY);
         const isDeepFall = (behindFloorY < baseSubY);
@@ -1138,8 +1249,7 @@
       }
     }
 
-    // ②：奥が壁塞がり → キャラ周囲（太さ幅・キャラ占有外・掘削対象外）の安定床へ高さ×2段まで散らばり
-    // 1段くぼんだ穴の中からでも、手が届く高さ（baseSubY 〜 baseSubY + reachH）の周囲床へ放り出せるようにする
+    // ②：奥が壁塞がり → キャラ周囲（太さ幅・キャラ占有外・掘削対象外）の安定床へ散らばり
     const { minOff, maxOff } = getFootprintBounds(stats.reachW);
     const spreadSpan = stats.reachW;
     const minSearch = minOff - spreadSpan;
@@ -1153,13 +1263,13 @@
         if (!isInsideIslandAbs(tx, tz)) continue;
         if (isInsideRobotFootprint(tx, tz, rAbsX, rAbsZ, stats.reachW)) continue;
         if (tx === target.absX && tz === target.absZ) continue;
-        if (isCrateAtAbs(tx, tz, areaId)) continue;
 
-        // 同じ高さ〜手が届く高さ(+reachH)の中で、空間に接している安定床面を探索
         let chosenFloorY = null;
         for (let h = 0; h <= stats.reachH; h++) {
           const yCheck = baseSubY + h;
-          if (!hasSolidTerrainAtAbsSubY(tx, yCheck, tz) && hasSolidTerrainAtAbsSubY(tx, yCheck - 1, tz)) {
+          if (!hasSolidTerrainAtAbsSubY(tx, yCheck, tz) &&
+              !isCrateBlockingAtSubY(tx, yCheck, tz, areaId) &&
+              hasSolidTerrainAtAbsSubY(tx, yCheck - 1, tz)) {
             chosenFloorY = yCheck;
             break;
           }
@@ -1169,35 +1279,41 @@
         const stack = getLooseSoilAtFloor(tx, tz, chosenFloorY, areaId);
         if (stack >= stats.maxStackHeight) continue;
         if (hasSolidTerrainAtAbsSubY(tx, chosenFloorY + stack, tz)) continue;
+        if (isCrateBlockingAtSubY(tx, chosenFloorY + stack, tz, areaId)) continue;
 
         const dist = Math.max(Math.abs(ox), Math.abs(oz));
         const heightDiff = chosenFloorY - baseSubY;
+        const fwdDot = ox * basis.fx + oz * basis.fz;
+        const rearPenalty = fwdDot < 0 ? 1.5 : 0;
+
         candidates.push({
           absX: tx,
           absZ: tz,
+          ox,
+          oz,
           floorSubY: chosenFloorY,
           stack,
           dist,
           heightDiff,
-          rand: Math.random()
+          rearPenalty
         });
       }
     }
 
     if (!candidates.length) return null;
 
-    // 同じ高さの床・低い段数・近い安定床を優先しつつ自然に散らばる
     candidates.sort((a, b) =>
-      (a.heightDiff * 1.2 + a.stack * 1.4 + a.dist * 0.25 + a.rand * 0.6) -
-      (b.heightDiff * 1.2 + b.stack * 1.4 + b.dist * 0.25 + b.rand * 0.6)
+      (a.heightDiff * 3.0 + a.stack * 2.0 + a.rearPenalty + a.dist * 0.4) -
+      (b.heightDiff * 3.0 + b.stack * 2.0 + b.rearPenalty + b.dist * 0.4)
     );
     const chosen = candidates[0];
+    const relPosText = describeRelativeDropPosition(chosen.ox, chosen.oz, chosen.heightDiff);
     return {
       absX: chosen.absX,
       absZ: chosen.absZ,
       floorSubY: chosen.floorSubY,
       fellDown: false,
-      note: chosen.heightDiff > 0 ? '周囲の1段上の床へ散らばった' : '周囲の床へ散らばった'
+      note: `${relPosText}へ散らばった`
     };
   }
 
@@ -1213,9 +1329,16 @@
 
     const dName = (dir && dir.name) ? dir.name.replace('(斜め)', '') : '正面';
     const stats = getSizeStats();
-    const target = findDigTargetByMode(mode, dir, thought);
+    const { target, hitWaterProtected } = findDigTargetByMode(mode, dir, thought);
 
     if (!target) {
+      if (hitWaterProtected) {
+        return {
+          actionLabel: `🛡️ 島の外周（水際の保護壁）は削れなかった`,
+          physicalResult: `そこは島の外周（水際の保護壁）のため削れなかった`,
+          moved: false
+        };
+      }
       if (mode === 'front') {
         if (hasUnreachableUpperWallInFront(dir, stats)) {
           const reachLabel = stats.reachH === 1 ? '高1' : `高1〜${stats.reachH}`;
@@ -1270,7 +1393,6 @@
     addLooseSoilAtFloor(dropPos.absX, dropPos.absZ, dropPos.floorSubY, 1, areaId);
     const totalHere = getLooseSoilAtFloor(dropPos.absX, dropPos.absZ, dropPos.floorSubY, areaId);
 
-    // 足元の床を掘り抜いて支えが完全に失われた場合は、その場で下の空間へ重力落下
     let fallText = '';
     if (mode === 'down') {
       const { absX: rAbsX, absZ: rAbsZ } = getRobotAbsPos();
@@ -1291,7 +1413,7 @@
 
     const dirPrefix = (mode === 'up' || target.kind === '足元の床') ? '' : `${dName}の`;
     return {
-      actionLabel: `🪏 ${dirPrefix}${target.kind}を1分割削った(${dropPos.fellDown ? '下方へ落下' : `積${totalHere}/${stats.maxStackHeight}段`})`,
+      actionLabel: `⛏️ ${dirPrefix}${target.kind}を1分割削った(${dropPos.fellDown ? '下方へ落下' : `積${totalHere}/${stats.maxStackHeight}段`})`,
       physicalResult: `${dirPrefix}${target.kind}を1分割削り、土は${dropPos.note}(その場の積み段数${totalHere})${fallText}`,
       moved: false
     };
@@ -1349,6 +1471,7 @@
     let pickedPocket = 0;
     let pickedHead   = 0;
     let blockedByCeiling = false;
+    let blockedByCrawl   = false;
 
     for (let i = 0; i < nearby.length && (pickedPocket + pickedHead) < maxPerTurn; i++) {
       let avail = nearby[i].cnt;
@@ -1365,11 +1488,11 @@
       while (avail > 0 && (pickedPocket + pickedHead) < maxPerTurn) {
         const curHead = DIG_STATE.headSoil || 0;
         if (curHead >= stats.headCap) break;
-        const nextLayers = getHeadStackHeight(curHead + 1, stats.reachW);
-        if (ROBOT.posture === 'crawl' && clearance <= stats.crawlH) {
-          blockedByCeiling = true;
+        if (ROBOT.posture === 'crawl') {
+          blockedByCrawl = true;
           break;
         }
+        const nextLayers = getHeadStackHeight(curHead + 1, stats.reachW);
         if (stats.bodyHeight + nextLayers > clearance) {
           blockedByCeiling = true;
           break;
@@ -1383,11 +1506,17 @@
 
     const totalPicked = pickedPocket + pickedHead;
     if (totalPicked <= 0) {
+      if (blockedByCrawl) {
+        return {
+          actionLabel: `🟫 ほふく姿勢中のため頭上へ積めなかった`,
+          physicalResult: `ポケットが満杯で、ほふく姿勢中のため頭上ピラミッドへ積めなかった`,
+          moved: false
+        };
+      }
       if (blockedByCeiling) {
-        const postureNote = ROBOT.posture === 'crawl' ? 'ほふく前進中で' : '';
         return {
           actionLabel: `🟫 天井が低く頭上に載せられなかった(空き${clearance}段)`,
-          physicalResult: `ポケットが満杯で、${postureNote}天井の空き(${clearance}分割)が足りないため頭上ピラミッドへ積めなかった`,
+          physicalResult: `ポケットが満杯で、天井の空き(${clearance}分割)が足りないため頭上ピラミッドへ積めなかった`,
           moved: false
         };
       }
@@ -1398,7 +1527,6 @@
       };
     }
 
-    // 足元の散らばり土を拾った場合に高さを再同期
     ROBOT.pos.subY = computeExactFootSubYAt(absX, absZ, baseSubY, stats.reachW);
     ROBOT.pos.lv = floorSubYToRobotLv(ROBOT.pos.subY);
 
@@ -1410,11 +1538,13 @@
     const parts = [];
     if (pickedPocket > 0) parts.push(`ポケット+${pickedPocket}`);
     if (pickedHead > 0) parts.push(`頭上ピラミッド+${pickedHead}`);
-    const ceilNote = blockedByCeiling ? '（天井が低くこれ以上は頭上に載せられない）' : '';
+    const note = blockedByCrawl
+      ? '（ほふく姿勢中のため頭上には積めない）'
+      : (blockedByCeiling ? '（天井が低くこれ以上は頭上に載せられない）' : '');
 
     return {
       actionLabel: `🧺 土を${totalPicked}個回収(${parts.join('・')})`,
-      physicalResult: `周囲の土を${totalPicked}個拾った(${parts.join('、')})。現在ポケット${DIG_STATE.pocketSoil}/${stats.pocketCap}個、頭上${DIG_STATE.headSoil}/${stats.headCap}個(+${newHeadLayers}段)${ceilNote}`,
+      physicalResult: `周囲の土を${totalPicked}個拾った(${parts.join('、')})。現在ポケット${DIG_STATE.pocketSoil}/${stats.pocketCap}個、頭上${DIG_STATE.headSoil}/${stats.headCap}個(+${newHeadLayers}段)${note}`,
       moved: false
     };
   }
@@ -1440,11 +1570,13 @@
     const { absX, absZ } = getRobotAbsPos();
     const baseSubY = getRobotBaseSubY();
     const stats = getSizeStats();
-    const dist = Math.floor(stats.reachW / 2) + 1;
-    const tx = absX + Math.sign(dir.dx || 0) * dist;
-    const tz = absZ + Math.sign(dir.dz || 0) * dist;
+    const dx = Math.sign(dir.dx || 0);
+    const dz = Math.sign(dir.dz || 0);
+    const frontEdge = getFrontEdgeOffset(dx, dz, stats.reachW);
+    const tx = absX + frontEdge.ox;
+    const tz = absZ + frontEdge.oz;
 
-    if (!isInsideIslandAbs(tx, tz) || isCrateAtAbs(tx, tz, areaId)) {
+    if (!isInsideIslandAbs(tx, tz) || isCrateBlockingAtSubY(tx, baseSubY, tz, areaId)) {
       return {
         actionLabel: `🟫 ${dName}には置けなかった`,
         physicalResult: `${dName}の目の前は島の端または圧縮木箱のため土を置けなかった`,
@@ -1471,10 +1603,10 @@
         moved: false
       };
     }
-    if (hasSolidTerrainAtAbsSubY(tx, floorY + curStack, tz)) {
+    if (hasSolidTerrainAtAbsSubY(tx, floorY + curStack, tz) || isCrateBlockingAtSubY(tx, floorY + curStack, tz, areaId)) {
       return {
         actionLabel: `🟫 ${dName}は壁・天井で塞がっており置けない`,
-        physicalResult: `${dName}の目の前は固体ブロックで塞がっており土を置けなかった`,
+        physicalResult: `${dName}の目の前は固体ブロックまたは圧縮木箱で塞がっており土を置けなかった`,
         moved: false
       };
     }
@@ -1501,21 +1633,36 @@
     };
   }
 
+  // 圧縮木箱との接触判定（占有端から距離1分割以内＆手が届く高さのみ許可）
   function findNearbyCrate() {
     const areaId = getCurAreaId();
-    return DIG_STATE.crates.find(c =>
-      c.areaId === areaId &&
-      Math.abs(Math.round(ROBOT.pos.x) - c.x) <= 1 &&
-      Math.abs(Math.round(ROBOT.pos.z) - c.z) <= 1
-    ) || null;
+    const { absX, absZ } = getRobotAbsPos();
+    const baseSubY = getRobotBaseSubY();
+    const stats = getSizeStats();
+    const { minOff, maxOff } = getFootprintBounds(stats.reachW);
+    const rMinX = absX + minOff, rMaxX = absX + maxOff;
+    const rMinZ = absZ + minOff, rMaxZ = absZ + maxOff;
+
+    return DIG_STATE.crates.find(c => {
+      if (c.areaId !== areaId) return false;
+      const cMinX = c.x * 5, cMaxX = c.x * 5 + 4;
+      const cMinZ = c.z * 5, cMaxZ = c.z * 5 + 4;
+      const gapX = Math.max(0, cMinX - rMaxX, rMinX - cMaxX);
+      const gapZ = Math.max(0, cMinZ - rMaxZ, rMinZ - cMaxZ);
+      if (Math.max(gapX, gapZ) > 1) return false;
+
+      const cBaseY = getCrateBaseSubY(c);
+      const rTopY = baseSubY + stats.reachH;
+      return (rTopY >= cBaseY) && (baseSubY <= cBaseY + 5);
+    }) || null;
   }
 
   function runStoreCrate() {
     const crate = findNearbyCrate();
     if (!crate) {
       return {
-        actionLabel: '📦 すぐ隣に圧縮木箱がなかった',
-        physicalResult: '手が届く隣に圧縮木箱がなく、収納できなかった',
+        actionLabel: '📦 手が届くすぐ隣に圧縮木箱がなかった',
+        physicalResult: '手が届くすぐ隣（距離1分割以内・同じ高さ）に圧縮木箱がなく、収納できなかった',
         moved: false
       };
     }
@@ -1561,78 +1708,6 @@
     };
   }
 
-  function runShovelFree(dir, thought) {
-    if (isBehindCurrentFacing(dir)) {
-      return runTurnAroundOnly(dir, 'シャベル操作');
-    }
-
-    const t = String(thought || '');
-    const dName = dir.name.replace('(斜め)', '');
-    const areaId = getCurAreaId();
-    const { absX, absZ } = getRobotAbsPos();
-    ROBOT.rotY = dir.rot;
-
-    if (!DIG_STATE.shovel.held) {
-      if (DIG_STATE.shovel.areaId !== areaId) {
-        return {
-          actionLabel: '🪏 近くにシャベルがなかった',
-          physicalResult: '手が届く周囲にシャベルがなく、拾えなかった',
-          moved: false
-        };
-      }
-      const dist = Math.max(Math.abs(DIG_STATE.shovel.absX - absX), Math.abs(DIG_STATE.shovel.absZ - absZ));
-      if (dist <= 3) {
-        DIG_STATE.shovel.held = true;
-        saveDigState();
-        return {
-          actionLabel: '🪏 こども用シャベルを拾った',
-          physicalResult: '足元付近にあったこども用シャベルを右手に拾い上げた',
-          moved: false
-        };
-      }
-      return {
-        actionLabel: '🪏 手が届く範囲にシャベルがなかった',
-        physicalResult: '手が届く範囲にシャベルがなく、触れなかった',
-        moved: false
-      };
-    }
-
-    if (t.includes('投') || t.includes('ポイ') || t.includes('放り') || t.includes('飛ば')) {
-      const throwDist = 4;
-      const tx = Math.max(-10, Math.min(14, absX + Math.sign(dir.dx || 0) * throwDist));
-      const tz = Math.max(-10, Math.min(14, absZ + Math.sign(dir.dz || 0) * throwDist));
-      DIG_STATE.shovel = { held: false, areaId, absX: tx, absZ: tz };
-      life.mental = Math.min(100, life.mental + 6);
-      saveDigState();
-      return {
-        actionLabel: `🪏 シャベルを${dName}へ放り投げた`,
-        physicalResult: `こども用シャベルを${dName}方向へ約4分割先に投げ、右手は空になった`,
-        moved: false
-      };
-    }
-
-    if (t.includes('遊') || t.includes('振') || t.includes('ブン')) {
-      life.mental = Math.min(100, life.mental + 6);
-      ROBOT.params.cautionLimiter = Math.min(100, (ROBOT.params.cautionLimiter || 50) + 2);
-      return {
-        actionLabel: '🪏 シャベルを空中で振った',
-        physicalResult: '右手のこども用シャベルを空中で振った',
-        moved: false
-      };
-    }
-
-    const tx = Math.max(-10, Math.min(14, absX + Math.sign(dir.dx || 0)));
-    const tz = Math.max(-10, Math.min(14, absZ + Math.sign(dir.dz || 0)));
-    DIG_STATE.shovel = { held: false, areaId, absX: tx, absZ: tz };
-    saveDigState();
-    return {
-      actionLabel: `🪏 シャベルを${dName}の地面に置いた`,
-      physicalResult: `こども用シャベルを${dName}のすぐそばの地面に置き、右手は空になった`,
-      moved: false
-    };
-  }
-
-  // 足元占有範囲の支えを調べ、すべて空間（底が抜けた）なら下の着地床Yを返す
   function computeSupportedFloorUnderFootprint(centerAbsX, centerAbsZ, curBaseSubY, reachW) {
     const areaId = getCurAreaId();
     const { minOff, maxOff } = getFootprintBounds(reachW);
@@ -1659,7 +1734,6 @@
     };
   }
 
-  // 1分割移動先の足場高さ・姿勢・段差可否を brain.js の SIZE_SPECS 原本ルールで厳密評価
   function evaluateSubStepTarget(nextAbsX, nextAbsZ, curBaseSubY, curPosture, stats) {
     const areaId = getCurAreaId();
     const { minOff, maxOff } = getFootprintBounds(stats.reachW);
@@ -1674,11 +1748,10 @@
         if (!isInsideIslandAbs(cx, cz)) {
           return { ok: false, reason: '島の端' };
         }
-        if (isCrateAtAbs(cx, cz, areaId)) {
+        if (isCrateBlockingAtSubY(cx, curBaseSubY, cz, areaId)) {
           return { ok: false, reason: '圧縮木箱' };
         }
 
-        // curBaseSubY から上へ maxClimbUp 段以内で、固体地形も散らばり土もない最初の空き空間を探す
         let openY = null;
         let hitLooseSoil = false;
         let looseHeightHere = 0;
@@ -1687,9 +1760,13 @@
           const yTest = curBaseSubY + up;
           const solid = hasSolidTerrainAtAbsSubY(cx, yTest, cz);
           const loose = hasLooseSoilAtSubY(cx, yTest, cz, areaId);
-          if (!solid && !loose) {
+          const crate = isCrateBlockingAtSubY(cx, yTest, cz, areaId);
+          if (!solid && !loose && !crate) {
             openY = yTest;
             break;
+          }
+          if (crate) {
+            return { ok: false, reason: '圧縮木箱' };
           }
           if (loose && !solid) {
             hitLooseSoil = true;
@@ -1724,7 +1801,6 @@
       return { ok: false, reason: curPosture === 'crawl' ? 'ほふく前進では登れない段差（壁）' : '高すぎる段差（壁）' };
     }
 
-    // 移動先の天井クリアランスを確認し、立位 / ほふく姿勢を自動決定
     const clearance = getCeilingClearanceSubAt(nextAbsX, nextAbsZ, highestFloorY, stats.reachW);
     const needStandH = stats.standH + stats.headLayers;
     const needCrawlH = stats.crawlH + stats.headLayers;
@@ -1741,7 +1817,6 @@
       return { ok: false, reason: `低い天井(空き${clearance}段)` };
     }
 
-    // 段差の種類を原本ルール（stairMax / subH）で分類
     let stepKind = 'flat';
     if (diffSub > 0) {
       stepKind = (diffSub <= stats.stairMax) ? 'stairs_up' : 'scramble_climb';
@@ -1802,7 +1877,6 @@
         break;
       }
 
-      // 斜め移動の角抜け防止（brain.jsの世界観準拠：両隣が壁なら斜めすり抜け不可）
       if (dx !== 0 && dz !== 0) {
         const sideA = evaluateSubStepTarget(curAbsX + dx, curAbsZ, curBaseSubY, curPosture, stats);
         const sideB = evaluateSubStepTarget(curAbsX, curAbsZ + dz, curBaseSubY, curPosture, stats);
@@ -1840,7 +1914,6 @@
       curPosture = ev.nextPosture;
       movedSteps++;
 
-      // よじ登り・身長超え落下時はその段差で一旦止まる（1段ずつの自然な挙動）
       if (ev.stepKind === 'high_drop' || ev.stepKind === 'scramble_climb') {
         break;
       }
@@ -1896,11 +1969,10 @@
   }
 
   // --------------------------------------------------------------------------
-  // 5. 日記帳アイテム枠UI（上段1枠目:シャベル / 2〜5枠目:資源＆頭上 / 下段5枠:圧縮木箱220）
+  // 5. 日記帳ポケット＆圧縮木箱UI（シャベル＆旧石アイテム削除・純粋資源5枠＋木箱5枠）
   // --------------------------------------------------------------------------
-  const ITEM_ICONS = { apple: '🍎', stone: '🪨', oil: '🧴', grass: '🌿' };
-
   function renderPocketAndCrateDiaryUI() {
+    purgeLegacyItems();
     const grid = document.getElementById('bag-grid');
     if (!grid) return;
 
@@ -1908,43 +1980,12 @@
     const headNow = DIG_STATE.headSoil || 0;
     if (grid.previousElementSibling) {
       grid.previousElementSibling.innerText =
-        `🎒 ポケット(上限${stats.pocketCap})・頭上(${headNow}/${stats.headCap}) ／ 📦圧縮木箱(${DIG_STATE.crates.length}/5箱)`;
+        `🎒 資源ポケット(上限${stats.pocketCap})・頭上(${headNow}/${stats.headCap}) ／ 📦圧縮木箱(${DIG_STATE.crates.length}/5箱)`;
     }
 
     grid.innerHTML = '';
 
-    // 1枠目：こども用シャベル
-    {
-      const slot = document.createElement('div');
-      slot.className = 'bag-slot';
-      slot.style.flexDirection = 'column';
-      slot.style.gap = '1px';
-      slot.style.padding = '2px';
-
-      if (DIG_STATE.shovel && DIG_STATE.shovel.held) {
-        slot.classList.add('filled');
-        slot.style.borderColor = '#38bdf8';
-        slot.style.background = '#e0f2fe';
-        slot.innerHTML = `<span style="font-size:15px;line-height:1;">🪏</span><span style="font-size:8.5px;font-weight:900;color:#0369a1;">シャベル</span>`;
-        slot.onclick = () => {
-          if (typeof showToast === 'function') showToast('🪏 こども用シャベル（右手所持中）');
-        };
-      } else {
-        slot.style.borderStyle = 'dashed';
-        slot.style.borderColor = '#94a3b8';
-        slot.style.background = '#f1f5f9';
-        const sx = DIG_STATE.shovel ? absToTile(DIG_STATE.shovel.absX).tile : 0;
-        const sz = DIG_STATE.shovel ? absToTile(DIG_STATE.shovel.absZ).tile : 0;
-        slot.innerHTML = `<span style="font-size:13px;opacity:0.45;line-height:1;">🪏</span><span style="font-size:8px;font-weight:800;color:#64748b;">放置(${sx},${sz})</span>`;
-        slot.onclick = () => {
-          if (typeof showToast === 'function') showToast(`🪏 こども用シャベルは(${sx},${sz})付近に放置中`);
-        };
-      }
-      grid.appendChild(slot);
-    }
-
-    // 2〜5枠目：資源枠（2枠目に分割土ポケット＋頭上ピラミッド残数を表示）
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       const slot = document.createElement('div');
       slot.className = 'bag-slot';
       slot.style.flexDirection = 'column';
@@ -1966,19 +2007,11 @@
           }
         };
       } else {
-        const bagIdx = i - 1;
-        const item = (bagIdx >= 0 && typeof BAG !== 'undefined' && BAG[bagIdx]) ? BAG[bagIdx] : null;
-        if (item) {
-          slot.classList.add('filled');
-          slot.innerHTML = `<span style="font-size:18px;line-height:1;">${ITEM_ICONS[item] || '📦'}</span>`;
-        } else {
-          slot.innerHTML = `<span style="font-size:8.5px;color:#94a3b8;font-weight:800;">資源空</span>`;
-        }
+        slot.innerHTML = `<span style="font-size:8.5px;color:#94a3b8;font-weight:800;">資源空</span>`;
       }
       grid.appendChild(slot);
     }
 
-    // 下段5枠：圧縮木箱（5×5×5・容量220）
     for (let i = 0; i < 5; i++) {
       const slot = document.createElement('div');
       slot.className = 'bag-slot';
@@ -2008,7 +2041,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 6. 既存フック接続（getSurfaceYAt の1分割ロボット高さ同期含む・world.js無改造）
+  // 6. 既存フック接続（整数座標維持・クラウド旧データ遮断・手帳UI維持・1分割高さ同期）
   // --------------------------------------------------------------------------
   if (_origGetSurfaceYAt) {
     getSurfaceYAt = function(gx, gz, lvOverride = null, reqWidth = 1) {
@@ -2023,9 +2056,61 @@
     };
   }
 
+  // 体格切替時に brain.js が sx/sz を小数へ書き換えて3D見た目と物理がズレる現象を防止
+  if (typeof clampCharSubPosForBodySize === 'function') {
+    clampCharSubPosForBodySize = function() {
+      if (typeof ROBOT === 'undefined' || !ROBOT || !ROBOT.pos) return;
+      ROBOT.pos.sx = Math.max(0, Math.min(4, Math.round(Number.isFinite(ROBOT.pos.sx) ? ROBOT.pos.sx : 2)));
+      ROBOT.pos.sz = Math.max(0, Math.min(4, Math.round(Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2)));
+      ROBOT.pos.subY = getRobotBaseSubY();
+      ROBOT.pos.lv = floorSubYToRobotLv(ROBOT.pos.subY);
+    };
+  }
+
+  if (typeof applyLoadedWorldData === 'function') {
+    const _origApplyLoaded = applyLoadedWorldData;
+    applyLoadedWorldData = function(d) {
+      const hasOldHole = d && d.heightMap && (d.heightMap['0,0'] < 0 || d.heightMap['0,-1'] !== 1 || d.heightMap['0,-2'] !== 1);
+      const syncedFlag = (typeof safeStorage !== 'undefined') && safeStorage.getItem(CLOUD_SYNC_FLAG) === '1';
+      _origApplyLoaded(d);
+      purgeLegacyItems();
+      if (!syncedFlag || hasOldHole) {
+        applyCleanTestTerrain(true);
+      } else {
+        relocatePortalsToCorner();
+        syncDugCellsToChipMap();
+        if (typeof ROBOT !== 'undefined' && ROBOT && ROBOT.pos) {
+          ROBOT.pos.sx = Math.max(0, Math.min(4, Math.round(Number.isFinite(ROBOT.pos.sx) ? ROBOT.pos.sx : 2)));
+          ROBOT.pos.sz = Math.max(0, Math.min(4, Math.round(Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2)));
+          ROBOT.pos.subY = getRobotBaseSubY();
+        }
+      }
+      renderDigVisuals();
+      renderPocketAndCrateDiaryUI();
+    };
+  }
+
+  if (typeof saveWorldState === 'function') {
+    const _origSaveWorld = saveWorldState;
+    saveWorldState = function() {
+      purgeLegacyItems();
+      return _origSaveWorld.apply(this, arguments);
+    };
+  }
+
+  if (typeof renderDiaryModal === 'function') {
+    const _origRenderDiary = renderDiaryModal;
+    renderDiaryModal = function() {
+      _origRenderDiary.apply(this, arguments);
+      renderPocketAndCrateDiaryUI();
+    };
+  }
+
   if (typeof rebuildTerrainAndItems === 'function') {
     const _origRebuild = rebuildTerrainAndItems;
     rebuildTerrainAndItems = function() {
+      relocatePortalsToCorner();
+      purgeLegacyItems();
       syncDugCellsToChipMap();
       _origRebuild();
       renderDigVisuals();
@@ -2044,7 +2129,12 @@
   if (typeof resetGameDirectly === 'function') {
     const _origReset = resetGameDirectly;
     resetGameDirectly = function() {
-      try { if (typeof safeStorage !== 'undefined') safeStorage.removeItem(STORAGE_KEY); } catch (e) {}
+      try {
+        if (typeof safeStorage !== 'undefined') {
+          safeStorage.removeItem(STORAGE_KEY);
+          safeStorage.removeItem(CLOUD_SYNC_FLAG);
+        }
+      } catch (e) {}
       if (window.AICommCore && typeof window.AICommCore.resetPhysicalHistory === 'function') {
         window.AICommCore.resetPhysicalHistory();
       }
@@ -2072,14 +2162,12 @@
       const basis = getFacingBasis();
       const { absX, absZ } = getRobotAbsPos();
       const clearance = getCeilingClearanceSubAt(absX, absZ, getRobotBaseSubY(), stats.reachW);
-      const bagOther = (typeof BAG !== 'undefined' && BAG.length) ? BAG.join(',') : 'なし';
 
       return [
         `体格: 高さ${stats.reachH}分割 × 幅${stats.reachW}分割 (1ターン歩幅:最大${stats.moveStep}分割 / スイスイ階段:${stats.stairMax}段・よじ登り上限:${stats.maxStepUpSub}段 / ほふく高:${stats.crawlH} / 整理積み上げ上限:${stats.maxStackHeight}段)`,
         `向いている方角: ${basis.actualFacingName} / 姿勢: ${ROBOT.posture === 'crawl' ? 'ほふく' : '立位'} / 頭上の天井空き: ${clearance}分割`,
         `身体状態: 体力${st.stamina}/100, おなか${st.energy}/100`,
-        `右手: ${DIG_STATE.shovel.held ? 'こども用シャベルを所持' : '空手'}`,
-        `ポケット: 土${DIG_STATE.pocketSoil}個 (資源合計${getResourceTotalCount()}/${stats.pocketCap}個 / その他:${bagOther})`,
+        `ポケット: 土${DIG_STATE.pocketSoil}/${stats.pocketCap}個`,
         `頭上ピラミッド: 土${DIG_STATE.headSoil || 0}/${stats.headCap}個 (現在+${stats.headLayers}段・移動時の必要天井高さ:${stats.bodyHeight + stats.headLayers}分割)`
       ].join('\n');
     });
@@ -2110,13 +2198,13 @@
 
     window.AICommCore.registerAction({
       id: 'dig_up',
-      desc: '頭上の届く高さにある天井の露出ブロックを1分割削る',
+      desc: '頭上の届く高さにある真上の天井の露出ブロックを1分割削る',
       run: ({ dir, dec }) => { lastTurnActionId = 'dig_up'; return runSubDigByMode('up', dir, dec && dec.thought); }
     });
 
     window.AICommCore.registerAction({
       id: 'pickup_soil',
-      desc: 'すぐそばの地面にある散らばった土を拾う（ポケット満杯後は天井に収まる範囲で頭上ピラミッドへ積む）',
+      desc: 'すぐそばの地面にある散らばった土を拾う（ポケット満杯後は立位かつ天井に収まる範囲で頭上ピラミッドへ積む）',
       run: () => { lastTurnActionId = 'pickup_soil'; return runPickupSoil(); }
     });
 
@@ -2128,14 +2216,8 @@
 
     window.AICommCore.registerAction({
       id: 'store_crate',
-      desc: 'すぐ隣の圧縮木箱(容量220)へ頭上とポケットの土をまとめて入れる',
+      desc: '手が届くすぐ隣(距離1分割以内)の圧縮木箱(容量220)へ頭上とポケットの土をまとめて入れる',
       run: () => { lastTurnActionId = 'store_crate'; return runStoreCrate(); }
-    });
-
-    window.AICommCore.registerAction({
-      id: 'shovel_free',
-      desc: 'こども用シャベルを地面に置く・指定方角へ投げる・すぐそばから拾う・振る',
-      run: ({ dir, dec }) => { lastTurnActionId = 'shovel_free'; return runShovelFree(dir, dec && dec.thought); }
     });
 
     window.AICommCore.registerPostTurnHook(({ dec }) => {
@@ -2144,8 +2226,6 @@
 
       if (act === 'dig_front' || act === 'dig_down' || act === 'dig_up') {
         ROBOT.emotion = 'swing_v';
-      } else if (act === 'shovel_free') {
-        ROBOT.emotion = DIG_STATE.shovel.held ? 'swing_h' : 'wave';
       } else if (act === 'look') {
         ROBOT.emotion = 'peek';
       } else if (act === 'move' && lastMoveVisualKind === 'scramble_climb') {
@@ -2161,7 +2241,6 @@
         else ROBOT.emotion = 'normal';
       }
       lastMoveVisualKind = null;
-      syncHandShovelVisibility();
       renderHeadPyramidVisual();
       return null;
     });
@@ -2170,6 +2249,7 @@
   loadDigState();
   if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
   else renderDigVisuals();
+  if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition(true);
   renderPocketAndCrateDiaryUI();
 
   window.DigRulesModule = Object.freeze({
@@ -2178,6 +2258,7 @@
     buildFirstPersonVisionMap,
     renderPocketAndCrateDiaryUI,
     renderDigVisuals,
-    renderHeadPyramidVisual
+    renderHeadPyramidVisual,
+    applyCleanTestTerrain
   });
 })();
