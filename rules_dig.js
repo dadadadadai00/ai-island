@@ -1,8 +1,9 @@
 // ============================================================================
-// 【レゴ物理環境＆1人称純粋知覚モジュール：rules_dig.js（v5 掘削3分離・DDA視界修正版）】
-// ・掘削アクションを3分離：dig_front(正面の壁) / dig_down(足元・目の前の地面) / dig_up(頭上の天井)
-// ・視界判定を厳密2DグリッドDDA化＆座標整数正規化（見えている壁表面が「?」に潰れるバグを修正）
-// ・パノラマ視野＆正面断面図に列ラベル（L2〜正〜R2等）を追加し、左右位置の誤読を防止
+// 【レゴ物理環境＆1人称純粋知覚モジュール：rules_dig.js（v5.1 低天井記号^分離・空振り物理詳細版）】
+// ・高1が空洞で高2〜高5に壁/天井が残るマスをパノラマ視野で「^」に分離（#壁との誤認・連続空振りを解消）
+// ・dig_front空振り時に「届く高さは既に空洞・上部壁には背が届かない」物理事実を正確に返却
+// ・掘削アクション3分離：dig_front(正面の壁) / dig_down(足元・目の前の地面) / dig_up(頭上の天井)
+// ・視界判定の厳密2DグリッドDDA化＆座標整数正規化、列ラベル（L4〜正〜R4 / L2〜正〜R2）付き
 // ・world.jsの移動エラー内部コード（too_high_step等）を日本語の物理事実へ変換
 // ・ポケット最大55個＆頭上ピラミッド最大55個・5×5×5圧縮木箱(220)・重力落下・背後1ターン消費を維持
 // ※ brain.js / world.js / index.html / ai_comm.js は無改造のまま動作します
@@ -543,7 +544,7 @@
 
   // 厳密2Dグリッド線分（DDA）による視線判定：
   // 自分のマスと対象マス自身は遮蔽物に含めず、途中のマスのみ遮蔽チェックするため、
-  // 見えている壁の一番手前の表面は確実に「#」と表示され、その奥だけが「?」になる。
+  // 見えている壁の一番手前の表面は確実に表示され、その奥だけが「?」になる。
   function isVisibleFromEye(curAbsX, curAbsZ, eyeSubY, targetAbsX, targetAbsZ) {
     const x0 = Math.round(curAbsX);
     const z0 = Math.round(curAbsZ);
@@ -574,7 +575,6 @@
 
     for (let iter = 0; iter < maxIter; iter++) {
       if (Math.abs(tMaxX - tMaxZ) < 1e-9) {
-        // 格子点を斜めに通過する場合、両隣とも壁なら隙間透視を防ぐ
         const sideBlockA = (cx + stepX !== x1 || cz !== z1) && isBlockingCell(cx + stepX, cz);
         const sideBlockB = (cx !== x1 || cz + stepZ !== z1) && isBlockingCell(cx, cz + stepZ);
         if (sideBlockA && sideBlockB) return false;
@@ -654,14 +654,28 @@
           const item = isWorldItemAtAbs(tx, tz);
           const floorHere = findFloorSubYBelow(tx, tz, baseSubY + 1);
           const loose = getLooseSoilAtFloor(tx, tz, floorHere, areaId);
+          const solid0 = hasSolidTerrainAtAbsSubY(tx, baseSubY, tz);
+          const solid1 = hasSolidTerrainAtAbsSubY(tx, baseSubY + 1, tz);
+          let hasLowCeiling = solid1;
+          if (!hasLowCeiling && !solid0) {
+            for (let h = 2; h <= 4; h++) {
+              if (hasSolidTerrainAtAbsSubY(tx, baseSubY + h, tz)) {
+                hasLowCeiling = true;
+                break;
+              }
+            }
+          }
+
           if (item && item.type === 'apple') {
             ch = 'A';
           } else if (loose > 0 && floorHere <= baseSubY + 1) {
             ch = String(Math.min(9, loose));
-          } else if (hasSolidTerrainAtAbsSubY(tx, baseSubY + 1, tz)) {
+          } else if (solid0 && solid1) {
             ch = '#';
-          } else if (hasSolidTerrainAtAbsSubY(tx, baseSubY, tz)) {
+          } else if (solid0 && !solid1) {
             ch = '+';
+          } else if (!solid0 && hasLowCeiling) {
+            ch = '^';
           } else if (floorHere === baseSubY) {
             ch = '.';
           } else {
@@ -710,7 +724,7 @@
       ...topRows,
       `[目の前1列目の正面断面 (L2=左2, L1=左1, 正=正面, R1=右1, R2=右2)]`,
       ...sliceRows,
-      `記号: @=自分 #=壁(高2以上) +=1段高 .=平坦/空間 v=低い床/穴 1-9/o=散らばり土(段数) B=圧縮木箱(5x5x5) S=シャベル A=リンゴ ~=端 ?=死角`
+      `記号: @=自分 #=壁(高1〜高2以上) +=1段高 ^=高1空洞(高2以上に壁/低天井) .=平坦/空間 v=低い床/穴 1-9/o=散らばり土(段数) B=圧縮木箱(5x5x5) S=シャベル A=リンゴ ~=端 ?=死角`
     ].join('\n');
   }
 
@@ -745,7 +759,6 @@
     rimTop.position.y = boxSize * 0.92;
     grp.add(rimTop);
 
-    // 圧縮木箱の補強バンド
     const band = new THREE.Mesh(new THREE.BoxGeometry(boxSize * 0.99, 0.07, boxSize * 0.99), bandMat);
     band.position.y = boxSize * 0.45;
     grp.add(band);
@@ -878,6 +891,31 @@
     };
   }
 
+  // 正面距離1に「自分の届く高さより上」の壁だけが残っているかを確認（空振り時の物理事実通知用）
+  function hasUnreachableUpperWallInFront(dir, stats) {
+    const { absX: curAbsX, absZ: curAbsZ } = getRobotAbsPos();
+    const baseSubY = getRobotBaseSubY();
+    const dx = Math.sign((dir && dir.dx) || 0);
+    const dz = Math.sign((dir && dir.dz) || 0);
+    let px = -dz, pz = dx;
+    if (dx !== 0 && dz !== 0) { px = -dz; pz = 0; }
+    if (px === 0 && pz === 0) { px = 1; pz = 0; }
+
+    const halfW = Math.floor(stats.reachW / 2);
+    const maxDist = Math.floor(stats.reachW / 2) + 1;
+    for (let dist = 1; dist <= maxDist; dist++) {
+      for (let i = 0; i < stats.reachW; i++) {
+        const w = i - halfW;
+        const tx = curAbsX + dx * dist + px * w;
+        const tz = curAbsZ + dz * dist + pz * w;
+        for (let h = stats.reachH; h <= 4; h++) {
+          if (hasSolidTerrainAtAbsSubY(tx, baseSubY + h, tz)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   // 掘削対象探索（モード別厳密分離：'front'=正面の壁のみ / 'down'=足元・目の前の地面のみ / 'up'=頭上の天井のみ）
   function findDigTargetByMode(mode, dir, thought) {
     const stats = getSizeStats();
@@ -920,7 +958,7 @@
     if (mode === 'front') {
       const hList = [];
       for (let y = 0; y < stats.reachH; y++) hList.push(y);
-      hList.sort((a, b) => b - a); // 高い位置の壁から優先
+      hList.sort((a, b) => b - a);
 
       for (let di = 0; di < distList.length; di++) {
         const dist = distList[di];
@@ -1096,6 +1134,14 @@
 
     if (!target) {
       if (mode === 'front') {
+        if (hasUnreachableUpperWallInFront(dir, stats)) {
+          const reachLabel = stats.reachH === 1 ? '高1' : `高1〜${stats.reachH}`;
+          return {
+            actionLabel: `⛏️ ${dName}の上部壁(高${stats.reachH + 1}以上)には背が届かず空振りした`,
+            physicalResult: `${dName}方向の目の前距離1は自分の届く高さ(${reachLabel})が既に空洞で、残っている上部の壁(高${stats.reachH + 1}以上)には背が届かず空振りした`,
+            moved: false
+          };
+        }
         return {
           actionLabel: `⛏️ ${dName}の正面壁を削ろうとしたが空振りした`,
           physicalResult: `${dName}方向の目の前距離1に削れる壁がなく空振りした`,
@@ -1183,7 +1229,6 @@
       const p = parseSoilKey(k);
       if (!p || p.areaId !== areaId) return;
       const floorY = (p.floorSubY !== null) ? p.floorSubY : getTerrainColumnTopSubY(p.absX, p.absZ);
-      // 手が届く高さ（自分の足元-1〜頭上+高さ）の土のみ拾える
       if (floorY < baseSubY - 1 || floorY > baseSubY + stats.reachH) return;
       const dist = Math.max(Math.abs(p.absX - absX), Math.abs(p.absZ - absZ));
       if (dist <= radiusSub) hits.push({ key: k, absX: p.absX, absZ: p.absZ, floorSubY: floorY, cnt, dist });
