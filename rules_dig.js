@@ -1,11 +1,10 @@
 // ============================================================================
-// 【レゴ物理環境＆1人称純粋知覚モジュール：rules_dig.js（v5.1 低天井記号^分離・空振り物理詳細版）】
-// ・高1が空洞で高2〜高5に壁/天井が残るマスをパノラマ視野で「^」に分離（#壁との誤認・連続空振りを解消）
-// ・dig_front空振り時に「届く高さは既に空洞・上部壁には背が届かない」物理事実を正確に返却
-// ・掘削アクション3分離：dig_front(正面の壁) / dig_down(足元・目の前の地面) / dig_up(頭上の天井)
-// ・視界判定の厳密2DグリッドDDA化＆座標整数正規化、列ラベル（L4〜正〜R4 / L2〜正〜R2）付き
-// ・world.jsの移動エラー内部コード（too_high_step等）を日本語の物理事実へ変換
-// ・ポケット最大55個＆頭上ピラミッド最大55個・5×5×5圧縮木箱(220)・重力落下・背後1ターン消費を維持
+// 【レゴ物理環境＆1人称純粋知覚モジュール：rules_dig.js（v5.2 SIZE_SPECS原本リンク・1分割階段＆脱出修正版）】
+// ・brain.js の SIZE_SPECS（スイスイ階段 stairMax / よじ登り subH / ほふく crawlH）を原本リンク参照
+// ・1分割単位の厳密な段差上り(階段/よじ登り)・下り(階段/安全着地/落下)・自動ほふく・角抜け防止へ統合
+// ・ロボットの3D足元高さを1分割単位で正確に同期（world.js無改造のまま1段穴の上り下りを完全一致）
+// ・1段くぼみの中からでも手が届く高さの周囲安定床へ土を散らばせられるよう修正（満杯誤判定の詰み解消）
+// ・掘削3分離(dig_front/dig_down/dig_up)・DDA視界・低天井記号「^」・頭上ピラミッド・圧縮木箱220を維持
 // ※ brain.js / world.js / index.html / ai_comm.js は無改造のまま動作します
 // ============================================================================
 (function initDigRulesModule() {
@@ -50,6 +49,10 @@
 
   let DIG_STATE = createDefaultState();
   let lastTurnActionId = null;
+  let lastMoveVisualKind = null; // 'stairs_up' | 'scramble_climb' | 'stairs_down' | 'safe_landing' | 'high_drop' | null
+
+  // world.js / brain.js の元の getSurfaceYAt を退避（外部呼び出し＆フォールバック用）
+  const _origGetSurfaceYAt = (typeof getSurfaceYAt === 'function') ? getSurfaceYAt : null;
 
   function getCurAreaId() {
     return (typeof getCurrentAreaDef === 'function' && getCurrentAreaDef())
@@ -76,12 +79,44 @@
     return layers;
   }
 
+  // brain.js の SIZE_SPECS / BODY_SPECS（原本）を直接リンク参照
+  function getOriginalSizeSpec() {
+    const key = (typeof ROBOT !== 'undefined' && ROBOT.sizeLevel) || 'tiny';
+    if (typeof SIZE_SPECS !== 'undefined' && SIZE_SPECS[key]) {
+      return SIZE_SPECS[key];
+    }
+    const h = HEIGHT_RANK[key] || 1;
+    return {
+      label: key,
+      subH: h,
+      scaleY: h * 0.2,
+      standH: h,
+      crawlH: Math.max(1, Math.ceil(h / 2)),
+      stairMax: h >= 4 ? 2 : (h >= 2 ? 1 : 0)
+    };
+  }
+
+  function getOriginalBodySpec() {
+    const key = (typeof ROBOT !== 'undefined' && ROBOT.bodyType) || 'slim1';
+    if (typeof BODY_SPECS !== 'undefined' && BODY_SPECS[key]) {
+      return BODY_SPECS[key];
+    }
+    const w = WIDTH_RANK[key] || 1;
+    return { label: key, reqWidth: w };
+  }
+
   function getSizeStats() {
-    const hRank = HEIGHT_RANK[(typeof ROBOT !== 'undefined' && ROBOT.sizeLevel) || 'tiny'] || 1;
-    const wRank = WIDTH_RANK[(typeof ROBOT !== 'undefined' && ROBOT.bodyType) || 'slim1'] || 1;
+    const sSpec = getOriginalSizeSpec();
+    const bSpec = getOriginalBodySpec();
+    const hRank = sSpec.subH || HEIGHT_RANK[(typeof ROBOT !== 'undefined' && ROBOT.sizeLevel) || 'tiny'] || 1;
+    const wRank = bSpec.reqWidth || WIDTH_RANK[(typeof ROBOT !== 'undefined' && ROBOT.bodyType) || 'slim1'] || 1;
     const pocketCap = (POCKET_CAP_TABLE[hRank] && POCKET_CAP_TABLE[hRank][wRank - 1]) || 1;
     const headCap = Math.min(PYRAMID_MAX_BY_WIDTH[wRank] || 1, pocketCap);
-    const bodyHeight = (typeof ROBOT !== 'undefined' && ROBOT.posture === 'crawl') ? 1 : hRank;
+    const standH = sSpec.standH || hRank;
+    const crawlH = sSpec.crawlH || 1;
+    const stairMax = Number.isFinite(sSpec.stairMax) ? sSpec.stairMax : 0;
+    const isCrawl = (typeof ROBOT !== 'undefined' && ROBOT.posture === 'crawl');
+    const bodyHeight = isCrawl ? crawlH : standH;
     const headLayers = getHeadStackHeight(DIG_STATE.headSoil || 0, wRank);
     return {
       reachH: hRank,
@@ -91,9 +126,14 @@
       pocketCap,
       headCap,
       headLayers,
+      standH,
+      crawlH,
+      stairMax,
+      climbMax: hRank,
       bodyHeight,
       maxStackHeight: hRank * 2,
-      maxStepUpSub: Math.min(3, Math.ceil(hRank / 2))
+      // ほふく前進中は1段まで、立位は身長(subH)までよじ登り可能（brain.js原本ルール準拠）
+      maxStepUpSub: isCrawl ? 1 : hRank
     };
   }
 
@@ -233,14 +273,6 @@
     const sx = Number.isFinite(ROBOT.pos.sx) ? Math.max(0, Math.min(4, Math.round(ROBOT.pos.sx))) : 2;
     const sz = Number.isFinite(ROBOT.pos.sz) ? Math.max(0, Math.min(4, Math.round(ROBOT.pos.sz))) : 2;
     return { absX: gx * 5 + sx, absZ: gz * 5 + sz };
-  }
-
-  function getRobotBaseSubY(gx = ROBOT.pos.x, gz = ROBOT.pos.z, lv = ROBOT.pos.lv) {
-    const bSpec = (typeof BODY_SPECS !== 'undefined' && BODY_SPECS[ROBOT.bodyType]) || { reqWidth: 1 };
-    const baseY = (typeof getSurfaceYAt === 'function')
-      ? getSurfaceYAt(Math.round(gx), Math.round(gz), lv, bSpec.reqWidth)
-      : (lv || 0);
-    return Math.round(baseY * 5);
   }
 
   function getFootprintBounds(reachW) {
@@ -413,6 +445,63 @@
     return minClear;
   }
 
+  // キャラの現在の正確な足元サブY（1分割単位・散らばり土の上面も考慮）を取得
+  function computeExactFootSubYAt(centerAbsX, centerAbsZ, hintSubY, reachW) {
+    const areaId = getCurAreaId();
+    const { minOff, maxOff } = getFootprintBounds(reachW);
+    let bestSupport = getMinSubY();
+    for (let ox = minOff; ox <= maxOff; ox++) {
+      for (let oz = minOff; oz <= maxOff; oz++) {
+        const cx = centerAbsX + ox;
+        const cz = centerAbsZ + oz;
+        if (!isInsideIslandAbs(cx, cz)) continue;
+        // 埋まり防止のため hintSubY から上に空いている高さを確認（最大+5段）
+        let airY = hintSubY;
+        let foundAir = false;
+        for (let up = 0; up <= 5; up++) {
+          const testY = hintSubY + up;
+          if (!hasSolidTerrainAtAbsSubY(cx, testY, cz) && !hasLooseSoilAtSubY(cx, testY, cz, areaId)) {
+            airY = testY;
+            foundAir = true;
+            break;
+          }
+        }
+        if (!foundAir) {
+          bestSupport = Math.max(bestSupport, getTerrainColumnTopSubY(cx, cz));
+          continue;
+        }
+        const solidFloor = findFloorSubYBelow(cx, cz, airY);
+        const looseCnt = getLooseSoilAtFloor(cx, cz, solidFloor, areaId);
+        const topSupport = Math.min(airY, solidFloor + looseCnt);
+        if (topSupport > bestSupport) bestSupport = topSupport;
+      }
+    }
+    return bestSupport;
+  }
+
+  function getRobotBaseSubY(gx = ROBOT.pos.x, gz = ROBOT.pos.z, lv = ROBOT.pos.lv) {
+    const stats = getSizeStats();
+    const isCurrentTile = (Math.round(gx) === Math.round(ROBOT.pos.x) && Math.round(gz) === Math.round(ROBOT.pos.z));
+    if (isCurrentTile) {
+      const { absX, absZ } = getRobotAbsPos();
+      let hintSubY;
+      if (Number.isFinite(ROBOT.pos.subY) && floorSubYToRobotLv(ROBOT.pos.subY) === (Number.isFinite(lv) ? lv : ROBOT.pos.lv)) {
+        hintSubY = Math.round(ROBOT.pos.subY);
+      } else if (_origGetSurfaceYAt) {
+        hintSubY = Math.round(_origGetSurfaceYAt(Math.round(gx), Math.round(gz), lv, stats.reachW) * 5);
+      } else {
+        hintSubY = (lv || 0) * 5;
+      }
+      const exactY = computeExactFootSubYAt(absX, absZ, hintSubY, stats.reachW);
+      ROBOT.pos.subY = exactY;
+      return exactY;
+    }
+    if (_origGetSurfaceYAt) {
+      return Math.round(_origGetSurfaceYAt(Math.round(gx), Math.round(gz), lv, stats.reachW) * 5);
+    }
+    return (lv || 0) * 5;
+  }
+
   function isCrateAtAbs(absX, absZ, areaId = getCurAreaId()) {
     return DIG_STATE.crates.some(c => {
       if (c.areaId !== areaId) return false;
@@ -488,6 +577,11 @@
     });
     DIG_STATE.worldSubSoils = nextSoils;
     if (migrated) saveDigState();
+
+    // 起動時のロボット足元サブYを同期
+    if (typeof ROBOT !== 'undefined' && ROBOT && ROBOT.pos) {
+      ROBOT.pos.subY = getRobotBaseSubY();
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -542,9 +636,7 @@
     return dot < -0.38;
   }
 
-  // 厳密2Dグリッド線分（DDA）による視線判定：
-  // 自分のマスと対象マス自身は遮蔽物に含めず、途中のマスのみ遮蔽チェックするため、
-  // 見えている壁の一番手前の表面は確実に表示され、その奥だけが「?」になる。
+  // 厳密2Dグリッド線分（DDA）による視線判定
   function isVisibleFromEye(curAbsX, curAbsZ, eyeSubY, targetAbsX, targetAbsZ) {
     const x0 = Math.round(curAbsX);
     const z0 = Math.round(curAbsZ);
@@ -625,7 +717,6 @@
           row += ' @ ';
           continue;
         }
-        // 移動直後は狭い前方扇形視野、停止中は真横(fwd=0)まで見渡せる180°ワイド視野
         if (isMoving) {
           if (fwd === 0 && Math.abs(lat) > 0) { row += ' ? '; continue; }
           if (fwd === 1 && Math.abs(lat) > 1) { row += ' ? '; continue; }
@@ -743,8 +834,8 @@
 
   function buildCrateMesh(crate) {
     const grp = new THREE.Group();
-    const boxSize = SUB_SIZE * 5; // 5×5×5 圧縮木箱（1大ブロックサイズ）
-    const yBase = (typeof getSurfaceYAt === 'function') ? getSurfaceYAt(crate.x, crate.z, null, 5) : 0;
+    const boxSize = SUB_SIZE * 5;
+    const yBase = _origGetSurfaceYAt ? _origGetSurfaceYAt(crate.x, crate.z, null, 5) : 0;
     grp.position.set(crate.x, yBase, crate.z);
 
     const woodMat  = new THREE.MeshLambertMaterial({ color: 0xe6be8a });
@@ -782,10 +873,10 @@
     if (count <= 0) return;
 
     const stats = getSizeStats();
-    const sSpec = (typeof SIZE_SPECS !== 'undefined' && typeof ROBOT !== 'undefined' && SIZE_SPECS[ROBOT.sizeLevel]) || null;
+    const sSpec = getOriginalSizeSpec();
     const headBaseY = (ROBOT.posture === 'crawl')
-      ? 0.24
-      : (sSpec && Number.isFinite(sSpec.scaleY) ? Math.max(0.22, sSpec.scaleY * 0.96) : stats.reachH * SUB_SIZE);
+      ? Math.max(0.20, stats.crawlH * SUB_SIZE)
+      : (Number.isFinite(sSpec.scaleY) ? Math.max(0.22, sSpec.scaleY * 0.96) : stats.reachH * SUB_SIZE);
 
     let placed = 0;
     for (let layer = 0; layer < stats.reachW && placed < count; layer++) {
@@ -850,27 +941,6 @@
   // --------------------------------------------------------------------------
   // 4. 物理アクション実装（純粋な物理結果のみ返却・誘導テキストなし）
   // --------------------------------------------------------------------------
-  function translateMoveReason(reason) {
-    const r = String(reason || '').trim();
-    if (!r) return '壁';
-    const map = {
-      too_high_step: '高すぎる段差（壁）',
-      too_deep_drop: '深すぎる段差（崖）',
-      low_ceiling: '低い天井',
-      no_ceiling_space: '低い天井',
-      too_narrow: '狭すぎる通路',
-      narrow_passage: '狭すぎる通路',
-      out_of_bounds: '島の端',
-      wall: '壁',
-      blocked: '障害物',
-      water: '水面',
-      cliff: '崖'
-    };
-    if (map[r]) return map[r];
-    if (/^[a-z0-9_]+$/i.test(r)) return '段差または壁';
-    return r;
-  }
-
   function runTurnAroundOnly(dir, intendedVerb) {
     ROBOT.rotY = dir.rot;
     const dName = dir.name.replace('(斜め)', '');
@@ -1010,7 +1080,7 @@
 
   // 散らばり＆落下先の厳密決定：
   // ① 掘った真下や奥に抜けた空間があれば押し出し落下（底なしは空間底まで重力落下）
-  // ② 奥が壁塞がりなら、キャラ占有外・掘削対象外・木箱外で太さ幅の安定床へ高さ×2段まで散らばり
+  // ② 奥が壁塞がりなら、キャラ占有外・掘削対象外・木箱外で太さ幅の周囲安定床（同じ高さ〜届く高さ）へ高さ×2段まで散らばり
   // ③ 全部埋まっていれば null（置き場不足で掘削停止）
   function findDropSlotForDugSoil(target, dir, stats) {
     const areaId = getCurAreaId();
@@ -1033,7 +1103,7 @@
       return true;
     }
 
-    // ①-A：掘った真下が空間（宙に浮いたブロック／底が抜けた場所）→ 真下の床または空間底へ重力落下
+    // ①-A：掘った真下が空間 → 真下の床または空間底へ重力落下
     if (!hasSolidTerrainAtAbsSubY(target.absX, target.totalSubY - 1, target.absZ)) {
       const fallFloorY = findFloorSubYBelow(target.absX, target.absZ, target.totalSubY - 1);
       const isDeepFall = (fallFloorY < baseSubY);
@@ -1068,7 +1138,8 @@
       }
     }
 
-    // ②：奥が壁で塞がっている → キャラ周囲（太さ幅・キャラ占有外・掘削対象外）の安定床へ高さ×2段まで散らばり
+    // ②：奥が壁塞がり → キャラ周囲（太さ幅・キャラ占有外・掘削対象外）の安定床へ高さ×2段まで散らばり
+    // 1段くぼんだ穴の中からでも、手が届く高さ（baseSubY 〜 baseSubY + reachH）の周囲床へ放り出せるようにする
     const { minOff, maxOff } = getFootprintBounds(stats.reachW);
     const spreadSpan = stats.reachW;
     const minSearch = minOff - spreadSpan;
@@ -1084,21 +1155,30 @@
         if (tx === target.absX && tz === target.absZ) continue;
         if (isCrateAtAbs(tx, tz, areaId)) continue;
 
-        const floorY = findFloorSubYBelow(tx, tz, baseSubY + 1);
-        if (floorY !== baseSubY) continue;
-        if (hasSolidTerrainAtAbsSubY(tx, baseSubY, tz)) continue;
+        // 同じ高さ〜手が届く高さ(+reachH)の中で、空間に接している安定床面を探索
+        let chosenFloorY = null;
+        for (let h = 0; h <= stats.reachH; h++) {
+          const yCheck = baseSubY + h;
+          if (!hasSolidTerrainAtAbsSubY(tx, yCheck, tz) && hasSolidTerrainAtAbsSubY(tx, yCheck - 1, tz)) {
+            chosenFloorY = yCheck;
+            break;
+          }
+        }
+        if (chosenFloorY === null) continue;
 
-        const stack = getLooseSoilAtFloor(tx, tz, floorY, areaId);
+        const stack = getLooseSoilAtFloor(tx, tz, chosenFloorY, areaId);
         if (stack >= stats.maxStackHeight) continue;
-        if (hasSolidTerrainAtAbsSubY(tx, floorY + stack, tz)) continue;
+        if (hasSolidTerrainAtAbsSubY(tx, chosenFloorY + stack, tz)) continue;
 
         const dist = Math.max(Math.abs(ox), Math.abs(oz));
+        const heightDiff = chosenFloorY - baseSubY;
         candidates.push({
           absX: tx,
           absZ: tz,
-          floorSubY: floorY,
+          floorSubY: chosenFloorY,
           stack,
           dist,
+          heightDiff,
           rand: Math.random()
         });
       }
@@ -1106,19 +1186,22 @@
 
     if (!candidates.length) return null;
 
-    candidates.sort((a, b) => (a.stack * 1.4 + a.dist * 0.25 + a.rand * 0.6) - (b.stack * 1.4 + b.dist * 0.25 + b.rand * 0.6));
+    // 同じ高さの床・低い段数・近い安定床を優先しつつ自然に散らばる
+    candidates.sort((a, b) =>
+      (a.heightDiff * 1.2 + a.stack * 1.4 + a.dist * 0.25 + a.rand * 0.6) -
+      (b.heightDiff * 1.2 + b.stack * 1.4 + b.dist * 0.25 + b.rand * 0.6)
+    );
     const chosen = candidates[0];
     return {
       absX: chosen.absX,
       absZ: chosen.absZ,
       floorSubY: chosen.floorSubY,
       fellDown: false,
-      note: '周囲の床へ散らばった'
+      note: chosen.heightDiff > 0 ? '周囲の1段上の床へ散らばった' : '周囲の床へ散らばった'
     };
   }
 
   function runSubDigByMode(mode, dir, thought) {
-    // 正面・地面掘りは背後（135〜180°）なら振り返り1ターン消費。頭上の天井掘りはその場で上を掘れる。
     if (mode !== 'up' && isBehindCurrentFacing(dir)) {
       const verb = mode === 'down' ? '地面掘削' : '壁掘削';
       return runTurnAroundOnly(dir, verb);
@@ -1162,7 +1245,6 @@
       };
     }
 
-    // 削る前に置き場チェック（満杯なら掘れない＝片付けが必要）
     const dropPos = findDropSlotForDugSoil(target, dir, stats);
     if (!dropPos) {
       return {
@@ -1184,10 +1266,7 @@
     if (!DIG_STATE.dugCells[stateKey]) DIG_STATE.dugCells[stateKey] = [];
     if (!DIG_STATE.dugCells[stateKey].includes(tag)) DIG_STATE.dugCells[stateKey].push(tag);
 
-    // 削った真上に既に散らばり土があった場合も重力落下させる
     settleFloatingLooseSoilsAtColumn(target.absX, target.absZ, areaId);
-
-    // 削った土を確定先へ配置
     addLooseSoilAtFloor(dropPos.absX, dropPos.absZ, dropPos.floorSubY, 1, areaId);
     const totalHere = getLooseSoilAtFloor(dropPos.absX, dropPos.absZ, dropPos.floorSubY, areaId);
 
@@ -1199,6 +1278,7 @@
       const support = computeSupportedFloorUnderFootprint(rAbsX, rAbsZ, curBaseY, stats.reachW);
       if (support.fell) {
         const dropDist = curBaseY - support.landingSubY;
+        ROBOT.pos.subY = support.landingSubY;
         ROBOT.pos.lv = floorSubYToRobotLv(support.landingSubY);
         fallText = `。足元の支えがなくなったため下の空間へ${dropDist}分割落下した`;
       }
@@ -1272,7 +1352,6 @@
 
     for (let i = 0; i < nearby.length && (pickedPocket + pickedHead) < maxPerTurn; i++) {
       let avail = nearby[i].cnt;
-      // ① まずポケットへ回収
       const pSpace = Math.max(0, stats.pocketCap - getResourceTotalCount());
       if (pSpace > 0 && avail > 0) {
         const takeP = Math.min(avail, pSpace, maxPerTurn - (pickedPocket + pickedHead));
@@ -1283,12 +1362,11 @@
           avail -= takeP;
         }
       }
-      // ② ポケット満杯なら、天井高さに収まる範囲で頭上ピラミッドへ自動積み上げ
       while (avail > 0 && (pickedPocket + pickedHead) < maxPerTurn) {
         const curHead = DIG_STATE.headSoil || 0;
         if (curHead >= stats.headCap) break;
         const nextLayers = getHeadStackHeight(curHead + 1, stats.reachW);
-        if (ROBOT.posture === 'crawl' && clearance <= 1) {
+        if (ROBOT.posture === 'crawl' && clearance <= stats.crawlH) {
           blockedByCeiling = true;
           break;
         }
@@ -1319,6 +1397,10 @@
         moved: false
       };
     }
+
+    // 足元の散らばり土を拾った場合に高さを再同期
+    ROBOT.pos.subY = computeExactFootSubYAt(absX, absZ, baseSubY, stats.reachW);
+    ROBOT.pos.lv = floorSubYToRobotLv(ROBOT.pos.subY);
 
     life.stamina = Math.max(0, life.stamina - 2);
     ROBOT.params.logic = Math.min(100, (ROBOT.params.logic || 50) + 2);
@@ -1370,11 +1452,18 @@
       };
     }
 
-    const floorY = findFloorSubYBelow(tx, tz, baseSubY + 1);
+    const floorY = findFloorSubYBelow(tx, tz, baseSubY + stats.reachH + 1);
+    if (floorY > baseSubY + stats.reachH) {
+      return {
+        actionLabel: `🟫 ${dName}は壁で塞がっており置けない`,
+        physicalResult: `${dName}の目の前は固体ブロックで塞がっており土を置けなかった`,
+        moved: false
+      };
+    }
+
     const curStack = getLooseSoilAtFloor(tx, tz, floorY, areaId);
     const isDeepDrop = (floorY < baseSubY);
 
-    // 整理積み上げ上限：キャラ高さ×2段
     if (!isDeepDrop && curStack >= stats.maxStackHeight) {
       return {
         actionLabel: `🟫 積み上げ上限(${stats.maxStackHeight}段)でこれ以上積めない`,
@@ -1390,7 +1479,6 @@
       };
     }
 
-    // 頭上に土があれば頭上から優先して下ろす
     let fromLabel = '';
     if (hasHead) {
       DIG_STATE.headSoil -= 1;
@@ -1450,7 +1538,6 @@
       };
     }
 
-    // 頭上ピラミッドとポケットの土をまとめて空き容量分まで一気に圧縮収納
     const moveHead = Math.min(curHead, free);
     DIG_STATE.headSoil = curHead - moveHead;
     const remFree = free - moveHead;
@@ -1545,30 +1632,6 @@
     };
   }
 
-  function checkObstacleAtStep(centerAbsX, centerAbsZ, curBaseSubY, stats) {
-    const areaId = getCurAreaId();
-    const { minOff, maxOff } = getFootprintBounds(stats.reachW);
-    for (let ox = minOff; ox <= maxOff; ox++) {
-      for (let oz = minOff; oz <= maxOff; oz++) {
-        const cx = centerAbsX + ox;
-        const cz = centerAbsZ + oz;
-        if (!isInsideIslandAbs(cx, cz)) return '島の端';
-        if (isCrateAtAbs(cx, cz, areaId)) return '圧縮木箱';
-
-        const floorHere = findFloorSubYBelow(cx, cz, curBaseSubY + 1);
-        const looseCnt = getLooseSoilAtFloor(cx, cz, floorHere, areaId);
-        if (looseCnt > 0) {
-          const topSubY = floorHere + looseCnt;
-          const diff = topSubY - curBaseSubY;
-          if (diff > stats.maxStepUpSub) {
-            return `高さ${looseCnt}段の散らばった土`;
-          }
-        }
-      }
-    }
-    return '';
-  }
-
   // 足元占有範囲の支えを調べ、すべて空間（底が抜けた）なら下の着地床Yを返す
   function computeSupportedFloorUnderFootprint(centerAbsX, centerAbsZ, curBaseSubY, reachW) {
     const areaId = getCurAreaId();
@@ -1596,7 +1659,110 @@
     };
   }
 
+  // 1分割移動先の足場高さ・姿勢・段差可否を brain.js の SIZE_SPECS 原本ルールで厳密評価
+  function evaluateSubStepTarget(nextAbsX, nextAbsZ, curBaseSubY, curPosture, stats) {
+    const areaId = getCurAreaId();
+    const { minOff, maxOff } = getFootprintBounds(stats.reachW);
+    const maxClimbUp = (curPosture === 'crawl') ? 1 : stats.climbMax;
+
+    let highestFloorY = getMinSubY();
+
+    for (let ox = minOff; ox <= maxOff; ox++) {
+      for (let oz = minOff; oz <= maxOff; oz++) {
+        const cx = nextAbsX + ox;
+        const cz = nextAbsZ + oz;
+        if (!isInsideIslandAbs(cx, cz)) {
+          return { ok: false, reason: '島の端' };
+        }
+        if (isCrateAtAbs(cx, cz, areaId)) {
+          return { ok: false, reason: '圧縮木箱' };
+        }
+
+        // curBaseSubY から上へ maxClimbUp 段以内で、固体地形も散らばり土もない最初の空き空間を探す
+        let openY = null;
+        let hitLooseSoil = false;
+        let looseHeightHere = 0;
+
+        for (let up = 0; up <= maxClimbUp; up++) {
+          const yTest = curBaseSubY + up;
+          const solid = hasSolidTerrainAtAbsSubY(cx, yTest, cz);
+          const loose = hasLooseSoilAtSubY(cx, yTest, cz, areaId);
+          if (!solid && !loose) {
+            openY = yTest;
+            break;
+          }
+          if (loose && !solid) {
+            hitLooseSoil = true;
+            looseHeightHere = Math.max(looseHeightHere, up + 1);
+          }
+        }
+
+        if (openY === null) {
+          if (hitLooseSoil) {
+            const fl = findFloorSubYBelow(cx, cz, curBaseSubY + 1);
+            const cnt = getLooseSoilAtFloor(cx, cz, fl, areaId) || looseHeightHere;
+            return { ok: false, reason: `高さ${cnt}段の散らばった土` };
+          }
+          if (curPosture === 'crawl') {
+            return { ok: false, reason: 'ほふく前進では登れない段差（壁）' };
+          }
+          return { ok: false, reason: '高すぎる段差（壁）' };
+        }
+
+        let cellFloorY = openY;
+        if (openY === curBaseSubY) {
+          const solidBelow = findFloorSubYBelow(cx, cz, curBaseSubY);
+          const looseBelow = getLooseSoilAtFloor(cx, cz, solidBelow, areaId);
+          cellFloorY = Math.min(curBaseSubY, solidBelow + looseBelow);
+        }
+        if (cellFloorY > highestFloorY) highestFloorY = cellFloorY;
+      }
+    }
+
+    const diffSub = highestFloorY - curBaseSubY;
+    if (diffSub > maxClimbUp) {
+      return { ok: false, reason: curPosture === 'crawl' ? 'ほふく前進では登れない段差（壁）' : '高すぎる段差（壁）' };
+    }
+
+    // 移動先の天井クリアランスを確認し、立位 / ほふく姿勢を自動決定
+    const clearance = getCeilingClearanceSubAt(nextAbsX, nextAbsZ, highestFloorY, stats.reachW);
+    const needStandH = stats.standH + stats.headLayers;
+    const needCrawlH = stats.crawlH + stats.headLayers;
+
+    let nextPosture = 'stand';
+    if (clearance >= needStandH) {
+      nextPosture = 'stand';
+    } else if (clearance >= needCrawlH) {
+      nextPosture = 'crawl';
+    } else {
+      if (stats.headLayers > 0 && clearance >= stats.crawlH) {
+        return { ok: false, reason: `頭上の土(+${stats.headLayers}段)が天井(空き${clearance}段)に当たる` };
+      }
+      return { ok: false, reason: `低い天井(空き${clearance}段)` };
+    }
+
+    // 段差の種類を原本ルール（stairMax / subH）で分類
+    let stepKind = 'flat';
+    if (diffSub > 0) {
+      stepKind = (diffSub <= stats.stairMax) ? 'stairs_up' : 'scramble_climb';
+    } else if (diffSub < 0) {
+      const drop = -diffSub;
+      if (drop <= stats.stairMax) stepKind = 'stairs_down';
+      else if (drop <= stats.climbMax) stepKind = 'safe_landing';
+      else stepKind = 'high_drop';
+    }
+
+    return {
+      ok: true,
+      destFloorSubY: highestFloorY,
+      nextPosture,
+      diffSub,
+      stepKind
+    };
+  }
+
   function runSubMove(dir) {
+    lastMoveVisualKind = null;
     if (isBehindCurrentFacing(dir)) {
       return runTurnAroundOnly(dir, '移動');
     }
@@ -1610,125 +1776,113 @@
 
     let curX = Math.round(ROBOT.pos.x || 0);
     let curZ = Math.round(ROBOT.pos.z || 0);
-    let curLv = (typeof getRobotHeightLevel === 'function') ? getRobotHeightLevel() : (ROBOT.pos.lv || 0);
     let curSx = Number.isFinite(ROBOT.pos.sx) ? Math.max(0, Math.min(4, Math.round(ROBOT.pos.sx))) : 2;
     let curSz = Number.isFinite(ROBOT.pos.sz) ? Math.max(0, Math.min(4, Math.round(ROBOT.pos.sz))) : 2;
-    let curBaseSubY = getRobotBaseSubY(curX, curZ, curLv);
+    let curBaseSubY = getRobotBaseSubY(curX, curZ, ROBOT.pos.lv);
+    let curLv = floorSubYToRobotLv(curBaseSubY);
+    let curPosture = ROBOT.posture === 'crawl' ? 'crawl' : 'stand';
 
     let movedSteps = 0;
-    let totalFallSub = 0;
+    let totalClimbSub = 0;
+    let totalDropSub = 0;
+    let didScramble = false;
+    let didStairsUp = false;
+    let didSafeLanding = false;
+    let didHighDrop = false;
     let stopReason = '';
 
     for (let s = 0; s < maxStep; s++) {
-      let nextSx = curSx + dx;
-      let nextSz = curSz + dz;
-      let nextX = curX;
-      let nextZ = curZ;
+      const curAbsX = curX * 5 + curSx;
+      const curAbsZ = curZ * 5 + curSz;
+      const nextAbsX = curAbsX + dx;
+      const nextAbsZ = curAbsZ + dz;
 
-      if (nextSx < 0) { nextSx = 4; nextX -= 1; }
-      else if (nextSx > 4) { nextSx = 0; nextX += 1; }
-
-      if (nextSz < 0) { nextSz = 4; nextZ -= 1; }
-      else if (nextSz > 4) { nextSz = 0; nextZ += 1; }
-
-      if (nextX < -2 || nextX > 2 || nextZ < -2 || nextZ > 2) {
+      if (!isInsideIslandAbs(nextAbsX, nextAbsZ)) {
         stopReason = '島の端';
         break;
       }
 
-      const nextAbsX = nextX * 5 + nextSx;
-      const nextAbsZ = nextZ * 5 + nextSz;
-      const obsBlock = checkObstacleAtStep(nextAbsX, nextAbsZ, curBaseSubY, stats);
-      if (obsBlock) {
-        stopReason = obsBlock;
-        break;
-      }
-
-      let nextLv = curLv;
-      let nextPosture = ROBOT.posture;
-      let nextBaseSubY = curBaseSubY;
-
-      if (nextX !== curX || nextZ !== curZ) {
-        const stepDir = { dx: nextX - curX, dz: nextZ - curZ, name: dir.name, rot: dir.rot };
-        const chk = (typeof checkMoveAndPosture === 'function')
-          ? checkMoveAndPosture(curX, curZ, curLv, stepDir)
-          : { canMove: true, targetLv: curLv, posture: 'stand', reason: '' };
-        if (!chk.canMove) {
-          stopReason = translateMoveReason(chk.reason);
-          break;
-        }
-        nextLv = chk.targetLv;
-        nextPosture = chk.posture;
-        nextBaseSubY = getRobotBaseSubY(nextX, nextZ, nextLv);
-      } else {
-        // 同一タイル内の移動：体幅分の足元高さに固体壁がないか確認
-        const { minOff, maxOff } = getFootprintBounds(stats.reachW);
-        let hitWall = false;
-        for (let ox = minOff; ox <= maxOff && !hitWall; ox++) {
-          for (let oz = minOff; oz <= maxOff && !hitWall; oz++) {
-            if (hasSolidTerrainAtAbsSubY(nextAbsX + ox, curBaseSubY, nextAbsZ + oz)) {
-              hitWall = true;
-            }
-          }
-        }
-        if (hitWall) {
-          stopReason = '土の壁';
+      // 斜め移動の角抜け防止（brain.jsの世界観準拠：両隣が壁なら斜めすり抜け不可）
+      if (dx !== 0 && dz !== 0) {
+        const sideA = evaluateSubStepTarget(curAbsX + dx, curAbsZ, curBaseSubY, curPosture, stats);
+        const sideB = evaluateSubStepTarget(curAbsX, curAbsZ + dz, curBaseSubY, curPosture, stats);
+        if (!sideA.ok && !sideB.ok) {
+          stopReason = '斜めの角の壁';
           break;
         }
       }
 
-      // 天井高さ制限（姿勢高さ＋頭上ピラミッド積み段数 <= 移動先の天井空き）
-      const effBodyH = (nextPosture === 'crawl') ? 1 : stats.reachH;
-      const needTotalH = effBodyH + stats.headLayers;
-      const clearance = getCeilingClearanceSubAt(nextAbsX, nextAbsZ, nextBaseSubY, stats.reachW);
-      if (clearance < needTotalH) {
-        if (stats.headLayers > 0 && clearance >= effBodyH) {
-          stopReason = `頭上の土(+${stats.headLayers}段)が天井(空き${clearance}段)に当たる`;
-        } else {
-          stopReason = `低い天井(空き${clearance}段)`;
-        }
+      const ev = evaluateSubStepTarget(nextAbsX, nextAbsZ, curBaseSubY, curPosture, stats);
+      if (!ev.ok) {
+        stopReason = ev.reason;
         break;
       }
 
-      // 足元の支え喪失によるキャラ重力落下判定
-      const support = computeSupportedFloorUnderFootprint(nextAbsX, nextAbsZ, nextBaseSubY, stats.reachW);
-      if (support.fell) {
-        const dropDist = nextBaseSubY - support.landingSubY;
-        totalFallSub += dropDist;
-        nextBaseSubY = support.landingSubY;
-        nextLv = floorSubYToRobotLv(nextBaseSubY);
+      const tX = absToTile(nextAbsX);
+      const tZ = absToTile(nextAbsZ);
+
+      if (ev.diffSub > 0) {
+        totalClimbSub += ev.diffSub;
+        if (ev.stepKind === 'scramble_climb') didScramble = true;
+        else didStairsUp = true;
+      } else if (ev.diffSub < 0) {
+        totalDropSub += (-ev.diffSub);
+        if (ev.stepKind === 'high_drop') didHighDrop = true;
+        else if (ev.stepKind === 'safe_landing') didSafeLanding = true;
       }
 
-      curX = nextX;
-      curZ = nextZ;
-      curLv = nextLv;
-      curSx = nextSx;
-      curSz = nextSz;
-      curBaseSubY = nextBaseSubY;
-      ROBOT.posture = nextPosture;
+      curX = tX.tile;
+      curZ = tZ.tile;
+      curSx = tX.sub;
+      curSz = tZ.sub;
+      curBaseSubY = ev.destFloorSubY;
+      curLv = floorSubYToRobotLv(curBaseSubY);
+      curPosture = ev.nextPosture;
       movedSteps++;
 
-      // 落下したターンは着地で一歩止める
-      if (support.fell) break;
+      // よじ登り・身長超え落下時はその段差で一旦止まる（1段ずつの自然な挙動）
+      if (ev.stepKind === 'high_drop' || ev.stepKind === 'scramble_climb') {
+        break;
+      }
     }
 
     if (movedSteps > 0) {
       ROBOT.pos.x = curX;
       ROBOT.pos.z = curZ;
-      ROBOT.pos.lv = curLv;
       ROBOT.pos.sx = curSx;
       ROBOT.pos.sz = curSz;
+      ROBOT.pos.subY = curBaseSubY;
+      ROBOT.pos.lv = curLv;
+      ROBOT.posture = curPosture;
+
       life.energy = Math.max(0, life.energy - 3);
-      life.stamina = Math.max(0, life.stamina - 4);
+      life.stamina = Math.max(0, life.stamina - (didScramble ? 6 : 4));
       life.mental = Math.min(100, life.mental + 5);
       ROBOT.params.curiosity = Math.min(100, (ROBOT.params.curiosity || 60) + 2);
 
-      const fallText = totalFallSub > 0 ? `、足元が空いていたため下の空間へ${totalFallSub}分割落下した` : '';
+      if (didScramble) lastMoveVisualKind = 'scramble_climb';
+      else if (didHighDrop) lastMoveVisualKind = 'high_drop';
+      else if (didSafeLanding) lastMoveVisualKind = 'safe_landing';
+      else if (didStairsUp) lastMoveVisualKind = 'stairs_up';
+
+      const notes = [];
+      if (didScramble) notes.push(`段差${totalClimbSub}分割をよじ登った`);
+      else if (totalClimbSub > 0) notes.push(`階段${totalClimbSub}分割を上がった`);
+      if (didHighDrop) notes.push(`足元が空いていたため下の空間へ${totalDropSub}分割落下した`);
+      else if (totalDropSub > 0) notes.push(`${totalDropSub}分割下へ降りた`);
+      if (curPosture === 'crawl') notes.push('低い天井の下でほふく姿勢になった');
+
+      const extraText = notes.length ? `（${notes.join('・')}）` : '';
       const phys = stopReason
-        ? `${dName}へ${movedSteps}分割進んだところで「${stopReason}」に当たり停止した${fallText}`
-        : `${dName}へ${movedSteps}分割進んだ${fallText}`;
+        ? `${dName}へ${movedSteps}分割進んだところで「${stopReason}」に当たり停止した${extraText}`
+        : `${dName}へ${movedSteps}分割進んだ${extraText}`;
+
+      const badge = didScramble
+        ? `(🧗↑${totalClimbSub})`
+        : (totalClimbSub > 0 ? `(🪜↑${totalClimbSub})` : (totalDropSub > 0 ? `(↓${totalDropSub})` : ''));
+
       return {
-        actionLabel: `🐾 ${dName}へ${movedSteps}分割移動${totalFallSub > 0 ? `(↓${totalFallSub}落下)` : ''}${stopReason ? `(${stopReason})` : ''}`,
+        actionLabel: `🐾 ${dName}へ${movedSteps}分割移動${badge}${stopReason ? `(${stopReason})` : ''}`,
         physicalResult: phys,
         moved: true
       };
@@ -1854,8 +2008,21 @@
   }
 
   // --------------------------------------------------------------------------
-  // 6. 既存フック接続
+  // 6. 既存フック接続（getSurfaceYAt の1分割ロボット高さ同期含む・world.js無改造）
   // --------------------------------------------------------------------------
+  if (_origGetSurfaceYAt) {
+    getSurfaceYAt = function(gx, gz, lvOverride = null, reqWidth = 1) {
+      if (typeof ROBOT !== 'undefined' && ROBOT && ROBOT.pos &&
+          lvOverride !== null &&
+          Math.round(gx) === Math.round(ROBOT.pos.x) &&
+          Math.round(gz) === Math.round(ROBOT.pos.z) &&
+          lvOverride === ROBOT.pos.lv) {
+        return getRobotBaseSubY(gx, gz, lvOverride) * SUB_SIZE;
+      }
+      return _origGetSurfaceYAt(gx, gz, lvOverride, reqWidth);
+    };
+  }
+
   if (typeof rebuildTerrainAndItems === 'function') {
     const _origRebuild = rebuildTerrainAndItems;
     rebuildTerrainAndItems = function() {
@@ -1908,7 +2075,7 @@
       const bagOther = (typeof BAG !== 'undefined' && BAG.length) ? BAG.join(',') : 'なし';
 
       return [
-        `体格: 高さ${stats.reachH}分割 × 幅${stats.reachW}分割 (1ターン歩幅:最大${stats.moveStep}分割 / 越えられる土段差:${stats.maxStepUpSub}段 / 整理積み上げ上限:${stats.maxStackHeight}段)`,
+        `体格: 高さ${stats.reachH}分割 × 幅${stats.reachW}分割 (1ターン歩幅:最大${stats.moveStep}分割 / スイスイ階段:${stats.stairMax}段・よじ登り上限:${stats.maxStepUpSub}段 / ほふく高:${stats.crawlH} / 整理積み上げ上限:${stats.maxStackHeight}段)`,
         `向いている方角: ${basis.actualFacingName} / 姿勢: ${ROBOT.posture === 'crawl' ? 'ほふく' : '立位'} / 頭上の天井空き: ${clearance}分割`,
         `身体状態: 体力${st.stamina}/100, おなか${st.energy}/100`,
         `右手: ${DIG_STATE.shovel.held ? 'こども用シャベルを所持' : '空手'}`,
@@ -1981,12 +2148,19 @@
         ROBOT.emotion = DIG_STATE.shovel.held ? 'swing_h' : 'wave';
       } else if (act === 'look') {
         ROBOT.emotion = 'peek';
+      } else if (act === 'move' && lastMoveVisualKind === 'scramble_climb') {
+        ROBOT.emotion = 'struggle';
+      } else if (act === 'move' && lastMoveVisualKind === 'safe_landing') {
+        ROBOT.emotion = 'pickup';
+      } else if (act === 'move' && lastMoveVisualKind === 'high_drop') {
+        ROBOT.emotion = 'surprise';
       } else if (eSpec && eSpec.tool) {
         if (act === 'move') ROBOT.emotion = 'run';
         else if (act === 'pickup_soil') ROBOT.emotion = 'pickup';
         else if (act === 'place_soil' || act === 'store_crate') ROBOT.emotion = 'carry';
         else ROBOT.emotion = 'normal';
       }
+      lastMoveVisualKind = null;
       syncHandShovelVisibility();
       renderHeadPyramidVisual();
       return null;
