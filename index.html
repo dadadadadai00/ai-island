@@ -501,6 +501,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="debug_guard.js"></script>
+<script>
+  if (window.DebugGuard) {
+    window.DebugGuard.expect([
+      'dig_core.js', 'dig_move.js', 'dig_vision_3d.js',
+      'dig_dig.js', 'dig_items.js', 'dig_throw.js', 'dig_ui.js'
+    ]);
+  }
+</script>
 <script src="brain.js"></script>
 <script src="world.js"></script>
 <script src="area_sky.js"></script>
@@ -508,7 +517,14 @@
 <script src="area_side.js"></script>
 <script src="entities.js"></script>
 <script src="ai_comm.js"></script>
-<script src="rules_dig.js"></script>
+<script src="dig_core.js"></script>
+<script src="dig_move.js"></script>
+<script src="dig_vision_3d.js"></script>
+<script src="dig_dig.js"></script>
+<script src="dig_items.js"></script>
+<script src="dig_throw.js"></script>
+<script src="dig_ui.js"></script>
+
 <script>
   // Groq思考一本化 ＆ 通信OFF時の完全オフライン遮断
   (function enforceGroqSingleBrain() {
