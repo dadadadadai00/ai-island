@@ -1,7 +1,7 @@
 // ============================================================================
 // 【分割物理モジュール 7/7：dig_ui.js】
 // ・手帳最上部（正面プレビュー＋左右6装備枠）・下部10枠・圧縮木箱25枠モーダル
-// ・既存フック接続・統一10アクション登録（準備動作独立・自由選択・詰み救済）・初期起動
+// ・既存フック接続・統一10アクション＆距離1触覚サマリー登録・初期起動
 // ============================================================================
 (function initDigUIAndWire() {
   const DIG = window.DIG;
@@ -439,7 +439,7 @@
   const diaryBtn = document.getElementById('diary-btn');
   if (diaryBtn) diaryBtn.addEventListener('click', () => setTimeout(renderDiaryFullUI, 20));
 
-  // --- AICommCore 接続（統一10アクション） ---
+  // --- AICommCore 接続（統一10アクション＋距離1触覚サマリー） ---
   if (window.AICommCore) {
     if (window.AICommCore.registerVisionProvider) window.AICommCore.registerVisionProvider((opts) => V.buildFirstPersonVisionMap(opts));
     const regBody = window.AICommCore.registerBodySensor || window.AICommCore.registerSensor;
@@ -456,6 +456,7 @@
       const nearCrate = I.findNearbyCrate();
       const trapped = (typeof M.isCompletelyTrapped === 'function') && M.isCompletelyTrapped();
       const faceLbl = faceMap[(typeof M.getFaceDir === 'function') ? M.getFaceDir() : 'front'] || '正面';
+      const touchLine = (typeof D.describeImmediateTouch === 'function') ? D.describeImmediateTouch() : '';
       const lines = [
         `体格: 高さ${stats.reachH}×幅${stats.reachW} (歩幅:1〜${stats.moveStep}自由 / 階段:${stats.stairMax}・登り:${stats.maxStepUpSub} / しゃがみ高:${stats.crawlH} / 整理上限:${stats.maxStackHeight}段 / 投げ最大:道具${stats.throwToolMax}・土${stats.throwSoilMax})`,
         `体の向き: ${basis.actualFacingName} / 顔の向き: ${faceLbl} / 姿勢: ${ROBOT.posture === 'crawl' ? 'しゃがみ(ほふく)' : '立位'} / 頭上の天井空き: ${clearance}分割`,
@@ -465,6 +466,7 @@
         `頭上ピラミッド(10枠目): 土${DIG.state.headSoil || 0}/${stats.headCap}個 (+${stats.headLayers}段・必要天井:${stats.bodyHeight + stats.headLayers}${(DIG.state.headSoil || 0) > 0 ? '・保持中は投擲不可' : ''})`,
         nearCrate ? `隣接圧縮木箱(手が届く): ${I.summarizeCrateContents(nearCrate)}` : '隣接圧縮木箱: なし（手が届く距離1分割以内にない）'
       ];
+      if (touchLine) lines.push(touchLine);
       if (trapped) lines.push('⚠️ 完全詰み状態: 周囲が塞がっているため use(sub:"punch"または"kick") で目の前1分割を粉砕(消失)して脱出可能');
       return lines.join('\n');
     });
@@ -479,7 +481,7 @@
       ({ dir, face }) => M.runTurn(dir, face));
     reg('move',    '移動：dir方向へcount歩(1〜最大歩幅)進む。sub:"pickup"/"place"/"throw"で移動しながら同時操作も可',
       ({ dir, count, sub, item }) => M.runSubMove(dir, { count, sub, item }));
-    reg('dig',     '掘削：繋がり合うブロック/分割ブロックをcount個(1〜最大)削る(target:"front"/"front_down"/"under"/"up"/"left"/"right", shape:"auto"/"wide"/"tall")',
+    reg('dig',     '掘削：手の届く距離1の繋がり合うブロック/分割ブロックをcount個(1〜最大)削る(target:"front"/"front_down"/"under"/"up"/"left"/"right", shape:"auto"/"wide"/"tall")',
       ({ dir, target, shape, count, dec }) => D.runUnifiedDig({ dir, target: target || 'front', shape: shape || 'auto', count, thought: dec && dec.thought }));
     reg('pickup',  '拾う：すぐそばの土や落ちたスコップ(S)をポケットへ拾う(item:"soil"/"shovel"/"all", count:個数自由)',
       ({ item, count }) => I.runPickup(item, count));
