@@ -1,9 +1,7 @@
-
 // ============================================================================
 // 【分割物理モジュール 5/7：dig_items.js】
-// ・圧縮木箱（5x5=25枠：素材1枠10・道具1枠5）の出し入れ計算
-// ・周囲の土＆落下スコップ回収(pickup)・木箱収納(store_crate)・一括取出(take_crate)
-// ・手枠への自由着脱(equip_hand)・周囲への破棄(drop_item)
+// ・圧縮木箱(25枠)の自由選択＆個数指定出し入れ（1ターン独立）
+// ・ポケット⇔手枠装備の自由持ち替え（1ターン独立）・拾う・捨てる
 // ============================================================================
 (function initDigItems() {
   const DIG = window.DIG;
@@ -12,90 +10,22 @@
   const M = DIG.move;
   const CONST = DIG.CONST;
 
-  // --- 圧縮木箱25枠ヘルパー ---
   function ensureCrateSlots(crate) {
-    if (!Array.isArray(crate.slots) || crate.slots.length !== CONST.CRATE_SLOTS) {
-      const next = Array.from({ length: CONST.CRATE_SLOTS }, () => null);
-      if (Array.isArray(crate.slots)) {
-        for (let i = 0; i < Math.min(CONST.CRATE_SLOTS, crate.slots.length); i++) next[i] = crate.slots[i];
-      }
-      crate.slots = next;
-    }
-    return crate.slots;
-  }
-
-  function countItemInCrate(crate, itemId) {
-    const slots = ensureCrateSlots(crate);
-    let total = 0;
-    for (let i = 0; i < slots.length; i++) {
-      if (slots[i] && slots[i].id === itemId) total += (slots[i].count || 0);
-    }
-    return total;
-  }
-
-  function countUsedSlotsInCrate(crate) {
-    const slots = ensureCrateSlots(crate);
-    let used = 0;
-    for (let i = 0; i < slots.length; i++) {
-      if (slots[i] && slots[i].count > 0) used++;
-    }
-    return used;
-  }
-
-  function addItemToCrate(crate, itemId, amount) {
-    const meta = CONST.ITEM_META[itemId];
-    if (!meta || amount <= 0) return 0;
-    const slots = ensureCrateSlots(crate);
-    const maxPerSlot = meta.stackMax || CONST.STACK_MATERIAL;
-    let rem = Math.floor(amount), added = 0;
-
-    for (let i = 0; i < slots.length && rem > 0; i++) {
-      const s = slots[i];
-      if (s && s.id === itemId && s.count < maxPerSlot) {
-        const take = Math.min(rem, maxPerSlot - s.count);
-        s.count += take; rem -= take; added += take;
+    if (!crate) return;
+    if (!Array.isArray(crate.slots)) crate.slots = C.createEmptyCrateSlots(false);
+    while (crate.slots.length < CONST.CRATE_SLOTS) crate.slots.push(null);
+    if (crate.slots.length > CONST.CRATE_SLOTS) crate.slots.length = CONST.CRATE_SLOTS;
+    for (let i = 0; i < crate.slots.length; i++) {
+      const s = crate.slots[i];
+      if (!s || !s.id || !Number.isFinite(Number(s.count)) || Math.floor(Number(s.count)) <= 0) {
+        crate.slots[i] = null;
+      } else {
+        crate.slots[i] = { id: String(s.id), count: Math.floor(Number(s.count)) };
       }
     }
-    for (let i = 0; i < slots.length && rem > 0; i++) {
-      if (!slots[i]) {
-        const take = Math.min(rem, maxPerSlot);
-        slots[i] = { id: itemId, count: take };
-        rem -= take; added += take;
-      }
-    }
-    return added;
   }
 
-  function removeItemFromCrate(crate, itemId, amount) {
-    if (amount <= 0) return 0;
-    const slots = ensureCrateSlots(crate);
-    let rem = Math.floor(amount), removed = 0;
-    for (let i = slots.length - 1; i >= 0 && rem > 0; i--) {
-      const s = slots[i];
-      if (s && s.id === itemId && s.count > 0) {
-        const take = Math.min(rem, s.count);
-        s.count -= take; rem -= take; removed += take;
-        if (s.count <= 0) slots[i] = null;
-      }
-    }
-    return removed;
-  }
-
-  function summarizeCrateContents(crate) {
-    const used = countUsedSlotsInCrate(crate);
-    const soil = countItemInCrate(crate, 'soil');
-    const shovel = countItemInCrate(crate, 'shovel');
-    const wood = countItemInCrate(crate, 'wood');
-    const stone = countItemInCrate(crate, 'stone');
-    const parts = [];
-    if (shovel > 0) parts.push(`スコップ${shovel}本`);
-    if (soil > 0) parts.push(`土${soil}個`);
-    if (wood > 0) parts.push(`木材${wood}個`);
-    if (stone > 0) parts.push(`石材${stone}個`);
-    return `${parts.length ? parts.join('・') : '空'}（使用${used}/${CONST.CRATE_SLOTS}枠）`;
-  }
-
-  function findNearbyCrate() {
+  function findAdjacentCrate() {
     const areaId = C.getCurAreaId();
     const { absX, absZ } = C.getRobotAbsPos();
     const baseSubY = M.getRobotBaseSubY();
@@ -104,355 +34,475 @@
     const rMinX = absX + minOff, rMaxX = absX + maxOff;
     const rMinZ = absZ + minOff, rMaxZ = absZ + maxOff;
 
-    return DIG.state.crates.find(c => {
-      if (c.areaId !== areaId) return false;
+    for (let i = 0; i < DIG.state.crates.length; i++) {
+      const c = DIG.state.crates[i];
+      if (c.areaId !== areaId) continue;
+      ensureCrateSlots(c);
       const cMinX = c.x * 5, cMaxX = c.x * 5 + 4;
       const cMinZ = c.z * 5, cMaxZ = c.z * 5 + 4;
-      const gapX = Math.max(0, cMinX - rMaxX, rMinX - cMaxX);
-      const gapZ = Math.max(0, cMinZ - rMaxZ, rMinZ - cMaxZ);
-      if (Math.max(gapX, gapZ) > 1) return false;
+      const gapX = Math.max(0, Math.max(cMinX - rMaxX, rMinX - cMaxX));
+      const gapZ = Math.max(0, Math.max(cMinZ - rMaxZ, rMinZ - cMaxZ));
       const cBaseY = M.getCrateBaseSubY(c);
-      return (baseSubY + stats.reachH >= cBaseY) && (baseSubY <= cBaseY + 5);
-    }) || null;
+      const vDist = Math.abs(baseSubY - cBaseY);
+      if (gapX <= 1 && gapZ <= 1 && vDist <= Math.max(5, stats.reachH + 2)) {
+        return c;
+      }
+    }
+    return null;
   }
 
-  // --- 回収(pickup) ---
-  function findNearbyLooseSoilStacks(radiusSub = 3) {
-    const areaId = C.getCurAreaId();
-    const { absX, absZ } = C.getRobotAbsPos();
-    const baseSubY = M.getRobotBaseSubY();
-    const stats = C.getSizeStats();
-    const hits = [];
-    Object.keys(DIG.state.worldSubSoils).forEach(k => {
-      const cnt = DIG.state.worldSubSoils[k] || 0;
-      if (cnt <= 0) return;
-      const p = C.parseSoilKey(k);
-      if (!p || p.areaId !== areaId) return;
-      const floorY = (p.floorSubY !== null) ? p.floorSubY : C.getTerrainColumnTopSubY(p.absX, p.absZ);
-      if (floorY < baseSubY - 1 || floorY > baseSubY + stats.reachH) return;
-      const dist = Math.max(Math.abs(p.absX - absX), Math.abs(p.absZ - absZ));
-      if (dist <= radiusSub) hits.push({ key: k, absX: p.absX, absZ: p.absZ, floorSubY: floorY, cnt, dist });
+  function getCrateItemCounts(crate) {
+    const counts = { soil: 0, wood: 0, stone: 0, shovel: 0 };
+    if (!crate) return counts;
+    ensureCrateSlots(crate);
+    crate.slots.forEach(s => {
+      if (s && s.count > 0) counts[s.id] = (counts[s.id] || 0) + s.count;
     });
-    return hits.sort((a, b) => a.dist - b.dist);
+    return counts;
   }
 
-  function findNearbyDroppedItems(radiusSub = 3, filterId = '') {
-    const areaId = C.getCurAreaId();
-    const { absX, absZ } = C.getRobotAbsPos();
-    const baseSubY = M.getRobotBaseSubY();
-    const stats = C.getSizeStats();
-    const hits = [];
-    (DIG.state.worldDroppedItems || []).forEach(it => {
-      if (it.areaId !== areaId || it.count <= 0) return;
-      if (filterId && it.id !== filterId) return;
-      if (it.floorSubY < baseSubY - 1 || it.floorSubY > baseSubY + stats.reachH) return;
-      const dist = Math.max(Math.abs(it.absX - absX), Math.abs(it.absZ - absZ));
-      if (dist <= radiusSub) hits.push({ ref: it, dist });
+  function formatCrateSummary(crate) {
+    if (!crate) return 'なし';
+    const cnt = getCrateItemCounts(crate);
+    const parts = [];
+    Object.keys(CONST.ITEM_META).forEach(id => {
+      if ((cnt[id] || 0) > 0) parts.push(`${CONST.ITEM_META[id].name}×${cnt[id]}`);
     });
-    return hits.sort((a, b) => a.dist - b.dist);
+    return parts.length ? parts.join('・') : '空';
   }
 
-  function runPickup(itemFilter = '') {
-    const stats = C.getSizeStats();
-    const areaId = C.getCurAreaId();
-    const { absX, absZ } = C.getRobotAbsPos();
-    const baseSubY = M.getRobotBaseSubY();
-    const searchRadius = Math.max(3, Math.floor(stats.reachW / 2) + 2);
+  function addItemToCrate(crate, itemId, amount) {
+    if (!crate || amount <= 0) return 0;
+    ensureCrateSlots(crate);
+    const meta = CONST.ITEM_META[itemId] || { stackMax: 10 };
+    const maxStack = meta.stackMax || 10;
+    let rem = Math.floor(amount);
 
-    const nearbyTools = (itemFilter !== 'soil') ? findNearbyDroppedItems(searchRadius, itemFilter === 'shovel' ? 'shovel' : '') : [];
-    let pickedShovel = 0;
-    if (nearbyTools.length && (itemFilter === 'shovel' || !itemFilter)) {
-      let room = C.getMaxAddableShovelsToPocket();
-      for (let i = 0; i < nearbyTools.length && room > 0; i++) {
-        const it = nearbyTools[i].ref;
-        if (it.id !== 'shovel') continue;
-        const take = Math.min(it.count, room);
-        if (take > 0) {
-          it.count -= take;
-          DIG.state.pocket.shovel = (DIG.state.pocket.shovel || 0) + take;
-          pickedShovel += take; room -= take;
-        }
-      }
-      DIG.state.worldDroppedItems = (DIG.state.worldDroppedItems || []).filter(it => it.count > 0);
-      if (pickedShovel > 0 && itemFilter === 'shovel') {
-        life.stamina = Math.max(0, life.stamina - 2);
-        C.saveDigState();
-        return {
-          actionLabel: `🪏 地面のスコップを${pickedShovel}本ポケットへ拾った`,
-          physicalResult: `周囲の地面からスコップを${pickedShovel}本拾ってポケットへ入れた（ポケット内スコップ計${DIG.state.pocket.shovel}本）`,
-          moved: false
-        };
+    // 1) 既存スタックへ加算
+    for (let i = 0; i < crate.slots.length && rem > 0; i++) {
+      const s = crate.slots[i];
+      if (s && s.id === itemId && s.count < maxStack) {
+        const add = Math.min(rem, maxStack - s.count);
+        s.count += add;
+        rem -= add;
       }
     }
-
-    const nearbySoil = (itemFilter !== 'shovel') ? findNearbyLooseSoilStacks(searchRadius) : [];
-    if (!nearbySoil.length && pickedShovel <= 0) {
-      return { actionLabel: '🟫 すぐそばに拾える土や道具がなかった', physicalResult: '手の届く周囲に散らばった土も落ちた道具もなく、何も拾えなかった', moved: false };
-    }
-
-    const maxPerTurn = Math.max(3, stats.reachW * 2);
-    const clearance = M.getCeilingClearanceSubAt(absX, absZ, baseSubY, stats.reachW);
-    let pickedPocket = 0, pickedHead = 0, blockedByCeiling = false, blockedByCrawl = false;
-
-    for (let i = 0; i < nearbySoil.length && (pickedPocket + pickedHead) < maxPerTurn; i++) {
-      let avail = nearbySoil[i].cnt;
-      const pSpace = Math.max(0, stats.pocketCap - C.getCarriedResourceTotal());
-      if (pSpace > 0 && avail > 0) {
-        const takeP = Math.min(avail, pSpace, maxPerTurn - (pickedPocket + pickedHead));
-        if (takeP > 0) {
-          C.addLooseSoilAtFloor(nearbySoil[i].absX, nearbySoil[i].absZ, nearbySoil[i].floorSubY, -takeP, areaId);
-          DIG.state.pocket.soil = (DIG.state.pocket.soil || 0) + takeP;
-          pickedPocket += takeP; avail -= takeP;
-        }
-      }
-      while (avail > 0 && (pickedPocket + pickedHead) < maxPerTurn) {
-        const curHead = DIG.state.headSoil || 0;
-        if (curHead >= stats.headCap) break;
-        if (ROBOT.posture === 'crawl') { blockedByCrawl = true; break; }
-        if (stats.bodyHeight + C.getHeadStackHeight(curHead + 1, stats.reachW) > clearance) { blockedByCeiling = true; break; }
-        C.addLooseSoilAtFloor(nearbySoil[i].absX, nearbySoil[i].absZ, nearbySoil[i].floorSubY, -1, areaId);
-        DIG.state.headSoil = curHead + 1;
-        pickedHead += 1; avail -= 1;
+    // 2) 空き枠へ新規配置
+    for (let i = 0; i < crate.slots.length && rem > 0; i++) {
+      if (!crate.slots[i]) {
+        const add = Math.min(rem, maxStack);
+        crate.slots[i] = { id: itemId, count: add };
+        rem -= add;
       }
     }
-
-    if (pickedPocket + pickedHead + pickedShovel <= 0) {
-      if (blockedByCrawl) return { actionLabel: '🟫 ほふく姿勢中のため頭上へ積めなかった', physicalResult: 'ポケットが資源上限で、ほふく姿勢中のため頭上ピラミッドへ積めなかった', moved: false };
-      if (blockedByCeiling) return { actionLabel: `🟫 天井が低く頭上に載せられなかった(空き${clearance}段)`, physicalResult: `ポケットが資源上限で、天井の空き(${clearance}分割)が足りないため頭上へ積めなかった`, moved: false };
-      return { actionLabel: `🟫 ポケット(${C.getCarriedResourceTotal()}/${stats.pocketCap})も頭上(${DIG.state.headSoil}/${stats.headCap})も満杯`, physicalResult: 'ポケットも頭上ピラミッドも上限に達しており、これ以上拾えなかった', moved: false };
-    }
-
-    ROBOT.pos.subY = M.computeExactFootSubYAt(absX, absZ, baseSubY, stats.reachW);
-    ROBOT.pos.lv = C.floorSubYToRobotLv(ROBOT.pos.subY);
-    life.stamina = Math.max(0, life.stamina - 2);
-    ROBOT.params.logic = Math.min(100, (ROBOT.params.logic || 50) + 2);
-    C.saveDigState();
-
-    const parts = [];
-    if (pickedShovel > 0) parts.push(`スコップ+${pickedShovel}本`);
-    if (pickedPocket > 0) parts.push(`ポケット土+${pickedPocket}`);
-    if (pickedHead > 0) parts.push(`頭上土+${pickedHead}`);
-    const newLayers = C.getHeadStackHeight(DIG.state.headSoil || 0, stats.reachW);
-    return {
-      actionLabel: `🧺 回収した(${parts.join('・')})`,
-      physicalResult: `周囲から回収した(${parts.join('、')})。現在ポケット資源${C.getCarriedResourceTotal()}/${stats.pocketCap}、頭上${DIG.state.headSoil}/${stats.headCap}(+${newLayers}段)`,
-      moved: false
-    };
+    return Math.floor(amount) - rem;
   }
 
-  // --- 圧縮木箱への収納(store_crate) ＆ 一括取り出し(take_crate) ---
-  function runStoreCrate(itemSpec = '') {
-    const crate = findNearbyCrate();
+  function removeItemFromCrate(crate, itemId, amount) {
+    if (!crate || amount <= 0) return 0;
+    ensureCrateSlots(crate);
+    let rem = Math.floor(amount);
+    for (let i = crate.slots.length - 1; i >= 0 && rem > 0; i--) {
+      const s = crate.slots[i];
+      if (s && s.id === itemId && s.count > 0) {
+        const take = Math.min(rem, s.count);
+        s.count -= take;
+        rem -= take;
+        if (s.count <= 0) crate.slots[i] = null;
+      }
+    }
+    return Math.floor(amount) - rem;
+  }
+
+  function pickTargetItemFromCrate(crate, itemPref) {
+    const cnt = getCrateItemCounts(crate);
+    const req = String(itemPref || '').toLowerCase();
+    if (req && req !== 'all' && req !== 'none' && (cnt[req] || 0) > 0) return req;
+    if ((cnt.shovel || 0) > 0) return 'shovel';
+    const ids = ['soil', 'wood', 'stone'];
+    for (let i = 0; i < ids.length; i++) if ((cnt[ids[i]] || 0) > 0) return ids[i];
+    return '';
+  }
+
+  // --- 木箱から取り出す（1ターン・アイテム/個数自由選択） ---
+  function runTakeCrate(itemPref = '', reqCount = 0) {
+    const crate = findAdjacentCrate();
     if (!crate) {
-      return { actionLabel: '📦 手が届くすぐ隣に圧縮木箱がなかった', physicalResult: '手が届くすぐ隣（距離1分割以内・同じ高さ）に圧縮木箱がなく、収納できなかった', moved: false };
-    }
-    const target = (itemSpec === 'shovel' || itemSpec === 'soil') ? itemSpec : 'all';
-    let movedSoil = 0, movedShovel = 0;
-
-    if (target === 'all' || target === 'soil') {
-      if ((DIG.state.headSoil || 0) > 0) {
-        const a = addItemToCrate(crate, 'soil', DIG.state.headSoil);
-        DIG.state.headSoil -= a; movedSoil += a;
-      }
-      if ((DIG.state.pocket.soil || 0) > 0) {
-        const a = addItemToCrate(crate, 'soil', DIG.state.pocket.soil);
-        DIG.state.pocket.soil -= a; movedSoil += a;
-      }
-      if (DIG.state.equip.hand && DIG.state.equip.hand.id === 'soil' && DIG.state.equip.hand.count > 0) {
-        const a = addItemToCrate(crate, 'soil', DIG.state.equip.hand.count);
-        DIG.state.equip.hand.count -= a;
-        if (DIG.state.equip.hand.count <= 0) DIG.state.equip.hand = null;
-        movedSoil += a;
-      }
-    }
-    if (target === 'shovel' || (target === 'all' && movedSoil === 0)) {
-      if ((DIG.state.pocket.shovel || 0) > 0) {
-        const a = addItemToCrate(crate, 'shovel', DIG.state.pocket.shovel);
-        DIG.state.pocket.shovel -= a; movedShovel += a;
-      }
-      if (target === 'shovel' && DIG.state.equip.hand && DIG.state.equip.hand.id === 'shovel' && DIG.state.equip.hand.count > 0) {
-        const a = addItemToCrate(crate, 'shovel', DIG.state.equip.hand.count);
-        DIG.state.equip.hand.count -= a;
-        if (DIG.state.equip.hand.count <= 0) DIG.state.equip.hand = null;
-        movedShovel += a;
-      }
-    }
-    if (movedSoil <= 0 && movedShovel <= 0) {
-      return { actionLabel: '📦 圧縮木箱へ入れられるアイテムがないか満杯だった', physicalResult: `収納できる対象アイテムがないか25枠が満杯だった（現在:${summarizeCrateContents(crate)}）`, moved: false };
-    }
-
-    ROBOT.params.logic = Math.min(100, (ROBOT.params.logic || 50) + 3);
-    life.mental = Math.min(100, life.mental + 6);
-    C.saveDigState();
-    const parts = [];
-    if (movedSoil > 0) parts.push(`土${movedSoil}個`);
-    if (movedShovel > 0) parts.push(`スコップ${movedShovel}本`);
-    return {
-      actionLabel: `📦 圧縮木箱へ収納(${parts.join('・')})`,
-      physicalResult: `圧縮木箱へ${parts.join('と')}を収納した（木箱状態:${summarizeCrateContents(crate)}）`,
-      moved: false
-    };
-  }
-
-  function runTakeCrate(itemSpec = '') {
-    const crate = findNearbyCrate();
-    if (!crate) {
-      return { actionLabel: '📦 手が届くすぐ隣に圧縮木箱がなかった', physicalResult: '手が届くすぐ隣（距離1分割以内）に圧縮木箱がなく、取り出せなかった', moved: false };
-    }
-    const stats = C.getSizeStats();
-    let itemId = (itemSpec === 'shovel' || itemSpec === 'soil') ? itemSpec : '';
-    if (!itemId) {
-      if (countItemInCrate(crate, 'shovel') > 0) itemId = 'shovel';
-      else if (countItemInCrate(crate, 'soil') > 0) itemId = 'soil';
-    }
-    if (!itemId || countItemInCrate(crate, itemId) <= 0) {
-      return { actionLabel: '📦 圧縮木箱に指定のアイテムが入っていなかった', physicalResult: `圧縮木箱の中に指定アイテムがなかった（現在:${summarizeCrateContents(crate)}）`, moved: false };
-    }
-
-    if (itemId === 'shovel') {
-      const avail = countItemInCrate(crate, 'shovel');
-      const room = C.getMaxAddableShovelsToPocket();
-      if (room <= 0) return { actionLabel: '📦 ポケット9枠が満杯でスコップを取り出せなかった', physicalResult: 'ポケット9枠に空きがなくスコップを取り出せなかった', moved: false };
-      const take = removeItemFromCrate(crate, 'shovel', Math.min(avail, room));
-      DIG.state.pocket.shovel = (DIG.state.pocket.shovel || 0) + take;
-      C.saveDigState();
       return {
-        actionLabel: `📦 圧縮木箱からスコップ${take}本をポケットへ取り出した`,
-        physicalResult: `圧縮木箱からスコップ${take}本をポケットへ取り出した（ポケット内スコップ${DIG.state.pocket.shovel}本・まだ手には装備していない）`,
+        actionLabel: '📦 すぐ隣に圧縮木箱がなく取り出せなかった',
+        physicalResult: '手の届く距離1分割以内に圧縮木箱がないため取り出せなかった',
         moved: false
       };
     }
 
-    const avail = countItemInCrate(crate, 'soil');
-    const room = Math.max(0, stats.pocketCap - C.getCarriedResourceTotal());
-    if (room <= 0) return { actionLabel: `📦 ポケットの資源上限(${stats.pocketCap})で土を取り出せなかった`, physicalResult: `ポケットが資源上限(${C.getCarriedResourceTotal()}/${stats.pocketCap})に達しており土を取り出せなかった`, moved: false };
-    const take = removeItemFromCrate(crate, 'soil', Math.min(avail, room));
-    DIG.state.pocket.soil = (DIG.state.pocket.soil || 0) + take;
+    const stats = C.getSizeStats();
+    const targetId = pickTargetItemFromCrate(crate, itemPref);
+    if (!targetId) {
+      return {
+        actionLabel: '📦 圧縮木箱に指定アイテムが入っていなかった',
+        physicalResult: `圧縮木箱の中身は「${formatCrateSummary(crate)}」で、取り出せる対象がなかった`,
+        moved: false
+      };
+    }
+
+    const meta = CONST.ITEM_META[targetId] || { name: targetId, kind: 'material' };
+    const availInCrate = getCrateItemCounts(crate)[targetId] || 0;
+    const capLimit = (meta.kind === 'tool')
+      ? C.getMaxAddableShovelsToPocket()
+      : Math.max(0, stats.pocketCap - C.getCarriedResourceTotal());
+
+    if (capLimit <= 0) {
+      return {
+        actionLabel: `📦 ポケットがいっぱいで${meta.name}を取り出せなかった`,
+        physicalResult: `ポケットの空き上限に達しており、圧縮木箱から${meta.name}を取り出せなかった`,
+        moved: false
+      };
+    }
+
+    const want = (Number.isFinite(Number(reqCount)) && Number(reqCount) > 0)
+      ? Math.min(availInCrate, capLimit, Math.floor(Number(reqCount)))
+      : Math.min(availInCrate, capLimit);
+
+    const taken = removeItemFromCrate(crate, targetId, want);
+    if (taken <= 0) {
+      return { actionLabel: '📦 取り出せなかった', physicalResult: '圧縮木箱から取り出せなかった', moved: false };
+    }
+
+    DIG.state.pocket[targetId] = (DIG.state.pocket[targetId] || 0) + taken;
     C.saveDigState();
+    if (DIG.ui && DIG.ui.renderDiaryFullUI) DIG.ui.renderDiaryFullUI();
+
+    const unit = meta.kind === 'tool' ? '本' : '個';
     return {
-      actionLabel: `📦 圧縮木箱から土${take}個をポケットへ取り出した`,
-      physicalResult: `圧縮木箱から土${take}個をポケットの空き上限までまとめて取り出した（ポケット土${DIG.state.pocket.soil}個）`,
+      actionLabel: `📦 圧縮木箱から${meta.name}を${taken}${unit}ポケットへ取り出した`,
+      physicalResult: `隣接する圧縮木箱から${meta.name}を${taken}${unit}ポケットへ取り出した（使うには次ターンで手枠へ装備する）`,
       moved: false
     };
   }
 
-  // --- 手枠への着脱(equip_hand) ＆ 破棄(drop_item) ---
-  function runEquipHand(itemSpec = '', reqCount = 0) {
+  // --- 木箱へ収納する（1ターン・アイテム/個数自由選択） ---
+  function runStoreCrate(itemPref = '', reqCount = 0) {
+    const crate = findAdjacentCrate();
+    if (!crate) {
+      return {
+        actionLabel: '📦 すぐ隣に圧縮木箱がなく収納できなかった',
+        physicalResult: '手の届く距離1分割以内に圧縮木箱がないため収納できなかった',
+        moved: false
+      };
+    }
+
+    const req = String(itemPref || '').toLowerCase();
+    const explicitCount = (Number.isFinite(Number(reqCount)) && Number(reqCount) > 0) ? Math.floor(Number(reqCount)) : 0;
+    const targetIds = (req && req !== 'all' && req !== 'none' && CONST.ITEM_META[req])
+      ? [req]
+      : ['soil', 'wood', 'stone', 'shovel'];
+
+    const storedNotes = [];
+    let totalStored = 0;
+
+    for (let i = 0; i < targetIds.length; i++) {
+      const id = targetIds[i];
+      const meta = CONST.ITEM_META[id];
+      const headHave = (id === 'soil') ? Math.max(0, DIG.state.headSoil || 0) : 0;
+      const pocketHave = Math.max(0, DIG.state.pocket[id] || 0);
+      const handHave = (DIG.state.equip.hand && DIG.state.equip.hand.id === id) ? Math.max(0, DIG.state.equip.hand.count || 0) : 0;
+      const totalHave = headHave + pocketHave + handHave;
+      if (totalHave <= 0) continue;
+
+      const want = explicitCount > 0 ? Math.min(totalHave, explicitCount) : totalHave;
+      const stored = addItemToCrate(crate, id, want);
+      if (stored <= 0) continue;
+
+      let rem = stored;
+      if (id === 'soil' && rem > 0 && DIG.state.headSoil > 0) {
+        const d = Math.min(rem, DIG.state.headSoil); DIG.state.headSoil -= d; rem -= d;
+      }
+      if (rem > 0 && (DIG.state.pocket[id] || 0) > 0) {
+        const d = Math.min(rem, DIG.state.pocket[id]); DIG.state.pocket[id] -= d; rem -= d;
+      }
+      if (rem > 0 && DIG.state.equip.hand && DIG.state.equip.hand.id === id) {
+        const d = Math.min(rem, DIG.state.equip.hand.count);
+        DIG.state.equip.hand.count -= d;
+        if (DIG.state.equip.hand.count <= 0) DIG.state.equip.hand = null;
+        rem -= d;
+      }
+      const unit = meta.kind === 'tool' ? '本' : '個';
+      storedNotes.push(`${meta.name}×${stored}${unit}`);
+      totalStored += stored;
+      if (explicitCount > 0 && targetIds.length === 1) break;
+    }
+
+    if (totalStored <= 0) {
+      return {
+        actionLabel: '📦 収納できるアイテムがないか木箱が満杯だった',
+        physicalResult: '手元・ポケット・頭上に収納対象がないか、圧縮木箱25枠が満杯で収納できなかった',
+        moved: false
+      };
+    }
+
+    C.saveDigState();
+    if (DIG.ui && DIG.ui.renderDiaryFullUI) DIG.ui.renderDiaryFullUI();
+    return {
+      actionLabel: `📦 圧縮木箱へ${storedNotes.join('・')}を収納した`,
+      physicalResult: `隣接する圧縮木箱へ${storedNotes.join('・')}を収納した（箱内:${formatCrateSummary(crate)}）`,
+      moved: false
+    };
+  }
+
+  // --- 統一木箱アクション（crate: sub="take"/"store"） ---
+  function runCrate(sub = 'take', itemPref = '', reqCount = 0) {
+    const mode = String(sub || 'take').toLowerCase();
+    if (mode === 'store' || mode === 'put' || mode === 'in') return runStoreCrate(itemPref, reqCount);
+    return runTakeCrate(itemPref, reqCount);
+  }
+
+  // --- ポケット⇔手枠の付け外し（1ターン独立・個数自由選択） ---
+  function runEquipHand(itemPref = 'none', reqCount = 0) {
     const stats = C.getSizeStats();
+    const req = String(itemPref || 'none').toLowerCase();
     const curHand = DIG.state.equip.hand;
 
-    function unequipHandToPocket() {
-      if (!DIG.state.equip.hand || !DIG.state.equip.hand.count) return '';
-      const h = DIG.state.equip.hand;
-      if (h.id === 'shovel') {
-        DIG.state.pocket.shovel = (DIG.state.pocket.shovel || 0) + h.count;
-        DIG.state.equip.hand = null;
-        return `スコップ${h.count}本をポケットへ戻した`;
+    // 外す（素手にする）
+    if (!req || req === 'none' || req === 'empty' || req === 'unequip') {
+      if (!curHand || curHand.count <= 0) {
+        return { actionLabel: '✋ すでに素手だった', physicalResult: '手枠はすでに空（素手）だった', moved: false };
       }
-      if (h.id === 'soil') {
-        DIG.state.pocket.soil = (DIG.state.pocket.soil || 0) + h.count;
-        DIG.state.equip.hand = null;
-        return `土${h.count}個をポケットへ戻した`;
+      const meta = CONST.ITEM_META[curHand.id] || { name: curHand.id, kind: 'material' };
+      const unit = meta.kind === 'tool' ? '本' : '個';
+      if (meta.kind === 'tool') {
+        const canAdd = C.getMaxAddableShovelsToPocket();
+        if (canAdd < curHand.count) {
+          return { actionLabel: '🚫 ポケット枠不足で手枠をしまえなかった', physicalResult: 'ポケットの道具枠が不足しており手枠の道具をしまえなかった', moved: false };
+        }
       }
+      DIG.state.pocket[curHand.id] = (DIG.state.pocket[curHand.id] || 0) + curHand.count;
+      const movedCnt = curHand.count;
       DIG.state.equip.hand = null;
-      return '';
-    }
-
-    if (itemSpec === 'none' || (!itemSpec && curHand)) {
-      if (!curHand || !curHand.count) return { actionLabel: '🖐️ 手枠はすでに空だった', physicalResult: '手枠には何も装備していなかった', moved: false };
-      const msg = unequipHandToPocket();
       C.saveDigState();
-      return { actionLabel: `🖐️ 手枠を外して素手になった(${msg})`, physicalResult: `${msg}。現在手枠は空（素手）になった`, moved: false };
-    }
-
-    const targetId = (itemSpec === 'shovel' || itemSpec === 'soil')
-      ? itemSpec
-      : ((DIG.state.pocket.shovel || 0) > 0 ? 'shovel' : ((DIG.state.pocket.soil || 0) > 0 ? 'soil' : ''));
-    if (!targetId) return { actionLabel: '🖐️ ポケットに装備できるアイテムがなかった', physicalResult: 'ポケットにスコップも土もなく、手枠へ装備できなかった', moved: false };
-
-    const prevMsg = unequipHandToPocket();
-    if (targetId === 'shovel') {
-      const avail = DIG.state.pocket.shovel || 0;
-      if (avail <= 0) { C.saveDigState(); return { actionLabel: '🖐️ ポケットにスコップがなかった', physicalResult: 'ポケットにスコップが入っておらず手枠へ持てなかった', moved: false }; }
-      const want = (reqCount > 0) ? Math.min(reqCount, stats.handShovelMax) : 1;
-      const take = Math.min(avail, want);
-      DIG.state.pocket.shovel -= take;
-      DIG.state.equip.hand = { id: 'shovel', count: take };
-      C.saveDigState();
-      const note = take === 1 ? '（掘削は体格範囲内で最大5個）' : '（2本持ちのため掘削不可・2本投擲可）';
+      if (DIG.ui && DIG.ui.renderDiaryFullUI) DIG.ui.renderDiaryFullUI();
       return {
-        actionLabel: `🪏 手枠にスコップを${take}本装備した`,
-        physicalResult: `${prevMsg ? prevMsg + '後、' : ''}ポケットから手枠へスコップを${take}本装備した${note}（ポケット残り${DIG.state.pocket.shovel}本）`,
+        actionLabel: `✋ 手枠の${meta.name}×${movedCnt}${unit}をポケットへしまい素手になった`,
+        physicalResult: `手枠の${meta.name}(${movedCnt}${unit})をポケットへ戻し、素手になった`,
         moved: false
       };
     }
 
-    const availSoil = DIG.state.pocket.soil || 0;
-    if (availSoil <= 0) { C.saveDigState(); return { actionLabel: '🖐️ ポケットに土がなかった', physicalResult: 'ポケットに土が入っておらず手枠へ持てなかった', moved: false }; }
-    const want = (reqCount > 0) ? Math.min(reqCount, stats.handSoilMax) : Math.min(availSoil, stats.handSoilMax);
-    const take = Math.min(availSoil, want);
-    DIG.state.pocket.soil -= take;
-    DIG.state.equip.hand = { id: 'soil', count: take };
+    if (!CONST.ITEM_META[req]) {
+      return { actionLabel: `🚫 不明な装備対象(${req})`, physicalResult: `装備対象(${req})が不明なため持ち替えできなかった`, moved: false };
+    }
+
+    const meta = CONST.ITEM_META[req];
+    const unit = meta.kind === 'tool' ? '本' : '個';
+    const handLimit = (meta.kind === 'tool') ? stats.handShovelMax : stats.handSoilMax;
+    const want = Math.max(1, Math.min(handLimit, (Number.isFinite(Number(reqCount)) && Number(reqCount) > 0) ? Math.floor(Number(reqCount)) : 1));
+
+    // 今持っている別アイテムを一旦ポケットへ戻す
+    if (curHand && curHand.id !== req && curHand.count > 0) {
+      const oldMeta = CONST.ITEM_META[curHand.id] || { kind: 'material' };
+      if (oldMeta.kind === 'tool' && C.getMaxAddableShovelsToPocket() < curHand.count) {
+        return { actionLabel: '🚫 ポケット枠不足で持ち替えできなかった', physicalResult: '今の装備をしまう空きがポケットになく持ち替えできなかった', moved: false };
+      }
+      DIG.state.pocket[curHand.id] = (DIG.state.pocket[curHand.id] || 0) + curHand.count;
+      DIG.state.equip.hand = null;
+    }
+
+    const alreadyInHand = (DIG.state.equip.hand && DIG.state.equip.hand.id === req) ? DIG.state.equip.hand.count : 0;
+    const pocketHave = Math.max(0, DIG.state.pocket[req] || 0);
+    const totalAvail = alreadyInHand + pocketHave;
+
+    if (totalAvail <= 0) {
+      return {
+        actionLabel: `✋ ポケットに${meta.name}がなく装備できなかった`,
+        physicalResult: `ポケットに${meta.name}が入っていないため手枠へ装備できなかった（先に拾うか木箱から取り出す必要がある）`,
+        moved: false
+      };
+    }
+
+    const finalCnt = Math.min(want, totalAvail);
+    const diff = finalCnt - alreadyInHand;
+    if (diff > 0) {
+      DIG.state.pocket[req] -= diff;
+      DIG.state.equip.hand = { id: req, count: finalCnt };
+    } else if (diff < 0) {
+      DIG.state.pocket[req] += (-diff);
+      DIG.state.equip.hand = finalCnt > 0 ? { id: req, count: finalCnt } : null;
+    } else {
+      return {
+        actionLabel: `✋ すでに手枠に${meta.name}×${finalCnt}${unit}を装備中`,
+        physicalResult: `すでに手枠へ${meta.name}を${finalCnt}${unit}装備していた`,
+        moved: false
+      };
+    }
+
     C.saveDigState();
+    if (DIG.ui && DIG.ui.renderDiaryFullUI) DIG.ui.renderDiaryFullUI();
     return {
-      actionLabel: `🟫 手枠に土を${take}個持った（上限${stats.handSoilMax}）`,
-      physicalResult: `${prevMsg ? prevMsg + '後、' : ''}ポケットから手枠へ土を${take}個移して持った（掘削不可・${take}個一括投擲可、ポケット土残り${DIG.state.pocket.soil}個）`,
+      actionLabel: `✋ 手枠に${meta.name}を${finalCnt}${unit}装備した`,
+      physicalResult: `ポケットから手枠へ${meta.name}を${finalCnt}${unit}持ち替えた`,
       moved: false
     };
   }
 
-  function runDropItem(itemSpec = '', reqCount = 1) {
+  // --- 周囲の散らばり土・落下道具を拾う（個数自由選択） ---
+  function runPickup(itemPref = '', reqCount = 0) {
+    const areaId = C.getCurAreaId();
+    const { absX, absZ } = C.getRobotAbsPos();
+    const baseSubY = M.getRobotBaseSubY();
+    const stats = C.getSizeStats();
+    const { minOff, maxOff } = C.getFootprintBounds(stats.reachW);
+    const req = String(itemPref || '').toLowerCase();
+    const explicitCount = (Number.isFinite(Number(reqCount)) && Number(reqCount) > 0) ? Math.floor(Number(reqCount)) : 0;
+
+    const wantShovel = (!req || req === 'all' || req === 'none' || req === 'shovel');
+    const wantSoil   = (!req || req === 'all' || req === 'none' || req === 'soil');
+
+    let pickedShovel = 0, pickedSoilPocket = 0, pickedSoilHead = 0;
+
+    // 1) 落ちているスコップを拾う
+    if (wantShovel && Array.isArray(DIG.state.worldDroppedItems)) {
+      let quota = explicitCount > 0 ? Math.min(explicitCount, C.getMaxAddableShovelsToPocket()) : C.getMaxAddableShovelsToPocket();
+      for (let i = DIG.state.worldDroppedItems.length - 1; i >= 0 && quota > 0; i--) {
+        const it = DIG.state.worldDroppedItems[i];
+        if (it.areaId !== areaId || it.id !== 'shovel' || it.count <= 0) continue;
+        const inX = it.absX >= absX + minOff - 1 && it.absX <= absX + maxOff + 1;
+        const inZ = it.absZ >= absZ + minOff - 1 && it.absZ <= absZ + maxOff + 1;
+        const inY = it.floorSubY >= baseSubY - 1 && it.floorSubY <= baseSubY + stats.reachH;
+        if (!inX || !inZ || !inY) continue;
+        const take = Math.min(it.count, quota);
+        it.count -= take;
+        DIG.state.pocket.shovel = (DIG.state.pocket.shovel || 0) + take;
+        pickedShovel += take;
+        quota -= take;
+        if (it.count <= 0) DIG.state.worldDroppedItems.splice(i, 1);
+      }
+    }
+
+    // 2) 周囲の散らばり土を拾う（ポケット優先→満杯なら天井確認して頭上ピラミッド）
+    if (wantSoil) {
+      const remExplicit = explicitCount > 0 ? Math.max(0, explicitCount - pickedShovel) : 999;
+      let pocketFree = Math.max(0, stats.pocketCap - C.getCarriedResourceTotal());
+      const clear = M.getCeilingClearanceSubAt(absX, absZ, baseSubY, stats.reachW);
+      let headFree = Math.max(0, stats.headCap - (DIG.state.headSoil || 0));
+      let soilQuota = Math.min(remExplicit, pocketFree + headFree);
+
+      const cells = [];
+      for (let ox = minOff - 1; ox <= maxOff + 1; ox++) {
+        for (let oz = minOff - 1; oz <= maxOff + 1; oz++) {
+          cells.push({ ax: absX + ox, az: absZ + oz, dist: Math.abs(ox) + Math.abs(oz) });
+        }
+      }
+      cells.sort((a, b) => a.dist - b.dist);
+
+      for (let i = 0; i < cells.length && soilQuota > 0; i++) {
+        const stacks = C.getLooseSoilStacksInColumn(cells[i].ax, cells[i].az, areaId);
+        for (let j = stacks.length - 1; j >= 0 && soilQuota > 0; j--) {
+          const st = stacks[j];
+          if (st.count <= 0) continue;
+          if (st.floorSubY > baseSubY + stats.reachH || st.floorSubY + st.count < baseSubY) continue;
+          while (st.count > 0 && soilQuota > 0) {
+            if (pocketFree > 0) {
+              C.addLooseSoilAtFloor(cells[i].ax, cells[i].az, st.floorSubY, -1, areaId);
+              DIG.state.pocket.soil = (DIG.state.pocket.soil || 0) + 1;
+              st.count--; pocketFree--; soilQuota--; pickedSoilPocket++;
+            } else if (headFree > 0) {
+              const nextLayers = C.getHeadStackHeight((DIG.state.headSoil || 0) + 1, stats.reachW);
+              if (clear < stats.bodyHeight + nextLayers) break;
+              C.addLooseSoilAtFloor(cells[i].ax, cells[i].az, st.floorSubY, -1, areaId);
+              DIG.state.headSoil = (DIG.state.headSoil || 0) + 1;
+              st.count--; headFree--; soilQuota--; pickedSoilHead++;
+            } else break;
+          }
+        }
+      }
+    }
+
+    if (pickedShovel + pickedSoilPocket + pickedSoilHead <= 0) {
+      return {
+        actionLabel: '🤲 すぐそばに拾えるものがないか所持上限だった',
+        physicalResult: '周囲距離1分割以内に拾える土・スコップがないか、ポケット・頭上の空き上限に達していた',
+        moved: false
+      };
+    }
+
+    C.saveDigState();
+    if (DIG.ui && DIG.ui.renderDiaryFullUI) DIG.ui.renderDiaryFullUI();
+    const notes = [];
+    if (pickedShovel > 0) notes.push(`スコップ×${pickedShovel}本(ポケット)`);
+    if (pickedSoilPocket > 0) notes.push(`土×${pickedSoilPocket}個(ポケット)`);
+    if (pickedSoilHead > 0) notes.push(`土×${pickedSoilHead}個(頭上)`);
+    return {
+      actionLabel: `🤲 ${notes.join('・')}を拾った`,
+      physicalResult: `周囲の地面から${notes.join('・')}を拾った`,
+      moved: false
+    };
+  }
+
+  // --- 周囲の地面へ捨てる（個数自由選択） ---
+  function runDropItem(itemPref = '', reqCount = 1) {
+    const req = String(itemPref || '').toLowerCase();
+    const id = (req && CONST.ITEM_META[req]) ? req : ((DIG.state.pocket.soil || 0) > 0 ? 'soil' : 'shovel');
+    const meta = CONST.ITEM_META[id];
+    const unit = meta.kind === 'tool' ? '本' : '個';
+    const want = Math.max(1, (Number.isFinite(Number(reqCount)) && Number(reqCount) > 0) ? Math.floor(Number(reqCount)) : 1);
+
     const areaId = C.getCurAreaId();
     const { absX, absZ } = C.getRobotAbsPos();
     const baseSubY = M.getRobotBaseSubY();
     const stats = C.getSizeStats();
 
-    let targetId = (itemSpec === 'shovel' || itemSpec === 'soil') ? itemSpec : '';
-    if (!targetId) {
-      if ((DIG.state.pocket.shovel || 0) > 0 || (DIG.state.equip.hand && DIG.state.equip.hand.id === 'shovel')) targetId = 'shovel';
-      else if ((DIG.state.pocket.soil || 0) > 0 || (DIG.state.equip.hand && DIG.state.equip.hand.id === 'soil')) targetId = 'soil';
+    const pHave = Math.max(0, DIG.state.pocket[id] || 0);
+    const hHave = (DIG.state.equip.hand && DIG.state.equip.hand.id === id) ? Math.max(0, DIG.state.equip.hand.count || 0) : 0;
+    const totalHave = pHave + hHave;
+    if (totalHave <= 0) {
+      return { actionLabel: `🗑️ 捨てる${meta.name}を持っていなかった`, physicalResult: `${meta.name}を所持していないため捨てられなかった`, moved: false };
     }
-    if (!targetId) return { actionLabel: '🗑️ 捨てるアイテムを持っていなかった', physicalResult: 'ポケットにも手枠にも捨てられるアイテムがなかった', moved: false };
 
-    const want = Math.max(1, reqCount || 1);
-    if (targetId === 'shovel') {
-      let dropped = 0;
-      const fromP = Math.min(DIG.state.pocket.shovel || 0, want);
-      if (fromP > 0) { DIG.state.pocket.shovel -= fromP; dropped += fromP; }
-      if (dropped < want && DIG.state.equip.hand && DIG.state.equip.hand.id === 'shovel') {
-        const fromH = Math.min(DIG.state.equip.hand.count, want - dropped);
-        DIG.state.equip.hand.count -= fromH;
-        if (DIG.state.equip.hand.count <= 0) DIG.state.equip.hand = null;
-        dropped += fromH;
+    const dropCnt = Math.min(want, totalHave);
+    let rem = dropCnt;
+    if (rem > 0 && (DIG.state.pocket[id] || 0) > 0) {
+      const d = Math.min(rem, DIG.state.pocket[id]); DIG.state.pocket[id] -= d; rem -= d;
+    }
+    if (rem > 0 && DIG.state.equip.hand && DIG.state.equip.hand.id === id) {
+      const d = Math.min(rem, DIG.state.equip.hand.count);
+      DIG.state.equip.hand.count -= d;
+      if (DIG.state.equip.hand.count <= 0) DIG.state.equip.hand = null;
+      rem -= d;
+    }
+
+    if (meta.kind === 'tool') {
+      C.addDroppedTool(id, absX, absZ, baseSubY, dropCnt, areaId);
+    } else {
+      let placed = 0;
+      const offs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+      for (let n = 0; n < dropCnt; n++) {
+        for (let k = 0; k < offs.length; k++) {
+          const tx = absX + offs[k][0], tz = absZ + offs[k][1];
+          if (!C.isInsideIslandAbs(tx, tz) || M.isCrateBlockingAtSubY(tx, baseSubY, tz, areaId)) continue;
+          const fy = C.findFloorSubYBelow(tx, tz, baseSubY + 1);
+          const cur = C.getLooseSoilAtFloor(tx, tz, fy, areaId);
+          if (cur < stats.maxStackHeight && !C.hasSolidTerrainAtAbsSubY(tx, fy + cur, tz)) {
+            C.addLooseSoilAtFloor(tx, tz, fy, 1, areaId);
+            placed++;
+            break;
+          }
+        }
       }
-      if (dropped <= 0) return { actionLabel: '🗑️ 捨てるスコップを持っていなかった', physicalResult: 'スコップを持っておらず捨てられなかった', moved: false };
-      C.addDroppedTool('shovel', absX, absZ, C.findFloorSubYBelow(absX, absZ, baseSubY + 1), dropped, areaId);
-      C.saveDigState();
-      return { actionLabel: `🗑️ スコップを${dropped}本足元へ捨てた`, physicalResult: `スコップを${dropped}本足元の地面へ捨てた（通り抜け可・後から回収可能）`, moved: false };
+      if (placed < dropCnt) DIG.state.pocket[id] = (DIG.state.pocket[id] || 0) + (dropCnt - placed);
     }
 
-    let dropped = 0;
-    for (let i = 0; i < want; i++) {
-      const hasP = (DIG.state.pocket.soil || 0) > 0;
-      const hasH = DIG.state.equip.hand && DIG.state.equip.hand.id === 'soil' && DIG.state.equip.hand.count > 0;
-      if (!hasP && !hasH) break;
-      const slot = DIG.dig && DIG.dig.findDropSlotForDugSoil ? DIG.dig.findDropSlotForDugSoil({ absX, absZ, totalSubY: baseSubY }, null, stats) : null;
-      if (!slot) break;
-      if (hasP) DIG.state.pocket.soil -= 1;
-      else { DIG.state.equip.hand.count -= 1; if (DIG.state.equip.hand.count <= 0) DIG.state.equip.hand = null; }
-      C.addLooseSoilAtFloor(slot.absX, slot.absZ, slot.floorSubY, 1, areaId);
-      dropped++;
-    }
-    if (dropped <= 0) return { actionLabel: '🗑️ 土を捨てられなかった（手持ちなし・周囲満杯）', physicalResult: '捨てられる土がないか周囲の床が満杯で捨てられなかった', moved: false };
     C.saveDigState();
-    return { actionLabel: `🗑️ 土を${dropped}個周囲へ捨てた`, physicalResult: `土を${dropped}個周囲の床へ捨てた`, moved: false };
+    if (DIG.ui && DIG.ui.renderDiaryFullUI) DIG.ui.renderDiaryFullUI();
+    return {
+      actionLabel: `🗑️ ${meta.name}を${dropCnt}${unit}その場へ捨てた`,
+      physicalResult: `${meta.name}を${dropCnt}${unit}周囲の地面へ捨てた`,
+      moved: false
+    };
   }
 
   DIG.items = {
-    ensureCrateSlots, countItemInCrate, countUsedSlotsInCrate,
-    addItemToCrate, removeItemFromCrate, summarizeCrateContents, findNearbyCrate,
-    findNearbyLooseSoilStacks, findNearbyDroppedItems,
-    runPickup, runStoreCrate, runTakeCrate, runEquipHand, runDropItem
+    ensureCrateSlots, findAdjacentCrate, getCrateItemCounts, formatCrateSummary,
+    addItemToCrate, removeItemFromCrate,
+    runTakeCrate, runStoreCrate, runCrate, runEquipHand, runPickup, runDropItem
   };
 
   if (window.DebugGuard) window.DebugGuard.markLoaded('dig_items.js');
