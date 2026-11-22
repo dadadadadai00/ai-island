@@ -1,8 +1,8 @@
 // ============================================================================
 // 【分割物理モジュール 3/7：dig_vision_3d.js】
 // ・キャラ基本表現へスポーツ3種(パンチ/キック/スイング)を追加登録
-// ・顔の向き連動の1人称視野記号マップ（厳密DDA視線・上下3×3補助視野）
-// ・3D描画（圧縮木箱・散らばり土・落下スコップ・頭上・手枠・砂粒＆瞬間モーション）
+// ・顔の向き連動の1人称視野記号マップ（ネタバレ語排除）
+// ・3D描画（子ども用手持ちパステルスコップ・メモ・砂粒＆スポーツ瞬間モーション）
 // ============================================================================
 (function initDigVision3D() {
   const DIG = window.DIG;
@@ -96,8 +96,14 @@
   const soilMatDark  = new THREE.MeshLambertMaterial({ color: 0xc68e5a });
   const sandMatPale  = new THREE.MeshLambertMaterial({ color: 0xebd0a7 });
   const soilEdgeMat  = new THREE.LineBasicMaterial({ color: 0x7c4a21, transparent: true, opacity: 0.42 });
-  const shovelHandleMat = new THREE.MeshLambertMaterial({ color: 0x92400e });
-  const shovelBladeMat  = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
+
+  // 子ども用手持ちパステルスコップ素材（ピンク持ち手・クリーム軸・ミント先端）
+  const pastelGripMat   = new THREE.MeshLambertMaterial({ color: 0xf9a8d4 });
+  const pastelHandleMat = new THREE.MeshLambertMaterial({ color: 0xfef3c7 });
+  const pastelBladeMat  = new THREE.MeshLambertMaterial({ color: 0x6ee7b7 });
+  const pastelRimMat    = new THREE.MeshLambertMaterial({ color: 0x7dd3fc });
+  const memoPaperMat    = new THREE.MeshLambertMaterial({ color: 0xfef9c3 });
+  const memoInkMat      = new THREE.MeshLambertMaterial({ color: 0x64748b });
 
   // --- 砂粒飛び散り＆スポーツ瞬間モーション制御 ---
   let lastPlayedAnimTime = 0;
@@ -370,7 +376,6 @@
       sliceRows.push(row.trimEnd());
     }
 
-    // 顔が上向き/下向きのときの3×3補助視野
     const extraFocus = [];
     if (faceDir === 'up') {
       extraFocus.push('[上向き視界: 頭上(高2〜高4)の天井 3×3 (L1/正/R1)]');
@@ -382,7 +387,7 @@
           if (!C.isInsideIslandAbs(tx, tz)) { r += ' ~ '; continue; }
           let ceilH = '.';
           for (let h = stats.bodyHeight; h <= stats.bodyHeight + 4; h++) {
-            if (C.hasSolidTerrainAtAbsSubY(tx, baseSubY + h, tz)) { ceilH = `#`; break; }
+            if (C.hasSolidTerrainAtAbsSubY(tx, baseSubY + h, tz)) { ceilH = '#'; break; }
           }
           r += ` ${ceilH} `;
         }
@@ -414,19 +419,35 @@
       ...sliceRows
     ];
     if (extraFocus.length) outLines.push(...extraFocus);
-    outLines.push('記号: @=自分 #=壁(高2以上) +=1段高 ^=高1空洞(高2以上に壁/低天井) .=平坦/空間 v=低い床/穴 1-9/o=散らばり土(段数) S=落ちたスコップ(通行可) B=圧縮木箱(5x5x5) ~=端 ?=死角');
+    outLines.push('記号: @=自分 #=壁(高2以上) +=1段高 ^=高1空洞(高2以上に壁/低天井) .=平坦/空間 v=低い床/穴 1-9/o=散らばり土(段数) S=落ちた道具(通行可) B=大きな四角い物体(5x5x5) ~=端 ?=死角');
     return outLines.join('\n');
   }
 
+  // 子どもが手で持つコンパクトなパステルカラースコップ
   function createMiniShovelMesh(scale = 1.0) {
     const g = new THREE.Group();
-    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.035 * scale, 0.22 * scale, 0.035 * scale), shovelHandleMat);
-    handle.position.y = 0.08 * scale;
-    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.085 * scale, 0.03 * scale, 0.035 * scale), shovelHandleMat);
-    grip.position.y = 0.19 * scale;
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.095 * scale, 0.09 * scale, 0.025 * scale), shovelBladeMat);
-    blade.position.y = -0.05 * scale;
-    g.add(handle, grip, blade);
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.052 * scale, 0.095 * scale, 0.052 * scale), pastelGripMat);
+    grip.position.y = 0.10 * scale;
+    const ring = new THREE.Mesh(new THREE.BoxGeometry(0.068 * scale, 0.026 * scale, 0.068 * scale), pastelHandleMat);
+    ring.position.y = 0.155 * scale;
+    const neck = new THREE.Mesh(new THREE.BoxGeometry(0.036 * scale, 0.055 * scale, 0.036 * scale), pastelHandleMat);
+    neck.position.y = 0.025 * scale;
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.115 * scale, 0.105 * scale, 0.030 * scale), pastelBladeMat);
+    blade.position.y = -0.048 * scale;
+    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.092 * scale, 0.028 * scale, 0.032 * scale), pastelRimMat);
+    tip.position.y = -0.105 * scale;
+    g.add(grip, ring, neck, blade, tip);
+    return g;
+  }
+
+  function createMiniMemoMesh(scale = 1.0) {
+    const g = new THREE.Group();
+    const paper = new THREE.Mesh(new THREE.BoxGeometry(0.12 * scale, 0.14 * scale, 0.014 * scale), memoPaperMat);
+    const line1 = new THREE.Mesh(new THREE.BoxGeometry(0.08 * scale, 0.014 * scale, 0.018 * scale), memoInkMat);
+    line1.position.y = 0.028 * scale;
+    const line2 = new THREE.Mesh(new THREE.BoxGeometry(0.07 * scale, 0.014 * scale, 0.018 * scale), memoInkMat);
+    line2.position.y = -0.012 * scale;
+    g.add(paper, line1, line2);
     return g;
   }
 
@@ -508,17 +529,22 @@
     const frontZ = Math.max(0.11, stats.reachW * CONST.SUB_SIZE * 0.52);
 
     if (hand.id === 'shovel') {
-      const sc = Math.max(0.85, 0.75 + stats.reachH * 0.16);
+      const sc = Math.max(0.85, 0.78 + stats.reachH * 0.14);
       const rSh = createMiniShovelMesh(sc);
-      rSh.position.set(sideX, handY, frontZ * 0.55);
-      rSh.rotation.set(0.45, 0, -0.2);
+      rSh.position.set(sideX, handY, frontZ * 0.58);
+      rSh.rotation.set(0.55, 0, -0.18);
       handEquipGroup.add(rSh);
       if (hand.count >= 2) {
         const lSh = createMiniShovelMesh(sc);
-        lSh.position.set(-sideX, handY, frontZ * 0.55);
-        lSh.rotation.set(0.45, 0, 0.2);
+        lSh.position.set(-sideX, handY, frontZ * 0.58);
+        lSh.rotation.set(0.55, 0, 0.18);
         handEquipGroup.add(lSh);
       }
+    } else if (hand.id === 'memo') {
+      const mm = createMiniMemoMesh(Math.max(0.85, 0.72 + stats.reachH * 0.12));
+      mm.position.set(sideX * 0.85, handY, frontZ * 0.72);
+      mm.rotation.set(-0.2, 0.25, 0);
+      handEquipGroup.add(mm);
     } else if (hand.id === 'soil') {
       const showN = Math.min(5, hand.count), mini = 0.65;
       for (let i = 0; i < showN; i++) {
@@ -560,9 +586,9 @@
 
     (DIG.state.worldDroppedItems || []).forEach(it => {
       if (it.areaId !== areaId || it.count <= 0 || !C.isInsideIslandAbs(it.absX, it.absZ)) return;
+      const { wx, wz } = C.absToWorldXZ(it.absX, it.absZ);
+      const yPos = it.floorSubY * CONST.SUB_SIZE + 0.03;
       if (it.id === 'shovel') {
-        const { wx, wz } = C.absToWorldXZ(it.absX, it.absZ);
-        const yPos = it.floorSubY * CONST.SUB_SIZE + 0.03;
         const showN = Math.min(3, it.count);
         for (let i = 0; i < showN; i++) {
           const sh = createMiniShovelMesh(0.95);
@@ -570,6 +596,11 @@
           sh.rotation.set(Math.PI / 2, 0.35 + i * 0.4, 0.2);
           digVisualGroup.add(sh);
         }
+      } else if (it.id === 'memo') {
+        const mm = createMiniMemoMesh(0.95);
+        mm.position.set(wx, yPos, wz);
+        mm.rotation.set(Math.PI / 2, 0, 0.2);
+        digVisualGroup.add(mm);
       }
     });
 
