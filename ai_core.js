@@ -1,6 +1,6 @@
 // ============================================================================
 // 【分割AI通信モジュール 3/4：ai_core.js】
-// ・プラグイン登録API・プロンプト組立・短期記憶・ターン実行制御
+// ・プラグイン登録API・プロンプト組立・短期記憶8T＆目標メモ・自由選択引数配線
 // ・不変API window.AICommCore の公開とグローバル関数配線
 // ============================================================================
 (function initAiCoreModule() {
@@ -23,6 +23,7 @@
     actionMap.set(spec.id, { id: String(spec.id), desc: String(spec.desc || spec.id), run: spec.run });
     return true;
   }
+  function clearActions() { actionMap.clear(); }
   function registerBodySensor(fn) { if (typeof fn === 'function') bodySensors.push(fn); }
   function registerSensor(fn) { registerBodySensor(fn); }
   function registerVisionProvider(fn) { if (typeof fn === 'function') visionProvider = fn; }
@@ -58,6 +59,7 @@
 
   function resetPhysicalHistory() {
     ST.shortTermMemory = [];
+    ST.currentGoal = '';
     ST.lastTurnWasMoving = false;
     ST.turnSequenceNo = 0;
     ST.lastTurnAudit.hasData = false;
@@ -91,7 +93,7 @@
     if (!ST.shortTermMemory.length) return 'なし（開始直後）';
     return ST.shortTermMemory.map((m, idx) => {
       const ago = ST.shortTermMemory.length - idx;
-      const tag = ago === 1 ? '直前' : `${ago}ターン前`;
+      const tag = ago === 1 ? '直前' : `${ago}T前`;
       const extra = m.extra ? ` ${m.extra}` : '';
       return `- ${tag}: [${m.action}(${m.dir}${extra})] 思考「${m.thought}」→ 結果: ${m.result}`;
     }).join('\n');
@@ -104,6 +106,7 @@
     const actionsText = actions.map(a => `- ${a.id}: ${a.desc}`).join('\n');
     const bodyText = collectBodyText();
     const memoryText = formatShortTermMemory();
+    const goalText = ST.currentGoal ? ST.currentGoal : 'なし（自由に決めてよい）';
 
     const fpvImageUrl = CAM.captureRobotFirstPersonImage(isMoving, true, true);
     let visionSection = '';
@@ -123,7 +126,8 @@
     }
 
     const promptText = `あなたはこの3Dブロック空間の中にいる1体の存在です。
-以下の知覚情報（視覚・身体感覚・直近の記憶）だけをもとに、次の行動を1つ自分で決めてください。
+以下の知覚情報（視覚・身体感覚・目標メモ・直近8ターンの記憶）だけをもとに、次の1ターンの行動を1つ自分で決めてください。
+※準備動作（向き変え・木箱出し入れ・持ち替え・姿勢変更）はそれぞれ独立した1ターンを消費します。
 
 【視覚（今見えている範囲のみ）】
 ${visionSection}
@@ -131,14 +135,17 @@ ${visionSection}
 【身体感覚・所持状態】
 ${bodyText}
 
-【直近の記憶（自分の思考と物理結果）】
+【現在の目標メモ（毎ターン継続または自由更新可）】
+${goalText}
+
+【直近の記憶（自分の思考と物理結果：最大${CONST.MAX_SHORT_MEMORY}ターン）】
 ${memoryText}
 
-【物理アクション】
+【物理アクション（1ターンに1つ選択）】
 ${actionsText}
 
-以下のJSON形式のみで返答してください（前置き・解説禁止、itemとcountは対象アイテムや個数を指定するアクション時のみ使用し不要時は"none"/0）:
-{"action":"${actionIds}","dir":"北/南/東/西/北西/北東/南西/南東","item":"soil/shovel/none","count":1,"emotion":"normal/joy/anger/sad/fun/fear/think/surprise/wave/sleep/swing_v/pickup/carry/push/run/peek/struggle","thought":"知覚した事実や意図を短い1文で"}`;
+以下のJSON形式のみで返答してください（前置き・解説禁止。不要な項目は"none"/0のままにしてください）:
+{"action":"${actionIds}","dir":"北/南/東/西/北西/北東/南西/南東","sub":"none/take/store/stand/crouch/jump/rest/look/pickup/place/throw/punch/kick/swing","target":"front/front_down/under/up/left/right","shape":"auto/wide/tall","face":"front/up/down/left/right","item":"soil/shovel/all/none","count":1,"goal":"今の目標を短い1文で","emotion":"normal/joy/anger/sad/fun/fear/think/surprise/wave/sleep/swing_v/pickup/carry/push/run/peek/struggle/punch/kick/swing","thought":"知覚した事実や意図を短い1文で"}`;
 
     return { promptText, sendImageUrl, fpvImageUrl, mode: effectiveMode, isMoving, actionsCount: actions.length };
   }
@@ -146,6 +153,12 @@ ${actionsText}
   function findDirByShortName(name) {
     if (!name || typeof ALL_DIRS === 'undefined') return ALL_DIRS[0];
     return ALL_DIRS.find(d => d.name.replace('(斜め)', '') === name || d.name === name) || ALL_DIRS[0];
+  }
+
+  function normStr(val, fallback = '') {
+    if (typeof val !== 'string') return fallback;
+    const s = val.trim().toLowerCase();
+    return (!s || s === 'none' || s === 'null') ? fallback : s;
   }
 
   function showStopMessage(title, detail) {
@@ -183,7 +196,9 @@ ${actionsText}
           facingBefore, facingAfter: facingBefore,
           beforeImageUrl: payload.fpvImageUrl, afterImageUrl: payload.fpvImageUrl,
           promptText: payload.promptText, rawResponse: res.lastRaw || '-', parsedJson: null,
-          actionId: '-', dirName: '-', itemName: '-', countVal: '-', emotionId: '-', motionLabel: '-',
+          actionId: '-', dirName: '-', subVal: '-', targetVal: '-', shapeVal: '-', faceVal: '-',
+          itemName: '-', countVal: '-', goalText: ST.currentGoal || '',
+          emotionId: '-', motionLabel: '-',
           thoughtText: '', actionLabel: '⚠️ 通信エラー（行動なし）',
           physicalResult: '通信失敗のため行動なし', error: res.reason
         };
@@ -205,11 +220,27 @@ ${actionsText}
       };
       const dir = findDirByShortName(dec.dir);
       const dirShort = dir.name.replace('(斜め)', '');
-      const chosenAction = actionMap.get(dec.action) || actionMap.get('rest') || Array.from(actionMap.values())[0];
+      const chosenAction = actionMap.get(dec.action)
+        || actionMap.get('posture')
+        || actionMap.get('rest')
+        || Array.from(actionMap.values())[0];
 
-      const itemStr = (typeof dec.item === 'string' && dec.item.trim() && dec.item.trim() !== 'none') ? dec.item.trim() : '';
-      const countNum = (Number.isFinite(Number(dec.count)) && Number(dec.count) > 0) ? Math.floor(Number(dec.count)) : 0;
-      const extraTag = itemStr ? (countNum > 0 ? `${itemStr}×${countNum}` : itemStr) : (countNum > 0 ? `×${countNum}` : '');
+      const subStr    = normStr(dec.sub, '');
+      const targetStr = normStr(dec.target, '');
+      const shapeStr  = normStr(dec.shape, '');
+      const faceStr   = normStr(dec.face, '');
+      const itemStr   = normStr(dec.item, '');
+      const countNum  = (Number.isFinite(Number(dec.count)) && Number(dec.count) > 0) ? Math.floor(Number(dec.count)) : 0;
+      const goalStr   = (typeof dec.goal === 'string' && dec.goal.trim()) ? dec.goal.trim().slice(0, 60) : '';
+      if (goalStr) ST.currentGoal = goalStr;
+
+      const extraParts = [];
+      if (subStr) extraParts.push(subStr);
+      if (targetStr && chosenAction.id === 'dig') extraParts.push(targetStr + (shapeStr && shapeStr !== 'auto' ? `/${shapeStr}` : ''));
+      if (faceStr && chosenAction.id === 'turn') extraParts.push(`顔:${faceStr}`);
+      if (itemStr) extraParts.push(itemStr);
+      if (countNum > 0) extraParts.push(`×${countNum}`);
+      const extraTag = extraParts.join(' ');
 
       let thoughtText = (typeof dec.thought === 'string' && dec.thought.trim()) ? dec.thought.trim() : '（無言で行動した）';
       let actionLabel = `🟪 ${chosenAction.id}`;
@@ -217,7 +248,11 @@ ${actionsText}
       let out = null;
 
       try {
-        out = chosenAction.run({ dec, dir, prevPos, item: itemStr, count: countNum });
+        out = chosenAction.run({
+          dec, dir, prevPos,
+          sub: subStr, target: targetStr, shape: shapeStr, face: faceStr,
+          item: itemStr, count: countNum, goal: ST.currentGoal
+        });
         if (out && out.actionLabel) actionLabel = out.actionLabel;
         if (out && out.physicalResult) physResult = out.physicalResult;
         else if (out && out.actionLabel) physResult = out.actionLabel;
@@ -232,11 +267,12 @@ ${actionsText}
         (curSx !== prevPos.sx) || (curSz !== prevPos.sz) || (ROBOT.pos.lv !== prevPos.lv);
 
       ST.lastTurnWasMoving = Boolean(chosenAction.id === 'move' && ((out && out.moved === true) || posChanged));
-      ROBOT.emotion = (typeof POSE_TABLE !== 'undefined' && POSE_TABLE[dec.emotion]) ? dec.emotion : 'normal';
+      const reqEmo = typeof dec.emotion === 'string' ? dec.emotion.trim() : 'normal';
+      ROBOT.emotion = (typeof POSE_TABLE !== 'undefined' && POSE_TABLE[reqEmo]) ? reqEmo : 'normal';
       ROBOT.bulbEmotion = null;
 
       for (let i = 0; i < postHooks.length; i++) {
-        try { postHooks[i]({ dec, dir, prevPos, out }); } catch (e) { console.warn('AICommCore postHook error:', e); }
+        try { postHooks[i]({ dec, dir, prevPos, out, sub: subStr }); } catch (e) { console.warn('AICommCore postHook error:', e); }
       }
 
       ST.shortTermMemory.push({ action: chosenAction.id, dir: dirShort, extra: extraTag, thought: thoughtText, result: physResult });
@@ -250,7 +286,7 @@ ${actionsText}
       if (actEl) actEl.innerText = actionLabel;
       if (msgEl) msgEl.innerText = thoughtText;
 
-      const finalEmotionId = ROBOT.emotion || dec.emotion || 'normal';
+      const finalEmotionId = ROBOT.emotion || reqEmo || 'normal';
       const motionLabel = getMotionDisplayName(finalEmotionId);
 
       if (typeof manualCameraMode !== 'undefined' && manualCameraMode === 'robot' && typeof resetFpvToRobotFront === 'function') {
@@ -273,7 +309,9 @@ ${actionsText}
         facingBefore, facingAfter, beforeImageUrl: payload.fpvImageUrl, afterImageUrl,
         promptText: payload.promptText, rawResponse: res.raw || '-', parsedJson: dec,
         actionId: chosenAction.id, dirName: dirShort,
-        itemName: itemStr || '-', countVal: countNum > 0 ? String(countNum) : '-',
+        subVal: subStr || '-', targetVal: targetStr || '-', shapeVal: shapeStr || '-', faceVal: faceStr || '-',
+        itemName: itemStr || (subStr || '-'), countVal: countNum > 0 ? String(countNum) : '-',
+        goalText: ST.currentGoal || '',
         emotionId: finalEmotionId, motionLabel, thoughtText, actionLabel, physicalResult: physResult, error: ''
       };
 
@@ -318,11 +356,13 @@ ${actionsText}
 
   // 不変コアAPI公開（UI系は ai_monitor_ui.js へ遅延委譲）
   const coreApi = Object.freeze({
-    version: '4.1-split-4mod',
+    version: '4.2-unified-10act',
     portalTravelDisabled: CONST.PORTAL_TRAVEL_DISABLED,
     isEnabled, setEnabled, getVisionMode, setVisionMode, isMovingVision,
-    registerAction, registerSensor, registerBodySensor, registerVisionProvider, registerPostTurnHook,
+    registerAction, clearActions, registerSensor, registerBodySensor, registerVisionProvider, registerPostTurnHook,
     resetPhysicalHistory,
+    getGoal: () => ST.currentGoal,
+    setGoal: (g) => { ST.currentGoal = String(g || '').slice(0, 60); },
     openVisionMonitor: (tab) => SYS.ui && SYS.ui.openVisionMonitor(tab),
     enablePinchZoomOnAllModals: () => SYS.ui && SYS.ui.enablePinchZoomOnAllModals(),
     resetAllModalZooms: () => SYS.ui && SYS.ui.resetAllModalZooms(),
@@ -333,7 +373,7 @@ ${actionsText}
   });
   Object.defineProperty(window, 'AICommCore', { value: coreApi, writable: false, configurable: false });
 
-  // 標準休憩アクション ＆ ペット追従フック
+  // 初期フォールバック休憩（dig_ui.js 刷新時に clearActions() で統一10アクションへ差し替え可）
   registerAction({
     id: 'rest',
     desc: 'その場で休む',
@@ -352,4 +392,3 @@ ${actionsText}
   SYS.core = { buildPerceptionPayload, setEnabled, setVisionMode, resetPhysicalHistory, runTurn };
   if (window.DebugGuard) window.DebugGuard.markLoaded('ai_core.js');
 })();
-
