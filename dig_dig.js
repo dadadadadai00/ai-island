@@ -1,7 +1,7 @@
 // ============================================================================
 // 【分割物理モジュール 4/7：dig_dig.js】
 // ・繋がり合うブロック/分割ブロックの自由連結掘削（上下左右・斜め45度・個数自由）
-// ・削った土の散らばり判定・足元掘削落下・個数指定手置き・完全詰み時の粉砕消失
+// ・距離1触覚サマリー(describeImmediateTouch)・空振り距離診断・個数指定手置き・詰み粉砕
 // ============================================================================
 (function initDigDig() {
   const DIG = window.DIG;
@@ -26,7 +26,6 @@
       for (let w = minOff; w <= maxOff; w++) {
         cells.push({ absX: curAbsX + frontEdge.ox + px * w, absZ: curAbsZ + frontEdge.oz + pz * w });
       }
-      // 斜め45度向きでは接する2辺の角セルも候補に含める
       cells.push({ absX: curAbsX + frontEdge.ox, absZ: curAbsZ });
       cells.push({ absX: curAbsX, absZ: curAbsZ + frontEdge.oz });
     }
@@ -41,7 +40,6 @@
   }
 
   function buildSideRowCells(curAbsX, curAbsZ, dir, stats, sideSign) {
-    // sideSign: -1=左横, +1=右横（斜め45度でも直交ベクトルで左右を算出）
     const dx = Math.sign((dir && dir.dx) || 0);
     const dz = Math.sign((dir && dir.dz) || 0);
     const sx = (-dz) * sideSign;
@@ -59,6 +57,65 @@
       }
     }
     return false;
+  }
+
+  function findNearestWallDistInDir(dir, mode, stats) {
+    const { absX: curAbsX, absZ: curAbsZ } = C.getRobotAbsPos();
+    const baseSubY = M.getRobotBaseSubY();
+    let dx = Math.sign((dir && dir.dx) || 0), dz = Math.sign((dir && dir.dz) || 0);
+    if (mode === 'left') { const ox = dx, oz = dz; dx = oz; dz = -ox; }
+    else if (mode === 'right') { const ox = dx, oz = dz; dx = -oz; dz = ox; }
+    if (dx === 0 && dz === 0) return 0;
+
+    for (let dist = 2; dist <= 4; dist++) {
+      const tx = curAbsX + dx * dist, tz = curAbsZ + dz * dist;
+      if (!C.isInsideIslandAbs(tx, tz)) break;
+      for (let h = 0; h < stats.reachH; h++) {
+        if (C.hasSolidTerrainAtAbsSubY(tx, baseSubY + h, tz)) return dist;
+      }
+    }
+    return 0;
+  }
+
+  // 今すぐ手が届く距離1の接触情報（触覚サマリー）
+  function describeImmediateTouch() {
+    const areaId = C.getCurAreaId();
+    const stats = C.getSizeStats();
+    const { absX, absZ } = C.getRobotAbsPos();
+    const baseSubY = M.getRobotBaseSubY();
+    const dirs = (typeof ALL_DIRS !== 'undefined' && ALL_DIRS.length) ? ALL_DIRS : [];
+    const hitWalls = [], hitLoose = [], hitCrates = [];
+
+    dirs.forEach(d => {
+      if (M.isBehindCurrentFacing(d)) return; // 背後死角の原則を維持
+      const dName = d.name.replace('(斜め)', '');
+      const frontEdge = C.getFrontEdgeOffset(Math.sign(d.dx), Math.sign(d.dz), stats.reachW);
+      const tx = absX + frontEdge.ox, tz = absZ + frontEdge.oz;
+      if (!C.isInsideIslandAbs(tx, tz)) return;
+
+      if (M.isCrateBlockingAtSubY(tx, baseSubY, tz, areaId)) {
+        hitCrates.push(dName);
+        return;
+      }
+      let hasDigWall = false;
+      for (let h = 0; h < stats.reachH; h++) {
+        if (C.hasSolidTerrainAtAbsSubY(tx, baseSubY + h, tz)) { hasDigWall = true; break; }
+      }
+      if (hasDigWall) {
+        hitWalls.push(dName);
+      } else {
+        const stacks = C.getLooseSoilStacksInColumn(tx, tz, areaId);
+        const st = stacks.find(s => s.count > 0 && s.floorSubY <= baseSubY + stats.reachH && s.floorSubY + s.count > baseSubY);
+        if (st) hitLoose.push(`${dName}(土${st.count}段)`);
+      }
+    });
+
+    const parts = [];
+    if (hitWalls.length) parts.push(`すぐ掘れる距離1の壁=[${hitWalls.join('・')}]`);
+    else parts.push('すぐ掘れる距離1の壁=なし(壁を掘るには距離1まで移動が必要)');
+    if (hitLoose.length) parts.push(`距離1の散らばり土=[${hitLoose.join('・')}]`);
+    if (hitCrates.length) parts.push(`距離1の圧縮木箱=[${hitCrates.join('・')}]`);
+    return `手の届く距離1の接触(視界側): ${parts.join(' ／ ')}`;
   }
 
   function isWithinDigReach(absX, totalSubY, absZ, curAbsX, baseSubY, curAbsZ, stats, targetMode) {
@@ -139,7 +196,6 @@
 
     if (!seedCandidates.length) return { targets: [], hitWaterProtected: state.hitWaterProtected };
 
-    // シードから「上下左右に繋り合う分割ブロック（ブロック境界も跨ぐ）」をBFS展開
     const dx = Math.sign((dir && dir.dx) || 0), dz = Math.sign((dir && dir.dz) || 0);
     const rx = -dz || 1, rz = dx || 0;
     const dirs6 = shape === 'tall'
@@ -169,7 +225,6 @@
           queue.push(nextCell);
         }
       }
-      // 隣接が尽きてもシード候補に残りがあれば続行
       if (!queue.length && targets.length < maxCount) {
         for (let s = 1; s < seedCandidates.length; s++) {
           if (!state.seen.has(seedCandidates[s].key)) {
@@ -334,11 +389,25 @@
         const rLbl = stats.reachH === 1 ? '高1' : `高1〜${stats.reachH}`;
         return {
           actionLabel: `⛏️ ${dName}の上部壁(高${stats.reachH + 1}以上)には背が届かず空振りした`,
-          physicalResult: `${dName}方向の目の前距離1は届く高さ(${rLbl})が空洞で、上部の壁には背が届かず空振りした`,
+          physicalResult: `${dName}方向の距離1は届く高さ(${rLbl})が既に空洞で、上部の壁(高${stats.reachH + 1}以上)には背が届かず空振りした`,
           moved: false
         };
       }
-      return { actionLabel: `⛏️ ${dName}(${mode})を削ろうとしたが空振りした`, physicalResult: `${dName}方向の${mode}に削れるブロックがなく空振りした`, moved: false };
+      if (mode === 'front' || mode === 'left' || mode === 'right') {
+        const wallDist = findNearestWallDistInDir(dir, mode, stats);
+        if (wallDist >= 2) {
+          return {
+            actionLabel: `⛏️ ${dName}(${mode})は距離1が空洞のため空振り(壁は距離${wallDist}先)`,
+            physicalResult: `${dName}(${mode})の距離1はすでに空洞で空振りした（壁は距離${wallDist}先にあるため、まず${wallDist - 1}分割近づく必要がある）`,
+            moved: false
+          };
+        }
+      }
+      return {
+        actionLabel: `⛏️ ${dName}(${mode})の距離1に削れるブロックがなく空振りした`,
+        physicalResult: `${dName}(${mode})の手の届く距離1に削れるブロックがなく空振りした`,
+        moved: false
+      };
     }
 
     const areaId = C.getCurAreaId();
@@ -405,7 +474,6 @@
     return runUnifiedDig({ target: mode, dir, shape: 'auto', count: 0, thought });
   }
 
-  // 完全詰み時のみ呼ばれる「1分割の粉砕（消失）脱出」
   function smashBlockForEscape(dir, verbLabel = 'パンチ') {
     const areaId = C.getCurAreaId();
     const { absX, absZ } = C.getRobotAbsPos();
@@ -414,7 +482,6 @@
     const cells = buildFrontRowCells(absX, absZ, dir, stats, '');
     const dName = (dir && dir.name) ? dir.name.replace('(斜め)', '') : '正面';
 
-    // 1) 目の前の散らばり土を1個粉砕して消失
     for (let i = 0; i < cells.length; i++) {
       const stacks = C.getLooseSoilStacksInColumn(cells[i].absX, cells[i].absZ, areaId);
       const hit = stacks.find(st => st.count > 0 && st.floorSubY <= baseSubY + stats.reachH && st.floorSubY + st.count > baseSubY);
@@ -429,7 +496,6 @@
       }
     }
 
-    // 2) 目の前の固体壁ブロックを1個粉砕して消失（水際保護壁は除外）
     const { targets, hitWaterProtected } = findConnectedDigTargets('front', dir, 'auto', 1, '');
     if (targets.length) {
       const t = targets[0];
@@ -522,6 +588,7 @@
 
   DIG.dig = {
     buildFrontRowCells, buildSideRowCells, hasUnreachableUpperWallInFront,
+    findNearestWallDistInDir, describeImmediateTouch,
     findConnectedDigTargets, findDigTargetsInBodyRange,
     describeRelativeDropPosition, findDropSlotForDugSoil,
     runUnifiedDig, runSubDigByMode, smashBlockForEscape, runPlaceSoil
