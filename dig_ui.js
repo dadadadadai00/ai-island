@@ -1,13 +1,40 @@
 // ============================================================================
 // 【分割物理モジュール 7/7：dig_ui.js】
 // ・手帳最上部（正面プレビュー＋左右6装備枠）・下部10枠・圧縮木箱25枠モーダル
-// ・既存フック接続・AICommCoreへの全センサー/全物理アクション登録・初期起動
+// ・既存フック接続・統一10アクション登録（準備動作独立・自由選択・詰み救済）・初期起動
 // ============================================================================
 (function initDigUIAndWire() {
   const DIG = window.DIG;
-  if (!DIG || !DIG.core || !DIG.move || !DIG.vision || !DIG.dig || !DIG.items || !DIG.throwAct) return;
-  const C = DIG.core, M = DIG.move, V = DIG.vision, D = DIG.dig, I = DIG.items, T = DIG.throwAct;
+  if (!DIG || !DIG.core || !DIG.move || !DIG.vision || !DIG.dig || !DIG.items) return;
+  const T = DIG.throw || DIG.throwAct;
+  if (!T) return;
+  DIG.throw = T;
+  DIG.throwAct = T;
+
+  const C = DIG.core, M = DIG.move, V = DIG.vision, D = DIG.dig, I = DIG.items;
   const CONST = DIG.CONST;
+
+  // --- 旧名・新名の互換エイリアス補完（他モジュール保護） ---
+  if (typeof I.ensureCrateSlots === 'function') {
+    const _rawEnsure = I.ensureCrateSlots;
+    I.ensureCrateSlots = function(crate) {
+      _rawEnsure(crate);
+      return (crate && Array.isArray(crate.slots)) ? crate.slots : C.createEmptyCrateSlots(false);
+    };
+  }
+  if (typeof I.summarizeCrateContents !== 'function') {
+    I.summarizeCrateContents = (crate) => (typeof I.formatCrateSummary === 'function' ? I.formatCrateSummary(crate) : '空');
+  }
+  if (typeof I.countUsedSlotsInCrate !== 'function') {
+    I.countUsedSlotsInCrate = (crate) => {
+      if (!crate) return 0;
+      const slots = I.ensureCrateSlots(crate);
+      return slots.filter(s => s && s.count > 0).length;
+    };
+  }
+  if (typeof I.findNearbyCrate !== 'function' && typeof I.findAdjacentCrate === 'function') {
+    I.findNearbyCrate = I.findAdjacentCrate;
+  }
 
   // --- 正面キャラプレビュー描画 ---
   function drawFrontCharacterPreview(canvas) {
@@ -412,56 +439,82 @@
   const diaryBtn = document.getElementById('diary-btn');
   if (diaryBtn) diaryBtn.addEventListener('click', () => setTimeout(renderDiaryFullUI, 20));
 
-  // --- AICommCore 接続 ---
+  // --- AICommCore 接続（統一10アクション） ---
   if (window.AICommCore) {
     if (window.AICommCore.registerVisionProvider) window.AICommCore.registerVisionProvider((opts) => V.buildFirstPersonVisionMap(opts));
     const regBody = window.AICommCore.registerBodySensor || window.AICommCore.registerSensor;
+    const faceMap = { front: '正面', up: '上向き', down: '下向き', left: '左向き', right: '右向き' };
+
     regBody(() => {
       const stats = C.getSizeStats(), st = life.getState(), basis = M.getFacingBasis();
       const { absX, absZ } = C.getRobotAbsPos();
       const clearance = M.getCeilingClearanceSubAt(absX, absZ, M.getRobotBaseSubY(), stats.reachW);
       const hand = DIG.state.equip && DIG.state.equip.hand;
       let handText = '空（素手：掘削1個）';
-      if (hand && hand.id === 'shovel') handText = hand.count === 1 ? 'スコップ1本（体格範囲で最大5個掘削可・投擲可）' : `スコップ${hand.count}本（掘削不可・${hand.count}本一括投擲可）`;
-      else if (hand && hand.id === 'soil') handText = `土${hand.count}/${stats.handSoilMax}個（掘削不可・${hand.count}個一括投擲可）`;
+      if (hand && hand.id === 'shovel') handText = hand.count === 1 ? 'スコップ1本（繋がるブロック最大5個掘削可・投擲可）' : `スコップ${hand.count}本（掘削不可・${hand.count}本投擲可）`;
+      else if (hand && hand.id === 'soil') handText = `土${hand.count}/${stats.handSoilMax}個（掘削不可・投擲可）`;
       const nearCrate = I.findNearbyCrate();
-      return [
-        `体格: 高さ${stats.reachH}×幅${stats.reachW} (歩幅:${stats.moveStep} / 階段:${stats.stairMax}・登り:${stats.maxStepUpSub} / ほふく高:${stats.crawlH} / 整理上限:${stats.maxStackHeight}段 / 投げ最大:道具${stats.throwToolMax}・土${stats.throwSoilMax})`,
-        `向いている方角: ${basis.actualFacingName} / 姿勢: ${ROBOT.posture === 'crawl' ? 'ほふく' : '立位'} / 頭上の天井空き: ${clearance}分割`,
+      const trapped = (typeof M.isCompletelyTrapped === 'function') && M.isCompletelyTrapped();
+      const faceLbl = faceMap[(typeof M.getFaceDir === 'function') ? M.getFaceDir() : 'front'] || '正面';
+      const lines = [
+        `体格: 高さ${stats.reachH}×幅${stats.reachW} (歩幅:1〜${stats.moveStep}自由 / 階段:${stats.stairMax}・登り:${stats.maxStepUpSub} / しゃがみ高:${stats.crawlH} / 整理上限:${stats.maxStackHeight}段 / 投げ最大:道具${stats.throwToolMax}・土${stats.throwSoilMax})`,
+        `体の向き: ${basis.actualFacingName} / 顔の向き: ${faceLbl} / 姿勢: ${ROBOT.posture === 'crawl' ? 'しゃがみ(ほふく)' : '立位'} / 頭上の天井空き: ${clearance}分割`,
         `身体状態: 体力${st.stamina}/100, おなか${st.energy}/100`,
         `手枠装備: ${handText}`,
         `ポケット(1〜9枠): 土${DIG.state.pocket.soil || 0}個（資源合計${C.getCarriedResourceTotal()}/${stats.pocketCap}・手枠共有）、スコップ${DIG.state.pocket.shovel || 0}本（資源上限非消費）`,
         `頭上ピラミッド(10枠目): 土${DIG.state.headSoil || 0}/${stats.headCap}個 (+${stats.headLayers}段・必要天井:${stats.bodyHeight + stats.headLayers}${(DIG.state.headSoil || 0) > 0 ? '・保持中は投擲不可' : ''})`,
         nearCrate ? `隣接圧縮木箱(手が届く): ${I.summarizeCrateContents(nearCrate)}` : '隣接圧縮木箱: なし（手が届く距離1分割以内にない）'
-      ].join('\n');
+      ];
+      if (trapped) lines.push('⚠️ 完全詰み状態: 周囲が塞がっているため use(sub:"punch"または"kick") で目の前1分割を粉砕(消失)して脱出可能');
+      return lines.join('\n');
     });
 
-    const reg = (id, desc, fn) => window.AICommCore.registerAction({ id, desc, run: (ctx) => { DIG.runtime.lastTurnActionId = id; return fn(ctx); } });
-    reg('look',        '移動せず指定方角へ体の向きを変える', ({ dir }) => M.runLook(dir));
-    reg('move',        '指定方角へ移動する（落ちたスコップSは通り抜け可）', ({ dir }) => M.runSubMove(dir));
-    reg('dig_front',   '指定方角の目の前距離1の壁を体格範囲内で削る（素手1個／スコップ1本最大5個／2本や土持ちは不可）', ({ dir, dec }) => D.runSubDigByMode('front', dir, dec && dec.thought));
-    reg('dig_down',    '指定方角の目の前または足元の地面(1段下)を体格範囲内で削る', ({ dir, dec }) => D.runSubDigByMode('down', dir, dec && dec.thought));
-    reg('dig_up',      '頭上の届く高さの天井を体格範囲内で削る', ({ dir, dec }) => D.runSubDigByMode('up', dir, dec && dec.thought));
-    reg('pickup',      'すぐそばの散らばった土や地面のスコップ(S)をポケットへ拾う（item:"soil"/"shovel"/省略可）', ({ item }) => I.runPickup(item));
-    reg('place_soil',  '頭上（なければ手枠・ポケット）の土を指定方角の距離1へ1個そっと置く（頭上保持中でも実行可）', ({ dir }) => D.runPlaceSoil(dir));
-    reg('store_crate', 'すぐ隣(距離1分割以内)の圧縮木箱(25枠)へ土やスコップを収納する（item:"soil"/"shovel"/省略可）', ({ item }) => I.runStoreCrate(item));
-    reg('take_crate',  'すぐ隣(距離1分割以内)の圧縮木箱からitem("shovel"/"soil")を一旦ポケットの空き上限までまとめて取り出す', ({ item }) => I.runTakeCrate(item));
-    reg('equip_hand',  'ポケットと手枠の間で自由に付け外しする（item:"shovel"/"soil"/"none", count:個数）', ({ item, count }) => I.runEquipHand(item, count));
-    reg('drop_item',   'ポケットや手枠のitem("shovel"/"soil")をcount個だけ周囲の地面へ捨てる', ({ item, count }) => I.runDropItem(item, count));
-    reg('throw_hand',  '手枠に装備中のスコップや土を指定方角へ放物線を描いて一気に投げる（頭上ピラミッド保持時は不可）', ({ dir }) => T.runThrowHand(dir));
+    if (typeof window.AICommCore.clearActions === 'function') window.AICommCore.clearActions();
+    const reg = (id, desc, fn) => window.AICommCore.registerAction({
+      id, desc,
+      run: (ctx) => { DIG.runtime.lastTurnActionId = id; return fn(ctx); }
+    });
 
-    window.AICommCore.registerPostTurnHook(({ dec }) => {
+    reg('turn',    '独立1T：移動せず体(dir:8方向)と顔(face:"front"/"up"/"down"/"left"/"right")の向きを変える',
+      ({ dir, face }) => M.runTurn(dir, face));
+    reg('move',    '移動：dir方向へcount歩(1〜最大歩幅)進む。sub:"pickup"/"place"/"throw"で移動しながら同時操作も可',
+      ({ dir, count, sub, item }) => M.runSubMove(dir, { count, sub, item }));
+    reg('dig',     '掘削：繋がり合うブロック/分割ブロックをcount個(1〜最大)削る(target:"front"/"front_down"/"under"/"up"/"left"/"right", shape:"auto"/"wide"/"tall")',
+      ({ dir, target, shape, count, dec }) => D.runUnifiedDig({ dir, target: target || 'front', shape: shape || 'auto', count, thought: dec && dec.thought }));
+    reg('pickup',  '拾う：すぐそばの土や落ちたスコップ(S)をポケットへ拾う(item:"soil"/"shovel"/"all", count:個数自由)',
+      ({ item, count }) => I.runPickup(item, count));
+    reg('place',   '置く：頭上・手枠・ポケットの土をdir方向の距離1へcount個そっと置く',
+      ({ dir, item, count }) => D.runPlaceSoil(dir, { item, count }));
+    reg('throw',   '投げる：手枠装備のスコップや土をdir方向へ放物線でcount個投げる(頭上保持時は不可)',
+      ({ dir, count }) => T.runThrowHand(dir, { count }));
+    reg('crate',   '独立1T：すぐ隣(距離1分割以内)の圧縮木箱と出し入れ(sub:"take"取り出し/"store"収納, item:"shovel"/"soil"/"all", count:個数自由)',
+      ({ sub, item, count }) => I.runCrate(sub || 'take', item, count));
+    reg('equip',   '独立1T：ポケット⇔手枠を持ち替える(item:"shovel"/"soil"/"none"素手, count:個数自由)',
+      ({ item, count }) => I.runEquipHand(item || 'none', count));
+    reg('posture', '独立1T：姿勢・待機(sub:"stand"立つ/"crouch"しゃがむ/"jump"跳ぶ/"rest"休む/"look"見回す)',
+      ({ sub, dir, face }) => M.runPosture(sub || 'rest', dir, face));
+    reg('use',     'スポーツ動作/使用(sub:"punch"/"kick"/"swing")：通常は土・道具を押し/蹴り/弾き(壁は砂が散る)、完全詰み時のみパンチ・キックで1分割粉砕消失',
+      ({ sub, dir, item, count }) => T.runUseAction(sub || 'punch', dir, { item, count }));
+
+    window.AICommCore.registerPostTurnHook(({ dec, sub }) => {
       const act = (dec && dec.action) || DIG.runtime.lastTurnActionId;
+      const subLow = String(sub || (dec && dec.sub) || '').toLowerCase();
       const eSpec = (typeof getExpressionSpec === 'function') ? getExpressionSpec(ROBOT.emotion) : null;
-      if (act === 'dig_front' || act === 'dig_down' || act === 'dig_up' || act === 'throw_hand') ROBOT.emotion = 'swing_v';
-      else if (act === 'look') ROBOT.emotion = 'peek';
+      if (act === 'dig' || act === 'throw') ROBOT.emotion = 'swing_v';
+      else if (act === 'use') {
+        if (typeof POSE_TABLE !== 'undefined' && POSE_TABLE[subLow]) ROBOT.emotion = subLow;
+        else if (subLow === 'swing') ROBOT.emotion = 'swing_v';
+        else ROBOT.emotion = 'push';
+      } else if (act === 'turn' || (act === 'posture' && subLow === 'look')) ROBOT.emotion = 'peek';
+      else if (act === 'posture' && subLow === 'rest') ROBOT.emotion = 'sleep';
+      else if (act === 'posture' && subLow === 'jump') ROBOT.emotion = 'joy';
       else if (act === 'move' && DIG.runtime.lastMoveVisualKind === 'scramble_climb') ROBOT.emotion = 'struggle';
       else if (act === 'move' && DIG.runtime.lastMoveVisualKind === 'safe_landing') ROBOT.emotion = 'pickup';
       else if (act === 'move' && DIG.runtime.lastMoveVisualKind === 'high_drop') ROBOT.emotion = 'surprise';
       else if (eSpec && eSpec.tool) {
         if (act === 'move') ROBOT.emotion = 'run';
-        else if (act === 'pickup' || act === 'take_crate') ROBOT.emotion = 'pickup';
-        else if (act === 'place_soil' || act === 'store_crate' || act === 'equip_hand') ROBOT.emotion = 'carry';
+        else if (act === 'pickup' || (act === 'crate' && subLow === 'take')) ROBOT.emotion = 'pickup';
+        else if (act === 'place' || (act === 'crate' && subLow === 'store') || act === 'equip') ROBOT.emotion = 'carry';
         else ROBOT.emotion = 'normal';
       }
       DIG.runtime.lastMoveVisualKind = null;
