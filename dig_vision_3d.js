@@ -1,8 +1,8 @@
 // ============================================================================
 // 【分割物理モジュール 3/7：dig_vision_3d.js】
-// ・1人称視野記号マップ（厳密DDA視線・落ちたスコップS表示）
-// ・3D描画（圧縮木箱・散らばり土・落下スコップ・頭上ピラミッド・手枠装備）
-// ・3D画面上の圧縮木箱短タップによる25枠モーダル起動
+// ・キャラ基本表現へスポーツ3種(パンチ/キック/スイング)を追加登録
+// ・顔の向き連動の1人称視野記号マップ（厳密DDA視線・上下3×3補助視野）
+// ・3D描画（圧縮木箱・散らばり土・落下スコップ・頭上・手枠・砂粒＆瞬間モーション）
 // ============================================================================
 (function initDigVision3D() {
   const DIG = window.DIG;
@@ -10,6 +10,52 @@
   const C = DIG.core;
   const M = DIG.move;
   const CONST = DIG.CONST;
+
+  // --- 設定ページ「キャラ基本表現」へ最小3種(パンチ/キック/スイング)を正式追加 ---
+  (function registerSportExpressions() {
+    const extras = [
+      {
+        expr: { key: 'punch', icon: '🥊', label: 'パンチ',   bulb: 0xf97316, words: 'パンチ、殴る、突く、ジャブ、壁叩き、粉砕脱出' },
+        pose: { spd: 16, bounce: 0.02, bodyX: 0.25,  headX: -0.10, shLX: -0.95, shLZ: 0.25, elLX: -1.45, shRX: -1.65, shRZ: -0.08, elRX: -0.15, hipX: -0.35, kneeX: 0.65, mode: 'push',    name: 'パンチ' }
+      },
+      {
+        expr: { key: 'kick',  icon: '🦵', label: 'キック',   bulb: 0xef4444, words: 'キック、蹴る、シュート、蹴り飛ばす、壁蹴り、粉砕脱出' },
+        pose: { spd: 15, bounce: 0.08, bodyX: -0.26, headX: 0.14,  shLX: -0.75, shLZ: 0.45, elLX: -1.10, shRX: -0.75, shRZ: -0.45, elRX: -1.10, hipX: -1.25, kneeX: 0.20, mode: 'stomp',   name: 'キック' }
+      },
+      {
+        expr: { key: 'swing', icon: '🏏', label: 'スイング', bulb: 0x10b981, words: 'スイング、フルスイング、バット、ラケット、打ち返す、振る', tool: true },
+        pose: { spd: 14, bounce: 0.03, bodyX: 0.18,  headX: 0.08,  shLX: -1.15, shLZ: 0.45, elLX: -0.70, shRX: -1.40, shRZ: -0.75, elRX: -0.45, hipX: -0.35, kneeX: 0.65, mode: 'swing_h', name: 'スイング' }
+      }
+    ];
+
+    let savedWords = null;
+    try {
+      if (typeof safeStorage !== 'undefined') {
+        const raw = safeStorage.getItem('island_spacecore_v15');
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed && parsed.customWords) savedWords = parsed.customWords;
+      }
+    } catch (e) {}
+
+    extras.forEach(({ expr, pose }) => {
+      if (typeof DEFAULT_EXPRESSIONS !== 'undefined' && Array.isArray(DEFAULT_EXPRESSIONS)) {
+        if (!DEFAULT_EXPRESSIONS.some(e => e.key === expr.key)) DEFAULT_EXPRESSIONS.push(expr);
+      }
+      if (typeof POSE_TABLE !== 'undefined' && POSE_TABLE && !POSE_TABLE[expr.key]) {
+        POSE_TABLE[expr.key] = pose;
+      }
+      if (typeof LOCKED_PHYSICAL_POSES !== 'undefined' && Array.isArray(LOCKED_PHYSICAL_POSES)) {
+        if (!LOCKED_PHYSICAL_POSES.includes(expr.key)) LOCKED_PHYSICAL_POSES.push(expr.key);
+      }
+      if (typeof CUSTOM_WORDS_MAP !== 'undefined' && CUSTOM_WORDS_MAP) {
+        if (savedWords && typeof savedWords[expr.key] === 'string' && savedWords[expr.key].trim()) {
+          CUSTOM_WORDS_MAP[expr.key] = savedWords[expr.key].trim();
+        } else if (!CUSTOM_WORDS_MAP[expr.key]) {
+          CUSTOM_WORDS_MAP[expr.key] = expr.words;
+        }
+      }
+    });
+  })();
 
   // 旧ツール非表示 ＆ 3D頭上・手元グループ接続
   try {
@@ -34,17 +80,153 @@
 
   const digVisualGroup = new THREE.Group();
   digVisualGroup.name = 'dig_rules_visual_group';
-  if (typeof scene !== 'undefined' && scene) scene.add(digVisualGroup);
+  const fxGroup = new THREE.Group();
+  fxGroup.name = 'dig_sport_fx_group';
+  if (typeof scene !== 'undefined' && scene) {
+    scene.add(digVisualGroup);
+    scene.add(fxGroup);
+  }
 
   const crateHitMeshes = [];
   const unitBoxGeo  = new THREE.BoxGeometry(CONST.SUB_SIZE * 0.96, CONST.SUB_SIZE * 0.96, CONST.SUB_SIZE * 0.96);
   const unitEdgeGeo = new THREE.EdgesGeometry(unitBoxGeo);
+  const sandGeo     = new THREE.BoxGeometry(0.036, 0.036, 0.036);
+  const smashGeo    = new THREE.BoxGeometry(0.068, 0.068, 0.068);
   const soilMatLight = new THREE.MeshLambertMaterial({ color: 0xd9a875 });
   const soilMatDark  = new THREE.MeshLambertMaterial({ color: 0xc68e5a });
+  const sandMatPale  = new THREE.MeshLambertMaterial({ color: 0xebd0a7 });
   const soilEdgeMat  = new THREE.LineBasicMaterial({ color: 0x7c4a21, transparent: true, opacity: 0.42 });
   const shovelHandleMat = new THREE.MeshLambertMaterial({ color: 0x92400e });
   const shovelBladeMat  = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
 
+  // --- 砂粒飛び散り＆スポーツ瞬間モーション制御 ---
+  let lastPlayedAnimTime = 0;
+  const activeParticles = [];
+  let activeBodyAnim = null;
+  let fxRafId = null;
+
+  function spawnSandBurst(wx, wy, wz, dx, dz, isSmash = false) {
+    const count = isSmash ? 16 : 10;
+    const geo = isSmash ? smashGeo : sandGeo;
+    const mats = [soilMatLight, soilMatDark, sandMatPale];
+    for (let i = 0; i < count; i++) {
+      const m = new THREE.Mesh(geo, mats[i % mats.length]);
+      m.position.set(
+        wx + (Math.random() - 0.5) * 0.14,
+        wy + (Math.random() - 0.3) * 0.12,
+        wz + (Math.random() - 0.5) * 0.14
+      );
+      const spread = isSmash ? 0.032 : 0.020;
+      const vx = (-dx * 0.014) + (Math.random() - 0.5) * spread;
+      const vy = (isSmash ? 0.036 : 0.024) + Math.random() * 0.022;
+      const vz = (-dz * 0.014) + (Math.random() - 0.5) * spread;
+      fxGroup.add(m);
+      activeParticles.push({ mesh: m, vx, vy, vz, life: 0, maxLife: isSmash ? 34 : 26 });
+    }
+  }
+
+  function stepFxLoop() {
+    let alive = false;
+
+    for (let i = activeParticles.length - 1; i >= 0; i--) {
+      const p = activeParticles[i];
+      p.life++;
+      p.vy -= 0.0024;
+      p.mesh.position.x += p.vx;
+      p.mesh.position.y += p.vy;
+      p.mesh.position.z += p.vz;
+      p.mesh.rotation.x += 0.18;
+      p.mesh.rotation.y += 0.15;
+      const sc = Math.max(0.05, 1 - p.life / p.maxLife);
+      p.mesh.scale.set(sc, sc, sc);
+      if (p.life >= p.maxLife) {
+        fxGroup.remove(p.mesh);
+        activeParticles.splice(i, 1);
+      } else {
+        alive = true;
+      }
+    }
+
+    if (activeBodyAnim && typeof robotGroup !== 'undefined' && robotGroup) {
+      const t = (performance.now() - activeBodyAnim.start) / activeBodyAnim.dur;
+      if (t >= 1) {
+        robotGroup.position.x = activeBodyAnim.baseX;
+        robotGroup.position.y = activeBodyAnim.baseY;
+        robotGroup.position.z = activeBodyAnim.baseZ;
+        robotGroup.rotation.x = 0;
+        robotGroup.rotation.z = 0;
+        robotGroup.rotation.y = activeBodyAnim.baseRotY;
+        activeBodyAnim = null;
+      } else {
+        alive = true;
+        const k = activeBodyAnim.kind;
+        const wave = Math.sin(t * Math.PI);
+        const snap = (t < 0.28) ? -(t / 0.28) * 0.45 : Math.sin(((t - 0.28) / 0.72) * Math.PI);
+        const fx = Math.sin(activeBodyAnim.baseRotY), fz = Math.cos(activeBodyAnim.baseRotY);
+
+        if (k === 'jump') {
+          robotGroup.position.y = activeBodyAnim.baseY + wave * 0.26;
+        } else if (k === 'punch') {
+          robotGroup.position.x = activeBodyAnim.baseX + fx * snap * 0.14;
+          robotGroup.position.z = activeBodyAnim.baseZ + fz * snap * 0.14;
+          robotGroup.rotation.x = snap * 0.28;
+          robotGroup.rotation.y = activeBodyAnim.baseRotY - snap * 0.32;
+        } else if (k === 'kick') {
+          robotGroup.position.x = activeBodyAnim.baseX + fx * snap * 0.13;
+          robotGroup.position.z = activeBodyAnim.baseZ + fz * snap * 0.13;
+          robotGroup.position.y = activeBodyAnim.baseY + Math.max(0, snap) * 0.09;
+          robotGroup.rotation.x = -snap * 0.34;
+        } else if (k === 'swing') {
+          robotGroup.rotation.y = activeBodyAnim.baseRotY + (t < 0.3 ? -0.75 * (t / 0.3) : (-0.75 + 1.65 * Math.sin(((t - 0.3) / 0.7) * Math.PI * 0.5)));
+          robotGroup.rotation.z = wave * 0.22;
+        } else if (k === 'throw') {
+          robotGroup.rotation.x = (t < 0.35 ? -0.35 * (t / 0.35) : 0.30 * Math.sin(((t - 0.35) / 0.65) * Math.PI));
+        }
+      }
+    }
+
+    if (typeof renderer !== 'undefined' && typeof scene !== 'undefined' && typeof activeCamera !== 'undefined') {
+      renderer.render(scene, activeCamera);
+    }
+    if (alive) fxRafId = requestAnimationFrame(stepFxLoop);
+    else fxRafId = null;
+  }
+
+  function playTurnFxIfNeeded() {
+    const anim = DIG.runtime.lastSportAnim;
+    const isJump = (DIG.runtime.lastMoveVisualKind === 'jump');
+    if (anim && anim.time && anim.time !== lastPlayedAnimTime) {
+      lastPlayedAnimTime = anim.time;
+      if (typeof robotGroup !== 'undefined' && robotGroup) {
+        activeBodyAnim = {
+          kind: anim.kind, start: performance.now(), dur: 360,
+          baseX: robotGroup.position.x, baseY: robotGroup.position.y, baseZ: robotGroup.position.z,
+          baseRotY: ROBOT.rotY || 0
+        };
+      }
+      if (anim.hitWall || anim.smash) {
+        const { absX, absZ } = C.getRobotAbsPos();
+        const baseSubY = M.getRobotBaseSubY();
+        const dx = Math.sign((anim.dir && anim.dir.dx) || Math.round(Math.sin(ROBOT.rotY || 0)));
+        const dz = Math.sign((anim.dir && anim.dir.dz) || Math.round(Math.cos(ROBOT.rotY || 0)));
+        const tAbs = anim.targetAbs || { absX: absX + dx, absZ: absZ + dz, subY: baseSubY };
+        const { wx, wz } = C.absToWorldXZ(tAbs.absX, tAbs.absZ);
+        const wy = ((Number.isFinite(tAbs.subY) ? tAbs.subY : baseSubY) + 0.5) * CONST.SUB_SIZE;
+        spawnSandBurst(wx, wy, wz, dx, dz, Boolean(anim.smash));
+      }
+      if (!fxRafId) fxRafId = requestAnimationFrame(stepFxLoop);
+    } else if (isJump && typeof robotGroup !== 'undefined' && robotGroup) {
+      DIG.runtime.lastMoveVisualKind = null;
+      activeBodyAnim = {
+        kind: 'jump', start: performance.now(), dur: 340,
+        baseX: robotGroup.position.x, baseY: robotGroup.position.y, baseZ: robotGroup.position.z,
+        baseRotY: ROBOT.rotY || 0
+      };
+      if (!fxRafId) fxRafId = requestAnimationFrame(stepFxLoop);
+    }
+  }
+
+  // --- 厳密DDA視線判定 ＆ 顔の向き連動記号マップ ---
   function isVisibleFromEye(curAbsX, curAbsZ, eyeSubY, targetAbsX, targetAbsZ) {
     const x0 = Math.round(curAbsX), z0 = Math.round(curAbsZ);
     const x1 = Math.round(targetAbsX), z1 = Math.round(targetAbsZ);
@@ -86,6 +268,25 @@
     return true;
   }
 
+  function resolveVisionBasis(bodyBasis, faceDir) {
+    const cardinals = (typeof ALL_DIRS !== 'undefined' ? ALL_DIRS : []).filter(d => Math.abs(d.dx) + Math.abs(d.dz) === 1);
+    const findName = (dx, dz) => {
+      const hit = cardinals.find(d => d.dx === dx && d.dz === dz);
+      return hit ? hit.name.replace('(斜め)', '') : '';
+    };
+    let fx = bodyBasis.fx, fz = bodyBasis.fz;
+    if (faceDir === 'left') { fx = -bodyBasis.rx; fz = -bodyBasis.rz; }
+    else if (faceDir === 'right') { fx = bodyBasis.rx; fz = bodyBasis.rz; }
+    const rx = -fz, rz = fx;
+    return {
+      fx, fz, rx, rz,
+      frontName: findName(fx, fz) || bodyBasis.frontName,
+      rightName: findName(rx, rz) || bodyBasis.rightName,
+      leftName: findName(-rx, -rz) || bodyBasis.leftName,
+      actualFacingName: (faceDir === 'left' || faceDir === 'right') ? (findName(fx, fz) || bodyBasis.frontName) : bodyBasis.actualFacingName
+    };
+  }
+
   function buildFirstPersonVisionMap(opts = {}) {
     const isMoving = Boolean(
       opts && typeof opts.isMoving === 'boolean'
@@ -97,7 +298,10 @@
     const { absX, absZ } = C.getRobotAbsPos();
     const baseSubY = M.getRobotBaseSubY();
     const eyeSubY = baseSubY + Math.max(1, stats.bodyHeight) - 1;
-    const basis = M.getFacingBasis();
+    const faceDir = (typeof M.getFaceDir === 'function') ? M.getFaceDir() : 'front';
+    const faceLabelMap = { front: '正面', up: '上向き', down: '下向き', left: '左向き', right: '右向き' };
+    const bodyBasis = M.getFacingBasis();
+    const basis = resolveVisionBasis(bodyBasis, faceDir);
 
     const maxLat = isMoving ? 3 : 4;
     const headerCols = [];
@@ -166,16 +370,52 @@
       sliceRows.push(row.trimEnd());
     }
 
+    // 顔が上向き/下向きのときの3×3補助視野
+    const extraFocus = [];
+    if (faceDir === 'up') {
+      extraFocus.push('[上向き視界: 頭上(高2〜高4)の天井 3×3 (L1/正/R1)]');
+      for (let fwd = 1; fwd >= -1; fwd--) {
+        let r = `${fwd === 1 ? '前1' : (fwd === 0 ? '真上' : '後1')}: `;
+        for (let lat = -1; lat <= 1; lat++) {
+          const tx = absX + basis.fx * fwd + basis.rx * lat;
+          const tz = absZ + basis.fz * fwd + basis.rz * lat;
+          if (!C.isInsideIslandAbs(tx, tz)) { r += ' ~ '; continue; }
+          let ceilH = '.';
+          for (let h = stats.bodyHeight; h <= stats.bodyHeight + 4; h++) {
+            if (C.hasSolidTerrainAtAbsSubY(tx, baseSubY + h, tz)) { ceilH = `#`; break; }
+          }
+          r += ` ${ceilH} `;
+        }
+        extraFocus.push(r.trimEnd());
+      }
+    } else if (faceDir === 'down') {
+      extraFocus.push('[下向き視界: 足元1段下の床 3×3 (L1/正/R1)]');
+      for (let fwd = 1; fwd >= -1; fwd--) {
+        let r = `${fwd === 1 ? '前1' : (fwd === 0 ? '足元' : '後1')}: `;
+        for (let lat = -1; lat <= 1; lat++) {
+          const tx = absX + basis.fx * fwd + basis.rx * lat;
+          const tz = absZ + basis.fz * fwd + basis.rz * lat;
+          if (!C.isInsideIslandAbs(tx, tz)) { r += ' ~ '; continue; }
+          const solid = C.hasSolidTerrainAtAbsSubY(tx, baseSubY - 1, tz);
+          const loose = C.hasLooseSoilAtSubY(tx, baseSubY - 1, tz, areaId);
+          r += ` ${solid ? '#' : (loose ? 'o' : 'v')} `;
+        }
+        extraFocus.push(r.trimEnd());
+      }
+    }
+
     const modeTitle = isMoving
       ? '[移動直後・狭い前方視野 (1文字=1分割, 上ほど奥)]'
       : '[停止中・180°パノラマ視野 (1文字=1分割, 上ほど奥・真横まで可視)]';
-    return [
-      `視界の向き: 正面=${basis.actualFacingName}(基準:${basis.frontName} / 左:${basis.leftName} / 右:${basis.rightName}) ※背後は死角`,
+    const outLines = [
+      `視界の向き: 視線=${basis.actualFacingName}(顔:${faceLabelMap[faceDir] || '正面'} / 体:${bodyBasis.actualFacingName} / 左:${basis.leftName} / 右:${basis.rightName}) ※背後は死角`,
       modeTitle, ...topRows,
       '[目の前1列目の正面断面 (L2=左2, L1=左1, 正=正面, R1=右1, R2=右2)]',
-      ...sliceRows,
-      '記号: @=自分 #=壁(高2以上) +=1段高 ^=高1空洞(高2以上に壁/低天井) .=平坦/空間 v=低い床/穴 1-9/o=散らばり土(段数) S=落ちたスコップ(通行可) B=圧縮木箱(5x5x5) ~=端 ?=死角'
-    ].join('\n');
+      ...sliceRows
+    ];
+    if (extraFocus.length) outLines.push(...extraFocus);
+    outLines.push('記号: @=自分 #=壁(高2以上) +=1段高 ^=高1空洞(高2以上に壁/低天井) .=平坦/空間 v=低い床/穴 1-9/o=散らばり土(段数) S=落ちたスコップ(通行可) B=圧縮木箱(5x5x5) ~=端 ?=死角');
+    return outLines.join('\n');
   }
 
   function createMiniShovelMesh(scale = 1.0) {
@@ -332,6 +572,8 @@
         }
       }
     });
+
+    playTurnFxIfNeeded();
   }
 
   // 3D画面上の圧縮木箱短タップで25枠モーダルを開く
@@ -372,9 +614,9 @@
 
   DIG.vision = {
     isVisibleFromEye, buildFirstPersonVisionMap,
-    renderHeadPyramidVisual, renderHandEquipVisual, renderDigVisuals
+    renderHeadPyramidVisual, renderHandEquipVisual, renderDigVisuals,
+    playTurnFxIfNeeded
   };
 
   if (window.DebugGuard) window.DebugGuard.markLoaded('dig_vision_3d.js');
 })();
-
