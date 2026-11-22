@@ -1,7 +1,7 @@
 // ============================================================================
 // 【分割AI通信モジュール 3/4：ai_core.js】
 // ・プラグイン登録API・プロンプト組立・短期記憶8T＆目標メモ・自由選択引数配線
-// ・不変API window.AICommCore の公開とグローバル関数配線
+// ・dir:"none"時の現在向き維持・詳細パラメータ分離・不変API window.AICommCore
 // ============================================================================
 (function initAiCoreModule() {
   const SYS = window.AI_SYS;
@@ -151,8 +151,20 @@ ${actionsText}
   }
 
   function findDirByShortName(name) {
-    if (!name || typeof ALL_DIRS === 'undefined') return ALL_DIRS[0];
-    return ALL_DIRS.find(d => d.name.replace('(斜め)', '') === name || d.name === name) || ALL_DIRS[0];
+    if (typeof ALL_DIRS === 'undefined' || !ALL_DIRS.length) return { name: '北', dx: 0, dz: -1, rot: Math.PI };
+    const clean = (typeof name === 'string') ? name.trim() : '';
+    if (clean && clean.toLowerCase() !== 'none' && clean.toLowerCase() !== 'null') {
+      const hit = ALL_DIRS.find(d => d.name.replace('(斜め)', '') === clean || d.name === clean);
+      if (hit) return hit;
+    }
+    // 未指定・"none"時は北へ戻さず現在の体の向きを維持
+    const rot = (typeof ROBOT !== 'undefined' && Number.isFinite(ROBOT.rotY)) ? ROBOT.rotY : Math.PI;
+    let best = ALL_DIRS[0], minDiff = 999;
+    ALL_DIRS.forEach(d => {
+      const diff = Math.abs(Math.atan2(Math.sin(rot - d.rot), Math.cos(rot - d.rot)));
+      if (diff < minDiff) { minDiff = diff; best = d; }
+    });
+    return best;
   }
 
   function normStr(val, fallback = '') {
@@ -310,7 +322,7 @@ ${actionsText}
         promptText: payload.promptText, rawResponse: res.raw || '-', parsedJson: dec,
         actionId: chosenAction.id, dirName: dirShort,
         subVal: subStr || '-', targetVal: targetStr || '-', shapeVal: shapeStr || '-', faceVal: faceStr || '-',
-        itemName: itemStr || (subStr || '-'), countVal: countNum > 0 ? String(countNum) : '-',
+        itemName: itemStr || '-', countVal: countNum > 0 ? String(countNum) : '-',
         goalText: ST.currentGoal || '',
         emotionId: finalEmotionId, motionLabel, thoughtText, actionLabel, physicalResult: physResult, error: ''
       };
@@ -339,7 +351,6 @@ ${actionsText}
     }
   }
 
-  // グローバル配線
   window.executeTurn = runTurn;
   if (typeof executeTurn !== 'undefined') executeTurn = runTurn;
   const actionBtn = document.getElementById('btn-action');
@@ -354,9 +365,8 @@ ${actionsText}
   }
   window.toggleAiCommSwitch = setEnabled;
 
-  // 不変コアAPI公開（UI系は ai_monitor_ui.js へ遅延委譲）
   const coreApi = Object.freeze({
-    version: '4.2-unified-10act',
+    version: '4.3-touch-fix',
     portalTravelDisabled: CONST.PORTAL_TRAVEL_DISABLED,
     isEnabled, setEnabled, getVisionMode, setVisionMode, isMovingVision,
     registerAction, clearActions, registerSensor, registerBodySensor, registerVisionProvider, registerPostTurnHook,
@@ -373,7 +383,6 @@ ${actionsText}
   });
   Object.defineProperty(window, 'AICommCore', { value: coreApi, writable: false, configurable: false });
 
-  // 初期フォールバック休憩（dig_ui.js 刷新時に clearActions() で統一10アクションへ差し替え可）
   registerAction({
     id: 'rest',
     desc: 'その場で休む',
