@@ -1,7 +1,7 @@
 // ============================================================================
 // 【分割物理モジュール 4/7：dig_dig.js】
-// ・体格範囲内での掘削（素手1個／スコップ1本最大5個／2本・土所持中は掘削不可）
-// ・削った土の散らばり先判定・足元掘削時の落下連動・目の前への手置き(place_soil)
+// ・繋がり合うブロック/分割ブロックの自由連結掘削（上下左右・斜め45度・個数自由）
+// ・削った土の散らばり判定・足元掘削落下・個数指定手置き・完全詰み時の粉砕消失
 // ============================================================================
 (function initDigDig() {
   const DIG = window.DIG;
@@ -26,6 +26,9 @@
       for (let w = minOff; w <= maxOff; w++) {
         cells.push({ absX: curAbsX + frontEdge.ox + px * w, absZ: curAbsZ + frontEdge.oz + pz * w });
       }
+      // 斜め45度向きでは接する2辺の角セルも候補に含める
+      cells.push({ absX: curAbsX + frontEdge.ox, absZ: curAbsZ });
+      cells.push({ absX: curAbsX, absZ: curAbsZ + frontEdge.oz });
     }
 
     const rx = -dz, rz = dx;
@@ -35,6 +38,15 @@
     else if (t.includes('右')) cells.sort((a, b) => lateralScore(b) - lateralScore(a));
     else cells.sort((a, b) => Math.abs(lateralScore(a)) - Math.abs(lateralScore(b)));
     return cells;
+  }
+
+  function buildSideRowCells(curAbsX, curAbsZ, dir, stats, sideSign) {
+    // sideSign: -1=左横, +1=右横（斜め45度でも直交ベクトルで左右を算出）
+    const dx = Math.sign((dir && dir.dx) || 0);
+    const dz = Math.sign((dir && dir.dz) || 0);
+    const sx = (-dz) * sideSign;
+    const sz = (dx) * sideSign;
+    return buildFrontRowCells(curAbsX, curAbsZ, { dx: sx, dz: sz }, stats, '');
   }
 
   function hasUnreachableUpperWallInFront(dir, stats) {
@@ -49,78 +61,131 @@
     return false;
   }
 
-  function findDigTargetsInBodyRange(mode, dir, thought, maxCount = 1) {
+  function isWithinDigReach(absX, totalSubY, absZ, curAbsX, baseSubY, curAbsZ, stats, targetMode) {
+    const { minOff, maxOff } = C.getFootprintBounds(stats.reachW);
+    const reachHoriz = Math.max(1, stats.reachW) + 1;
+    if (absX < curAbsX + minOff - reachHoriz || absX > curAbsX + maxOff + reachHoriz) return false;
+    if (absZ < curAbsZ + minOff - reachHoriz || absZ > curAbsZ + maxOff + reachHoriz) return false;
+    const minY = (targetMode === 'front_down' || targetMode === 'under' || targetMode === 'down') ? (baseSubY - 2) : (baseSubY - 1);
+    const maxY = (targetMode === 'up') ? (baseSubY + stats.reachH + 1) : (baseSubY + stats.reachH);
+    return totalSubY >= minY && totalSubY <= maxY;
+  }
+
+  function validateDigCell(absX, totalSubY, absZ, kindLabel, state) {
+    const key = `${absX},${totalSubY},${absZ}`;
+    if (state.seen.has(key) || !C.isInsideIslandAbs(absX, absZ)) return null;
+    const tX = C.absToTile(absX), tZ = C.absToTile(absZ), yInfo = C.subYToLvSy(totalSubY);
+    if (!C.hasSolidTerrainSubVoxel(tX.tile, tZ.tile, yInfo.lv, tX.sub, yInfo.sy, tZ.sub)) return null;
+    if (!C.isExposedToAir(tX.tile, tZ.tile, yInfo.lv, tX.sub, yInfo.sy, tZ.sub)) return null;
+    if (!DIG.runtime.waterProtectOff && C.isWaterProtectedCell(tX.tile, tZ.tile, yInfo.lv, tX.sub, yInfo.sy, tZ.sub)) {
+      state.hitWaterProtected = true;
+      return null;
+    }
+    return {
+      key, tx: tX.tile, tz: tZ.tile, lv: yInfo.lv,
+      tsx: tX.sub, tsy: yInfo.sy, tsz: tZ.sub,
+      absX, absZ, totalSubY, kind: kindLabel
+    };
+  }
+
+  function findConnectedDigTargets(targetMode, dir, shape, maxCount, thought) {
     const stats = C.getSizeStats();
     const { absX: curAbsX, absZ: curAbsZ } = C.getRobotAbsPos();
     const baseSubY = M.getRobotBaseSubY();
-    const targets = [];
-    const seen = new Set();
-    let hitWaterProtected = false;
+    const state = { seen: new Set(), hitWaterProtected: false };
+    const seedCandidates = [];
 
-    const tryPush = (absX, totalSubY, absZ, kindLabel) => {
-      if (targets.length >= maxCount) return;
-      const key = `${absX},${totalSubY},${absZ}`;
-      if (seen.has(key) || !C.isInsideIslandAbs(absX, absZ)) return;
-      const tX = C.absToTile(absX), tZ = C.absToTile(absZ), yInfo = C.subYToLvSy(totalSubY);
-      if (!C.hasSolidTerrainSubVoxel(tX.tile, tZ.tile, yInfo.lv, tX.sub, yInfo.sy, tZ.sub)) return;
-      if (!C.isExposedToAir(tX.tile, tZ.tile, yInfo.lv, tX.sub, yInfo.sy, tZ.sub)) return;
-      if (C.isWaterProtectedCell(tX.tile, tZ.tile, yInfo.lv, tX.sub, yInfo.sy, tZ.sub)) {
-        hitWaterProtected = true;
-        return;
-      }
-      seen.add(key);
-      targets.push({
-        tx: tX.tile, tz: tZ.tile, lv: yInfo.lv,
-        tsx: tX.sub, tsy: yInfo.sy, tsz: tZ.sub,
-        absX, absZ, totalSubY, kind: kindLabel
-      });
+    const pushSeed = (ax, ay, az, label) => {
+      const cell = validateDigCell(ax, ay, az, label, state);
+      if (cell) seedCandidates.push(cell);
     };
 
-    if (mode === 'front') {
-      const frontCells = buildFrontRowCells(curAbsX, curAbsZ, dir, stats, thought);
-      for (let h = stats.reachH - 1; h >= 0 && targets.length < maxCount; h--) {
-        for (let i = 0; i < frontCells.length && targets.length < maxCount; i++) {
-          tryPush(frontCells[i].absX, baseSubY + h, frontCells[i].absZ, '壁');
-        }
+    const { minOff, maxOff } = C.getFootprintBounds(stats.reachW);
+    const underCells = [];
+    for (let ox = minOff; ox <= maxOff; ox++) {
+      for (let oz = minOff; oz <= maxOff; oz++) {
+        underCells.push({ absX: curAbsX + ox, absZ: curAbsZ + oz, dist: Math.abs(ox) + Math.abs(oz) });
       }
-    } else if (mode === 'down') {
+    }
+    underCells.sort((a, b) => a.dist - b.dist);
+
+    if (targetMode === 'front' || targetMode === 'left' || targetMode === 'right') {
+      const cells = targetMode === 'left'
+        ? buildSideRowCells(curAbsX, curAbsZ, dir, stats, -1)
+        : (targetMode === 'right'
+            ? buildSideRowCells(curAbsX, curAbsZ, dir, stats, 1)
+            : buildFrontRowCells(curAbsX, curAbsZ, dir, stats, thought));
+      const lbl = targetMode === 'left' ? '左横の壁' : (targetMode === 'right' ? '右横の壁' : '正面の壁');
+      for (let h = stats.reachH - 1; h >= 0; h--) {
+        for (let i = 0; i < cells.length; i++) pushSeed(cells[i].absX, baseSubY + h, cells[i].absZ, lbl);
+      }
+    } else if (targetMode === 'front_down') {
+      const cells = buildFrontRowCells(curAbsX, curAbsZ, dir, stats, thought);
+      for (let i = 0; i < cells.length; i++) pushSeed(cells[i].absX, baseSubY - 1, cells[i].absZ, '目の前の地面');
+    } else if (targetMode === 'under') {
+      for (let i = 0; i < underCells.length; i++) pushSeed(underCells[i].absX, baseSubY - 1, underCells[i].absZ, '足元の床');
+    } else if (targetMode === 'down') {
       const t = String(thought || '');
-      const preferUnderFeet = t.includes('真下') || t.includes('足元');
       const frontCells = buildFrontRowCells(curAbsX, curAbsZ, dir, stats, thought);
-      const { minOff, maxOff } = C.getFootprintBounds(stats.reachW);
-      const underCells = [];
-      for (let ox = minOff; ox <= maxOff; ox++) {
-        for (let oz = minOff; oz <= maxOff; oz++) {
-          underCells.push({ absX: curAbsX + ox, absZ: curAbsZ + oz, dist: Math.abs(ox) + Math.abs(oz) });
+      const list = (t.includes('真下') || t.includes('足元'))
+        ? [{ c: underCells, l: '足元の床' }, { c: frontCells, l: '目の前の地面' }]
+        : [{ c: frontCells, l: '目の前の地面' }, { c: underCells, l: '足元の床' }];
+      list.forEach(g => g.c.forEach(p => pushSeed(p.absX, baseSubY - 1, p.absZ, g.l)));
+    } else if (targetMode === 'up') {
+      for (let h = Math.max(1, stats.bodyHeight); h <= stats.reachH; h++) {
+        for (let i = 0; i < underCells.length; i++) pushSeed(underCells[i].absX, baseSubY + h, underCells[i].absZ, '頭上の天井');
+      }
+    }
+
+    if (!seedCandidates.length) return { targets: [], hitWaterProtected: state.hitWaterProtected };
+
+    // シードから「上下左右に繋り合う分割ブロック（ブロック境界も跨ぐ）」をBFS展開
+    const dx = Math.sign((dir && dir.dx) || 0), dz = Math.sign((dir && dir.dz) || 0);
+    const rx = -dz || 1, rz = dx || 0;
+    const dirs6 = shape === 'tall'
+      ? [[0, 1, 0], [0, -1, 0], [rx, 0, rz], [-rx, 0, -rz], [dx, 0, dz], [-dx, 0, -dz]]
+      : (shape === 'wide'
+          ? [[rx, 0, rz], [-rx, 0, -rz], [0, 1, 0], [0, -1, 0], [dx, 0, dz], [-dx, 0, -dz]]
+          : [[rx, 0, rz], [-rx, 0, -rz], [0, -1, 0], [0, 1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]]);
+
+    const targets = [];
+    const queue = [seedCandidates[0]];
+    state.seen.add(seedCandidates[0].key);
+
+    while (queue.length && targets.length < maxCount) {
+      const cur = queue.shift();
+      targets.push(cur);
+      if (targets.length >= maxCount) break;
+
+      for (let i = 0; i < dirs6.length; i++) {
+        const nx = cur.absX + dirs6[i][0];
+        const ny = cur.totalSubY + dirs6[i][1];
+        const nz = cur.absZ + dirs6[i][2];
+        if (nx === cur.absX && ny === cur.totalSubY && nz === cur.absZ) continue;
+        if (!isWithinDigReach(nx, ny, nz, curAbsX, baseSubY, curAbsZ, stats, targetMode)) continue;
+        const nextCell = validateDigCell(nx, ny, nz, cur.kind, state);
+        if (nextCell) {
+          state.seen.add(nextCell.key);
+          queue.push(nextCell);
         }
       }
-      underCells.sort((a, b) => a.dist - b.dist);
-      const groups = preferUnderFeet
-        ? [{ list: underCells, label: '足元の床' }, { list: frontCells, label: '目の前の地面' }]
-        : [{ list: frontCells, label: '目の前の地面' }, { list: underCells, label: '足元の床' }];
-      for (let g = 0; g < groups.length && targets.length < maxCount; g++) {
-        for (let i = 0; i < groups[g].list.length && targets.length < maxCount; i++) {
-          tryPush(groups[g].list[i].absX, baseSubY - 1, groups[g].list[i].absZ, groups[g].label);
-        }
-      }
-    } else if (mode === 'up') {
-      const minCeilH = Math.max(1, stats.bodyHeight);
-      const maxCeilH = stats.reachH;
-      const { minOff, maxOff } = C.getFootprintBounds(stats.reachW);
-      const topCells = [];
-      for (let ox = minOff; ox <= maxOff; ox++) {
-        for (let oz = minOff; oz <= maxOff; oz++) {
-          topCells.push({ absX: curAbsX + ox, absZ: curAbsZ + oz, dist: Math.abs(ox) + Math.abs(oz) });
-        }
-      }
-      topCells.sort((a, b) => a.dist - b.dist);
-      for (let h = minCeilH; h <= maxCeilH && targets.length < maxCount; h++) {
-        for (let i = 0; i < topCells.length && targets.length < maxCount; i++) {
-          tryPush(topCells[i].absX, baseSubY + h, topCells[i].absZ, '頭上の天井');
+      // 隣接が尽きてもシード候補に残りがあれば続行
+      if (!queue.length && targets.length < maxCount) {
+        for (let s = 1; s < seedCandidates.length; s++) {
+          if (!state.seen.has(seedCandidates[s].key)) {
+            state.seen.add(seedCandidates[s].key);
+            queue.push(seedCandidates[s]);
+            break;
+          }
         }
       }
     }
-    return { targets, hitWaterProtected };
+
+    return { targets, hitWaterProtected: state.hitWaterProtected };
+  }
+
+  function findDigTargetsInBodyRange(mode, dir, thought, maxCount = 1) {
+    return findConnectedDigTargets(mode, dir, 'auto', maxCount, thought);
   }
 
   function describeRelativeDropPosition(ox, oz, heightDiff) {
@@ -220,16 +285,21 @@
     };
   }
 
-  function runSubDigByMode(mode, dir, thought) {
-    if (mode !== 'up' && M.isBehindCurrentFacing(dir)) {
-      return M.runTurnAroundOnly(dir, mode === 'down' ? '地面掘削' : '壁掘削');
+  function runUnifiedDig(opts = {}) {
+    const mode = String(opts.target || 'front').toLowerCase();
+    const shape = String(opts.shape || 'auto').toLowerCase();
+    const dir = opts.dir;
+    const thought = opts.thought || '';
+
+    if (mode !== 'up' && mode !== 'under' && M.isBehindCurrentFacing(dir)) {
+      return M.runTurnAroundOnly(dir, mode === 'front_down' || mode === 'down' ? '地面掘削' : '壁掘削');
     }
 
     const hand = DIG.state.equip && DIG.state.equip.hand;
-    let digQuota = 1, toolLabel = '素手';
+    let maxQuota = 1, toolLabel = '素手';
     if (hand && hand.count > 0) {
       if (hand.id === 'shovel' && hand.count === 1) {
-        digQuota = 5;
+        maxQuota = 5;
         toolLabel = 'スコップ1本';
       } else if (hand.id === 'shovel' && hand.count >= 2) {
         return {
@@ -247,30 +317,28 @@
       }
     }
 
-    if (mode !== 'up' && dir && Number.isFinite(dir.rot)) ROBOT.rotY = dir.rot;
+    const reqCount = (Number.isFinite(Number(opts.count)) && Number(opts.count) > 0)
+      ? Math.max(1, Math.min(maxQuota, Math.floor(Number(opts.count))))
+      : maxQuota;
+
+    if (mode !== 'up' && mode !== 'under' && dir && Number.isFinite(dir.rot)) ROBOT.rotY = dir.rot;
     const dName = (dir && dir.name) ? dir.name.replace('(斜め)', '') : '正面';
     const stats = C.getSizeStats();
-    const { targets, hitWaterProtected } = findDigTargetsInBodyRange(mode, dir, thought, digQuota);
+    const { targets, hitWaterProtected } = findConnectedDigTargets(mode, dir, shape, reqCount, thought);
 
     if (!targets.length) {
       if (hitWaterProtected) {
         return { actionLabel: '🛡️ 島の外周（水際の保護壁）は削れなかった', physicalResult: 'そこは島の外周（水際の保護壁）のため削れなかった', moved: false };
       }
-      if (mode === 'front') {
-        if (hasUnreachableUpperWallInFront(dir, stats)) {
-          const rLbl = stats.reachH === 1 ? '高1' : `高1〜${stats.reachH}`;
-          return {
-            actionLabel: `⛏️ ${dName}の上部壁(高${stats.reachH + 1}以上)には背が届かず空振りした`,
-            physicalResult: `${dName}方向の目の前距離1は自分の届く高さ(${rLbl})が既に空洞で、上部の壁(高${stats.reachH + 1}以上)には背が届かず空振りした`,
-            moved: false
-          };
-        }
-        return { actionLabel: `⛏️ ${dName}の正面壁を削ろうとしたが空振りした`, physicalResult: `${dName}方向の目の前距離1に削れる壁がなく空振りした`, moved: false };
+      if (mode === 'front' && hasUnreachableUpperWallInFront(dir, stats)) {
+        const rLbl = stats.reachH === 1 ? '高1' : `高1〜${stats.reachH}`;
+        return {
+          actionLabel: `⛏️ ${dName}の上部壁(高${stats.reachH + 1}以上)には背が届かず空振りした`,
+          physicalResult: `${dName}方向の目の前距離1は届く高さ(${rLbl})が空洞で、上部の壁には背が届かず空振りした`,
+          moved: false
+        };
       }
-      if (mode === 'down') {
-        return { actionLabel: `⛏️ ${dName}の地面を削ろうとしたが空振りした`, physicalResult: `${dName}方向の目の前および足元に削れる地面ブロックがなく空振りした`, moved: false };
-      }
-      return { actionLabel: '⛏️ 頭上の天井を削ろうとしたが空振りした', physicalResult: '頭上の届く高さに削れる天井ブロックがなく空振りした', moved: false };
+      return { actionLabel: `⛏️ ${dName}(${mode})を削ろうとしたが空振りした`, physicalResult: `${dName}方向の${mode}に削れるブロックがなく空振りした`, moved: false };
     }
 
     const areaId = C.getCurAreaId();
@@ -300,14 +368,14 @@
 
     if (dugCount <= 0) {
       return {
-        actionLabel: '🧱 周囲の土が満杯で掘れなかった（片付けが必要）',
-        physicalResult: `${lastKind}を削ろうとしたが、周囲の床がすべて積み上限(${stats.maxStackHeight}段)まで埋まっており置き場がないため掘れなかった`,
+        actionLabel: '🧱 周囲の土が満杯で掘れなかった（片付けか詰み時パンチ/キックが必要）',
+        physicalResult: `${lastKind}を削ろうとしたが周囲の床が上限(${stats.maxStackHeight}段)まで満杯で置き場がないため掘れなかった`,
         moved: false
       };
     }
 
     let fallText = '';
-    if (mode === 'down') {
+    if (mode === 'under' || mode === 'down' || mode === 'front_down') {
       const { absX: rAbsX, absZ: rAbsZ } = C.getRobotAbsPos();
       const curBaseY = M.getRobotBaseSubY();
       const support = M.computeSupportedFloorUnderFootprint(rAbsX, rAbsZ, curBaseY, stats.reachW);
@@ -324,24 +392,81 @@
     ROBOT.params.power = Math.min(100, (ROBOT.params.power || 50) + 2);
     C.saveDigState();
 
-    const dirPrefix = (mode === 'up' || lastKind === '足元の床') ? '' : `${dName}の`;
+    const dirPrefix = (mode === 'up' || mode === 'under' || lastKind === '足元の床') ? '' : `${dName}の`;
     const fullNote = stoppedByFull ? '（途中で周囲が満杯になり停止）' : '';
     return {
       actionLabel: `⛏️ ${toolLabel}で${dirPrefix}${lastKind}を${dugCount}分割削った${fullNote}`,
-      physicalResult: `${toolLabel}で体格範囲内の${dirPrefix}${lastKind}を${dugCount}分割削り、土は${lastDropNote}${fullNote}${fallText}`,
+      physicalResult: `${toolLabel}で繋がり合う${dirPrefix}${lastKind}を${dugCount}分割削り、土は${lastDropNote}${fullNote}${fallText}`,
       moved: false
     };
   }
 
-  function runPlaceSoil(dir) {
+  function runSubDigByMode(mode, dir, thought) {
+    return runUnifiedDig({ target: mode, dir, shape: 'auto', count: 0, thought });
+  }
+
+  // 完全詰み時のみ呼ばれる「1分割の粉砕（消失）脱出」
+  function smashBlockForEscape(dir, verbLabel = 'パンチ') {
+    const areaId = C.getCurAreaId();
+    const { absX, absZ } = C.getRobotAbsPos();
+    const baseSubY = M.getRobotBaseSubY();
+    const stats = C.getSizeStats();
+    const cells = buildFrontRowCells(absX, absZ, dir, stats, '');
+    const dName = (dir && dir.name) ? dir.name.replace('(斜め)', '') : '正面';
+
+    // 1) 目の前の散らばり土を1個粉砕して消失
+    for (let i = 0; i < cells.length; i++) {
+      const stacks = C.getLooseSoilStacksInColumn(cells[i].absX, cells[i].absZ, areaId);
+      const hit = stacks.find(st => st.count > 0 && st.floorSubY <= baseSubY + stats.reachH && st.floorSubY + st.count > baseSubY);
+      if (hit) {
+        C.addLooseSoilAtFloor(cells[i].absX, cells[i].absZ, hit.floorSubY, -1, areaId);
+        C.saveDigState();
+        return {
+          smashed: true,
+          actionLabel: `💥 詰み脱出！${dName}の散らばり土を${verbLabel}で1個粉砕(消失)した`,
+          physicalResult: `完全詰み状態だったため、${dName}の散らばり土を${verbLabel}で1分割粉砕して消失させ脱出路を作った`
+        };
+      }
+    }
+
+    // 2) 目の前の固体壁ブロックを1個粉砕して消失（水際保護壁は除外）
+    const { targets, hitWaterProtected } = findConnectedDigTargets('front', dir, 'auto', 1, '');
+    if (targets.length) {
+      const t = targets[0];
+      const chipKey = `${t.tx},${t.tz},${t.lv}`;
+      const tag = `${t.tsx},${t.tsy},${t.tsz}`;
+      if (typeof CHIP_MAP !== 'undefined') {
+        if (!CHIP_MAP[chipKey]) CHIP_MAP[chipKey] = {};
+        CHIP_MAP[chipKey][tag] = true;
+      }
+      const stateKey = `${areaId}|${chipKey}`;
+      if (!DIG.state.dugCells[stateKey]) DIG.state.dugCells[stateKey] = [];
+      if (!DIG.state.dugCells[stateKey].includes(tag)) DIG.state.dugCells[stateKey].push(tag);
+      C.settleFloatingLooseSoilsAtColumn(t.absX, t.absZ, areaId);
+      C.saveDigState();
+      return {
+        smashed: true,
+        actionLabel: `💥 詰み脱出！${dName}の壁を${verbLabel}で1分割粉砕(消失)した`,
+        physicalResult: `完全詰み状態だったため、${dName}の壁1分割を${verbLabel}で粉砕・消失させて脱出路を作った`
+      };
+    }
+
+    return { smashed: false, hitWaterProtected };
+  }
+
+  function runPlaceSoil(dir, opts = {}) {
     if (M.isBehindCurrentFacing(dir)) return M.runTurnAroundOnly(dir, '土の配置');
 
-    const hasHead   = (DIG.state.headSoil || 0) > 0;
-    const hasHand   = DIG.state.equip.hand && DIG.state.equip.hand.id === 'soil' && DIG.state.equip.hand.count > 0;
-    const hasPocket = (DIG.state.pocket.soil || 0) > 0;
-    if (!hasHead && !hasHand && !hasPocket) {
+    const totalAvail = (DIG.state.headSoil || 0)
+      + ((DIG.state.equip.hand && DIG.state.equip.hand.id === 'soil') ? DIG.state.equip.hand.count : 0)
+      + (DIG.state.pocket.soil || 0);
+    if (totalAvail <= 0) {
       return { actionLabel: '🟫 置く土が手元にも頭上にもなかった', physicalResult: 'ポケット・手枠・頭上のいずれにも土がなく、置けなかった', moved: false };
     }
+
+    const reqCount = (Number.isFinite(Number(opts.count)) && Number(opts.count) > 0)
+      ? Math.max(1, Math.min(totalAvail, Math.floor(Number(opts.count))))
+      : 1;
 
     ROBOT.rotY = dir.rot;
     const dName = dir.name.replace('(斜め)', '');
@@ -360,46 +485,47 @@
     if (floorY > baseSubY + stats.reachH) {
       return { actionLabel: `🟫 ${dName}は壁で塞がっており置けない`, physicalResult: `${dName}の目の前は固体ブロックで塞がっており土を置けなかった`, moved: false };
     }
-    const curStack = C.getLooseSoilAtFloor(tx, tz, floorY, areaId);
+
     const isDeep = (floorY < baseSubY);
-    if (!isDeep && curStack >= stats.maxStackHeight) {
-      return { actionLabel: `🟫 積み上げ上限(${stats.maxStackHeight}段)でこれ以上積めない`, physicalResult: `${dName}の目の前は既に${curStack}段積まれており上限(${stats.maxStackHeight}段)のため置けなかった`, moved: false };
-    }
-    if (C.hasSolidTerrainAtAbsSubY(tx, floorY + curStack, tz) || M.isCrateBlockingAtSubY(tx, floorY + curStack, tz, areaId)) {
-      return { actionLabel: `🟫 ${dName}は壁・天井で塞がっており置けない`, physicalResult: `${dName}の目の前は壁・天井・圧縮木箱で塞がっており置けなかった`, moved: false };
+    let placed = 0, lastFrom = '';
+    for (let i = 0; i < reqCount; i++) {
+      const curStack = C.getLooseSoilAtFloor(tx, tz, floorY, areaId);
+      if (!isDeep && curStack >= stats.maxStackHeight) break;
+      if (C.hasSolidTerrainAtAbsSubY(tx, floorY + curStack, tz) || M.isCrateBlockingAtSubY(tx, floorY + curStack, tz, areaId)) break;
+
+      if ((DIG.state.headSoil || 0) > 0) { DIG.state.headSoil -= 1; lastFrom = '頭上から'; }
+      else if (DIG.state.equip.hand && DIG.state.equip.hand.id === 'soil' && DIG.state.equip.hand.count > 0) {
+        DIG.state.equip.hand.count -= 1;
+        if (DIG.state.equip.hand.count <= 0) DIG.state.equip.hand = null;
+        lastFrom = '手枠から';
+      } else if ((DIG.state.pocket.soil || 0) > 0) { DIG.state.pocket.soil -= 1; lastFrom = 'ポケットから'; }
+      else break;
+
+      C.addLooseSoilAtFloor(tx, tz, floorY, 1, areaId);
+      placed++;
     }
 
-    let fromLabel = '';
-    if (hasHead) {
-      DIG.state.headSoil -= 1;
-      fromLabel = '頭上から';
-    } else if (hasHand) {
-      DIG.state.equip.hand.count -= 1;
-      if (DIG.state.equip.hand.count <= 0) DIG.state.equip.hand = null;
-      fromLabel = '手枠から';
-    } else {
-      DIG.state.pocket.soil -= 1;
-      fromLabel = 'ポケットから';
+    if (placed <= 0) {
+      return { actionLabel: `🟫 上限(${stats.maxStackHeight}段)または障害物で置けなかった`, physicalResult: `${dName}の目の前は積み上限または壁・天井のため土を置けなかった`, moved: false };
     }
 
-    C.addLooseSoilAtFloor(tx, tz, floorY, 1, areaId);
     ROBOT.params.power = Math.min(100, (ROBOT.params.power || 50) + 2);
     C.saveDigState();
-
     const stackNow = C.getLooseSoilAtFloor(tx, tz, floorY, areaId);
     const dropNote = isDeep ? '下の空間の底へ落ちた' : `高さ${stackNow}/${stats.maxStackHeight}段になった`;
     return {
-      actionLabel: `🟫 ${fromLabel}${dName}へ土を1個置いた(${isDeep ? '底へ落下' : `積${stackNow}/${stats.maxStackHeight}段`})`,
-      physicalResult: `${fromLabel}${dName}の目の前へ土を1個そっと置き、${dropNote}`,
+      actionLabel: `🟫 ${lastFrom}${dName}へ土を${placed}個置いた(${isDeep ? '底へ落下' : `積${stackNow}/${stats.maxStackHeight}段`})`,
+      physicalResult: `${lastFrom}${dName}の目の前へ土を${placed}個そっと置き、${dropNote}`,
       moved: false
     };
   }
 
   DIG.dig = {
-    buildFrontRowCells, hasUnreachableUpperWallInFront, findDigTargetsInBodyRange,
-    describeRelativeDropPosition, findDropSlotForDugSoil, runSubDigByMode, runPlaceSoil
+    buildFrontRowCells, buildSideRowCells, hasUnreachableUpperWallInFront,
+    findConnectedDigTargets, findDigTargetsInBodyRange,
+    describeRelativeDropPosition, findDropSlotForDugSoil,
+    runUnifiedDig, runSubDigByMode, smashBlockForEscape, runPlaceSoil
   };
 
   if (window.DebugGuard) window.DebugGuard.markLoaded('dig_dig.js');
 })();
-
