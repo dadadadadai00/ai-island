@@ -1,7 +1,7 @@
 // ============================================================================
 // 【分割物理モジュール 4/7：dig_dig.js】
-// ・繋がり合うブロック/分割ブロックの自由連結掘削（上下左右・斜め45度・個数自由）
-// ・距離1触覚サマリー(describeImmediateTouch)・空振り距離診断・個数指定手置き・詰み粉砕
+// ・繋がり合うブロック/分割ブロックの自由連結掘削（体験を日記メモへ自動記録）
+// ・距離1触覚サマリー(ネタバレ遮断)・空振り距離診断・個数指定手置き・詰み粉砕
 // ============================================================================
 (function initDigDig() {
   const DIG = window.DIG;
@@ -77,31 +77,31 @@
     return 0;
   }
 
-  // 今すぐ手が届く距離1の接触情報（触覚サマリー）
+  // 今すぐ手が届く距離1の接触情報（箱の正体や中身は一切ネタバレしない）
   function describeImmediateTouch() {
     const areaId = C.getCurAreaId();
     const stats = C.getSizeStats();
     const { absX, absZ } = C.getRobotAbsPos();
     const baseSubY = M.getRobotBaseSubY();
     const dirs = (typeof ALL_DIRS !== 'undefined' && ALL_DIRS.length) ? ALL_DIRS : [];
-    const hitWalls = [], hitLoose = [], hitCrates = [];
+    const hitWalls = [], hitLoose = [], hitObjects = [];
 
     dirs.forEach(d => {
-      if (M.isBehindCurrentFacing(d)) return; // 背後死角の原則を維持
+      if (M.isBehindCurrentFacing(d)) return;
       const dName = d.name.replace('(斜め)', '');
       const frontEdge = C.getFrontEdgeOffset(Math.sign(d.dx), Math.sign(d.dz), stats.reachW);
       const tx = absX + frontEdge.ox, tz = absZ + frontEdge.oz;
       if (!C.isInsideIslandAbs(tx, tz)) return;
 
       if (M.isCrateBlockingAtSubY(tx, baseSubY, tz, areaId)) {
-        hitCrates.push(dName);
+        hitObjects.push(dName);
         return;
       }
-      let hasDigWall = false;
+      let hasWall = false;
       for (let h = 0; h < stats.reachH; h++) {
-        if (C.hasSolidTerrainAtAbsSubY(tx, baseSubY + h, tz)) { hasDigWall = true; break; }
+        if (C.hasSolidTerrainAtAbsSubY(tx, baseSubY + h, tz)) { hasWall = true; break; }
       }
-      if (hasDigWall) {
+      if (hasWall) {
         hitWalls.push(dName);
       } else {
         const stacks = C.getLooseSoilStacksInColumn(tx, tz, areaId);
@@ -111,10 +111,10 @@
     });
 
     const parts = [];
-    if (hitWalls.length) parts.push(`すぐ掘れる距離1の壁=[${hitWalls.join('・')}]`);
-    else parts.push('すぐ掘れる距離1の壁=なし(壁を掘るには距離1まで移動が必要)');
+    if (hitWalls.length) parts.push(`距離1の壁=[${hitWalls.join('・')}]`);
+    else parts.push('距離1の壁=なし');
     if (hitLoose.length) parts.push(`距離1の散らばり土=[${hitLoose.join('・')}]`);
-    if (hitCrates.length) parts.push(`距離1の圧縮木箱=[${hitCrates.join('・')}]`);
+    if (hitObjects.length) parts.push(`距離1の大きな四角い物体=[${hitObjects.join('・')}]`);
     return `手の届く距離1の接触(視界側): ${parts.join(' ／ ')}`;
   }
 
@@ -351,15 +351,18 @@
     }
 
     const hand = DIG.state.equip && DIG.state.equip.hand;
-    let maxQuota = 1, toolLabel = '素手';
+    let maxQuota = 1, toolLabel = '素手', usedBareHand = true, usedShovel = false;
     if (hand && hand.count > 0) {
+      usedBareHand = false;
       if (hand.id === 'shovel' && hand.count === 1) {
         maxQuota = 5;
-        toolLabel = 'スコップ1本';
+        toolLabel = 'パステルスコップ';
+        usedShovel = true;
       } else if (hand.id === 'shovel' && hand.count >= 2) {
+        C.addDiaryMemo('パステルスコップを2本持つと両手が塞がって掘れなかった（1本持ちなら使える）');
         return {
-          actionLabel: '🚫 スコップ2本持ちのため両手が塞がり掘れなかった',
-          physicalResult: '手枠にスコップを2本持っていて両手が塞がっているため掘削できなかった（1本だけ持つか素手にする必要がある）',
+          actionLabel: '🚫 パステルスコップ2本持ちのため両手が塞がり掘れなかった',
+          physicalResult: '手枠にパステルスコップを2本持っていて両手が塞がっているため掘削できなかった',
           moved: false
         };
       } else {
@@ -441,6 +444,13 @@
         physicalResult: `${lastKind}を削ろうとしたが周囲の床が上限(${stats.maxStackHeight}段)まで満杯で置き場がないため掘れなかった`,
         moved: false
       };
+    }
+
+    // 実際に掘れた体験だけを日記メモへ記録（事前知識は与えない）
+    if (usedBareHand) {
+      C.addDiaryMemo('試してみたら、素手でも距離1のブロックを1分割だけ削って掘れることが分かった');
+    } else if (usedShovel) {
+      C.addDiaryMemo('パステルスコップを1本持って掘ると、繋がり合うブロックを一気に最大5分割まで削れることが分かった');
     }
 
     let fallText = '';
@@ -545,7 +555,7 @@
     const tx = absX + frontEdge.ox, tz = absZ + frontEdge.oz;
 
     if (!C.isInsideIslandAbs(tx, tz) || M.isCrateBlockingAtSubY(tx, baseSubY, tz, areaId)) {
-      return { actionLabel: `🟫 ${dName}には置けなかった`, physicalResult: `${dName}の目の前は島の端または圧縮木箱のため土を置けなかった`, moved: false };
+      return { actionLabel: `🟫 ${dName}には置けなかった`, physicalResult: `${dName}の目の前は島の端または大きな物体のため土を置けなかった`, moved: false };
     }
     const floorY = C.findFloorSubYBelow(tx, tz, baseSubY + stats.reachH + 1);
     if (floorY > baseSubY + stats.reachH) {
@@ -572,7 +582,7 @@
     }
 
     if (placed <= 0) {
-      return { actionLabel: `🟫 上限(${stats.maxStackHeight}段)または障害物で置けなかった`, physicalResult: `${dName}の目の前は積み上限または壁・天井のため土を置けなかった`, moved: false };
+      return { actionLabel: `🟫 上限(${stats.maxStackHeight}段)または障害物で置けなかった`, physicalResult: `${dName}の目の前は積み上限または障害物のため土を置けなかった`, moved: false };
     }
 
     ROBOT.params.power = Math.min(100, (ROBOT.params.power || 50) + 2);
