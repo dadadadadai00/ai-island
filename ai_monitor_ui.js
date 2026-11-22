@@ -1,6 +1,7 @@
 // ============================================================================
 // 【分割AI通信モジュール 4/4：ai_monitor_ui.js】
-// ・1ターン答え合わせ2タブモーダル・レポートコピペ・設定UI注入
+// ・1ターン答え合わせ2タブモーダル（目標メモ/自由選択引数対応）・コピペ・設定UI注入
+// ・自動「⚡ 今すぐ考える」連続再生トグル（安全停止＆モーダル一時待機付き）
 // ・全モーダル共通の非崩れピンチ拡大縮小（内部スクロール保護付き）
 // ============================================================================
 (function initAiMonitorUiModule() {
@@ -13,11 +14,122 @@
   const CAM = SYS.camera;
   const CORE = SYS.core;
 
+  const AUTO_INTERVAL_KEY = 'ai_auto_interval_ms_v1';
   let currentMonitorTab = 'before';
   let currentDimMoving = false;
   const modalResetFns = [];
 
+  let autoPlayEnabled = false;
+  let autoTimerId = null;
+  let autoBusy = false;
+
+  function getAutoIntervalMs() {
+    const raw = (typeof safeStorage !== 'undefined') ? Number(safeStorage.getItem(AUTO_INTERVAL_KEY)) : 2500;
+    return (Number.isFinite(raw) && raw >= 1000 && raw <= 15000) ? raw : 2500;
+  }
+
+  function isAnyModalOpen() {
+    return Array.from(document.querySelectorAll('.modal-overlay')).some(
+      el => el.classList.contains('active') || (el.style.display && el.style.display !== 'none')
+    );
+  }
+
+  function updateAutoPlayButtonUI() {
+    const btn = document.getElementById('btn-auto-play');
+    if (!btn) return;
+    if (autoPlayEnabled) {
+      btn.innerText = '⏹ 停止';
+      btn.style.background = '#ef4444';
+      btn.style.color = '#ffffff';
+      btn.style.borderColor = '#dc2626';
+    } else {
+      btn.innerText = '▶ 自動';
+      btn.style.background = '#0f172a';
+      btn.style.color = '#38bdf8';
+      btn.style.borderColor = '#38bdf8';
+    }
+  }
+
+  function stopAutoPlay(reasonToast = '') {
+    autoPlayEnabled = false;
+    if (autoTimerId) { clearTimeout(autoTimerId); autoTimerId = null; }
+    updateAutoPlayButtonUI();
+    if (reasonToast && typeof showToast === 'function') showToast(reasonToast);
+  }
+
+  function scheduleNextAutoTick(delayMs) {
+    if (!autoPlayEnabled) return;
+    if (autoTimerId) clearTimeout(autoTimerId);
+    autoTimerId = setTimeout(runAutoTick, delayMs);
+  }
+
+  async function runAutoTick() {
+    autoTimerId = null;
+    if (!autoPlayEnabled) return;
+    if (!ST.commEnabled) {
+      stopAutoPlay('⏸️ 通信OFFのため自動再生を停止しました');
+      return;
+    }
+    if (isAnyModalOpen() || autoBusy) {
+      scheduleNextAutoTick(700);
+      return;
+    }
+    const actBtn = document.getElementById('btn-action');
+    if (actBtn && actBtn.disabled) {
+      scheduleNextAutoTick(500);
+      return;
+    }
+
+    autoBusy = true;
+    try {
+      await CORE.runTurn();
+    } catch (e) {
+      stopAutoPlay('⚠️ 実行エラーのため自動再生を停止しました');
+      autoBusy = false;
+      return;
+    }
+    autoBusy = false;
+
+    if (!autoPlayEnabled) return;
+    if (ST.lastTurnAudit && ST.lastTurnAudit.error) {
+      stopAutoPlay('⚠️ 通信エラーのため自動再生を停止しました');
+      return;
+    }
+    if (typeof life !== 'undefined' && life && life.getState && life.getState().mode === 'DEAD') {
+      stopAutoPlay('💀 世代交代のため自動再生を停止しました');
+      return;
+    }
+    scheduleNextAutoTick(getAutoIntervalMs());
+  }
+
+  function setAutoPlay(isOn) {
+    if (!isOn) {
+      stopAutoPlay('⏹ 自動思考を停止しました');
+      return;
+    }
+    if (!ST.commEnabled) {
+      if (typeof showToast === 'function') showToast('⚠️ 先に⚙️設定で通信ONにしてください');
+      updateAutoPlayButtonUI();
+      return;
+    }
+    autoPlayEnabled = true;
+    updateAutoPlayButtonUI();
+    if (typeof showToast === 'function') showToast(`▶ 自動思考ON（間隔 ${(getAutoIntervalMs() / 1000).toFixed(1)}秒）`);
+    scheduleNextAutoTick(250);
+  }
+
   // --- 1ターン答え合わせテキスト生成 ＆ クリップボード ---
+  function formatDetailParams(a) {
+    const parts = [];
+    if (a.subVal && a.subVal !== '-') parts.push(`sub:${a.subVal}`);
+    if (a.targetVal && a.targetVal !== '-') parts.push(`target:${a.targetVal}`);
+    if (a.shapeVal && a.shapeVal !== '-') parts.push(`shape:${a.shapeVal}`);
+    if (a.faceVal && a.faceVal !== '-') parts.push(`face:${a.faceVal}`);
+    if (a.itemName && a.itemName !== '-') parts.push(`item:${a.itemName}`);
+    if (a.countVal && a.countVal !== '-') parts.push(`count:${a.countVal}`);
+    return parts.length ? parts.join(' / ') : '-';
+  }
+
   function buildTurnCopyText() {
     const a = ST.lastTurnAudit;
     if (!a.hasData) {
@@ -35,13 +147,15 @@
       `通信方式: A案(記号マップ送信) / 使用モデル: ${a.modelId}`,
       `視野状態: 行動前=${a.isMovingBefore ? '移動視点' : 'クリア(停止180°)'}（向き:${a.facingBefore}） → 行動後=${a.isMovingAfter ? '移動視点' : 'クリア(停止180°)'}（向き:${a.facingAfter}）`,
       '', '--- [1] AIへ送信した情報文（今すぐ考える前） ---', a.promptText || '(なし)',
-      '', '--- [2] AIからの返答（しゃべり・判断・動き） ---'
+      '', '--- [2] AIからの返答（しゃべり・目標・判断・動き） ---'
     ];
     if (a.error) {
       lines.push(`エラー: ${a.error}`, `生データ: ${a.rawResponse || '-'}`);
     } else {
-      lines.push(`思考・しゃべり: ${a.thoughtText}`, `選んだ行動: ${a.actionId}`, `選んだ方角: ${a.dirName}`);
-      if (a.itemName !== '-' || a.countVal !== '-') lines.push(`指定アイテム / 個数: ${a.itemName} / ${a.countVal}`);
+      lines.push(`思考・しゃべり: ${a.thoughtText}`);
+      if (a.goalText) lines.push(`目標メモ(goal): ${a.goalText}`);
+      lines.push(`選んだ行動 / 方角: ${a.actionId} / ${a.dirName}`);
+      lines.push(`詳細指定: ${formatDetailParams(a)}`);
       lines.push(`表情・動き(モーション): ${a.motionLabel}`, `生返答JSON: ${a.rawResponse}`);
     }
     lines.push('', '--- [3] 実行後の物理結果 ---', `画面表示ログ: ${a.actionLabel}`, `物理結果: ${a.physicalResult}`, '================================================');
@@ -205,7 +319,7 @@
     }
   }
 
-  // --- 統一2タブ式モニター描画 ＆ 設定UI注入 ---
+  // --- 統一2タブ式モニター描画 ＆ 設定UI・自動再生ボタン注入 ---
   function applyDimOverlayState(isMovingDim) {
     currentDimMoving = Boolean(isMovingDim);
     const lM = document.getElementById('mon-dim-left'), rM = document.getElementById('mon-dim-right');
@@ -246,9 +360,11 @@
       if (a.error) {
         if (rSumEl) rSumEl.innerHTML = `<div style="color:#dc2626;font-weight:900;">⚠️ 通信エラー：${API.escapeHtml(a.error).replace(/\n/g, '<br>')}</div>`;
       } else {
-        const itemPart = (a.itemName !== '-' || a.countVal !== '-') ? `　<strong>🎒 指定：</strong>${API.escapeHtml(a.itemName)}×${API.escapeHtml(a.countVal)}` : '';
+        const detail = formatDetailParams(a);
+        const detailPart = detail !== '-' ? `　<strong>⚙️ 詳細：</strong>${API.escapeHtml(detail)}` : '';
+        const goalLine = a.goalText ? `<div><strong>🎯 目標メモ：</strong>${API.escapeHtml(a.goalText)}</div>` : '';
         if (rSumEl) {
-          rSumEl.innerHTML = `<div><strong>💬 思考・しゃべり：</strong>${API.escapeHtml(a.thoughtText)}</div><div><strong>🎯 行動 / 方角：</strong><code>${API.escapeHtml(a.actionId)}</code> ／ <strong>${API.escapeHtml(a.dirName)}</strong>${itemPart}　<strong>🤖 動き：</strong>${API.escapeHtml(a.motionLabel)}</div>`;
+          rSumEl.innerHTML = `${goalLine}<div><strong>💬 思考・しゃべり：</strong>${API.escapeHtml(a.thoughtText)}</div><div><strong>🧭 行動 / 方角：</strong><code>${API.escapeHtml(a.actionId)}</code> ／ <strong>${API.escapeHtml(a.dirName)}</strong>${detailPart}　<strong>🤖 動き：</strong>${API.escapeHtml(a.motionLabel)}</div>`;
         }
       }
       if (rawEl) { rawEl.textContent = a.rawResponse || '-'; rawEl.scrollTop = 0; }
@@ -263,7 +379,7 @@
         applyDimOverlayState(live.isMoving);
         if (pLblEl) pLblEl.innerText = '📤 AIへ送る予定の情報文（まだ送信前）';
         if (pEl) { pEl.textContent = live.promptText || ''; pEl.scrollTop = 0; }
-        fillReply('📥 AIからの返答（しゃべり・判断・動き）');
+        fillReply('📥 AIからの返答（しゃべり・目標・判断・動き）');
         return;
       }
       if (metaEl) metaEl.innerText = `第${a.turnNo}ターン(${a.day}日目 ${a.time}) ／ 行動前 ／ ${a.isMovingBefore ? '🏃移動視点(自動)' : '🧍クリア(自動)'} ／ 向き:${a.facingBefore}`;
@@ -271,7 +387,7 @@
       applyDimOverlayState(a.isMovingBefore);
       if (pLblEl) pLblEl.innerText = '📤 AIへ送信した情報文（今すぐ考える前）';
       if (pEl) { pEl.textContent = a.promptText || ''; pEl.scrollTop = 0; }
-      fillReply('📥 AIからの返答（しゃべり・判断・動き）');
+      fillReply('📥 AIからの返答（しゃべり・目標・判断・動き）');
     } else {
       const live = CORE.buildPerceptionPayload('map', ST.lastTurnWasMoving);
       if (metaEl) metaEl.innerText = `${a.hasData ? `第${a.turnNo}ターン後(${a.day}日目 ${a.time})` : '現在状態（未実行）'} ／ 次の送信状態 ／ ${live.isMoving ? '🏃移動視点(自動)' : '🧍クリア(自動)'} ／ 向き:${CAM.rotToShortDirName(ROBOT.rotY || 0)}`;
@@ -279,7 +395,7 @@
       applyDimOverlayState(live.isMoving);
       if (pLblEl) pLblEl.innerText = '📤 現在の状態文（次に送る予定の情報）';
       if (pEl) { pEl.textContent = live.promptText || ''; pEl.scrollTop = 0; }
-      fillReply('📥 直前ターンのAI返答（しゃべり・判断・動き）');
+      fillReply('📥 直前ターンのAI返答（しゃべり・目標・判断・動き）');
     }
   }
 
@@ -300,7 +416,32 @@
     modal.classList.remove('active');
   }
 
+  function injectAutoPlayButton() {
+    const actionBtn = document.getElementById('btn-action');
+    if (!actionBtn || document.getElementById('btn-auto-play')) return;
+    const parent = actionBtn.parentNode;
+    if (!parent) return;
+
+    const row = document.createElement('div');
+    row.id = 'action-auto-row';
+    row.style.cssText = 'display:flex;gap:6px;align-items:stretch;width:100%;';
+    parent.insertBefore(row, actionBtn);
+    row.appendChild(actionBtn);
+    actionBtn.style.flex = '1';
+    actionBtn.style.width = 'auto';
+
+    const autoBtn = document.createElement('button');
+    autoBtn.type = 'button';
+    autoBtn.id = 'btn-auto-play';
+    autoBtn.style.cssText = 'flex:0 0 88px;border-radius:12px;border:2px solid #38bdf8;font-size:12px;font-weight:900;cursor:pointer;padding:0 6px;box-shadow:0 3px 10px rgba(15,23,42,0.22);transition:background 0.15s ease;';
+    autoBtn.onclick = () => setAutoPlay(!autoPlayEnabled);
+    row.appendChild(autoBtn);
+    updateAutoPlayButtonUI();
+  }
+
   function injectVisionControlsUI() {
+    injectAutoPlayButton();
+
     const settingsModal = document.getElementById('modal-settings');
     if (settingsModal && !document.getElementById('setting-ai-vision-mode')) {
       const commCard = settingsModal.querySelector('.comm-toggle-card');
@@ -314,6 +455,13 @@
           <option value="image" ${CONST.B_MODE_LOCKED ? 'disabled' : ''}>${CONST.B_MODE_LOCKED ? '🔒 B案：キャラ視点3Dカメラ画像（A案安定まで使用停止）' : 'B案：キャラ視点3Dカメラ画像'}</option>
         </select>
         ${CONST.B_MODE_LOCKED ? '<div style="background:#334155;color:#94a3b8;border:1px solid #475569;border-radius:8px;padding:6px 8px;font-size:10.5px;font-weight:800;opacity:0.85;">🔒 B案（3Dカメラ画像のAI送信）：使用停止中（機能温存・A案安定次第解放）</div>' : ''}
+        <label class="setting-label" style="color:#0369a1;margin-top:2px;">▶ 自動思考の実行間隔</label>
+        <select id="setting-auto-interval" class="setting-input">
+          <option value="1500">1.5秒（テンポ重視）</option>
+          <option value="2500">2.5秒（標準・観察向け）</option>
+          <option value="4000">4.0秒（じっくり確認）</option>
+          <option value="6000">6.0秒（ゆっくり）</option>
+        </select>
         <label class="setting-label" style="color:#0369a1;margin-top:2px;">🤖 Groqモデル手動指定（空欄で自動検出）</label>
         <input id="setting-groq-manual-model" type="text" class="setting-input" placeholder="例: openai/gpt-oss-120b（空欄推奨）">
         <button type="button" id="btn-open-vision-mon-from-settings" class="btn-sub" style="padding:6px;font-size:11px;">👁️ 1ターン答え合わせ・キャラ視点を確認する</button>
@@ -322,6 +470,13 @@
 
       const sel = document.getElementById('setting-ai-vision-mode');
       if (sel) { sel.value = ST.visionMode; sel.addEventListener('change', () => CORE.setVisionMode(sel.value)); }
+      const intSel = document.getElementById('setting-auto-interval');
+      if (intSel) {
+        intSel.value = String(getAutoIntervalMs());
+        intSel.addEventListener('change', () => {
+          if (typeof safeStorage !== 'undefined') safeStorage.setItem(AUTO_INTERVAL_KEY, intSel.value);
+        });
+      }
       const manualInput = document.getElementById('setting-groq-manual-model');
       if (manualInput) {
         manualInput.value = API.getManualModelOverride();
@@ -409,7 +564,11 @@
     enablePinchZoomOnAllModals();
   }
 
-  SYS.ui = { openVisionMonitor, closeVisionMonitor, enablePinchZoomOnAllModals, resetAllModalZooms, buildTurnCopyText };
+  SYS.ui = {
+    openVisionMonitor, closeVisionMonitor,
+    enablePinchZoomOnAllModals, resetAllModalZooms,
+    buildTurnCopyText, setAutoPlay, stopAutoPlay, isAutoPlay: () => autoPlayEnabled
+  };
 
   injectVisionControlsUI();
   setTimeout(enablePinchZoomOnAllModals, 500);
