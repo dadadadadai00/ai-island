@@ -1,6 +1,6 @@
 // ============================================================================
 // 【分割AI通信モジュール 1/4：ai_api.js】
-// ・共通ハブ window.AI_SYS・定数・共有状態の初期化
+// ・共通ハブ window.AI_SYS・定数・共有状態の初期化（短期記憶8T・目標メモ対応）
 // ・Groq API通信・実在アクティブモデル自動検出・JSON解析
 // ============================================================================
 (function initAiApiModule() {
@@ -14,7 +14,7 @@
     VISION_MODEL_CACHE_KEY: 'groq_vision_model_cache_v5',
     MANUAL_MODEL_KEY:       'groq_manual_model_v1',
     VISION_MODE_KEY:        'ai_vision_mode_v1',
-    MAX_SHORT_MEMORY:       4,
+    MAX_SHORT_MEMORY:       8,     // 準備動作独立のため8ターン記憶へ拡張
     B_MODE_LOCKED:          true,  // A案安定までB案(画像AI送信)は一時停止・内部温存
     PORTAL_TRAVEL_DISABLED: true   // 初期エリアのみで基本動作検証
   };
@@ -32,6 +32,7 @@
     visionMode: initVision,
     lastTurnWasMoving: false,
     shortTermMemory: [],
+    currentGoal: '',
     turnSequenceNo: 0,
     lastTurnAudit: {
       hasData: false, turnNo: 0, time: '未実行', day: 1, mode: 'map',
@@ -39,7 +40,8 @@
       facingBefore: '-', facingAfter: '-',
       beforeImageUrl: null, afterImageUrl: null,
       promptText: '', rawResponse: '', parsedJson: null,
-      actionId: '-', dirName: '-', itemName: '-', countVal: '-',
+      actionId: '-', dirName: '-', subVal: '-', targetVal: '-', shapeVal: '-', faceVal: '-',
+      itemName: '-', countVal: '-', goalText: '',
       emotionId: '-', motionLabel: '-', thoughtText: '',
       actionLabel: '-', physicalResult: '-', error: ''
     }
@@ -172,7 +174,7 @@
         ? [{ type: 'text', text: promptText }, { type: 'image_url', image_url: { url: sendImageUrl } }]
         : promptText;
 
-      const body = { model: modelId, messages: [{ role: 'user', content: userContent }], max_tokens: 320, temperature: 0.75 };
+      const body = { model: modelId, messages: [{ role: 'user', content: userContent }], max_tokens: 380, temperature: 0.72 };
       if (useJsonFormat && !sendImageUrl) body.response_format = { type: 'json_object' };
 
       const res = await fetch(CONST.GROQ_CHAT_URL, {
@@ -254,4 +256,3 @@
   SYS.api = { escapeHtml, getManualModelOverride, clearModelCache, fetchAvailableModels, extractJsonFromText, requestDecision };
   if (window.DebugGuard) window.DebugGuard.markLoaded('ai_api.js');
 })();
-
