@@ -1,7 +1,7 @@
 // ============================================================================
 // 【分割AI通信モジュール 2/4：ai_camera.js】
 // ・キャラ視点（🤖視点＆検証カメラ共通）での未削り分割ブロック全表示・めり込み防止
-// ・3連180°統一サイズの1人称3D撮影（B案用単写ロジックも内部温存）
+// ・顔の向き(上/下/左/右/正面)連動の視線制御・3連180°統一サイズ1人称3D撮影
 // ============================================================================
 (function initAiCameraModule() {
   const SYS = window.AI_SYS;
@@ -11,6 +11,16 @@
     const sSpec = (typeof SIZE_SPECS !== 'undefined' && SIZE_SPECS[ROBOT.sizeLevel]) || { scaleY: 0.25 };
     if (ROBOT.posture === 'crawl') return Math.max(0.10, Math.min(0.15, 0.18 * sSpec.scaleY));
     return Math.max(0.12, Math.min(0.84, 0.52 * sSpec.scaleY));
+  }
+
+  function getFaceLookOffsets() {
+    const f = (window.DIG && window.DIG.move && typeof window.DIG.move.getFaceDir === 'function')
+      ? window.DIG.move.getFaceDir() : 'front';
+    if (f === 'left')  return { yawOff:  Math.PI / 2, pitch: -0.10, tag: '顔:左' };
+    if (f === 'right') return { yawOff: -Math.PI / 2, pitch: -0.10, tag: '顔:右' };
+    if (f === 'up')    return { yawOff:  0,           pitch:  0.56, tag: '顔:上' };
+    if (f === 'down')  return { yawOff:  0,           pitch: -0.66, tag: '顔:下' };
+    return { yawOff: 0, pitch: -0.13, tag: '' };
   }
 
   if (typeof updateTransparencyAndOcclusion === 'function') {
@@ -48,8 +58,9 @@
       if (typeof manualCameraMode !== 'undefined' && manualCameraMode === 'robot' &&
           typeof innerRobotCam !== 'undefined' && typeof robotGroup !== 'undefined') {
         const rot = ROBOT.rotY || 0;
-        const lookYaw = rot + (typeof fpvYawOffset === 'number' ? fpvYawOffset : 0);
-        const pitch = (typeof fpvPitch === 'number') ? fpvPitch : -0.06;
+        const face = getFaceLookOffsets();
+        const lookYaw = rot + face.yawOff + (typeof fpvYawOffset === 'number' ? fpvYawOffset : 0);
+        const manualPitch = (typeof fpvPitch === 'number' && Math.abs(fpvPitch + 0.06) > 0.02) ? fpvPitch : face.pitch;
         const lx = Math.sin(lookYaw), lz = Math.cos(lookYaw);
         const eyeX = robotGroup.position.x;
         const eyeY = robotGroup.position.y + getSafeRobotEyeHeight();
@@ -57,9 +68,9 @@
 
         innerRobotCam.position.set(eyeX, eyeY, eyeZ);
         innerRobotCam.lookAt(
-          eyeX + 20 * Math.cos(pitch) * lx,
-          eyeY + 20 * Math.sin(pitch),
-          eyeZ + 20 * Math.cos(pitch) * lz
+          eyeX + 20 * Math.cos(manualPitch) * lx,
+          eyeY + 20 * Math.sin(manualPitch),
+          eyeZ + 20 * Math.cos(manualPitch) * lz
         );
       }
     };
@@ -100,7 +111,9 @@
       const prevFov = innerRobotCam.fov;
       const prevAspect = innerRobotCam.aspect;
       const h = (typeof getRobotHeightLevel === 'function') ? getRobotHeightLevel() : (ROBOT.pos.lv || 0);
-      const baseRot = ROBOT.rotY || 0;
+      const face = getFaceLookOffsets();
+      const baseRot = (ROBOT.rotY || 0) + face.yawOff;
+      const pitch = face.pitch;
       const eyeH = getSafeRobotEyeHeight();
 
       let rx = (typeof robotGroup !== 'undefined') ? robotGroup.position.x : ROBOT.pos.x;
@@ -134,11 +147,12 @@
       const fullHalfTanX = Math.tan(targetHFovRad / 2) * (srcW / cropW);
       const vFovDeg = Math.min(135, Math.max(35, 2 * Math.atan(fullHalfTanX / srcAspect) * (180 / Math.PI)));
 
+      const fSuffix = face.tag ? `/${face.tag}` : '';
       const shots = singleOnly
-        ? [{ yaw: baseRot, label: `移動中・正面(${rotToShortDirName(baseRot)})` }]
+        ? [{ yaw: baseRot, label: `移動中・正面(${rotToShortDirName(baseRot)}${fSuffix})` }]
         : [
             { yaw: baseRot + Math.PI / 3, label: `左60°(${rotToShortDirName(baseRot + Math.PI / 3)})` },
-            { yaw: baseRot,               label: `正面(${rotToShortDirName(baseRot)})` },
+            { yaw: baseRot,               label: `正面(${rotToShortDirName(baseRot)}${fSuffix})` },
             { yaw: baseRot - Math.PI / 3, label: `右60°(${rotToShortDirName(baseRot - Math.PI / 3)})` }
           ];
 
@@ -154,10 +168,11 @@
       innerRobotCam.updateProjectionMatrix();
 
       const eyeX = rx, eyeY = ry + eyeH, eyeZ = rz;
+      const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
       shots.forEach((shot, idx) => {
         const lx = Math.sin(shot.yaw), lz = Math.cos(shot.yaw);
         innerRobotCam.position.set(eyeX, eyeY, eyeZ);
-        innerRobotCam.lookAt(eyeX + 20 * lx, eyeY - 2.6, eyeZ + 20 * lz);
+        innerRobotCam.lookAt(eyeX + 20 * cosP * lx, eyeY + 20 * sinP, eyeZ + 20 * cosP * lz);
         if (typeof updateTransparencyAndOcclusion === 'function') {
           updateTransparencyAndOcclusion('robot_fpv', innerRobotCam.position, rx, ry, rz, h, lx, lz);
         }
@@ -194,6 +209,6 @@
     }
   }
 
-  SYS.camera = { getSafeRobotEyeHeight, rotToShortDirName, getLogicalRobotWorldPos, captureRobotFirstPersonImage };
+  SYS.camera = { getSafeRobotEyeHeight, getFaceLookOffsets, rotToShortDirName, getLogicalRobotWorldPos, captureRobotFirstPersonImage };
   if (window.DebugGuard) window.DebugGuard.markLoaded('ai_camera.js');
 })();
