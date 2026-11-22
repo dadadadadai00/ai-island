@@ -1,7 +1,7 @@
 // ============================================================================
 // 【分割物理モジュール 7/7：dig_ui.js】
-// ・手帳最上部（正面プレビュー＋左右6装備枠）・下部10枠・圧縮木箱25枠モーダル
-// ・既存フック接続・統一10アクション＆距離1触覚サマリー登録・初期起動
+// ・手帳（パステルスコップ＆ひんとメモ描画）・圧縮木箱25枠モーダル・思考枠の大型化
+// ・AIへの箱/素手掘りネタバレ完全遮断＋体験記録【日記メモ】のみ連携
 // ============================================================================
 (function initDigUIAndWire() {
   const DIG = window.DIG;
@@ -14,7 +14,23 @@
   const C = DIG.core, M = DIG.move, V = DIG.vision, D = DIG.dig, I = DIG.items;
   const CONST = DIG.CONST;
 
-  // --- 旧名・新名の互換エイリアス補完（他モジュール保護） ---
+  // --- ロボット思考枠を上下広く・文字を大きく調整 ---
+  function enhanceMessageBoxUI() {
+    const msgEl = document.getElementById('message-box');
+    if (msgEl) {
+      msgEl.style.minHeight = '96px';
+      msgEl.style.maxHeight = '148px';
+      msgEl.style.overflowY = 'auto';
+      msgEl.style.fontSize = '15.5px';
+      msgEl.style.lineHeight = '1.5';
+      msgEl.style.fontWeight = '700';
+      msgEl.style.padding = '10px 12px';
+      msgEl.style.boxSizing = 'border-box';
+    }
+  }
+  enhanceMessageBoxUI();
+
+  // --- 旧名・新名の互換エイリアス補完 ---
   if (typeof I.ensureCrateSlots === 'function') {
     const _rawEnsure = I.ensureCrateSlots;
     I.ensureCrateSlots = function(crate) {
@@ -28,15 +44,14 @@
   if (typeof I.countUsedSlotsInCrate !== 'function') {
     I.countUsedSlotsInCrate = (crate) => {
       if (!crate) return 0;
-      const slots = I.ensureCrateSlots(crate);
-      return slots.filter(s => s && s.count > 0).length;
+      return I.ensureCrateSlots(crate).filter(s => s && s.count > 0).length;
     };
   }
   if (typeof I.findNearbyCrate !== 'function' && typeof I.findAdjacentCrate === 'function') {
     I.findNearbyCrate = I.findAdjacentCrate;
   }
 
-  // --- 正面キャラプレビュー描画 ---
+  // --- 正面キャラプレビュー描画（パステルスコップ＆ひんとメモ対応） ---
   function drawFrontCharacterPreview(canvas) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -90,14 +105,23 @@
     if (hand && hand.count > 0) {
       const handY = bodyY + bodyH * 0.52;
       if (hand.id === 'shovel') {
-        const drawSh = (sx) => {
-          ctx.strokeStyle = '#92400e'; ctx.lineWidth = 3;
-          ctx.beginPath(); ctx.moveTo(sx, handY - 14); ctx.lineTo(sx, handY + 12); ctx.stroke();
-          ctx.fillStyle = '#94a3b8'; ctx.strokeStyle = '#334155'; ctx.lineWidth = 1.2;
-          ctx.fillRect(sx - 5, handY + 8, 10, 9); ctx.strokeRect(sx - 5, handY + 8, 10, 9);
+        const drawPastelShovel = (sx) => {
+          // 子ども用パステルスコップ（ピンク持ち手・クリーム軸・ミント先端）
+          ctx.fillStyle = '#f9a8d4'; ctx.strokeStyle = '#db2777'; ctx.lineWidth = 1.2;
+          ctx.fillRect(sx - 3, handY - 12, 6, 9); ctx.strokeRect(sx - 3, handY - 12, 6, 9);
+          ctx.fillStyle = '#fef3c7';
+          ctx.fillRect(sx - 2, handY - 3, 4, 6);
+          ctx.fillStyle = '#6ee7b7'; ctx.strokeStyle = '#059669'; ctx.lineWidth = 1.2;
+          ctx.fillRect(sx - 6, handY + 3, 12, 10); ctx.strokeRect(sx - 6, handY + 3, 12, 10);
+          ctx.fillStyle = '#7dd3fc';
+          ctx.fillRect(sx - 4, handY + 11, 8, 3);
         };
-        drawSh(cx + bodyW / 2 + 10);
-        if (hand.count >= 2) drawSh(cx - bodyW / 2 - 10);
+        drawPastelShovel(cx + bodyW / 2 + 10);
+        if (hand.count >= 2) drawPastelShovel(cx - bodyW / 2 - 10);
+      } else if (hand.id === 'memo') {
+        ctx.fillStyle = '#fef9c3'; ctx.strokeStyle = '#ca8a04'; ctx.lineWidth = 1.2;
+        ctx.fillRect(cx + bodyW / 2 + 5, handY - 7, 11, 14);
+        ctx.strokeRect(cx + bodyW / 2 + 5, handY - 7, 11, 14);
       } else if (hand.id === 'soil') {
         for (let i = 0; i < Math.min(5, hand.count); i++) {
           ctx.fillStyle = (i % 2 === 0) ? '#d9a875' : '#c68e5a';
@@ -119,7 +143,9 @@
     let border = '#cbd5e1', bg = '#f8fafc';
     if (eq && eq.count > 0) {
       const meta = CONST.ITEM_META[eq.id] || { icon: '✨', name: eq.id };
-      const maxStr = (slotKey === 'hand') ? (eq.id === 'shovel' ? `/${stats.handShovelMax}` : `/${stats.handSoilMax}`) : '';
+      const maxStr = (slotKey === 'hand')
+        ? (eq.id === 'shovel' ? `/${stats.handShovelMax}` : (eq.id === 'memo' ? '/1' : `/${stats.handSoilMax}`))
+        : '';
       border = '#0284c7'; bg = '#e0f2fe';
       content = `<span style="font-size:16px;line-height:1;">${meta.icon}</span><span style="font-size:8.5px;font-weight:900;color:#0369a1;line-height:1;">${eq.count}${maxStr}</span>`;
     }
@@ -143,12 +169,10 @@
 
     const stats = C.getSizeStats();
     const hand = DIG.state.equip && DIG.state.equip.hand;
-    let handDesc = '素手（掘削1個）';
-    if (hand && hand.id === 'shovel') {
-      handDesc = hand.count === 1 ? 'スコップ1本（最大5個掘削・投擲可）' : `スコップ${hand.count}本（掘削不可・${hand.count}本投擲可）`;
-    } else if (hand && hand.id === 'soil') {
-      handDesc = `土${hand.count}/${stats.handSoilMax}個（掘削不可・一括投擲可）`;
-    }
+    let handDesc = 'なし（空）';
+    if (hand && hand.id === 'shovel') handDesc = `パステルスコップ×${hand.count}本`;
+    else if (hand && hand.id === 'memo') handDesc = 'ひんとメモ×1枚';
+    else if (hand && hand.id === 'soil') handDesc = `土×${hand.count}/${stats.handSoilMax}個`;
 
     panel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;font-size:10.5px;font-weight:900;color:#0369a1;">
@@ -169,13 +193,14 @@
     `;
     drawFrontCharacterPreview(document.getElementById('dig-front-preview-canvas'));
 
-    const names = { head: '頭（防具・飾り専用／頭上ピラミッド別）', body: '体', waist: '腰', back: '背', hand: '手（スコップ最大2本／土は高さ分）', feet: '足' };
+    const names = { head: '頭', body: '体', waist: '腰', back: '背', hand: '手', feet: '足' };
     panel.querySelectorAll('[data-equip-slot]').forEach(el => {
       el.onclick = () => {
         const key = el.getAttribute('data-equip-slot');
         const eq = DIG.state.equip && DIG.state.equip[key];
         if (typeof showToast === 'function') {
-          if (eq && eq.count > 0) {
+          if (eq && eq.id === 'memo') showToast(`📝 ひんとメモ：「${CONST.HINT_MEMO_TEXT}」`);
+          else if (eq && eq.count > 0) {
             const m = CONST.ITEM_META[eq.id] || { name: eq.id, icon: '' };
             showToast(`${names[key]}：${m.icon}${m.name} × ${eq.count}`);
           } else showToast(`${names[key]}：未装備`);
@@ -184,7 +209,7 @@
     });
   }
 
-  // --- 圧縮木箱25枠モーダル ---
+  // --- 圧縮木箱25枠モーダル（並び順：枠1メモ・枠2パステルスコップ） ---
   function ensureCrateModal() {
     let modal = document.getElementById('modal-crate-25');
     if (modal) return modal;
@@ -197,8 +222,9 @@
         <div class="modal-close" id="btn-close-crate25-x">✕</div>
         <div class="modal-title" id="crate25-title" style="font-size:14px;">📦 圧縮木箱（5×5＝25枠）</div>
         <div id="crate25-meta" style="font-size:10.5px;font-weight:800;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:6px 8px;"></div>
+        <div id="crate25-memo-box" style="display:none;font-size:12px;font-weight:800;color:#854d0e;background:#fef9c3;border:1.5px solid #eab308;border-radius:10px;padding:8px 10px;line-height:1.45;"></div>
         <div id="crate25-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:5px;padding:4px;background:#fef3c7;border:1.5px solid #d97706;border-radius:10px;"></div>
-        <div style="font-size:10px;color:#64748b;line-height:1.4;">※ 素材類：1枠10個 ／ 道具類：1枠5本 ／ 頭上ピラミッド収納時は「土」へ加算</div>
+        <div style="font-size:10px;color:#64748b;line-height:1.4;">※ メモ枠をタップすると内容を確認できます ／ 素材類:1枠10個 ／ 道具類:1枠5本</div>
         <button type="button" id="btn-close-crate25" class="btn-sub" style="font-size:11.5px;">閉じる</button>
       </div>
     `;
@@ -221,9 +247,19 @@
     const slots = I.ensureCrateSlots(crate);
     const tEl = document.getElementById('crate25-title');
     const mEl = document.getElementById('crate25-meta');
+    const memoEl = document.getElementById('crate25-memo-box');
     const gEl = document.getElementById('crate25-grid');
     if (tEl) tEl.innerText = `📦 圧縮木箱 #${(idx >= 0 ? idx : 0) + 1}（縦5×横5＝25枠）`;
     if (mEl) mEl.innerText = `場所(${crate.x}, ${crate.z}) ／ ${I.summarizeCrateContents(crate)}`;
+    const hasMemo = slots.some(s => s && s.id === 'memo' && s.count > 0);
+    if (memoEl) {
+      if (hasMemo) {
+        memoEl.style.display = 'block';
+        memoEl.innerText = `📝 ひんとメモ：「${CONST.HINT_MEMO_TEXT}」`;
+      } else {
+        memoEl.style.display = 'none';
+      }
+    }
     if (!gEl) return;
 
     gEl.innerHTML = '';
@@ -233,9 +269,15 @@
       cell.style.cssText = 'aspect-ratio:1/1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-weight:900;cursor:pointer;box-sizing:border-box;';
       if (s && s.count > 0) {
         const meta = CONST.ITEM_META[s.id] || { icon: '📦', name: s.id, stackMax: 10 };
-        cell.style.background = '#ffffff'; cell.style.border = '1.5px solid #b45309';
-        cell.innerHTML = `<span style="font-size:17px;line-height:1;">${meta.icon}</span><span style="font-size:9px;color:#92400e;">${s.count}/${meta.stackMax}</span>`;
-        cell.onclick = () => { if (typeof showToast === 'function') showToast(`枠${i + 1}：${meta.icon}${meta.name} ${s.count}/${meta.stackMax}`); };
+        cell.style.background = s.id === 'memo' ? '#fef9c3' : (s.id === 'shovel' ? '#ecfdf5' : '#ffffff');
+        cell.style.border = s.id === 'memo' ? '1.5px solid #ca8a04' : (s.id === 'shovel' ? '1.5px solid #34d399' : '1.5px solid #b45309');
+        cell.innerHTML = `<span style="font-size:17px;line-height:1;">${meta.icon}</span><span style="font-size:8.5px;color:#92400e;">${s.count}/${meta.stackMax}</span>`;
+        cell.onclick = () => {
+          if (typeof showToast === 'function') {
+            if (s.id === 'memo') showToast(`📝 ひんとメモ：「${CONST.HINT_MEMO_TEXT}」`);
+            else showToast(`枠${i + 1}：${meta.icon}${meta.name} ${s.count}/${meta.stackMax}`);
+          }
+        };
       } else {
         cell.style.background = 'rgba(255,255,255,0.55)'; cell.style.border = '1px dashed #d97706';
         cell.innerHTML = `<span style="font-size:8.5px;color:#b45309;opacity:0.45;">${i + 1}</span>`;
@@ -267,15 +309,16 @@
     }
 
     const entries = [];
-    ['soil', 'wood', 'stone'].forEach(id => {
-      if ((DIG.state.pocket[id] || 0) > 0) entries.push({ id, count: DIG.state.pocket[id], isMat: true });
-    });
+    if ((DIG.state.pocket.memo || 0) > 0) entries.push({ id: 'memo', count: DIG.state.pocket.memo, kind: 'memo' });
     let remSh = DIG.state.pocket.shovel || 0;
     while (remSh > 0 && entries.length < 9) {
       const take = Math.min(CONST.STACK_TOOL, remSh);
-      entries.push({ id: 'shovel', count: take, isMat: false });
+      entries.push({ id: 'shovel', count: take, kind: 'tool' });
       remSh -= take;
     }
+    ['soil', 'wood', 'stone'].forEach(id => {
+      if ((DIG.state.pocket[id] || 0) > 0 && entries.length < 9) entries.push({ id, count: DIG.state.pocket[id], kind: 'material' });
+    });
 
     grid.innerHTML = '';
     for (let i = 0; i < 9; i++) {
@@ -286,16 +329,20 @@
       if (ent) {
         const meta = CONST.ITEM_META[ent.id] || { icon: '📦', name: ent.id };
         slot.classList.add('filled');
-        if (ent.isMat) {
+        if (ent.kind === 'memo') {
+          slot.style.borderColor = '#ca8a04'; slot.style.background = '#fef9c3';
+          slot.innerHTML = `<span style="font-size:15px;line-height:1;">${meta.icon}</span><span style="font-size:8.5px;font-weight:900;color:#854d0e;">1枚</span>`;
+          slot.onclick = () => { if (typeof showToast === 'function') showToast(`📝 ひんとメモ：「${CONST.HINT_MEMO_TEXT}」`); };
+        } else if (ent.kind === 'material') {
           const over = carriedRes > stats.pocketCap;
           slot.style.borderColor = over ? '#ef4444' : '#b45309';
           slot.style.background  = over ? '#fef2f2' : '#fef3c7';
           slot.innerHTML = `<span style="font-size:15px;line-height:1;">${meta.icon}</span><span style="font-size:8.5px;font-weight:900;color:${over ? '#dc2626' : '#92400e'};">${ent.count}</span>`;
           slot.onclick = () => { if (typeof showToast === 'function') showToast(`${meta.icon}${meta.name}：${ent.count}個（資源合計${carriedRes}/${stats.pocketCap}）`); };
         } else {
-          slot.style.borderColor = '#0284c7'; slot.style.background = '#e0f2fe';
-          slot.innerHTML = `<span style="font-size:15px;line-height:1;">${meta.icon}</span><span style="font-size:8.5px;font-weight:900;color:#0369a1;">${ent.count}/${CONST.STACK_TOOL}</span>`;
-          slot.onclick = () => { if (typeof showToast === 'function') showToast(`${meta.icon}${meta.name}：${ent.count}/${CONST.STACK_TOOL}本（資源上限非消費）`); };
+          slot.style.borderColor = '#34d399'; slot.style.background = '#ecfdf5';
+          slot.innerHTML = `<span style="font-size:15px;line-height:1;">${meta.icon}</span><span style="font-size:8.5px;font-weight:900;color:#047857;">${ent.count}/${CONST.STACK_TOOL}</span>`;
+          slot.onclick = () => { if (typeof showToast === 'function') showToast(`${meta.icon}${meta.name}：${ent.count}/${CONST.STACK_TOOL}本`); };
         }
       } else {
         slot.innerHTML = `<span style="font-size:8px;color:#94a3b8;font-weight:800;">枠${i + 1}</span>`;
@@ -345,7 +392,7 @@
     if (DIG.runtime.activeCrateModalId) renderCrateModalContent(DIG.runtime.activeCrateModalId);
   }
 
-  DIG.ui = { openCrateModal, renderDiaryFullUI, renderEquipPreviewUI };
+  DIG.ui = { openCrateModal, renderDiaryFullUI, renderEquipPreviewUI, enhanceMessageBoxUI };
 
   // --- ボタン再接続 ＆ 既存フック差し替え ---
   const oldBtn = document.getElementById('btn-action');
@@ -390,7 +437,7 @@
         ROBOT.pos.sz = Math.max(0, Math.min(4, Math.round(Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2)));
         ROBOT.pos.subY = M.getRobotBaseSubY();
       }
-      V.renderDigVisuals(); renderDiaryFullUI();
+      V.renderDigVisuals(); renderDiaryFullUI(); enhanceMessageBoxUI();
     };
   }
   if (typeof saveWorldState === 'function') {
@@ -426,7 +473,7 @@
   }
   if (typeof updateEnvironmentAndUI === 'function') {
     const _o = updateEnvironmentAndUI;
-    updateEnvironmentAndUI = function() { _o(); V.renderHeadPyramidVisual(); V.renderHandEquipVisual(); renderDiaryFullUI(); };
+    updateEnvironmentAndUI = function() { _o(); V.renderHeadPyramidVisual(); V.renderHandEquipVisual(); renderDiaryFullUI(); enhanceMessageBoxUI(); };
   }
   if (typeof resetGameDirectly === 'function') {
     const _o = resetGameDirectly;
@@ -439,7 +486,7 @@
   const diaryBtn = document.getElementById('diary-btn');
   if (diaryBtn) diaryBtn.addEventListener('click', () => setTimeout(renderDiaryFullUI, 20));
 
-  // --- AICommCore 接続（統一10アクション＋距離1触覚サマリー） ---
+  // --- AICommCore 接続（圧縮木箱・素手掘りのネタバレ完全遮断＋日記メモ連携） ---
   if (window.AICommCore) {
     if (window.AICommCore.registerVisionProvider) window.AICommCore.registerVisionProvider((opts) => V.buildFirstPersonVisionMap(opts));
     const regBody = window.AICommCore.registerBodySensor || window.AICommCore.registerSensor;
@@ -450,24 +497,47 @@
       const { absX, absZ } = C.getRobotAbsPos();
       const clearance = M.getCeilingClearanceSubAt(absX, absZ, M.getRobotBaseSubY(), stats.reachW);
       const hand = DIG.state.equip && DIG.state.equip.hand;
-      let handText = '空（素手：掘削1個）';
-      if (hand && hand.id === 'shovel') handText = hand.count === 1 ? 'スコップ1本（繋がるブロック最大5個掘削可・投擲可）' : `スコップ${hand.count}本（掘削不可・${hand.count}本投擲可）`;
-      else if (hand && hand.id === 'soil') handText = `土${hand.count}/${stats.handSoilMax}個（掘削不可・投擲可）`;
-      const nearCrate = I.findNearbyCrate();
+      let handText = '空';
+      if (hand && hand.count > 0) {
+        const meta = CONST.ITEM_META[hand.id] || { name: hand.id, kind: 'material' };
+        const unit = meta.kind === 'memo' ? '枚' : (meta.kind === 'tool' ? '本' : '個');
+        handText = `${meta.name}×${hand.count}${unit}`;
+      }
+
+      // ポケットは現在所持している物のみ記載（未所持アイテムの存在を匂わせない）
+      const pocketParts = [];
+      ['memo', 'shovel', 'soil', 'wood', 'stone'].forEach(id => {
+        const n = DIG.state.pocket[id] || 0;
+        if (n > 0 && CONST.ITEM_META[id]) {
+          const m = CONST.ITEM_META[id];
+          const unit = m.kind === 'memo' ? '枚' : (m.kind === 'tool' ? '本' : '個');
+          pocketParts.push(`${m.name}×${n}${unit}`);
+        }
+      });
+      const pocketText = pocketParts.length
+        ? `${pocketParts.join('、')}（資源合計${C.getCarriedResourceTotal()}/${stats.pocketCap}）`
+        : `空（資源上限${stats.pocketCap}）`;
+
       const trapped = (typeof M.isCompletelyTrapped === 'function') && M.isCompletelyTrapped();
       const faceLbl = faceMap[(typeof M.getFaceDir === 'function') ? M.getFaceDir() : 'front'] || '正面';
       const touchLine = (typeof D.describeImmediateTouch === 'function') ? D.describeImmediateTouch() : '';
+      const memos = (typeof C.getDiaryMemos === 'function') ? C.getDiaryMemos() : [];
+      const diaryBlock = memos.length
+        ? memos.map((m, i) => `  ${i + 1}. ${m}`).join('\n')
+        : '  まだ記録なし（自分で試したり調べたりして発見したことがここに記録される）';
+
       const lines = [
         `体格: 高さ${stats.reachH}×幅${stats.reachW} (歩幅:1〜${stats.moveStep}自由 / 階段:${stats.stairMax}・登り:${stats.maxStepUpSub} / しゃがみ高:${stats.crawlH} / 整理上限:${stats.maxStackHeight}段 / 投げ最大:道具${stats.throwToolMax}・土${stats.throwSoilMax})`,
         `体の向き: ${basis.actualFacingName} / 顔の向き: ${faceLbl} / 姿勢: ${ROBOT.posture === 'crawl' ? 'しゃがみ(ほふく)' : '立位'} / 頭上の天井空き: ${clearance}分割`,
         `身体状態: 体力${st.stamina}/100, おなか${st.energy}/100`,
         `手枠装備: ${handText}`,
-        `ポケット(1〜9枠): 土${DIG.state.pocket.soil || 0}個（資源合計${C.getCarriedResourceTotal()}/${stats.pocketCap}・手枠共有）、スコップ${DIG.state.pocket.shovel || 0}本（資源上限非消費）`,
-        `頭上ピラミッド(10枠目): 土${DIG.state.headSoil || 0}/${stats.headCap}個 (+${stats.headLayers}段・必要天井:${stats.bodyHeight + stats.headLayers}${(DIG.state.headSoil || 0) > 0 ? '・保持中は投擲不可' : ''})`,
-        nearCrate ? `隣接圧縮木箱(手が届く): ${I.summarizeCrateContents(nearCrate)}` : '隣接圧縮木箱: なし（手が届く距離1分割以内にない）'
+        `ポケット(1〜9枠): ${pocketText}`,
+        `頭上ピラミッド(10枠目): 土${DIG.state.headSoil || 0}/${stats.headCap}個 (+${stats.headLayers}段・必要天井:${stats.bodyHeight + stats.headLayers}${(DIG.state.headSoil || 0) > 0 ? '・保持中は投擲不可' : ''})`
       ];
       if (touchLine) lines.push(touchLine);
       if (trapped) lines.push('⚠️ 完全詰み状態: 周囲が塞がっているため use(sub:"punch"または"kick") で目の前1分割を粉砕(消失)して脱出可能');
+      lines.push('【日記メモ（自分が体験・発見して記録した知識）】');
+      lines.push(diaryBlock);
       return lines.join('\n');
     });
 
@@ -483,15 +553,15 @@
       ({ dir, count, sub, item }) => M.runSubMove(dir, { count, sub, item }));
     reg('dig',     '掘削：手の届く距離1の繋がり合うブロック/分割ブロックをcount個(1〜最大)削る(target:"front"/"front_down"/"under"/"up"/"left"/"right", shape:"auto"/"wide"/"tall")',
       ({ dir, target, shape, count, dec }) => D.runUnifiedDig({ dir, target: target || 'front', shape: shape || 'auto', count, thought: dec && dec.thought }));
-    reg('pickup',  '拾う：すぐそばの土や落ちたスコップ(S)をポケットへ拾う(item:"soil"/"shovel"/"all", count:個数自由)',
+    reg('pickup',  '拾う：すぐそばの落ちている物をポケットへ拾う(item:対象/"all", count:個数自由)',
       ({ item, count }) => I.runPickup(item, count));
-    reg('place',   '置く：頭上・手枠・ポケットの土をdir方向の距離1へcount個そっと置く',
+    reg('place',   '置く：手元の土をdir方向の距離1へcount個そっと置く',
       ({ dir, item, count }) => D.runPlaceSoil(dir, { item, count }));
-    reg('throw',   '投げる：手枠装備のスコップや土をdir方向へ放物線でcount個投げる(頭上保持時は不可)',
+    reg('throw',   '投げる：手枠の持ち物をdir方向へ放物線でcount個投げる(頭上保持時は不可)',
       ({ dir, count }) => T.runThrowHand(dir, { count }));
-    reg('crate',   '独立1T：すぐ隣(距離1分割以内)の圧縮木箱と出し入れ(sub:"take"取り出し/"store"収納, item:"shovel"/"soil"/"all", count:個数自由)',
+    reg('crate',   '独立1T：すぐ隣(距離1分割以内)の大きな物体・容器を調べる/出し入れする(sub:"take"調べる・出す/"store"入れる, item:対象/"all", count:個数自由)',
       ({ sub, item, count }) => I.runCrate(sub || 'take', item, count));
-    reg('equip',   '独立1T：ポケット⇔手枠を持ち替える(item:"shovel"/"soil"/"none"素手, count:個数自由)',
+    reg('equip',   '独立1T：ポケット⇔手枠を持ち替える(item:所持アイテム/"none", count:個数自由)',
       ({ item, count }) => I.runEquipHand(item || 'none', count));
     reg('posture', '独立1T：姿勢・待機(sub:"stand"立つ/"crouch"しゃがむ/"jump"跳ぶ/"rest"休む/"look"見回す)',
       ({ sub, dir, face }) => M.runPosture(sub || 'rest', dir, face));
@@ -532,6 +602,7 @@
   else V.renderDigVisuals();
   if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition(true);
   renderDiaryFullUI();
+  enhanceMessageBoxUI();
 
   window.DigRulesModule = Object.freeze({
     getState: () => DIG.state,
