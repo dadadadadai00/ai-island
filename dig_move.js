@@ -1,13 +1,21 @@
 // ============================================================================
 // 【分割物理モジュール 2/7：dig_move.js】
-// ・1分割足元高さ同期・天井空き・木箱遮蔽判定・向き判定
-// ・移動／階段／よじ登り／ほふく／落下物理（落ちたスコップSは通り抜け可）
+// ・1分割足元高さ同期・天井空き・木箱遮蔽判定・体/顔の向き管理
+// ・歩数自由移動＆移動中操作・姿勢(立/しゃがみ/ジャンプ/休む/見る)・完全詰み判定
 // ============================================================================
 (function initDigMove() {
   const DIG = window.DIG;
   if (!DIG || !DIG.core) return;
   const C = DIG.core;
-  const CONST = DIG.CONST;
+
+  DIG.runtime.faceDir = DIG.runtime.faceDir || 'front';
+
+  function getFaceDir() { return DIG.runtime.faceDir || 'front'; }
+  function setFaceDir(f) {
+    const ok = ['front', 'up', 'down', 'left', 'right'];
+    DIG.runtime.faceDir = ok.includes(f) ? f : 'front';
+    return DIG.runtime.faceDir;
+  }
 
   function getCrateBaseSubY(crate) {
     const orig = DIG.runtime.origGetSurfaceYAt;
@@ -127,6 +135,7 @@
 
   function runTurnAroundOnly(dir, intendedVerb) {
     ROBOT.rotY = dir.rot;
+    setFaceDir('front');
     const dName = dir.name.replace('(斜め)', '');
     return {
       actionLabel: `🔄 背後(${dName})を振り返った（1ターン消費）`,
@@ -135,15 +144,20 @@
     };
   }
 
-  function runLook(dir) {
-    ROBOT.rotY = dir.rot;
-    const dName = dir.name.replace('(斜め)', '');
+  function runTurn(dir, face = '') {
+    const faceMap = { front: '正面', up: '上向き', down: '下向き', left: '左向き', right: '右向き' };
+    if (dir && Number.isFinite(dir.rot)) ROBOT.rotY = dir.rot;
+    const dName = (dir && dir.name) ? dir.name.replace('(斜め)', '') : getFacingBasis().actualFacingName;
+    const fKey = setFaceDir(face || 'front');
+    const fLabel = faceMap[fKey] || '正面';
     return {
-      actionLabel: `👀 ${dName}の方を向いて見回した`,
-      physicalResult: `移動せず${dName}の方へ体の向きを変えた`,
+      actionLabel: `🔄 体を${dName}・顔を${fLabel}へ向けた`,
+      physicalResult: `移動せず体の向きを${dName}、顔の向きを${fLabel}に変えた`,
       moved: false
     };
   }
+
+  function runLook(dir, face = 'front') { return runTurn(dir, face); }
 
   function computeSupportedFloorUnderFootprint(centerAbsX, centerAbsZ, curBaseSubY, reachW) {
     const areaId = C.getCurAreaId();
@@ -165,10 +179,10 @@
     return { fell: !hasImmediateSupport && highestSupportY < curBaseSubY, landingSubY: hasImmediateSupport ? curBaseSubY : highestSupportY };
   }
 
-  function evaluateSubStepTarget(nextAbsX, nextAbsZ, curBaseSubY, curPosture, stats) {
+  function evaluateSubStepTarget(nextAbsX, nextAbsZ, curBaseSubY, curPosture, stats, extraClimb = 0) {
     const areaId = C.getCurAreaId();
     const { minOff, maxOff } = C.getFootprintBounds(stats.reachW);
-    const maxClimbUp = (curPosture === 'crawl') ? 1 : stats.climbMax;
+    const maxClimbUp = ((curPosture === 'crawl') ? 1 : stats.climbMax) + extraClimb;
     let highestFloorY = C.getMinSubY();
 
     for (let ox = minOff; ox <= maxOff; ox++) {
@@ -193,7 +207,7 @@
             const cnt = C.getLooseSoilAtFloor(cx, cz, fl, areaId) || looseHeightHere;
             return { ok: false, reason: `高さ${cnt}段の散らばった土` };
           }
-          return { ok: false, reason: curPosture === 'crawl' ? 'ほふく前進では登れない段差（壁）' : '高すぎる段差（壁）' };
+          return { ok: false, reason: curPosture === 'crawl' ? 'しゃがみでは登れない段差（壁）' : '高すぎる段差（壁）' };
         }
         let cellFloorY = openY;
         if (openY === curBaseSubY) {
@@ -207,17 +221,22 @@
 
     const diffSub = highestFloorY - curBaseSubY;
     if (diffSub > maxClimbUp) {
-      return { ok: false, reason: curPosture === 'crawl' ? 'ほふく前進では登れない段差（壁）' : '高すぎる段差（壁）' };
+      return { ok: false, reason: curPosture === 'crawl' ? 'しゃがみでは登れない段差（壁）' : '高すぎる段差（壁）' };
     }
 
     const clearance = getCeilingClearanceSubAt(nextAbsX, nextAbsZ, highestFloorY, stats.reachW);
-    let nextPosture = 'stand';
-    if (clearance >= stats.standH + stats.headLayers) nextPosture = 'stand';
-    else if (clearance >= stats.crawlH + stats.headLayers) nextPosture = 'crawl';
-    else {
-      if (stats.headLayers > 0 && clearance >= stats.crawlH) {
-        return { ok: false, reason: `頭上の土(+${stats.headLayers}段)が天井(空き${clearance}段)に当たる` };
+    let nextPosture = curPosture;
+    if (nextPosture === 'stand' && clearance < stats.standH + stats.headLayers) {
+      if (clearance >= stats.crawlH + stats.headLayers) nextPosture = 'crawl';
+      else {
+        return {
+          ok: false,
+          reason: (stats.headLayers > 0 && clearance >= stats.crawlH)
+            ? `頭上の土(+${stats.headLayers}段)が天井(空き${clearance}段)に当たる`
+            : `低い天井(空き${clearance}段)`
+        };
       }
+    } else if (nextPosture === 'crawl' && clearance < stats.crawlH + stats.headLayers) {
       return { ok: false, reason: `低い天井(空き${clearance}段)` };
     }
 
@@ -232,14 +251,94 @@
     return { ok: true, destFloorSubY: highestFloorY, nextPosture, diffSub, stepKind };
   }
 
-  function runSubMove(dir) {
+  function isCompletelyTrapped() {
+    const stats = C.getSizeStats();
+    const { absX, absZ } = C.getRobotAbsPos();
+    const baseSubY = getRobotBaseSubY();
+    const curPosture = ROBOT.posture === 'crawl' ? 'crawl' : 'stand';
+    const dirs = [
+      [0, -1], [1, 0], [0, 1], [-1, 0],
+      [1, -1], [1, 1], [-1, 1], [-1, -1]
+    ];
+    for (let i = 0; i < dirs.length; i++) {
+      const ev = evaluateSubStepTarget(absX + dirs[i][0], absZ + dirs[i][1], baseSubY, curPosture, stats, 0);
+      if (ev.ok) return false;
+    }
+    return true;
+  }
+
+  function runPosture(sub, dir, face) {
+    const mode = String(sub || 'rest').toLowerCase();
+    const stats = C.getSizeStats();
+    const { absX, absZ } = C.getRobotAbsPos();
+    const baseSubY = getRobotBaseSubY();
+
+    if (mode === 'look') return runTurn(dir, face || 'front');
+    if (mode === 'crouch' || mode === 'crawl') {
+      ROBOT.posture = 'crawl';
+      return { actionLabel: '🧎 その場でしゃがんだ', physicalResult: '姿勢をしゃがみ(低姿勢)へ切り替えた', moved: false };
+    }
+    if (mode === 'stand') {
+      const clear = getCeilingClearanceSubAt(absX, absZ, baseSubY, stats.reachW);
+      if (clear < stats.standH + stats.headLayers) {
+        return {
+          actionLabel: `🚫 天井が低く立ち上がれない(空き${clear}段)`,
+          physicalResult: `頭上の天井空き(${clear}段)が足りず立ち上がれなかった`,
+          moved: false
+        };
+      }
+      ROBOT.posture = 'stand';
+      return { actionLabel: '🧍 立ち上がった', physicalResult: '姿勢を立位へ戻した', moved: false };
+    }
+    if (mode === 'jump') {
+      DIG.runtime.lastMoveVisualKind = 'jump';
+      if (dir && Number.isFinite(dir.rot)) ROBOT.rotY = dir.rot;
+      setFaceDir('front');
+      const dx = Math.sign((dir && dir.dx) || 0), dz = Math.sign((dir && dir.dz) || 0);
+      const dName = (dir && dir.name) ? dir.name.replace('(斜め)', '') : '正面';
+      const clear = getCeilingClearanceSubAt(absX, absZ, baseSubY, stats.reachW);
+      if (clear <= stats.bodyHeight) {
+        return { actionLabel: '🚫 天井がつかえてジャンプできなかった', physicalResult: '頭上に余裕がなくジャンプできなかった', moved: false };
+      }
+      life.stamina = Math.max(0, life.stamina - 5);
+      if (dx !== 0 || dz !== 0) {
+        const ev = evaluateSubStepTarget(absX + dx, absZ + dz, baseSubY, 'stand', stats, 1);
+        if (ev.ok) {
+          const tX = C.absToTile(absX + dx), tZ = C.absToTile(absZ + dz);
+          ROBOT.pos.x = tX.tile; ROBOT.pos.z = tZ.tile; ROBOT.pos.sx = tX.sub; ROBOT.pos.sz = tZ.sub;
+          ROBOT.pos.subY = ev.destFloorSubY; ROBOT.pos.lv = C.floorSubYToRobotLv(ev.destFloorSubY);
+          ROBOT.posture = ev.nextPosture;
+          return {
+            actionLabel: `🦘 ${dName}へジャンプした(${ev.diffSub > 0 ? `↑${ev.diffSub}段` : '1分割'})`,
+            physicalResult: `${dName}方向へ1分割ジャンプして着地した`,
+            moved: true
+          };
+        }
+      }
+      return { actionLabel: '🦘 その場でジャンプした', physicalResult: 'その場で真上へジャンプして着地した', moved: false };
+    }
+
+    // default: rest
+    life.stamina = Math.min(100, life.stamina + 30);
+    life.energy = Math.max(0, life.energy - 3);
+    ROBOT.params.eco = Math.min(100, (ROBOT.params.eco || 40) + 2);
+    return { actionLabel: '💤 その場で休んだ', physicalResult: 'その場で休み、体力が回復した', moved: false };
+  }
+
+  function runSubMove(dir, opts = {}) {
     DIG.runtime.lastMoveVisualKind = null;
     if (isBehindCurrentFacing(dir)) return runTurnAroundOnly(dir, '移動');
 
     const stats = C.getSizeStats();
+    const reqSteps = (Number.isFinite(Number(opts.count)) && Number(opts.count) > 0)
+      ? Math.max(1, Math.min(stats.moveStep, Math.floor(Number(opts.count))))
+      : stats.moveStep;
+    const subAction = String(opts.sub || '').toLowerCase();
+
     const dx = Math.sign(dir.dx || 0), dz = Math.sign(dir.dz || 0);
     const dName = dir.name.replace('(斜め)', '');
     ROBOT.rotY = dir.rot;
+    setFaceDir('front');
 
     let curX = Math.round(ROBOT.pos.x || 0), curZ = Math.round(ROBOT.pos.z || 0);
     let curSx = Number.isFinite(ROBOT.pos.sx) ? Math.max(0, Math.min(4, Math.round(ROBOT.pos.sx))) : 2;
@@ -252,7 +351,7 @@
     let didScramble = false, didStairsUp = false, didSafeLanding = false, didHighDrop = false;
     let stopReason = '';
 
-    for (let s = 0; s < stats.moveStep; s++) {
+    for (let s = 0; s < reqSteps; s++) {
       const curAbsX = curX * 5 + curSx, curAbsZ = curZ * 5 + curSz;
       const nextAbsX = curAbsX + dx, nextAbsZ = curAbsZ + dz;
       if (!C.isInsideIslandAbs(nextAbsX, nextAbsZ)) { stopReason = '島の端'; break; }
@@ -280,6 +379,7 @@
       if (ev.stepKind === 'high_drop' || ev.stepKind === 'scramble_climb') break;
     }
 
+    let subNote = '';
     if (movedSteps > 0) {
       ROBOT.pos.x = curX; ROBOT.pos.z = curZ; ROBOT.pos.sx = curSx; ROBOT.pos.sz = curSz;
       ROBOT.pos.subY = curBaseSubY; ROBOT.pos.lv = curLv; ROBOT.posture = curPosture;
@@ -293,20 +393,33 @@
       else if (didSafeLanding) DIG.runtime.lastMoveVisualKind = 'safe_landing';
       else if (didStairsUp) DIG.runtime.lastMoveVisualKind = 'stairs_up';
 
+      // 移動しながら操作（移動拾い・移動置き・移動投げ）
+      if (subAction === 'pickup' && DIG.items && DIG.items.runPickup) {
+        const r = DIG.items.runPickup(opts.item || '', opts.itemCount || 0);
+        if (r && r.physicalResult) subNote = `＋移動拾い(${r.physicalResult})`;
+      } else if (subAction === 'place' && DIG.dig && DIG.dig.runPlaceSoil) {
+        const r = DIG.dig.runPlaceSoil(dir, { count: 1, item: opts.item || 'soil' });
+        if (r && r.physicalResult) subNote = `＋移動置き(${r.physicalResult})`;
+      } else if (subAction === 'throw' && DIG.throw && DIG.throw.runThrowHand) {
+        const r = DIG.throw.runThrowHand(dir, { count: 0 });
+        if (r && r.physicalResult) subNote = `＋移動投げ(${r.physicalResult})`;
+      }
+
       const notes = [];
       if (didScramble) notes.push(`段差${totalClimbSub}分割をよじ登った`);
       else if (totalClimbSub > 0) notes.push(`階段${totalClimbSub}分割を上がった`);
       if (didHighDrop) notes.push(`足元が空いていたため下の空間へ${totalDropSub}分割落下した`);
       else if (totalDropSub > 0) notes.push(`${totalDropSub}分割下へ降りた`);
-      if (curPosture === 'crawl') notes.push('低い天井の下でほふく姿勢になった');
+      if (curPosture === 'crawl') notes.push('低い姿勢(しゃがみ)になった');
 
       const extraText = notes.length ? `（${notes.join('・')}）` : '';
-      const phys = stopReason
+      const phys = (stopReason
         ? `${dName}へ${movedSteps}分割進んだところで「${stopReason}」に当たり停止した${extraText}`
-        : `${dName}へ${movedSteps}分割進んだ${extraText}`;
+        : `${dName}へ${movedSteps}分割進んだ${extraText}`) + subNote;
       const badge = didScramble ? `(🧗↑${totalClimbSub})` : (totalClimbSub > 0 ? `(🪜↑${totalClimbSub})` : (totalDropSub > 0 ? `(↓${totalDropSub})` : ''));
+      const subTag = subNote ? `[+${subAction}]` : '';
       return {
-        actionLabel: `🐾 ${dName}へ${movedSteps}分割移動${badge}${stopReason ? `(${stopReason})` : ''}`,
+        actionLabel: `🐾 ${dName}へ${movedSteps}分割移動${badge}${subTag}${stopReason ? `(${stopReason})` : ''}`,
         physicalResult: phys,
         moved: true
       };
@@ -320,12 +433,12 @@
   }
 
   DIG.move = {
+    getFaceDir, setFaceDir,
     getCrateBaseSubY, isCrateBlockingAtSubY, getCeilingClearanceSubAt,
     computeExactFootSubYAt, getRobotBaseSubY, getFacingBasis, isBehindCurrentFacing,
-    runTurnAroundOnly, runLook, computeSupportedFloorUnderFootprint,
-    evaluateSubStepTarget, runSubMove
+    runTurnAroundOnly, runTurn, runLook, runPosture, isCompletelyTrapped,
+    computeSupportedFloorUnderFootprint, evaluateSubStepTarget, runSubMove
   };
 
   if (window.DebugGuard) window.DebugGuard.markLoaded('dig_move.js');
 })();
-
