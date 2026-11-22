@@ -1,7 +1,7 @@
 // ============================================================================
 // 【分割AI通信モジュール 4/4：ai_monitor_ui.js】
-// ・1ターン答え合わせ2タブモーダル（目標メモ/自由選択引数対応）・コピペ・設定UI注入
-// ・自動「⚡ 今すぐ考える」連続再生トグル（安全停止＆モーダル一時待機付き）
+// ・1ターン答え合わせ2タブモーダル（目標メモ/詳細指定の独立行表示）・コピペ・設定UI
+// ・自動「⚡ 今すぐ考える」連続再生（5段階間隔・モニター開いたら即完全停止）
 // ・全モーダル共通の非崩れピンチ拡大縮小（内部スクロール保護付き）
 // ============================================================================
 (function initAiMonitorUiModule() {
@@ -14,7 +14,15 @@
   const CAM = SYS.camera;
   const CORE = SYS.core;
 
-  const AUTO_INTERVAL_KEY = 'ai_auto_interval_ms_v1';
+  const AUTO_INTERVAL_KEY = 'ai_auto_interval_ms_v2';
+  const AUTO_INTERVAL_OPTIONS = [
+    { ms: 2500,  label: '① 2.5秒（高速・有料枠向け）' },
+    { ms: 5000,  label: '② 5.0秒（標準・有料枠向け）' },
+    { ms: 10000, label: '③ 10秒（やや遅め・軽負荷）' },
+    { ms: 16000, label: '④ 16秒（無料枠・安定推奨）' },
+    { ms: 25000, label: '⑤ 25秒（無料枠・超安全）' }
+  ];
+
   let currentMonitorTab = 'before';
   let currentDimMoving = false;
   const modalResetFns = [];
@@ -24,8 +32,9 @@
   let autoBusy = false;
 
   function getAutoIntervalMs() {
-    const raw = (typeof safeStorage !== 'undefined') ? Number(safeStorage.getItem(AUTO_INTERVAL_KEY)) : 2500;
-    return (Number.isFinite(raw) && raw >= 1000 && raw <= 15000) ? raw : 2500;
+    const raw = (typeof safeStorage !== 'undefined') ? Number(safeStorage.getItem(AUTO_INTERVAL_KEY)) : 16000;
+    const hit = AUTO_INTERVAL_OPTIONS.find(o => o.ms === raw);
+    return hit ? hit.ms : 16000;
   }
 
   function isAnyModalOpen() {
@@ -67,11 +76,15 @@
     autoTimerId = null;
     if (!autoPlayEnabled) return;
     if (!ST.commEnabled) {
-      stopAutoPlay('⏸️ 通信OFFのため自動再生を停止しました');
+      stopAutoPlay('⏸️ 通信OFFのため自動思考を停止しました');
       return;
     }
-    if (isAnyModalOpen() || autoBusy) {
-      scheduleNextAutoTick(700);
+    if (isAnyModalOpen()) {
+      stopAutoPlay('⏹ モニター/設定画面を開いたため自動思考を停止しました');
+      return;
+    }
+    if (autoBusy) {
+      scheduleNextAutoTick(500);
       return;
     }
     const actBtn = document.getElementById('btn-action');
@@ -84,19 +97,27 @@
     try {
       await CORE.runTurn();
     } catch (e) {
-      stopAutoPlay('⚠️ 実行エラーのため自動再生を停止しました');
+      stopAutoPlay('⚠️ 実行エラーのため自動思考を停止しました');
       autoBusy = false;
       return;
     }
     autoBusy = false;
 
+    // 通信中に停止またはモニターが開かれていた場合は次を絶対に予約しない
     if (!autoPlayEnabled) return;
+    if (isAnyModalOpen()) {
+      stopAutoPlay('⏹ モニター/設定画面を開いたため自動思考を停止しました');
+      return;
+    }
     if (ST.lastTurnAudit && ST.lastTurnAudit.error) {
-      stopAutoPlay('⚠️ 通信エラーのため自動再生を停止しました');
+      const is429 = String(ST.lastTurnAudit.error).includes('429');
+      stopAutoPlay(is429
+        ? '⚠️ レート制限(429)で停止：⚙️設定で間隔を④16秒〜⑤25秒へ広げてください'
+        : '⚠️ 通信エラーのため自動思考を停止しました');
       return;
     }
     if (typeof life !== 'undefined' && life && life.getState && life.getState().mode === 'DEAD') {
-      stopAutoPlay('💀 世代交代のため自動再生を停止しました');
+      stopAutoPlay('💀 世代交代のため自動思考を停止しました');
       return;
     }
     scheduleNextAutoTick(getAutoIntervalMs());
@@ -112,9 +133,15 @@
       updateAutoPlayButtonUI();
       return;
     }
+    if (isAnyModalOpen()) {
+      if (typeof showToast === 'function') showToast('⚠️ 開いている画面を閉じてから自動思考を押してください');
+      updateAutoPlayButtonUI();
+      return;
+    }
     autoPlayEnabled = true;
     updateAutoPlayButtonUI();
-    if (typeof showToast === 'function') showToast(`▶ 自動思考ON（間隔 ${(getAutoIntervalMs() / 1000).toFixed(1)}秒）`);
+    const sec = (getAutoIntervalMs() / 1000).toFixed(1).replace(/\.0$/, '');
+    if (typeof showToast === 'function') showToast(`▶ 自動思考ON（間隔 ${sec}秒）`);
     scheduleNextAutoTick(250);
   }
 
@@ -127,7 +154,7 @@
     if (a.faceVal && a.faceVal !== '-') parts.push(`face:${a.faceVal}`);
     if (a.itemName && a.itemName !== '-') parts.push(`item:${a.itemName}`);
     if (a.countVal && a.countVal !== '-') parts.push(`count:${a.countVal}`);
-    return parts.length ? parts.join(' / ') : '-';
+    return parts.length ? parts.join(' / ') : 'なし';
   }
 
   function buildTurnCopyText() {
@@ -249,7 +276,12 @@
     let prevVis = overlay.classList.contains('active') || (overlay.style.display && overlay.style.display !== 'none');
     new MutationObserver(() => {
       const nowVis = overlay.classList.contains('active') || (overlay.style.display && overlay.style.display !== 'none');
-      if (nowVis !== prevVis) { prevVis = nowVis; resetZoom(); }
+      if (nowVis !== prevVis) {
+        prevVis = nowVis;
+        resetZoom();
+        // いずれかのモーダルが開いた瞬間に自動思考を即停止
+        if (nowVis && autoPlayEnabled) stopAutoPlay('⏹ 画面を開いたため自動思考を停止しました');
+      }
     }).observe(overlay, { attributes: true, attributeFilter: ['style', 'class'] });
 
     ['pointerdown', 'pointermove', 'pointerup'].forEach(ev => overlay.addEventListener(ev, (e) => e.stopPropagation()));
@@ -361,10 +393,14 @@
         if (rSumEl) rSumEl.innerHTML = `<div style="color:#dc2626;font-weight:900;">⚠️ 通信エラー：${API.escapeHtml(a.error).replace(/\n/g, '<br>')}</div>`;
       } else {
         const detail = formatDetailParams(a);
-        const detailPart = detail !== '-' ? `　<strong>⚙️ 詳細：</strong>${API.escapeHtml(detail)}` : '';
         const goalLine = a.goalText ? `<div><strong>🎯 目標メモ：</strong>${API.escapeHtml(a.goalText)}</div>` : '';
         if (rSumEl) {
-          rSumEl.innerHTML = `${goalLine}<div><strong>💬 思考・しゃべり：</strong>${API.escapeHtml(a.thoughtText)}</div><div><strong>🧭 行動 / 方角：</strong><code>${API.escapeHtml(a.actionId)}</code> ／ <strong>${API.escapeHtml(a.dirName)}</strong>${detailPart}　<strong>🤖 動き：</strong>${API.escapeHtml(a.motionLabel)}</div>`;
+          rSumEl.innerHTML = [
+            goalLine,
+            `<div><strong>💬 思考・しゃべり：</strong>${API.escapeHtml(a.thoughtText)}</div>`,
+            `<div><strong>🧭 行動 / 方角：</strong><code>${API.escapeHtml(a.actionId)}</code> ／ <strong>${API.escapeHtml(a.dirName)}</strong>　<strong>🤖 動き：</strong>${API.escapeHtml(a.motionLabel)}</div>`,
+            `<div><strong>⚙️ 詳細指定：</strong><code>${API.escapeHtml(detail)}</code></div>`
+          ].filter(Boolean).join('');
         }
       }
       if (rawEl) { rawEl.textContent = a.rawResponse || '-'; rawEl.scrollTop = 0; }
@@ -379,7 +415,7 @@
         applyDimOverlayState(live.isMoving);
         if (pLblEl) pLblEl.innerText = '📤 AIへ送る予定の情報文（まだ送信前）';
         if (pEl) { pEl.textContent = live.promptText || ''; pEl.scrollTop = 0; }
-        fillReply('📥 AIからの返答（しゃべり・目標・判断・動き）');
+        fillReply('📥 AIからの返答（しゃべり・目標・判断・詳細）');
         return;
       }
       if (metaEl) metaEl.innerText = `第${a.turnNo}ターン(${a.day}日目 ${a.time}) ／ 行動前 ／ ${a.isMovingBefore ? '🏃移動視点(自動)' : '🧍クリア(自動)'} ／ 向き:${a.facingBefore}`;
@@ -387,7 +423,7 @@
       applyDimOverlayState(a.isMovingBefore);
       if (pLblEl) pLblEl.innerText = '📤 AIへ送信した情報文（今すぐ考える前）';
       if (pEl) { pEl.textContent = a.promptText || ''; pEl.scrollTop = 0; }
-      fillReply('📥 AIからの返答（しゃべり・目標・判断・動き）');
+      fillReply('📥 AIからの返答（しゃべり・目標・判断・詳細）');
     } else {
       const live = CORE.buildPerceptionPayload('map', ST.lastTurnWasMoving);
       if (metaEl) metaEl.innerText = `${a.hasData ? `第${a.turnNo}ターン後(${a.day}日目 ${a.time})` : '現在状態（未実行）'} ／ 次の送信状態 ／ ${live.isMoving ? '🏃移動視点(自動)' : '🧍クリア(自動)'} ／ 向き:${CAM.rotToShortDirName(ROBOT.rotY || 0)}`;
@@ -395,11 +431,13 @@
       applyDimOverlayState(live.isMoving);
       if (pLblEl) pLblEl.innerText = '📤 現在の状態文（次に送る予定の情報）';
       if (pEl) { pEl.textContent = live.promptText || ''; pEl.scrollTop = 0; }
-      fillReply('📥 直前ターンのAI返答（しゃべり・目標・判断・動き）');
+      fillReply('📥 直前ターンのAI返答（しゃべり・目標・判断・詳細）');
     }
   }
 
   function openVisionMonitor(initialTab = null) {
+    // モニターを開いたら即座に自動思考を完全停止
+    if (autoPlayEnabled) stopAutoPlay('👁️ モニターを開いたため自動思考を停止しました');
     const modal = document.getElementById('modal-ai-vision');
     if (!modal) return;
     resetAllModalZooms();
@@ -448,6 +486,7 @@
       const group = document.createElement('div');
       group.className = 'setting-group';
       group.style.cssText = 'background:#f0f9ff;border:1.5px solid #7dd3fc;border-radius:12px;padding:8px 10px;gap:6px;';
+      const intervalOptsHtml = AUTO_INTERVAL_OPTIONS.map(o => `<option value="${o.ms}">${o.label}</option>`).join('');
       group.innerHTML = `
         <label class="setting-label" style="color:#0369a1;">👁️ AIキャラ視点情報（送信方式）</label>
         <select id="setting-ai-vision-mode" class="setting-input">
@@ -455,13 +494,8 @@
           <option value="image" ${CONST.B_MODE_LOCKED ? 'disabled' : ''}>${CONST.B_MODE_LOCKED ? '🔒 B案：キャラ視点3Dカメラ画像（A案安定まで使用停止）' : 'B案：キャラ視点3Dカメラ画像'}</option>
         </select>
         ${CONST.B_MODE_LOCKED ? '<div style="background:#334155;color:#94a3b8;border:1px solid #475569;border-radius:8px;padding:6px 8px;font-size:10.5px;font-weight:800;opacity:0.85;">🔒 B案（3Dカメラ画像のAI送信）：使用停止中（機能温存・A案安定次第解放）</div>' : ''}
-        <label class="setting-label" style="color:#0369a1;margin-top:2px;">▶ 自動思考の実行間隔</label>
-        <select id="setting-auto-interval" class="setting-input">
-          <option value="1500">1.5秒（テンポ重視）</option>
-          <option value="2500">2.5秒（標準・観察向け）</option>
-          <option value="4000">4.0秒（じっくり確認）</option>
-          <option value="6000">6.0秒（ゆっくり）</option>
-        </select>
+        <label class="setting-label" style="color:#0369a1;margin-top:2px;">▶ 自動思考の実行間隔（5段階・無料枠は④〜⑤推奨）</label>
+        <select id="setting-auto-interval" class="setting-input">${intervalOptsHtml}</select>
         <label class="setting-label" style="color:#0369a1;margin-top:2px;">🤖 Groqモデル手動指定（空欄で自動検出）</label>
         <input id="setting-groq-manual-model" type="text" class="setting-input" placeholder="例: openai/gpt-oss-120b（空欄推奨）">
         <button type="button" id="btn-open-vision-mon-from-settings" class="btn-sub" style="padding:6px;font-size:11px;">👁️ 1ターン答え合わせ・キャラ視点を確認する</button>
@@ -531,7 +565,7 @@
           <div id="mon-prompt-label" style="font-size:11px;font-weight:900;color:#334155;"></div>
           <pre id="mon-prompt" data-allow-inner-scroll="1" style="background:#0f172a;color:#e2e8f0;padding:8px;border-radius:10px;font-size:10px;line-height:1.35;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;height:145px;white-space:pre-wrap;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
           <div id="mon-reply-label" style="font-size:11px;font-weight:900;color:#334155;"></div>
-          <div id="mon-reply-summary" style="background:#f0fdf4;border:1.5px solid #86efac;color:#14532d;padding:6px 8px;border-radius:9px;font-size:10.5px;line-height:1.4;min-height:48px;"></div>
+          <div id="mon-reply-summary" style="background:#f0fdf4;border:1.5px solid #86efac;color:#14532d;padding:6px 8px;border-radius:9px;font-size:10.5px;line-height:1.45;min-height:60px;"></div>
           <pre id="mon-raw-json" data-allow-inner-scroll="1" style="background:#f8fafc;color:#1e293b;border:1px solid #cbd5e1;padding:6px 7px;border-radius:8px;font-size:9.5px;line-height:1.3;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;height:56px;white-space:pre-wrap;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"></pre>
           <div id="mon-phys-result" style="background:#fffbeb;border:1.5px solid #fcd34d;color:#78350f;padding:5px 8px;border-radius:8px;font-size:10.5px;line-height:1.35;"></div>
           <button type="button" id="btn-copy-turn-report" class="btn-primary" style="padding:8px;font-size:11.5px;font-weight:900;background:#0ea5e9;margin-top:2px;">📋 1ターン答え合わせをコピペ（送信文＋AI返答＋結果）</button>
