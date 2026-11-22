@@ -1,7 +1,7 @@
 // ============================================================================
 // 【分割物理モジュール 1/7：dig_core.js】
-// ・共通ハブ window.DIG の生成・定数・アイテム定義・状態データ
-// ・体格計算・資源上限・5x5x5座標基礎・散らばり土/落下道具データ・セーブ/ロード・初期地形
+// ・共通ハブ window.DIG の生成・定数・アイテム定義（ひんとメモ＆パステルスコップ）
+// ・体格計算・体験ベースの日記メモ(diaryMemos)・5x5x5座標基礎・セーブ/ロード・初期地形
 // ============================================================================
 (function initDigCore() {
   const DIG = window.DIG = window.DIG || {};
@@ -15,39 +15,46 @@
     STACK_TOOL:        5,
     HAND_SHOVEL_MAX:   2,
     PORTAL_CORNER_POS: { x: -2, z: -2 },
+    HINT_MEMO_TEXT:    'きみは パステルじまへ おくられた たんさロボットだよ！ この スコップをつかって しまを ほって ちょうさしよう！',
     HEIGHT_RANK: { tiny: 1, small: 2, medium: 3, large: 4, giant: 5 },
     WIDTH_RANK:  { slim1: 1, slim2: 2, normal3: 3, fat4: 4, fat5: 5 },
     POCKET_CAP_TABLE: {
       1: [1,  2,  4,  5,  7],
-      2: [2,  5,  8, 12, 16],
-      3: [4,  8, 14, 20, 28],
-      4: [5, 12, 20, 30, 41],
-      5: [7, 16, 28, 41, 55]
+      2: [2,  5,  8,  12, 16],
+      3: [4,  8,  14, 20, 28],
+      4: [5,  12, 20, 30, 41],
+      5: [7,  16, 28, 41, 55]
     },
     PYRAMID_MAX_BY_WIDTH: [0, 1, 5, 14, 30, 55],
     ITEM_META: {
-      soil:   { id: 'soil',   name: '土ブロック', icon: '🟫', kind: 'material', stackMax: 10 },
-      wood:   { id: 'wood',   name: '木材',       icon: '🪵', kind: 'material', stackMax: 10 },
-      stone:  { id: 'stone',  name: '石材',       icon: '🪨', kind: 'material', stackMax: 10 },
-      shovel: { id: 'shovel', name: 'スコップ',   icon: '🪏', kind: 'tool',     stackMax: 5 }
+      memo:   { id: 'memo',   name: 'ひんとメモ',       icon: '📝', kind: 'memo',     stackMax: 1 },
+      shovel: { id: 'shovel', name: 'パステルスコップ', icon: '🪏', kind: 'tool',     stackMax: 5 },
+      soil:   { id: 'soil',   name: '土ブロック',       icon: '🟫', kind: 'material', stackMax: 10 },
+      wood:   { id: 'wood',   name: '木材',             icon: '🪵', kind: 'material', stackMax: 10 },
+      stone:  { id: 'stone',  name: '石材',             icon: '🪨', kind: 'material', stackMax: 10 }
     }
   };
 
-  function createEmptyCrateSlots(withTestShovel = false) {
+  function createEmptyCrateSlots(withStarterItems = false) {
     const slots = Array.from({ length: CONST.CRATE_SLOTS }, () => null);
-    if (withTestShovel) slots[0] = { id: 'shovel', count: 1 };
+    if (withStarterItems) {
+      // 並び順：1枠目メモ・2枠目パステルスコップ
+      slots[0] = { id: 'memo', count: 1 };
+      slots[1] = { id: 'shovel', count: 1 };
+    }
     return slots;
   }
 
   function createDefaultState() {
     return {
       envTag: CONST.CLEAN_ENV_TAG,
-      pocket: { soil: 0, wood: 0, stone: 0, shovel: 0 },
+      pocket: { soil: 0, wood: 0, stone: 0, shovel: 0, memo: 0 },
       headSoil: 0,
       equip: { head: null, body: null, waist: null, back: null, hand: null, feet: null },
       crates: [
         { id: 'crate_1', areaId: 'home', x: -1, z: 0, slots: createEmptyCrateSlots(true) }
       ],
+      diaryMemos: [],
       dugCells: {},
       worldSubSoils: {},
       worldDroppedItems: []
@@ -61,6 +68,26 @@
     activeCrateModalId: null,
     origGetSurfaceYAt: (typeof getSurfaceYAt === 'function') ? getSurfaceYAt : null
   };
+
+  // --- 体験・発見だけを記録する日記メモ（AIへ渡す唯一の知識記憶） ---
+  function addDiaryMemo(text) {
+    const clean = String(text || '').trim();
+    if (!clean) return false;
+    if (!Array.isArray(DIG.state.diaryMemos)) DIG.state.diaryMemos = [];
+    if (DIG.state.diaryMemos.includes(clean)) return false;
+    DIG.state.diaryMemos.push(clean);
+    if (DIG.state.diaryMemos.length > 12) DIG.state.diaryMemos.shift();
+    if (typeof DIARY_LOGS !== 'undefined' && Array.isArray(DIARY_LOGS)) {
+      const dayNum = (typeof GAME_DAY !== 'undefined') ? GAME_DAY : 1;
+      DIARY_LOGS.push(`📝 ${dayNum}日目：${clean}`);
+    }
+    saveDigState();
+    return true;
+  }
+
+  function getDiaryMemos() {
+    return Array.isArray(DIG.state.diaryMemos) ? DIG.state.diaryMemos.slice() : [];
+  }
 
   // --- 基本参照＆体格計算 ---
   function getCurAreaId() {
@@ -137,8 +164,11 @@
   function getMaxAddableShovelsToPocket() {
     const p = DIG.state.pocket || {};
     const curShovels = Math.max(0, Math.floor(p.shovel || 0));
-    const matSlots = ((p.soil || 0) > 0 ? 1 : 0) + ((p.wood || 0) > 0 ? 1 : 0) + ((p.stone || 0) > 0 ? 1 : 0);
-    return Math.max(0, Math.max(0, 9 - matSlots) * CONST.STACK_TOOL - curShovels);
+    const usedNonShovel = ((p.soil || 0) > 0 ? 1 : 0)
+      + ((p.wood || 0) > 0 ? 1 : 0)
+      + ((p.stone || 0) > 0 ? 1 : 0)
+      + ((p.memo || 0) > 0 ? 1 : 0);
+    return Math.max(0, Math.max(0, 9 - usedNonShovel) * CONST.STACK_TOOL - curShovels);
   }
 
   // --- 5x5x5サブ座標・地形・土＆落下道具基礎 ---
@@ -340,6 +370,34 @@
     if (getCurAreaId() !== 'home' || typeof HEIGHT_MAP === 'undefined') return false;
     return HEIGHT_MAP['0,0'] === 0 && HEIGHT_MAP['0,-1'] === 1 && HEIGHT_MAP['0,-2'] === 1 && HEIGHT_MAP['1,2'] !== 1;
   }
+
+  // 既存セーブにも「枠1:メモ / 枠2:スコップ」を自動補完
+  function ensureStarterMemoInFirstCrate() {
+    const first = DIG.state.crates && DIG.state.crates[0];
+    if (!first || !Array.isArray(first.slots)) return;
+    const hasMemoAnywhere = first.slots.some(s => s && s.id === 'memo' && s.count > 0)
+      || (DIG.state.pocket && DIG.state.pocket.memo > 0)
+      || (DIG.state.equip && DIG.state.equip.hand && DIG.state.equip.hand.id === 'memo')
+      || (Array.isArray(DIG.state.diaryMemos) && DIG.state.diaryMemos.some(m => m.includes('ひんとメモ')));
+    if (hasMemoAnywhere) return;
+
+    // 枠0にスコップだけ入っている旧初期状態なら、枠0=メモ・枠1=スコップへ並べ替え
+    const nonEmpty = first.slots.filter(s => s && s.count > 0);
+    if (nonEmpty.length === 1 && nonEmpty[0].id === 'shovel') {
+      first.slots = createEmptyCrateSlots(false);
+      first.slots[0] = { id: 'memo', count: 1 };
+      first.slots[1] = { id: 'shovel', count: nonEmpty[0].count };
+    } else {
+      // 先頭に空きを作るか空き枠へ追加
+      if (!first.slots[0]) first.slots[0] = { id: 'memo', count: 1 };
+      else {
+        const emptyIdx = first.slots.findIndex(s => !s);
+        if (emptyIdx >= 0) first.slots[emptyIdx] = { id: 'memo', count: 1 };
+      }
+    }
+    saveDigState();
+  }
+
   function applyCleanTestTerrain(resetStatus = true) {
     relocatePortalsToCorner();
     if (getCurAreaId() !== 'home') {
@@ -371,12 +429,12 @@
       if (typeof AI_MEMORY !== 'undefined' && Array.isArray(AI_MEMORY)) AI_MEMORY.length = 0;
       if (typeof DIARY_LOGS !== 'undefined' && Array.isArray(DIARY_LOGS)) {
         DIARY_LOGS.length = 0;
-        DIARY_LOGS.push('🌱 1日目：完全手ぶら・圧縮木箱(25枠・スコップ1本入)でスタート');
+        DIARY_LOGS.push('🌱 1日目：完全手ぶらでスタート（左隣の箱にメモとスコップ入り）');
       }
       const actEl = document.getElementById('history-action');
       const msgEl = document.getElementById('message-box');
-      if (actEl) actEl.innerText = '🌱 7分割検証環境を初期化しました';
-      if (msgEl) msgEl.innerText = '完全手ぶらで待機中（左隣の圧縮木箱にスコップ1本入り・木箱タップで25枠確認可）。';
+      if (actEl) actEl.innerText = '🌱 検証環境を初期化しました';
+      if (msgEl) msgEl.innerText = '完全手ぶらで待機中（左隣の圧縮木箱タップでメモ＆パステルスコップ確認可）。';
       if (window.AICommCore && typeof window.AICommCore.resetPhysicalHistory === 'function') window.AICommCore.resetPhysicalHistory();
     }
     if (typeof saveHomeSnapshotIfHome === 'function') try { saveHomeSnapshotIfHome(); } catch (e) {}
@@ -399,11 +457,13 @@
           const parsed = JSON.parse(raw);
           if (parsed && parsed.envTag === CONST.CLEAN_ENV_TAG) {
             DIG.state = Object.assign(createDefaultState(), parsed);
-            DIG.state.pocket = Object.assign({ soil: 0, wood: 0, stone: 0, shovel: 0 }, parsed.pocket || {});
+            DIG.state.pocket = Object.assign({ soil: 0, wood: 0, stone: 0, shovel: 0, memo: 0 }, parsed.pocket || {});
             DIG.state.equip = Object.assign({ head: null, body: null, waist: null, back: null, hand: null, feet: null }, parsed.equip || {});
+            if (!Array.isArray(DIG.state.diaryMemos)) DIG.state.diaryMemos = [];
             if (!Array.isArray(DIG.state.crates) || !DIG.state.crates.length) DIG.state.crates = createDefaultState().crates;
             else if (DIG.items && DIG.items.ensureCrateSlots) DIG.state.crates.forEach(c => DIG.items.ensureCrateSlots(c));
             if (!Array.isArray(DIG.state.worldDroppedItems)) DIG.state.worldDroppedItems = [];
+            ensureStarterMemoInFirstCrate();
             loaded = true;
           }
         }
@@ -425,7 +485,7 @@
   }
 
   DIG.core = {
-    createEmptyCrateSlots, createDefaultState,
+    createEmptyCrateSlots, createDefaultState, addDiaryMemo, getDiaryMemos,
     getCurAreaId, getMinUnderLv, getMinSubY, getHeadStackHeight,
     getOriginalSizeSpec, getOriginalBodySpec, getSizeStats,
     getPocketResourceTotal, getHandResourceTotal, getCarriedResourceTotal, getMaxAddableShovelsToPocket,
@@ -438,7 +498,7 @@
     addDroppedTool, hasDroppedShovelAt,
     purgeLegacyItems, saveDigState, syncDugCellsToChipMap,
     relocatePortalsToCorner, buildStairTagsFor5StepNorth, isCleanTerrainValid,
-    applyCleanTestTerrain, loadDigState
+    ensureStarterMemoInFirstCrate, applyCleanTestTerrain, loadDigState
   };
 
   if (window.DebugGuard) window.DebugGuard.markLoaded('dig_core.js');
