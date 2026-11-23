@@ -85,7 +85,6 @@
     return { alt, az };
   }
 
-  // 北=-Z, 東=+X, 南=+Z, 西=-X に完全一致する天球座標変換
   function altAzToVec3(alt, az, r = SKY_R) {
     const c = Math.cos(alt);
     return new THREE.Vector3(r * c * Math.sin(az), r * Math.sin(alt), -r * c * Math.cos(az));
@@ -114,7 +113,6 @@
     else if (h >= times.sunsetH - 1.5 && h < times.sunsetH + 0.75) realPhase = 2;
     else realPhase = 3;
 
-    // 深夜0時〜日の出前は「前日夜の続き」として扱う
     const skyDayBase = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
     if (h < times.sunriseH) skyDayBase.setDate(skyDayBase.getDate() - 1);
     return { realPhase, skyDayBase, times };
@@ -130,7 +128,6 @@
 
     const rawTs = (typeof TIME_STEP !== 'undefined' && Number.isFinite(Number(TIME_STEP))) ? Math.floor(Number(TIME_STEP)) : 0;
     const appPhase = ((rawTs % 4) + 4) % 4;
-    // 今と同じ・これから来る時間帯は当日、過ぎた時間帯は翌日へ送る
     const dayOffset = (appPhase < realPhase) ? 1 : 0;
     const refBase = new Date(skyDayBase.getTime());
     refBase.setDate(refBase.getDate() + dayOffset);
@@ -154,7 +151,6 @@
   skyRoot.visible = false;
   scene.add(skyRoot);
 
-  // 1. 青白デジタル太陽軌道アーチ＆太陽オブジェクト
   const orbitLineMat = new THREE.LineBasicMaterial({ color: 0xbae6fd, transparent: true, opacity: 0.45, depthWrite: false });
   const orbitLine = new THREE.Line(new THREE.BufferGeometry(), orbitLineMat);
   skyRoot.add(orbitLine);
@@ -167,7 +163,6 @@
   sunGroup.add(sunHalo);
   skyRoot.add(sunGroup);
 
-  // 2. 朝・夕の青白デジタル光幕（オレンジを使わず未来展示風に表現）
   function createHorizonGlowTex() {
     const cv = document.createElement('canvas');
     cv.width = 128; cv.height = 128;
@@ -190,7 +185,6 @@
   glowCurtain.visible = false;
   skyRoot.add(glowCurtain);
 
-  // 3. 夜空リアル星座（星点＋極細青いホログラムライン）
   function createStarDotTex() {
     const cv = document.createElement('canvas');
     cv.width = 64; cv.height = 64;
@@ -243,7 +237,6 @@
     if (!force && key === lastCalcKey) return;
     lastCalcKey = key;
 
-    // 太陽軌道アーチ（その日の日の出〜日の入りを20分刻みで算出）
     const orbitPts = [];
     const y = moment.date.getFullYear(), mo = moment.date.getMonth(), da = moment.date.getDate();
     let riseVec = null, setVec = null;
@@ -263,7 +256,6 @@
     orbitLine.geometry = new THREE.BufferGeometry().setFromPoints(orbitPts);
     orbitLineMat.opacity = (moment.phase === 3) ? 0.16 : (moment.phase === 1 ? 0.38 : 0.52);
 
-    // 現在の太陽位置
     const curSun = getSunRaDec(moment.date);
     const curLst = (getGMSTDeg(moment.date) + state.lon + 360) % 360;
     const sunPos = raDecToAltAz(curSun.raDeg, curSun.decDeg, curLst, state.lat);
@@ -275,7 +267,6 @@
       sunGroup.visible = false;
     }
 
-    // 朝・夕の青白デジタル光幕
     if (moment.phase === 0 && riseVec) {
       glowCurtain.visible = true;
       glowCurtain.position.set(riseVec.x, 1.8, riseVec.z);
@@ -290,7 +281,6 @@
       glowCurtain.visible = false;
     }
 
-    // リアル星座（夜のみ表示：星点＋極細青ホログラム星座線）
     const isNight = (moment.phase === 3 || sunPos.alt < -0.05);
     starGroup.visible = isNight;
     if (isNight) {
@@ -458,4 +448,3 @@
 
   if (window.DebugGuard) window.DebugGuard.markLoaded('sky_time.js');
 })();
-
