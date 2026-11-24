@@ -3,12 +3,14 @@
 // ・丸い海の外周へ余白を空けて配置する未来風・青ホログラム3Dコンパス
 // ・東西南北（中心向き直立3層立体＋大型発光土台＆投影光）固定
 // ・直立シンプル目盛りリング（4ヶ所のみ長く太い）がゆっくり時計回り
+// ・二重描画廃止＆カリング防止でキャラ視点上下移動時のちらつき解消
 // ============================================================================
 (function initCompassRingModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
   const STORAGE_KEY = 'island_compass_ring_v1';
   const state = { unlocked: false, visible: false, rotating: true, radiusOffset: 0.9 };
+  let externalHide = false;
 
   function loadState() {
     try {
@@ -25,7 +27,6 @@
   }
   loadState();
 
-  // --- 丸い海の半径・高さを自動検出（未検出時は標準値5.0） ---
   function detectSeaMetrics() {
     let radius = 5.0, topY = -0.12;
     const candidates = [];
@@ -54,7 +55,6 @@
     return { radius, topY };
   }
 
-  // --- スキャンライン入りホログラム漢字テクスチャ ---
   function createKanjiHoloTexture(char) {
     const cv = document.createElement('canvas');
     cv.width = 256; cv.height = 256;
@@ -65,20 +65,19 @@
     ctx.textBaseline = 'middle';
     ctx.font = '700 162px "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif';
 
-    ctx.shadowColor = 'rgba(125, 211, 252, 0.95)';
-    ctx.shadowBlur = 20;
+    ctx.shadowColor = 'rgba(125, 211, 252, 0.92)';
+    ctx.shadowBlur = 18;
     ctx.lineWidth = 6;
-    ctx.strokeStyle = 'rgba(224, 242, 254, 0.9)';
+    ctx.strokeStyle = 'rgba(224, 242, 254, 0.88)';
     ctx.strokeText(char, 128, 134);
 
     ctx.shadowBlur = 8;
     ctx.fillStyle = '#ffffff';
     ctx.fillText(char, 128, 134);
 
-    // 極細スキャンライン
     ctx.shadowBlur = 0;
     ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
     for (let y = 0; y < 256; y += 8) ctx.fillRect(0, y, 256, 2);
     ctx.globalCompositeOperation = 'source-over';
 
@@ -87,15 +86,14 @@
     return tex;
   }
 
-  // --- 下から上へ滑らかに消える投影光柱テクスチャ ---
   function createBeamGradientTexture() {
     const cv = document.createElement('canvas');
     cv.width = 64; cv.height = 128;
     const ctx = cv.getContext('2d');
     const grad = ctx.createLinearGradient(0, 128, 0, 0);
-    grad.addColorStop(0.0, 'rgba(255, 255, 255, 0.92)');
-    grad.addColorStop(0.35, 'rgba(186, 230, 253, 0.42)');
-    grad.addColorStop(0.78, 'rgba(125, 211, 252, 0.12)');
+    grad.addColorStop(0.0, 'rgba(255, 255, 255, 0.88)');
+    grad.addColorStop(0.35, 'rgba(186, 230, 253, 0.38)');
+    grad.addColorStop(0.78, 'rgba(125, 211, 252, 0.10)');
     grad.addColorStop(1.0, 'rgba(56, 189, 248, 0.0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 64, 128);
@@ -104,15 +102,14 @@
     return tex;
   }
 
-  // --- 土台の床に広がる柔らかな発光円盤テクスチャ ---
   function createBaseGlowTexture() {
     const cv = document.createElement('canvas');
     cv.width = 128; cv.height = 128;
     const ctx = cv.getContext('2d');
     const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
-    g.addColorStop(0.0, 'rgba(224, 242, 254, 0.90)');
-    g.addColorStop(0.45, 'rgba(125, 211, 252, 0.42)');
-    g.addColorStop(0.82, 'rgba(56, 189, 248, 0.10)');
+    g.addColorStop(0.0, 'rgba(224, 242, 254, 0.85)');
+    g.addColorStop(0.45, 'rgba(125, 211, 252, 0.38)');
+    g.addColorStop(0.82, 'rgba(56, 189, 248, 0.08)');
     g.addColorStop(1.0, 'rgba(56, 189, 248, 0.0)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 128, 128);
@@ -121,7 +118,6 @@
     return tex;
   }
 
-  // --- 3Dコンパス本体 ---
   const rootGroup = new THREE.Group();
   rootGroup.name = 'holo_compass_root';
   rootGroup.visible = false;
@@ -132,13 +128,13 @@
   rootGroup.add(staticGroup, rotatingGroup);
 
   const mats = {
-    ringMain:  new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.72, side: THREE.DoubleSide, depthWrite: false }),
-    ringSub:   new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.36, side: THREE.DoubleSide, depthWrite: false }),
-    ticks:     new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.68, depthWrite: false }),
-    majorTick: new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.88, side: THREE.DoubleSide, depthWrite: false }),
-    node:      new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.82, side: THREE.DoubleSide, depthWrite: false }),
-    baseGlow:  new THREE.MeshBasicMaterial({ map: createBaseGlowTexture(), color: 0x38bdf8, transparent: true, opacity: 0.48, side: THREE.DoubleSide, depthWrite: false }),
-    beam:      new THREE.MeshBasicMaterial({ map: createBeamGradientTexture(), color: 0x38bdf8, transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false }),
+    ringMain:  new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.48, side: THREE.DoubleSide, depthWrite: false }),
+    ringSub:   new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }),
+    ticks:     new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.42, depthWrite: false }),
+    majorTick: new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.56, side: THREE.DoubleSide, depthWrite: false }),
+    node:      new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.52, side: THREE.DoubleSide, depthWrite: false }),
+    baseGlow:  new THREE.MeshBasicMaterial({ map: createBaseGlowTexture(), color: 0x38bdf8, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false }),
+    beam:      new THREE.MeshBasicMaterial({ map: createBeamGradientTexture(), color: 0x38bdf8, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false }),
     kanji:     []
   };
 
@@ -154,12 +150,10 @@
     builtRadius = R;
     rootGroup.position.set(0, topY + 0.08, 0);
 
-    // 1. 固定外周の極細ガイドリング
     const outerGuide = new THREE.Mesh(new THREE.RingGeometry(R + 0.12, R + 0.155, 96), mats.ringSub);
     outerGuide.rotation.x = -Math.PI / 2;
     staticGroup.add(outerGuide);
 
-    // 2. 回転層：水平ベース輪 ＋ 直立シンプル縦線目盛り（48本・うち4ヶ所だけ少し長く太い）
     const baseRing = new THREE.Mesh(new THREE.RingGeometry(R - 0.028, R + 0.028, 96), mats.ringMain);
     baseRing.rotation.x = -Math.PI / 2;
     rotatingGroup.add(baseRing);
@@ -171,7 +165,6 @@
     for (let i = 0; i < totalTicks; i++) {
       const ang = (i / totalTicks) * Math.PI * 2;
       if (i % 12 === 0) {
-        // 90°ごとの4ヶ所：少し長く・少し太い直立目盛り
         const holder = new THREE.Group();
         holder.rotation.y = -ang;
         const bar = new THREE.Mesh(majorBarGeo, mats.majorTick);
@@ -179,7 +172,6 @@
         holder.add(bar);
         rotatingGroup.add(holder);
       } else {
-        // 通常目盛り：シンプルな直立縦線
         const x = Math.sin(ang) * R;
         const z = -Math.cos(ang) * R;
         tickPositions.push(x, 0.006, z, x, 0.24, z);
@@ -189,7 +181,6 @@
     tickGeo.setAttribute('position', new THREE.Float32BufferAttribute(tickPositions, 3));
     rotatingGroup.add(new THREE.LineSegments(tickGeo, mats.ticks));
 
-    // 3. 東西南北固定（北=Z-, 東=X+, 南=Z+, 西=X-）＋ 大型土台＆投影光 ＋ 中心向き直立立体文字
     const cardinals = [
       { label: '北', rotY: 0 },
       { label: '東', rotY: -Math.PI / 2 },
@@ -208,7 +199,6 @@
       const holder = new THREE.Group();
       holder.rotation.y = rotY;
 
-      // 大型ホログラム土台（床の淡い光＋二重リング）
       const padGlow = new THREE.Mesh(baseGlowGeo, mats.baseGlow);
       padGlow.rotation.x = -Math.PI / 2;
       padGlow.position.set(0, 0.005, -labelDist);
@@ -224,21 +214,19 @@
       innerPad.position.set(0, 0.014, -labelDist);
       holder.add(innerPad);
 
-      // 土台から文字を包む青いライトアップ光柱
       const beam = new THREE.Mesh(beamGeo, mats.beam);
       beam.position.set(0, 0.66, -labelDist);
       holder.add(beam);
 
-      // 島の中心（キャラ）へ向かって直立する3層ホログラム漢字
       const tex = createKanjiHoloTexture(label);
       const layers = [
-        { dz: -0.048, opMul: 0.30, sc: 1.03 },
-        { dz:  0.000, opMul: 0.62, sc: 1.00 },
-        { dz:  0.048, opMul: 1.00, sc: 1.00 }
+        { dz: -0.048, opMul: 0.26, sc: 1.03 },
+        { dz:  0.000, opMul: 0.52, sc: 1.00 },
+        { dz:  0.048, opMul: 0.92, sc: 1.00 }
       ];
       layers.forEach((ly) => {
         const km = new THREE.MeshBasicMaterial({
-          map: tex, color: 0x38bdf8, transparent: true, opacity: 0.88 * ly.opMul,
+          map: tex, color: 0x38bdf8, transparent: true, opacity: 0.62 * ly.opMul,
           side: THREE.DoubleSide, depthWrite: false
         });
         km.userData.opMul = ly.opMul;
@@ -251,14 +239,16 @@
 
       staticGroup.add(holder);
     });
+
+    // 視線上下移動時に一瞬消えるカリングちらつきを防止
+    rootGroup.traverse((obj) => { obj.frustumCulled = false; });
   }
 
-  // --- 時間帯に応じた青系ホログラム自動調光 ---
   const PHASE_PALETTE = [
-    { main: 0x0284c7, sub: 0x0ea5e9, text: 0x0284c7, beam: 0x38bdf8, ringOp: 0.74, subOp: 0.40, textOp: 0.88, beamOp: 0.28, glowOp: 0.40, add: false },
-    { main: 0x0369a1, sub: 0x0284c7, text: 0x0369a1, beam: 0x0ea5e9, ringOp: 0.86, subOp: 0.48, textOp: 0.94, beamOp: 0.22, glowOp: 0.34, add: false },
-    { main: 0x0ea5e9, sub: 0x38bdf8, text: 0x38bdf8, beam: 0x38bdf8, ringOp: 0.80, subOp: 0.46, textOp: 0.92, beamOp: 0.34, glowOp: 0.46, add: false },
-    { main: 0x38bdf8, sub: 0x7dd3fc, text: 0x7dd3fc, beam: 0x7dd3fc, ringOp: 0.84, subOp: 0.48, textOp: 0.96, beamOp: 0.42, glowOp: 0.56, add: true }
+    { main: 0x0284c7, sub: 0x38bdf8, text: 0x0284c7, beam: 0x38bdf8, ringOp: 0.46, subOp: 0.28, tickOp: 0.40, majorOp: 0.54, textOp: 0.62, beamOp: 0.22, glowOp: 0.30, add: false },
+    { main: 0x0369a1, sub: 0x0284c7, text: 0x0369a1, beam: 0x0ea5e9, ringOp: 0.52, subOp: 0.32, tickOp: 0.46, majorOp: 0.60, textOp: 0.68, beamOp: 0.20, glowOp: 0.28, add: false },
+    { main: 0x0ea5e9, sub: 0x38bdf8, text: 0x38bdf8, beam: 0x38bdf8, ringOp: 0.48, subOp: 0.30, tickOp: 0.42, majorOp: 0.56, textOp: 0.64, beamOp: 0.26, glowOp: 0.34, add: false },
+    { main: 0x38bdf8, sub: 0x7dd3fc, text: 0x7dd3fc, beam: 0x7dd3fc, ringOp: 0.72, subOp: 0.42, tickOp: 0.64, majorOp: 0.80, textOp: 0.88, beamOp: 0.38, glowOp: 0.48, add: true }
   ];
 
   function getCurrentPhaseIndex() {
@@ -277,13 +267,13 @@
     const pal = PHASE_PALETTE[pIdx] || PHASE_PALETTE[0];
     const blend = pal.add ? THREE.AdditiveBlending : THREE.NormalBlending;
 
-    mats.ringMain.color.setHex(pal.main);  mats.ringMain.opacity  = pal.ringOp;        mats.ringMain.blending  = blend;
-    mats.ringSub.color.setHex(pal.sub);    mats.ringSub.opacity   = pal.subOp;         mats.ringSub.blending   = blend;
-    mats.ticks.color.setHex(pal.main);     mats.ticks.opacity     = pal.ringOp * 0.85; mats.ticks.blending     = blend;
-    mats.majorTick.color.setHex(pal.text); mats.majorTick.opacity = pal.textOp * 0.92; mats.majorTick.blending = blend;
-    mats.node.color.setHex(pal.text);      mats.node.opacity      = pal.textOp * 0.85; mats.node.blending      = blend;
-    mats.baseGlow.color.setHex(pal.beam);  mats.baseGlow.opacity  = pal.glowOp;        mats.baseGlow.blending  = THREE.AdditiveBlending;
-    mats.beam.color.setHex(pal.beam);      mats.beam.opacity      = pal.beamOp;        mats.beam.blending      = THREE.AdditiveBlending;
+    mats.ringMain.color.setHex(pal.main);  mats.ringMain.opacity  = pal.ringOp;  mats.ringMain.blending  = blend;
+    mats.ringSub.color.setHex(pal.sub);    mats.ringSub.opacity   = pal.subOp;   mats.ringSub.blending   = blend;
+    mats.ticks.color.setHex(pal.main);     mats.ticks.opacity     = pal.tickOp;  mats.ticks.blending     = blend;
+    mats.majorTick.color.setHex(pal.text); mats.majorTick.opacity = pal.majorOp; mats.majorTick.blending = blend;
+    mats.node.color.setHex(pal.text);      mats.node.opacity      = pal.textOp * 0.78; mats.node.blending = blend;
+    mats.baseGlow.color.setHex(pal.beam);  mats.baseGlow.opacity  = pal.glowOp;  mats.baseGlow.blending  = THREE.AdditiveBlending;
+    mats.beam.color.setHex(pal.beam);      mats.beam.opacity      = pal.beamOp;  mats.beam.blending      = THREE.AdditiveBlending;
 
     mats.kanji.forEach((km) => {
       km.color.setHex(pal.text);
@@ -293,12 +283,11 @@
   }
 
   function applyVisibility() {
-    rootGroup.visible = Boolean(state.unlocked && state.visible);
+    rootGroup.visible = Boolean(state.unlocked && state.visible && !externalHide);
     if (rootGroup.visible) applyTimePalette(true);
     syncSettingsPanelUI();
   }
 
-  // --- 設定画面へテスト＆解放スイッチを自動注入 ---
   function ensureEnvSettingsPanel() {
     let panel = document.getElementById('env-hologram-settings-panel');
     if (panel) return panel;
@@ -319,7 +308,7 @@
     panel = document.createElement('div');
     panel.id = 'env-hologram-settings-panel';
     panel.style.cssText = 'margin-top:8px;padding:10px;border-radius:12px;background:#f0f9ff;border:1.5px solid #7dd3fc;display:flex;flex-direction:column;gap:8px;text-align:left;';
-    panel.innerHTML = '<div style="font-size:11.5px;font-weight:900;color:#0369a1;">🧪 観察環境・機能解放（基本非表示／ストーリー解放予定）</div>';
+    panel.innerHTML = '<div style="font-size:11.5px;font-weight:900;color:#0369a1;">🧪 観察環境・機能設定</div>';
     targetContent.appendChild(panel);
     return panel;
   }
@@ -358,9 +347,8 @@
     }
   }
 
-  // --- 時計回りアニメーション＆自動再描画 ---
+  // --- 時計回りアニメーション（元アプリの描画ループに一本化してちらつき防止） ---
   let lastTs = performance.now();
-  let lastRenderFrame = -1;
   function tick(now) {
     const dt = Math.min(0.1, Math.max(0, (now - lastTs) / 1000));
     lastTs = now;
@@ -370,12 +358,6 @@
         rotatingGroup.rotation.y -= 0.055 * dt;
       }
       applyTimePalette(false);
-
-      if (typeof renderer !== 'undefined' && renderer && renderer.info && typeof activeCamera !== 'undefined' && activeCamera) {
-        const curFrame = renderer.info.render.frame;
-        if (curFrame === lastRenderFrame) renderer.render(scene, activeCamera);
-        lastRenderFrame = renderer.info.render.frame;
-      }
     }
     requestAnimationFrame(tick);
   }
@@ -395,7 +377,8 @@
   window.CompassRingModule = {
     unlock: () => { state.unlocked = true; state.visible = true; saveState(); applyVisibility(); },
     setVisible: (v) => { state.visible = Boolean(v); if (v) state.unlocked = true; saveState(); applyVisibility(); },
-    isVisible: () => Boolean(state.unlocked && state.visible),
+    setExternalHide: (hide) => { externalHide = Boolean(hide); applyVisibility(); },
+    isVisible: () => Boolean(state.unlocked && state.visible && !externalHide),
     setRadiusOffset: (off) => { if (Number.isFinite(off)) { state.radiusOffset = off; saveState(); buildCompassGeometry(); applyTimePalette(true); } },
     refresh: () => { buildCompassGeometry(); applyTimePalette(true); }
   };
