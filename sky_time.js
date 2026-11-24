@@ -1,28 +1,23 @@
 // ============================================================================
 // 【独立ビジュアルモジュール：sky_time.js】
-// ・二重球体スクリーン（外側：宇宙星空ドーム／内側：朝昼夕夜深夜の空ドーム）
-// ・3段階表示：通常(パステル空＋アニメ表情)／観測前(リアル空＆天体)／観察時(計測◯)
-// ・5時間帯プレビュー([自動][朝][昼][夕][夜][深夜])・GPS自前確認・現実時刻同期
+// ・二重球体スクリーン（内側：空・太陽・月／外側：宇宙・星空）
+// ・①観察アプリ(表なし・5ターン周期)／②天体観察前(表あり・5ターン×現在時刻)／③天体観察時(現在時刻)
+// ・星はすべて●型／旧オリオン座看板は自動非表示／GPS自前事前確認付き
 // ============================================================================
 (function initSkyTimeModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_sky_time_v4';
+  const STORAGE_KEY = 'island_sky_time_v6';
   const RAD = Math.PI / 180;
   const DEG = 180 / Math.PI;
   const SKY_R = 16.5;
   const INNER_DOME_R = 20.5;
-  const STAR_R = 22.2;
+  const STAR_R = 22.0;
   const OUTER_DOME_R = 25.0;
 
   const state = {
-    skyUnlocked: false,
-    skyVisible: false,
-    viewMode: 'anime',    // 'anime' | 'pre_obs' | 'obs'
-    previewPhase: 'auto', // 'auto' | 0(朝) | 1(昼) | 2(夕) | 3(夜) | 4(深夜)
+    viewMode: 'anime', // 'anime'(①観察アプリ) | 'pre_obs'(②天体観察前) | 'obs'(③天体観察時)
     obsConstLines: true,
-    realtimeUnlocked: false,
-    realtimeActive: false,
     lat: 35.68,
     lon: 139.77,
     gpsApplied: false
@@ -32,7 +27,14 @@
     try {
       const store = (typeof safeStorage !== 'undefined') ? safeStorage : window.localStorage;
       const raw = store && store.getItem(STORAGE_KEY);
-      if (raw) Object.assign(state, JSON.parse(raw));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (['anime', 'pre_obs', 'obs'].includes(parsed.viewMode)) state.viewMode = parsed.viewMode;
+        if (typeof parsed.obsConstLines === 'boolean') state.obsConstLines = parsed.obsConstLines;
+        if (Number.isFinite(parsed.lat)) state.lat = parsed.lat;
+        if (Number.isFinite(parsed.lon)) state.lon = parsed.lon;
+        if (typeof parsed.gpsApplied === 'boolean') state.gpsApplied = parsed.gpsApplied;
+      }
     } catch (e) {}
   }
   function saveState() {
@@ -58,6 +60,34 @@
     { name: 'ふたご座', stars: [[7.58,31.89],[7.76,28.03],[6.63,16.40],[6.38,22.51]], lines: [[0,1],[0,3],[1,2]] },
     { name: 'ペガスス座', stars: [[23.08,15.21],[23.06,28.08],[0.14,29.09],[0.22,15.18]], lines: [[0,1],[1,2],[2,3],[3,0]] }
   ];
+
+  // --- ターン数取得（5ターンごとに朝→昼→夕→夜→深夜） ---
+  let internalTurnFallback = 0;
+  const startMs = Date.now();
+
+  function getGameTurnNumber() {
+    const candidates = [
+      typeof turnCount !== 'undefined' ? turnCount : null,
+      typeof totalTurns !== 'undefined' ? totalTurns : null,
+      typeof currentTurn !== 'undefined' ? currentTurn : null,
+      typeof stepCount !== 'undefined' ? stepCount : null,
+      window.turnCount,
+      window.totalTurns,
+      window.currentTurn
+    ];
+    for (let i = 0; i < candidates.length; i++) {
+      if (Number.isFinite(Number(candidates[i])) && Number(candidates[i]) >= 0) {
+        return Math.floor(Number(candidates[i]));
+      }
+    }
+    if (typeof TIME_STEP !== 'undefined' && Number.isFinite(Number(TIME_STEP))) {
+      // TIME_STEPが1ずつ増える仕様なら5ステップで1時間帯、すでに0..3なら5倍基準と整合
+      const ts = Math.floor(Number(TIME_STEP));
+      if (ts >= 5) return ts;
+      return ts * 5 + Math.floor(((Date.now() - startMs) / 16000) % 5);
+    }
+    return internalTurnFallback;
+  }
 
   // --- 天文計算 ---
   function norm360(v) { return ((v % 360) + 360) % 360; }
@@ -122,12 +152,11 @@
     return { sunriseH: solarNoonH - halfDayH, sunsetH: solarNoonH + halfDayH, solarNoonH };
   }
 
-  // --- 日の出基準・5時間帯（0:朝 1:昼 2:夕 3:夜 4:深夜）算出 ---
   function getRealTimeInfo(now) {
     const times = calcSunriseSunsetLocal(now, state.lat, state.lon);
     const h = now.getHours() + now.getMinutes() / 60;
     let realPhase = 3;
-    if (h < times.sunriseH) realPhase = 4; // 0:00〜日の出前＝深夜（前日夜の続き）
+    if (h < times.sunriseH) realPhase = 4;
     else if (h < 10.5) realPhase = 0;
     else if (h < times.sunsetH - 1.5) realPhase = 1;
     else if (h < times.sunsetH + 0.75) realPhase = 2;
@@ -138,61 +167,58 @@
     return { realPhase, skyDayBase, times, nowH: h };
   }
 
-  function resolveEffectiveSkyMoment() {
+  // --- 3モードそれぞれの時間・空計算 ---
+  function resolveSkyMoment() {
     const now = new Date();
     const { realPhase, skyDayBase, times, nowH } = getRealTimeInfo(now);
-    const isPreview = (state.previewPhase !== 'auto' && Number.isInteger(Number(state.previewPhase)));
+    const turn = getGameTurnNumber();
+    const turnPhase = Math.floor(turn / 5) % 5; // 5ターンごとに 0:朝, 1:昼, 2:夕, 3:夜, 4:深夜
+    const subStep = turn % 5; // 0〜4（同じ時間帯内の進行）
 
-    // プレビュー無指定かつ現実時刻ONなら、現在時刻そのまま
-    if (!isPreview && state.realtimeUnlocked && state.realtimeActive) {
+    // ③ 天体観察時：スマホ現在時刻そのまま
+    if (state.viewMode === 'obs') {
       let moonMood = 'calm';
       if (realPhase === 3 && nowH < 22.0) moonMood = 'energetic';
       else if (realPhase === 4 && nowH >= 2.0) moonMood = 'sleepy';
-      return { date: now, phase: realPhase, times, modeLabel: '現実リアルタイム', moonMood, isRealtime: true };
+      return { date: now, phase: realPhase, subStep: 2, turn, times, moonMood, dayTag: '現在時刻' };
     }
 
-    let targetPhase;
-    if (isPreview) {
-      targetPhase = Math.max(0, Math.min(4, Number(state.previewPhase)));
-    } else {
-      const rawTs = (typeof TIME_STEP !== 'undefined' && Number.isFinite(Number(TIME_STEP))) ? Math.floor(Number(TIME_STEP)) : 0;
-      const app4 = ((rawTs % 4) + 4) % 4;
-      targetPhase = (app4 === 3 && realPhase === 4) ? 4 : app4;
+    // ① 観察アプリ：表を元にしない（5ターン周期のみ）
+    if (state.viewMode === 'anime') {
+      const moonMood = turnPhase === 3 ? 'energetic' : 'sleepy';
+      return { date: now, phase: turnPhase, subStep, turn, times, moonMood, dayTag: 'ゲーム周期(表なし)' };
     }
 
+    // ② 天体観察前：表を元にした（5ターン時間帯 × 現在時刻の当日/翌日判定）
     const refBase = new Date(skyDayBase.getTime());
-    if (!isPreview && Math.min(3, targetPhase) < Math.min(3, realPhase)) {
-      refBase.setDate(refBase.getDate() + 1);
-    }
+    const isNextDay = Math.min(3, turnPhase) < Math.min(3, realPhase);
+    if (isNextDay) refBase.setDate(refBase.getDate() + 1);
     const refTimes = calcSunriseSunsetLocal(refBase, state.lat, state.lon);
 
     let refDate;
     let moonMood = 'calm';
-    if (targetPhase === 0) {
+    if (turnPhase === 0) {
       const th = refTimes.sunriseH + 0.55;
       refDate = new Date(refBase.getFullYear(), refBase.getMonth(), refBase.getDate(), Math.floor(th), Math.floor((th % 1) * 60), 0);
-    } else if (targetPhase === 1) {
+    } else if (turnPhase === 1) {
       const th = refTimes.solarNoonH;
       refDate = new Date(refBase.getFullYear(), refBase.getMonth(), refBase.getDate(), Math.floor(th), Math.floor((th % 1) * 60), 0);
-    } else if (targetPhase === 2) {
+    } else if (turnPhase === 2) {
       const th = refTimes.sunsetH - 0.55;
       refDate = new Date(refBase.getFullYear(), refBase.getMonth(), refBase.getDate(), Math.floor(th), Math.floor((th % 1) * 60), 0);
-    } else if (targetPhase === 3) {
+    } else if (turnPhase === 3) {
       refDate = new Date(refBase.getFullYear(), refBase.getMonth(), refBase.getDate(), 20, 30, 0);
       moonMood = 'energetic';
     } else {
-      // 深夜：0時またぎ（前日夜の続き＝翌カレンダー日の2:30頃）
-      const nextDay = new Date(refBase.getTime());
-      nextDay.setDate(nextDay.getDate() + 1);
-      refDate = new Date(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate(), 2, 30, 0);
+      const nextCal = new Date(refBase.getTime());
+      nextCal.setDate(nextCal.getDate() + 1);
+      refDate = new Date(nextCal.getFullYear(), nextCal.getMonth(), nextCal.getDate(), 2, 30, 0);
       moonMood = 'sleepy';
     }
-
-    const modeLabel = isPreview ? '時間帯プレビュー' : 'ゲーム昼夜×現実空';
-    return { date: refDate, phase: targetPhase, times: refTimes, modeLabel, moonMood, isRealtime: false };
+    return { date: refDate, phase: turnPhase, subStep, turn, times: refTimes, moonMood, dayTag: isNextDay ? '表ルール:翌日空' : '表ルール:当日空' };
   }
 
-  // --- テクスチャ生成ユーティリティ ---
+  // --- テクスチャ生成 ---
   function makeCanvasTex(w, h, drawFn) {
     const cv = document.createElement('canvas');
     cv.width = w; cv.height = h;
@@ -202,7 +228,7 @@
     return tex;
   }
 
-  // 1. 外側ドーム（宇宙・星空スクリーン）テクスチャ
+  // 外側ドーム（宇宙・星空スクリーン）
   const texOuterSpace = makeCanvasTex(1024, 512, (ctx, w, h) => {
     const g = ctx.createLinearGradient(0, 0, 0, h);
     g.addColorStop(0.00, '#020617');
@@ -211,28 +237,26 @@
     g.addColorStop(1.00, '#020617');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
-    // 控えめな遠景の星粒（決定的疑似乱数で毎回均一に配置）
     let seed = 1337;
     const rand = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
     for (let i = 0; i < 240; i++) {
       const x = rand() * w;
-      const y = rand() * (h * 0.52); // 地平線より上中心
-      const r = 0.6 + rand() * 1.4;
+      const y = rand() * (h * 0.56);
+      const r = 0.7 + rand() * 1.3;
       const a = 0.25 + rand() * 0.65;
       ctx.fillStyle = `rgba(224, 242, 254, ${a.toFixed(2)})`;
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
     }
   });
 
-  // 2. 内側ドーム（朝・昼・夕・夜・深夜の空グラデーション）キャッシュ
-  // anime＝パステル寄り／real＝落ち着いたリアル寄り
+  // 内側ドーム（朝・昼・夕・夜・深夜の空グラデーション）
   const SKY_PALETTES = {
     anime: [
       { stops: [[0,'#7dd3fc'],[0.34,'#bae6fd'],[0.49,'#fde68a'],[0.54,'#fbcfe8'],[1,'#bae6fd']], op: 1.00 }, // 0:朝
       { stops: [[0,'#38bdf8'],[0.32,'#7dd3fc'],[0.50,'#e0f2fe'],[0.56,'#bae6fd'],[1,'#7dd3fc']], op: 1.00 }, // 1:昼
       { stops: [[0,'#818cf8'],[0.28,'#f472b6'],[0.48,'#fdba74'],[0.55,'#fde68a'],[1,'#c4b5fd']], op: 1.00 }, // 2:夕
-      { stops: [[0,'#1e1b4b'],[0.35,'#312e81'],[0.52,'#4c1d95'],[1,'#1e1b4b']], op: 0.46 },                   // 3:夜
-      { stops: [[0,'#090d24'],[0.38,'#11183c'],[0.54,'#1e2959'],[1,'#090d24']], op: 0.20 }                    // 4:深夜
+      { stops: [[0,'#1e1b4b'],[0.35,'#312e81'],[0.52,'#4c1d95'],[1,'#1e1b4b']], op: 0.48 },                   // 3:夜
+      { stops: [[0,'#090d24'],[0.38,'#11183c'],[0.54,'#1e2959'],[1,'#090d24']], op: 0.24 }                    // 4:深夜
     ],
     real: [
       { stops: [[0,'#1e4e79'],[0.32,'#4b86b4'],[0.48,'#d4a987'],[0.54,'#94a3b8'],[1,'#334155']], op: 1.00 }, // 0:朝
@@ -259,7 +283,6 @@
     return { tex: skyDomeTexCache[key], opacity: def.op };
   }
 
-  // 3. かわいい顔描画（元気・穏やか・眠い）
   function drawCuteFace(ctx, cx, cy, mood, ink, cheekRgba, isProfile = false) {
     ctx.fillStyle = cheekRgba;
     if (isProfile) {
@@ -391,37 +414,40 @@
   const texSunObs  = createMeasureTex('rgba(250, 204, 21, 0.36)', 'rgba(253, 224, 71, 0.88)');
   const texMoonObs = createMeasureTex('rgba(255, 255, 255, 0.34)', 'rgba(241, 245, 249, 0.90)');
 
-  const texStarDigital = makeCanvasTex(64, 64, (ctx, s) => {
+  // 星はすべて●型
+  const texStarCircleDigital = makeCanvasTex(64, 64, (ctx, s) => {
     const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
-    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(186,230,253,0.85)'); g.addColorStop(1, 'rgba(56,189,248,0)');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+    g.addColorStop(0.0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.35, 'rgba(224,242,254,0.92)');
+    g.addColorStop(0.65, 'rgba(56,189,248,0.40)');
+    g.addColorStop(1.0, 'rgba(56,189,248,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(32, 32, 30, 0, Math.PI * 2); ctx.fill();
   });
-  const texStarPastel = makeCanvasTex(64, 64, (ctx, s) => {
-    const c = 32, g = ctx.createRadialGradient(c, c, 2, c, c, 28);
-    g.addColorStop(0, 'rgba(255,251,235,1)'); g.addColorStop(0.45, 'rgba(253,224,71,0.55)'); g.addColorStop(1, 'rgba(249,168,212,0)');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
-    ctx.fillStyle = '#fffbeb'; ctx.beginPath();
-    ctx.moveTo(c, 6); ctx.quadraticCurveTo(c, c, 58, c); ctx.quadraticCurveTo(c, c, c, 58);
-    ctx.quadraticCurveTo(c, c, 6, c); ctx.quadraticCurveTo(c, c, c, 6); ctx.fill();
+  const texStarCirclePastel = makeCanvasTex(64, 64, (ctx, s) => {
+    const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
+    g.addColorStop(0.0, 'rgba(255,251,235,1)');
+    g.addColorStop(0.38, 'rgba(254,240,138,0.90)');
+    g.addColorStop(0.68, 'rgba(249,168,212,0.40)');
+    g.addColorStop(1.0, 'rgba(249,168,212,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(32, 32, 30, 0, Math.PI * 2); ctx.fill();
   });
 
   // --- 3D二重球体スクリーン＋天体グループ ---
   const skyRoot = new THREE.Group();
   skyRoot.name = 'holo_sky_exhibit_root';
-  skyRoot.visible = false;
   scene.add(skyRoot);
 
-  // 外側：宇宙・星空球体スクリーン（内側から眺める）
+  // 外側：宇宙・星空球体スクリーン（②観察前・③観察時で使用）
   const outerSpaceMat = new THREE.MeshBasicMaterial({ map: texOuterSpace, side: THREE.BackSide, depthWrite: false });
   const outerSpaceDome = new THREE.Mesh(new THREE.SphereGeometry(OUTER_DOME_R, 36, 24), outerSpaceMat);
   outerSpaceDome.renderOrder = -20;
   skyRoot.add(outerSpaceDome);
 
-  // 中間：夜空星座（外側ドームの内側・空ドームの外側）
+  // 中間：夜空星座（●星＋線）
   const starGroup = new THREE.Group();
-  const starPointsMat = new THREE.PointsMaterial({ map: texStarDigital, color: 0xe0f2fe, size: 0.68, transparent: true, opacity: 0.96, blending: THREE.AdditiveBlending, depthWrite: false });
-  const starLineSolidMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false });
-  const starLineDashMat  = new THREE.LineDashedMaterial({ color: 0xf9a8d4, dashSize: 0.65, gapSize: 0.40, transparent: true, opacity: 0.62, depthWrite: false });
+  const starPointsMat = new THREE.PointsMaterial({ map: texStarCircleDigital, color: 0xe0f2fe, size: 0.92, transparent: true, opacity: 0.96, blending: THREE.AdditiveBlending, depthWrite: false });
+  const starLineSolidMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.44, blending: THREE.AdditiveBlending, depthWrite: false });
+  const starLineDashMat  = new THREE.LineDashedMaterial({ color: 0xf9a8d4, dashSize: 0.65, gapSize: 0.40, transparent: true, opacity: 0.64, depthWrite: false });
   const starPoints = new THREE.Points(new THREE.BufferGeometry(), starPointsMat);
   const starLines  = new THREE.LineSegments(new THREE.BufferGeometry(), starLineSolidMat);
   starPoints.renderOrder = -15;
@@ -429,7 +455,7 @@
   starGroup.add(starLines, starPoints);
   skyRoot.add(starGroup);
 
-  // 内側：空環境球体スクリーン（朝昼夕は不透明で星を隠し、夜・深夜は透けて星を見せる）
+  // 内側：空環境球体スクリーン
   const innerSkyMat = new THREE.MeshBasicMaterial({ map: getSkyDomeStyle(true, 0).tex, side: THREE.BackSide, transparent: true, opacity: 1.0, depthWrite: false });
   const innerSkyDome = new THREE.Mesh(new THREE.SphereGeometry(INNER_DOME_R, 36, 24), innerSkyMat);
   innerSkyDome.renderOrder = -10;
@@ -455,9 +481,7 @@
   moonSprite.renderOrder = -3;
   skyRoot.add(sunRaySprite, sunSprite, moonSprite);
 
-  // --- 旧星空＆旧オリオン座の自動非表示 ---
-  const hiddenLegacy3D = new Map();
-  const hiddenLegacyDOM = new Map();
+  // --- 旧星空＆旧オリオン座看板の自動非表示 ---
   const CONST_KW = ['オリオン座', '北斗七星', 'カシオペア', '夏の大三角', 'さそり座', 'こぐま座'];
 
   function isOwnObject(obj) {
@@ -469,50 +493,44 @@
     return false;
   }
 
-  function syncLegacySkyObjects(shouldHide) {
-    if (shouldHide) {
-      scene.traverse((obj) => {
-        if (!obj || isOwnObject(obj) || !obj.visible) return;
-        const nm = (obj.name || '').toLowerCase();
-        let hide = nm.includes('star') || nm.includes('constell') || nm.includes('orion') || nm.includes('zodiac');
-        if (!hide && obj.isPoints && obj.geometry && obj.geometry.attributes && obj.geometry.attributes.position) {
-          if (obj.geometry.attributes.position.count >= 15) {
-            obj.geometry.computeBoundingSphere();
-            if (obj.geometry.boundingSphere && obj.geometry.boundingSphere.radius > 8) hide = true;
+  function hideLegacySkyObjects() {
+    scene.traverse((obj) => {
+      if (!obj || isOwnObject(obj) || !obj.visible) return;
+      const nm = (obj.name || '').toLowerCase();
+      let hide = nm.includes('star') || nm.includes('constell') || nm.includes('orion') || nm.includes('zodiac');
+      if (!hide && obj.isPoints && obj.geometry && obj.geometry.attributes && obj.geometry.attributes.position) {
+        if (obj.geometry.attributes.position.count >= 12) {
+          obj.geometry.computeBoundingSphere();
+          if (obj.geometry.boundingSphere && obj.geometry.boundingSphere.radius > 7.5) hide = true;
+        }
+      }
+      if (!hide && (obj.isLine || obj.isLineSegments || obj.isMesh)) {
+        const wp = new THREE.Vector3();
+        obj.getWorldPosition(wp);
+        if (wp.length() > 9.0 && wp.y > 1.2) {
+          if (obj.isLine || obj.isLineSegments) hide = true;
+          else if (obj.material && obj.material.color) {
+            const col = obj.material.color;
+            if (col.r > 0.82 && col.g > 0.70 && col.b < 0.52) hide = true;
           }
         }
-        if (!hide && (obj.isLine || obj.isLineSegments || obj.isMesh)) {
-          const wp = new THREE.Vector3();
-          obj.getWorldPosition(wp);
-          if (wp.length() > 9.5 && wp.y > 1.5) {
-            if (obj.isLine || obj.isLineSegments) hide = true;
-            else if (obj.material && obj.material.color) {
-              const col = obj.material.color;
-              if (col.r > 0.85 && col.g > 0.72 && col.b < 0.5) hide = true;
-            }
-          }
-        }
-        if (hide) { hiddenLegacy3D.set(obj, true); obj.visible = false; }
-      });
+      }
+      if (hide) obj.visible = false;
+    });
 
-      document.querySelectorAll('div, span').forEach((el) => {
-        if (!el || el.children.length > 0 || el.id === 'env-skytime-status') return;
-        const txt = (el.textContent || '').trim();
-        if (txt.length > 0 && txt.length <= 16 && CONST_KW.some((kw) => txt.includes(kw))) {
-          if (el.style.display !== 'none') { hiddenLegacyDOM.set(el, el.style.display || ''); el.style.display = 'none'; }
-        }
-      });
-    } else {
-      hiddenLegacy3D.forEach((_, obj) => { try { obj.visible = true; } catch (e) {} });
-      hiddenLegacy3D.clear();
-      hiddenLegacyDOM.forEach((d, el) => { try { el.style.display = d; } catch (e) {} });
-      hiddenLegacyDOM.clear();
-    }
+    // 子要素を含む「🏹 オリオン座」などの旧ラベル枠も確実に非表示
+    document.querySelectorAll('div, span').forEach((el) => {
+      if (!el || el.id === 'env-skytime-status' || el.style.display === 'none') return;
+      const txt = (el.textContent || '').trim();
+      if (txt.length > 0 && txt.length <= 18 && CONST_KW.some((kw) => txt.includes(kw))) {
+        el.style.display = 'none';
+      }
+    });
   }
 
-  // --- 天体・二重ドームのメイン更新 ---
+  // --- 天体・二重球体スクリーンのメイン更新 ---
   let lastCalcKey = '';
-  let lastStatusText = '非表示';
+  let lastStatusText = '';
   let currentRayMode = 'off';
 
   function formatHM(hVal) {
@@ -534,47 +552,37 @@
   }
 
   function updateCelestialExhibit(force = false) {
-    const active = Boolean(state.skyUnlocked && state.skyVisible);
-    skyRoot.visible = active;
-    syncLegacySkyObjects(active);
-    if (!active) {
-      currentRayMode = 'off';
-      lastStatusText = '非表示';
-      syncSettingsUI();
-      return;
-    }
+    hideLegacySkyObjects();
 
-    // カメラ描画距離が短いと外側ドームが欠けるため安全確保
     if (typeof activeCamera !== 'undefined' && activeCamera && activeCamera.far < 90) {
       activeCamera.far = 120;
       activeCamera.updateProjectionMatrix();
     }
 
-    const moment = resolveEffectiveSkyMoment();
-    const key = `${state.viewMode}-${state.previewPhase}-${state.obsConstLines}-${moment.isRealtime}-${moment.moonMood}-${moment.date.getFullYear()}-${moment.date.getMonth()}-${moment.date.getDate()}-${moment.date.getHours()}-${Math.floor(moment.date.getMinutes() / 2)}-${moment.phase}-${state.lat.toFixed(2)}-${state.lon.toFixed(2)}`;
+    const moment = resolveSkyMoment();
+    const key = `${state.viewMode}-${state.obsConstLines}-${moment.phase}-${moment.subStep}-${moment.dayTag}-${moment.date.getFullYear()}-${moment.date.getMonth()}-${moment.date.getDate()}-${moment.date.getHours()}-${Math.floor(moment.date.getMinutes() / 2)}-${state.lat.toFixed(2)}-${state.lon.toFixed(2)}`;
     if (!force && key === lastCalcKey) return;
     lastCalcKey = key;
 
-    const y = moment.date.getFullYear(), mo = moment.date.getMonth(), da = moment.date.getDate();
-    const curLst = norm360(getGMSTDeg(moment.date) + state.lon);
-    const curSun = getSunInfo(moment.date);
-    const curMoon = getMoonInfo(moment.date);
-    const sunPos = raDecToAltAz(curSun.raDeg, curSun.decDeg, curLst, state.lat);
-    const moonPos = raDecToAltAz(curMoon.raDeg, curMoon.decDeg, curLst, state.lat);
-    const isNight = (moment.phase >= 3 || sunPos.alt < -0.05);
-    const isAnime = (state.viewMode === 'anime');
+    const isAnime  = (state.viewMode === 'anime');
     const isPreObs = (state.viewMode === 'pre_obs');
+    const isNight  = (moment.phase >= 3);
 
-    // 0. 内側空ドーム（朝昼夕は不透明で星を隠し、夜・深夜は透けて外側宇宙ドーム＆星座を見せる）
+    // 0. 二重球体スクリーンの表示制御
+    // ①観察アプリ：内側スクリーン中心（夜は透けて星空が見える）
+    // ②天体観察前・③天体観察時：空側(外側宇宙ドーム＋内側リアル/計測ドーム)を使用
     const domeStyle = getSkyDomeStyle(isAnime, moment.phase);
+    innerSkyDome.visible = true;
     innerSkyMat.map = domeStyle.tex;
     innerSkyMat.opacity = domeStyle.opacity;
     innerSkyMat.needsUpdate = true;
     outerSpaceDome.visible = isNight;
 
-    // 1. 軌道線（通常アニメなし／観測前・観察時は太陽＆月あり）
+    // 1. 軌道線（①観察アプリなし／②天体観察前・③天体観察時あり）
+    const y = moment.date.getFullYear(), mo = moment.date.getMonth(), da = moment.date.getDate();
     if (isAnime) {
-      sunOrbitLine.visible = false; moonOrbitLine.visible = false;
+      sunOrbitLine.visible = false;
+      moonOrbitLine.visible = false;
     } else {
       const sPts = buildBodyOrbitPoints(y, mo, da, getSunInfo, SKY_R - 0.6);
       sunOrbitLine.geometry.dispose();
@@ -589,19 +597,28 @@
       moonOrbitMat.opacity = isNight ? 0.44 : 0.24;
     }
 
-    // 2. 太陽配置＆表情（朝：元気＋ピカピカ▲／昼：穏やか＋弱▲／夕：眠い＋◯のみ）
+    // 2. 太陽・月の配置
     currentRayMode = 'off';
-    if (!isNight && sunPos.alt > -0.04) {
-      const sVec = altAzToVec3(Math.max(0.05, sunPos.alt), sunPos.az, SKY_R - 0.6);
-      const horizonFade = Math.min(1, Math.max(0.55, (sunPos.alt + 0.04) / 0.16));
-      sunSprite.visible = true;
-      sunSprite.position.copy(sVec);
+    const curLst = norm360(getGMSTDeg(moment.date) + state.lon);
+    const curSun = getSunInfo(moment.date);
+    const curMoon = getMoonInfo(moment.date);
 
-      if (isAnime) {
+    if (isAnime) {
+      // ① 観察アプリ（表なし・5ターン周期のシンプル軌道）
+      if (!isNight) {
+        // 朝(0)→昼(1)→夕(2)の15ターン分で東(95°)→南(180°)→西(265°)へ移動
+        const dayProgress = Math.min(1, Math.max(0, (moment.phase * 5 + moment.subStep) / 14));
+        const az = (95 + dayProgress * 170) * RAD;
+        const alt = (0.14 + Math.sin(dayProgress * Math.PI) * 0.68);
+        const sVec = altAzToVec3(alt, az, SKY_R - 0.6);
         const sunMood = moment.phase === 0 ? 'energetic' : (moment.phase === 1 ? 'calm' : 'sleepy');
+        sunSprite.visible = true;
+        sunSprite.position.copy(sVec);
         sunSpriteMat.map = texSunAnime[sunMood];
-        sunSpriteMat.opacity = horizonFade;
+        sunSpriteMat.opacity = 1.0;
         sunSprite.scale.set(2.6, 2.6, 1);
+        sunSpriteMat.needsUpdate = true;
+
         sunRaySprite.position.copy(sVec).multiplyScalar(1.008);
         if (moment.phase === 0) {
           currentRayMode = 'morning'; sunRaySprite.visible = true; sunRaySprite.scale.set(3.25, 3.25, 1); sunRayMat.opacity = 0.95;
@@ -610,48 +627,59 @@
         } else {
           sunRaySprite.visible = false;
         }
-      } else if (isPreObs) {
-        sunRaySprite.visible = false;
-        sunSpriteMat.map = texSunReal; sunSpriteMat.opacity = 0.98 * horizonFade; sunSprite.scale.set(3.2, 3.2, 1);
+        moonSprite.visible = false;
       } else {
+        sunSprite.visible = false;
         sunRaySprite.visible = false;
-        sunSpriteMat.map = texSunObs;  sunSpriteMat.opacity = 0.92; sunSprite.scale.set(2.1, 2.1, 1);
-      }
-      sunSpriteMat.needsUpdate = true;
-    } else {
-      sunSprite.visible = false;
-      sunRaySprite.visible = false;
-    }
-
-    // 3. 月配置＆表情（夜：元気／深夜：眠い）
-    if (isAnime) {
-      if (isNight) {
+        // 夜(3)→深夜(4)の10ターン分で東寄り→西寄りへ移動
+        const nightProgress = Math.min(1, Math.max(0, ((moment.phase - 3) * 5 + moment.subStep) / 9));
+        const az = (130 + nightProgress * 110) * RAD;
+        const alt = (0.28 + Math.sin(nightProgress * Math.PI) * 0.42);
         const shape = (curMoon.illum <= 0.55) ? 'crescent' : 'full';
         moonSprite.visible = true;
+        moonSprite.position.copy(altAzToVec3(alt, az, SKY_R - 0.8));
         moonSpriteMat.map = texMoonAnime[shape][moment.moonMood] || texMoonAnime[shape].calm;
         moonSpriteMat.opacity = moment.moonMood === 'sleepy' ? 0.88 : 1.0;
-        moonSpriteMat.needsUpdate = true;
         moonSprite.scale.set(2.5, 2.5, 1);
-        if (moonPos.alt > 0.08) moonSprite.position.copy(altAzToVec3(moonPos.alt, moonPos.az, SKY_R - 0.8));
-        else moonSprite.position.copy(altAzToVec3(0.42, 215 * RAD, SKY_R - 0.8));
+        moonSpriteMat.needsUpdate = true;
+      }
+    } else {
+      // ② 天体観察前（表ルール）＆ ③ 天体観察時（現在時刻）：正確な天球座標
+      const sunPos = raDecToAltAz(curSun.raDeg, curSun.decDeg, curLst, state.lat);
+      const moonPos = raDecToAltAz(curMoon.raDeg, curMoon.decDeg, curLst, state.lat);
+      sunRaySprite.visible = false;
+
+      if (!isNight && sunPos.alt > -0.04) {
+        const sVec = altAzToVec3(Math.max(0.05, sunPos.alt), sunPos.az, SKY_R - 0.6);
+        const horizonFade = Math.min(1, Math.max(0.55, (sunPos.alt + 0.04) / 0.16));
+        sunSprite.visible = true;
+        sunSprite.position.copy(sVec);
+        if (isPreObs) {
+          sunSpriteMat.map = texSunReal; sunSpriteMat.opacity = 0.98 * horizonFade; sunSprite.scale.set(3.2, 3.2, 1);
+        } else {
+          sunSpriteMat.map = texSunObs;  sunSpriteMat.opacity = 0.92; sunSprite.scale.set(2.1, 2.1, 1);
+        }
+        sunSpriteMat.needsUpdate = true;
+      } else {
+        sunSprite.visible = false;
+      }
+
+      if (moonPos.alt > -0.02) {
+        moonSprite.visible = true;
+        moonSprite.position.copy(altAzToVec3(Math.max(0.04, moonPos.alt), moonPos.az, SKY_R - 0.9));
+        if (isPreObs) {
+          updateRealMoonTexture(curMoon.phaseDeg);
+          moonSpriteMat.map = texMoonReal; moonSpriteMat.opacity = isNight ? 0.98 : 0.62; moonSprite.scale.set(2.3, 2.3, 1);
+        } else {
+          moonSpriteMat.map = texMoonObs;  moonSpriteMat.opacity = isNight ? 0.92 : 0.58; moonSprite.scale.set(1.9, 1.9, 1);
+        }
+        moonSpriteMat.needsUpdate = true;
       } else {
         moonSprite.visible = false;
       }
-    } else if (moonPos.alt > -0.02) {
-      moonSprite.visible = true;
-      moonSprite.position.copy(altAzToVec3(Math.max(0.04, moonPos.alt), moonPos.az, SKY_R - 0.9));
-      if (isPreObs) {
-        updateRealMoonTexture(curMoon.phaseDeg);
-        moonSpriteMat.map = texMoonReal; moonSpriteMat.opacity = isNight ? 0.98 : 0.62; moonSprite.scale.set(2.3, 2.3, 1);
-      } else {
-        moonSpriteMat.map = texMoonObs;  moonSpriteMat.opacity = isNight ? 0.92 : 0.58; moonSprite.scale.set(1.9, 1.9, 1);
-      }
-      moonSpriteMat.needsUpdate = true;
-    } else {
-      moonSprite.visible = false;
     }
 
-    // 4. 星座（夜・深夜のみ／内側空ドームの外側＝STAR_Rへ配置）
+    // 3. 星座（夜・深夜のみ／星はすべて●型）
     starGroup.visible = isNight;
     if (isNight) {
       const pArr = [], lArr = [];
@@ -670,9 +698,9 @@
       starPoints.geometry.dispose();
       starPoints.geometry = new THREE.BufferGeometry();
       starPoints.geometry.setAttribute('position', new THREE.Float32BufferAttribute(pArr, 3));
-      starPointsMat.map = isAnime ? texStarPastel : texStarDigital;
+      starPointsMat.map = isAnime ? texStarCirclePastel : texStarCircleDigital;
       starPointsMat.color.setHex(isAnime ? 0xfffbeb : 0xe0f2fe);
-      starPointsMat.size = isAnime ? 0.98 : 0.72;
+      starPointsMat.size = isAnime ? 1.15 : 0.88;
       starPointsMat.needsUpdate = true;
 
       starLines.geometry.dispose();
@@ -684,8 +712,8 @@
     }
 
     const pNames = ['朝', '昼', '夕', '夜', '深夜'];
-    const mNames = { anime: '通常(アニメ)', pre_obs: '観測前(リアル)', obs: '観察時(計測◯)' };
-    lastStatusText = `${mNames[state.viewMode]}｜${moment.modeLabel}｜${mo + 1}/${da} ${pNames[moment.phase]}（日出${formatHM(moment.times.sunriseH)}・日入${formatHM(moment.times.sunsetH)}）｜${state.gpsApplied ? `GPS(${state.lat.toFixed(1)}°N)` : '日本標準'}`;
+    const mNames = { anime: '①観察アプリ', pre_obs: '②天体観察前', obs: '③天体観察時' };
+    lastStatusText = `${mNames[state.viewMode]}｜${moment.dayTag}｜${pNames[moment.phase]}（${moment.turn}T目・日出${formatHM(moment.times.sunriseH)}・日入${formatHM(moment.times.sunsetH)}）｜${state.gpsApplied ? `GPS(${state.lat.toFixed(1)}°N)` : '日本標準'}`;
     syncSettingsUI();
 
     if (typeof renderer !== 'undefined' && renderer && typeof activeCamera !== 'undefined' && activeCamera) {
@@ -746,7 +774,7 @@
     );
   }
 
-  // --- 設定画面UI注入（3モード＋5時間帯プレビュー＋現実時刻＋GPS） ---
+  // --- 設定画面UI（余計なボタンを削ぎ落としたシンプル構成） ---
   function syncSettingsUI() {
     let panel = document.getElementById('env-hologram-settings-panel');
     if (!panel) {
@@ -760,7 +788,7 @@
             panel = document.createElement('div');
             panel.id = 'env-hologram-settings-panel';
             panel.style.cssText = 'margin-top:8px;padding:10px;border-radius:12px;background:#f0f9ff;border:1.5px solid #7dd3fc;display:flex;flex-direction:column;gap:8px;text-align:left;';
-            panel.innerHTML = '<div style="font-size:11.5px;font-weight:900;color:#0369a1;">🧪 観察環境・機能解放（基本非表示／ストーリー解放予定）</div>';
+            panel.innerHTML = '<div style="font-size:11.5px;font-weight:900;color:#0369a1;">🧪 観察環境・機能設定</div>';
             content.appendChild(panel);
           }
           break;
@@ -775,36 +803,17 @@
       box.id = 'env-skytime-box';
       box.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
       box.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#ffffff;border:1px solid #bae6fd;border-radius:9px;padding:7px 9px;">
-          <div style="font-size:11px;font-weight:800;color:#0f172a;">🌌 空・天体システム<div style="font-size:9.5px;font-weight:600;color:#64748b;">二重球体ドーム（表ルール基準）</div></div>
-          <button type="button" id="btn-toggle-holo-sky" style="padding:5px 10px;border-radius:8px;border:none;font-size:11px;font-weight:900;cursor:pointer;"></button>
-        </div>
         <div style="background:#ffffff;border:1px solid #bae6fd;border-radius:9px;padding:7px 9px;display:flex;flex-direction:column;gap:6px;">
-          <div style="font-size:10.5px;font-weight:800;color:#0f172a;">🎨 空の表示モード（同じ天体位置で切替）</div>
+          <div style="font-size:10.5px;font-weight:800;color:#0f172a;">🎨 観察モード（二重球体スクリーン切替）</div>
           <div style="display:flex;gap:4px;">
-            <button type="button" data-skymode="anime" style="flex:1;padding:6px 4px;border-radius:7px;border:1px solid #bae6fd;font-size:10px;font-weight:900;cursor:pointer;">通常(アニメ)</button>
-            <button type="button" data-skymode="pre_obs" style="flex:1;padding:6px 4px;border-radius:7px;border:1px solid #bae6fd;font-size:10px;font-weight:900;cursor:pointer;">観測前(リアル)</button>
-            <button type="button" data-skymode="obs" style="flex:1;padding:6px 4px;border-radius:7px;border:1px solid #bae6fd;font-size:10px;font-weight:900;cursor:pointer;">観察時(計測◯)</button>
+            <button type="button" data-skymode="anime" style="flex:1;padding:7px 4px;border-radius:7px;border:1px solid #bae6fd;font-size:10.5px;font-weight:900;cursor:pointer;">①観察アプリ</button>
+            <button type="button" data-skymode="pre_obs" style="flex:1;padding:7px 4px;border-radius:7px;border:1px solid #bae6fd;font-size:10.5px;font-weight:900;cursor:pointer;">②天体観察前</button>
+            <button type="button" data-skymode="obs" style="flex:1;padding:7px 4px;border-radius:7px;border:1px solid #bae6fd;font-size:10.5px;font-weight:900;cursor:pointer;">③天体観察時</button>
           </div>
           <div id="row-obs-const-line" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:4px;border-top:1px dashed #e2e8f0;">
             <span style="font-size:10px;font-weight:800;color:#334155;">✨ 観察時の星座線（夜・深夜）</span>
             <button type="button" id="btn-toggle-obs-lines" style="padding:4px 9px;border-radius:7px;border:none;font-size:10px;font-weight:900;cursor:pointer;"></button>
           </div>
-        </div>
-        <div style="background:#ffffff;border:1px solid #bae6fd;border-radius:9px;padding:7px 9px;display:flex;flex-direction:column;gap:5px;">
-          <div style="font-size:10.5px;font-weight:800;color:#0f172a;">🌅 時間帯プレビュー（5時間帯の空を確認）</div>
-          <div style="display:flex;gap:3px;">
-            <button type="button" data-preview="auto" style="flex:1.1;padding:5px 2px;border-radius:6px;border:1px solid #bae6fd;font-size:10px;font-weight:900;cursor:pointer;">自動</button>
-            <button type="button" data-preview="0" style="flex:1;padding:5px 2px;border-radius:6px;border:1px solid #bae6fd;font-size:10px;font-weight:900;cursor:pointer;">朝</button>
-            <button type="button" data-preview="1" style="flex:1;padding:5px 2px;border-radius:6px;border:1px solid #bae6fd;font-size:10px;font-weight:900;cursor:pointer;">昼</button>
-            <button type="button" data-preview="2" style="flex:1;padding:5px 2px;border-radius:6px;border:1px solid #bae6fd;font-size:10px;font-weight:900;cursor:pointer;">夕</button>
-            <button type="button" data-preview="3" style="flex:1;padding:5px 2px;border-radius:6px;border:1px solid #bae6fd;font-size:10px;font-weight:900;cursor:pointer;">夜</button>
-            <button type="button" data-preview="4" style="flex:1.1;padding:5px 2px;border-radius:6px;border:1px solid #bae6fd;font-size:10px;font-weight:900;cursor:pointer;">深夜</button>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#ffffff;border:1px solid #bae6fd;border-radius:9px;padding:7px 9px;">
-          <div style="font-size:11px;font-weight:800;color:#0f172a;">🕒 時刻だけを現実時刻に合わす<div style="font-size:9.5px;font-weight:600;color:#64748b;">観察時モード選択で自動ON／単独切替可</div></div>
-          <button type="button" id="btn-toggle-realtime-sky" style="padding:5px 10px;border-radius:8px;border:none;font-size:11px;font-weight:900;cursor:pointer;"></button>
         </div>
         <div style="display:flex;align-items:center;gap:6px;">
           <button type="button" id="btn-gps-sync-sky" style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid #38bdf8;background:#e0f2fe;color:#0369a1;font-size:10.5px;font-weight:900;cursor:pointer;">📍 GPSで現在地の空に合わせる</button>
@@ -814,76 +823,45 @@
       `;
       panel.appendChild(box);
 
-      document.getElementById('btn-toggle-holo-sky').onclick = () => {
-        const next = !(state.skyUnlocked && state.skyVisible);
-        state.skyUnlocked = next; state.skyVisible = next;
-        saveState(); updateCelestialExhibit(true);
-      };
       box.querySelectorAll('[data-skymode]').forEach((btn) => {
         btn.onclick = () => {
-          const m = btn.getAttribute('data-skymode');
-          state.viewMode = m;
-          state.skyUnlocked = true; state.skyVisible = true;
-          if (m === 'obs') { state.realtimeUnlocked = true; state.realtimeActive = true; state.previewPhase = 'auto'; }
-          else { state.realtimeActive = false; }
-          saveState(); updateCelestialExhibit(true);
-        };
-      });
-      box.querySelectorAll('[data-preview]').forEach((btn) => {
-        btn.onclick = () => {
-          const v = btn.getAttribute('data-preview');
-          state.previewPhase = (v === 'auto') ? 'auto' : Number(v);
-          state.skyUnlocked = true; state.skyVisible = true;
-          saveState(); updateCelestialExhibit(true);
+          state.viewMode = btn.getAttribute('data-skymode');
+          saveState();
+          updateCelestialExhibit(true);
         };
       });
       document.getElementById('btn-toggle-obs-lines').onclick = () => {
         state.obsConstLines = !state.obsConstLines;
-        saveState(); updateCelestialExhibit(true);
-      };
-      document.getElementById('btn-toggle-realtime-sky').onclick = () => {
-        const next = !(state.realtimeUnlocked && state.realtimeActive);
-        state.realtimeUnlocked = next; state.realtimeActive = next;
-        if (next) { state.skyUnlocked = true; state.skyVisible = true; state.previewPhase = 'auto'; }
-        saveState(); updateCelestialExhibit(true);
+        saveState();
+        updateCelestialExhibit(true);
       };
       document.getElementById('btn-gps-sync-sky').onclick = openGpsConsentModal;
       document.getElementById('btn-gps-reset-sky').onclick = () => {
         state.lat = 35.68; state.lon = 139.77; state.gpsApplied = false;
-        saveState(); updateCelestialExhibit(true);
+        saveState();
+        updateCelestialExhibit(true);
         if (typeof showToast === 'function') showToast('📍 日本標準座標(35.7°N)へ戻しました');
       };
     }
 
-    const skyOn = Boolean(state.skyUnlocked && state.skyVisible);
-    const rtOn = Boolean(state.realtimeUnlocked && state.realtimeActive);
-    const bSky = document.getElementById('btn-toggle-holo-sky');
-    const bRt  = document.getElementById('btn-toggle-realtime-sky');
     const bLn  = document.getElementById('btn-toggle-obs-lines');
     const rLn  = document.getElementById('row-obs-const-line');
     const stEl = document.getElementById('env-skytime-status');
 
-    if (bSky) { bSky.innerText = skyOn ? '表示中 (ON)' : '非表示 (OFF)'; bSky.style.background = skyOn ? '#0284c7' : '#e2e8f0'; bSky.style.color = skyOn ? '#fff' : '#475569'; }
-    if (bRt)  { bRt.innerText = rtOn ? '現実時刻 (ON)' : 'ゲーム連動 (OFF)'; bRt.style.background = rtOn ? '#0284c7' : '#e2e8f0'; bRt.style.color = rtOn ? '#fff' : '#475569'; }
-    if (rLn)  { rLn.style.display = (state.viewMode === 'obs') ? 'flex' : 'none'; }
-    if (bLn)  { bLn.innerText = state.obsConstLines ? '星座線 ON' : '星座線 OFF'; bLn.style.background = state.obsConstLines ? '#0284c7' : '#e2e8f0'; bLn.style.color = state.obsConstLines ? '#fff' : '#475569'; }
+    if (rLn) rLn.style.display = (state.viewMode === 'obs') ? 'flex' : 'none';
+    if (bLn) { bLn.innerText = state.obsConstLines ? '星座線 ON' : '星座線 OFF'; bLn.style.background = state.obsConstLines ? '#0284c7' : '#e2e8f0'; bLn.style.color = state.obsConstLines ? '#fff' : '#475569'; }
     box.querySelectorAll('[data-skymode]').forEach((btn) => {
       const sel = (btn.getAttribute('data-skymode') === state.viewMode);
-      btn.style.background = sel ? '#0284c7' : '#f8fafc';
-      btn.style.color = sel ? '#ffffff' : '#334155';
-    });
-    box.querySelectorAll('[data-preview]').forEach((btn) => {
-      const sel = (String(state.previewPhase) === btn.getAttribute('data-preview'));
       btn.style.background = sel ? '#0284c7' : '#f8fafc';
       btn.style.color = sel ? '#ffffff' : '#334155';
     });
     if (stEl) stEl.innerText = lastStatusText;
   }
 
-  // --- 軽量アニメーション（朝のピカピカ▲揺れ） ---
+  // --- 朝のピカピカ▲アニメーション ---
   let lastRenderFrame = -1;
   function animateSky(now) {
-    if (skyRoot.visible && sunRaySprite.visible) {
+    if (sunRaySprite.visible) {
       const t = now * 0.001;
       if (currentRayMode === 'morning') {
         sunRayMat.rotation = t * 0.35;
@@ -912,23 +890,17 @@
     };
   }
   setInterval(() => {
-    if (skyRoot.visible) syncLegacySkyObjects(true);
+    internalTurnFallback = Math.floor((Date.now() - startMs) / 16000);
     updateCelestialExhibit(false);
-  }, 2500);
+  }, 2000);
   setTimeout(() => { updateCelestialExhibit(true); syncSettingsUI(); }, 800);
   requestAnimationFrame(animateSky);
 
   window.SkyTimeModule = {
-    unlockSky: () => { state.skyUnlocked = true; state.skyVisible = true; saveState(); updateCelestialExhibit(true); },
-    setSkyVisible: (v) => { state.skyVisible = Boolean(v); if (v) state.skyUnlocked = true; saveState(); updateCelestialExhibit(true); },
-    setMode: (m) => { if (['anime','pre_obs','obs'].includes(m)) { state.viewMode = m; state.skyUnlocked = true; state.skyVisible = true; state.realtimeActive = (m === 'obs'); if (m === 'obs') { state.realtimeUnlocked = true; state.previewPhase = 'auto'; } saveState(); updateCelestialExhibit(true); } },
-    setPreviewPhase: (p) => { state.previewPhase = (p === 'auto') ? 'auto' : Number(p); saveState(); updateCelestialExhibit(true); },
+    setMode: (m) => { if (['anime','pre_obs','obs'].includes(m)) { state.viewMode = m; saveState(); updateCelestialExhibit(true); } },
     setObsConstLines: (v) => { state.obsConstLines = Boolean(v); saveState(); updateCelestialExhibit(true); },
-    unlockRealtime: () => { state.realtimeUnlocked = true; state.realtimeActive = true; state.skyUnlocked = true; state.skyVisible = true; state.previewPhase = 'auto'; saveState(); updateCelestialExhibit(true); },
-    setRealtime: (v) => { state.realtimeActive = Boolean(v); if (v) { state.realtimeUnlocked = true; state.skyUnlocked = true; state.skyVisible = true; state.previewPhase = 'auto'; } saveState(); updateCelestialExhibit(true); },
     requestGPS: openGpsConsentModal,
-    // compass_ring.js側(0〜3)との互換のため深夜(4)も3(夜パレット)として返す
-    getPhaseIndex: () => Math.min(3, resolveEffectiveSkyMoment().phase),
+    getPhaseIndex: () => Math.min(3, resolveSkyMoment().phase),
     refresh: () => updateCelestialExhibit(true)
   };
 
