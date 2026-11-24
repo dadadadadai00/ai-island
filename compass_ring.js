@@ -3,14 +3,12 @@
 // ・丸い海の外周へ余白を空けて配置する未来風・青ホログラム3Dコンパス
 // ・東西南北（中心向き直立3層立体＋大型発光土台＆投影光）固定
 // ・直立シンプル目盛りリング（4ヶ所のみ長く太い）がゆっくり時計回り
-// ・朝昼夕の透過バランス調整済み／360°観測時は自動一時非表示
 // ============================================================================
 (function initCompassRingModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
   const STORAGE_KEY = 'island_compass_ring_v1';
   const state = { unlocked: false, visible: false, rotating: true, radiusOffset: 0.9 };
-  let externalHide = false; // 360°天体観測時の一時非表示フラグ
 
   function loadState() {
     try {
@@ -67,19 +65,20 @@
     ctx.textBaseline = 'middle';
     ctx.font = '700 162px "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif';
 
-    ctx.shadowColor = 'rgba(125, 211, 252, 0.92)';
-    ctx.shadowBlur = 18;
+    ctx.shadowColor = 'rgba(125, 211, 252, 0.95)';
+    ctx.shadowBlur = 20;
     ctx.lineWidth = 6;
-    ctx.strokeStyle = 'rgba(224, 242, 254, 0.88)';
+    ctx.strokeStyle = 'rgba(224, 242, 254, 0.9)';
     ctx.strokeText(char, 128, 134);
 
     ctx.shadowBlur = 8;
     ctx.fillStyle = '#ffffff';
     ctx.fillText(char, 128, 134);
 
+    // 極細スキャンライン
     ctx.shadowBlur = 0;
     ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
     for (let y = 0; y < 256; y += 8) ctx.fillRect(0, y, 256, 2);
     ctx.globalCompositeOperation = 'source-over';
 
@@ -94,9 +93,9 @@
     cv.width = 64; cv.height = 128;
     const ctx = cv.getContext('2d');
     const grad = ctx.createLinearGradient(0, 128, 0, 0);
-    grad.addColorStop(0.0, 'rgba(255, 255, 255, 0.88)');
-    grad.addColorStop(0.35, 'rgba(186, 230, 253, 0.38)');
-    grad.addColorStop(0.78, 'rgba(125, 211, 252, 0.10)');
+    grad.addColorStop(0.0, 'rgba(255, 255, 255, 0.92)');
+    grad.addColorStop(0.35, 'rgba(186, 230, 253, 0.42)');
+    grad.addColorStop(0.78, 'rgba(125, 211, 252, 0.12)');
     grad.addColorStop(1.0, 'rgba(56, 189, 248, 0.0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 64, 128);
@@ -111,9 +110,9 @@
     cv.width = 128; cv.height = 128;
     const ctx = cv.getContext('2d');
     const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
-    g.addColorStop(0.0, 'rgba(224, 242, 254, 0.85)');
-    g.addColorStop(0.45, 'rgba(125, 211, 252, 0.38)');
-    g.addColorStop(0.82, 'rgba(56, 189, 248, 0.08)');
+    g.addColorStop(0.0, 'rgba(224, 242, 254, 0.90)');
+    g.addColorStop(0.45, 'rgba(125, 211, 252, 0.42)');
+    g.addColorStop(0.82, 'rgba(56, 189, 248, 0.10)');
     g.addColorStop(1.0, 'rgba(56, 189, 248, 0.0)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 128, 128);
@@ -133,13 +132,13 @@
   rootGroup.add(staticGroup, rotatingGroup);
 
   const mats = {
-    ringMain:  new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.48, side: THREE.DoubleSide, depthWrite: false }),
-    ringSub:   new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }),
-    ticks:     new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.42, depthWrite: false }),
-    majorTick: new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.56, side: THREE.DoubleSide, depthWrite: false }),
-    node:      new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.52, side: THREE.DoubleSide, depthWrite: false }),
-    baseGlow:  new THREE.MeshBasicMaterial({ map: createBaseGlowTexture(), color: 0x38bdf8, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false }),
-    beam:      new THREE.MeshBasicMaterial({ map: createBeamGradientTexture(), color: 0x38bdf8, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false }),
+    ringMain:  new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.72, side: THREE.DoubleSide, depthWrite: false }),
+    ringSub:   new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.36, side: THREE.DoubleSide, depthWrite: false }),
+    ticks:     new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.68, depthWrite: false }),
+    majorTick: new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.88, side: THREE.DoubleSide, depthWrite: false }),
+    node:      new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.82, side: THREE.DoubleSide, depthWrite: false }),
+    baseGlow:  new THREE.MeshBasicMaterial({ map: createBaseGlowTexture(), color: 0x38bdf8, transparent: true, opacity: 0.48, side: THREE.DoubleSide, depthWrite: false }),
+    beam:      new THREE.MeshBasicMaterial({ map: createBeamGradientTexture(), color: 0x38bdf8, transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false }),
     kanji:     []
   };
 
@@ -172,6 +171,7 @@
     for (let i = 0; i < totalTicks; i++) {
       const ang = (i / totalTicks) * Math.PI * 2;
       if (i % 12 === 0) {
+        // 90°ごとの4ヶ所：少し長く・少し太い直立目盛り
         const holder = new THREE.Group();
         holder.rotation.y = -ang;
         const bar = new THREE.Mesh(majorBarGeo, mats.majorTick);
@@ -179,6 +179,7 @@
         holder.add(bar);
         rotatingGroup.add(holder);
       } else {
+        // 通常目盛り：シンプルな直立縦線
         const x = Math.sin(ang) * R;
         const z = -Math.cos(ang) * R;
         tickPositions.push(x, 0.006, z, x, 0.24, z);
@@ -207,6 +208,7 @@
       const holder = new THREE.Group();
       holder.rotation.y = rotY;
 
+      // 大型ホログラム土台（床の淡い光＋二重リング）
       const padGlow = new THREE.Mesh(baseGlowGeo, mats.baseGlow);
       padGlow.rotation.x = -Math.PI / 2;
       padGlow.position.set(0, 0.005, -labelDist);
@@ -222,19 +224,21 @@
       innerPad.position.set(0, 0.014, -labelDist);
       holder.add(innerPad);
 
+      // 土台から文字を包む青いライトアップ光柱
       const beam = new THREE.Mesh(beamGeo, mats.beam);
       beam.position.set(0, 0.66, -labelDist);
       holder.add(beam);
 
+      // 島の中心（キャラ）へ向かって直立する3層ホログラム漢字
       const tex = createKanjiHoloTexture(label);
       const layers = [
-        { dz: -0.048, opMul: 0.26, sc: 1.03 },
-        { dz:  0.000, opMul: 0.52, sc: 1.00 },
-        { dz:  0.048, opMul: 0.92, sc: 1.00 }
+        { dz: -0.048, opMul: 0.30, sc: 1.03 },
+        { dz:  0.000, opMul: 0.62, sc: 1.00 },
+        { dz:  0.048, opMul: 1.00, sc: 1.00 }
       ];
       layers.forEach((ly) => {
         const km = new THREE.MeshBasicMaterial({
-          map: tex, color: 0x38bdf8, transparent: true, opacity: 0.62 * ly.opMul,
+          map: tex, color: 0x38bdf8, transparent: true, opacity: 0.88 * ly.opMul,
           side: THREE.DoubleSide, depthWrite: false
         });
         km.userData.opMul = ly.opMul;
@@ -249,16 +253,12 @@
     });
   }
 
-  // --- 時間帯に応じた透過バランス調整（朝昼夕は透け感を重視し、夜はクリアに発光） ---
+  // --- 時間帯に応じた青系ホログラム自動調光 ---
   const PHASE_PALETTE = [
-    // 0: 朝（爽やかな透け感）
-    { main: 0x0284c7, sub: 0x38bdf8, text: 0x0284c7, beam: 0x38bdf8, ringOp: 0.46, subOp: 0.28, tickOp: 0.40, majorOp: 0.54, textOp: 0.62, beamOp: 0.22, glowOp: 0.30, add: false },
-    // 1: 昼（空と海に溶け込みつつ読めるバランス透過）
-    { main: 0x0369a1, sub: 0x0284c7, text: 0x0369a1, beam: 0x0ea5e9, ringOp: 0.52, subOp: 0.32, tickOp: 0.46, majorOp: 0.60, textOp: 0.68, beamOp: 0.20, glowOp: 0.28, add: false },
-    // 2: 夕（夕景に馴染む柔らかなシアン透過）
-    { main: 0x0ea5e9, sub: 0x38bdf8, text: 0x38bdf8, beam: 0x38bdf8, ringOp: 0.48, subOp: 0.30, tickOp: 0.42, majorOp: 0.56, textOp: 0.64, beamOp: 0.26, glowOp: 0.34, add: false },
-    // 3: 夜・深夜（クリアに浮かぶ発光ホログラム）
-    { main: 0x38bdf8, sub: 0x7dd3fc, text: 0x7dd3fc, beam: 0x7dd3fc, ringOp: 0.72, subOp: 0.42, tickOp: 0.64, majorOp: 0.80, textOp: 0.88, beamOp: 0.38, glowOp: 0.48, add: true }
+    { main: 0x0284c7, sub: 0x0ea5e9, text: 0x0284c7, beam: 0x38bdf8, ringOp: 0.74, subOp: 0.40, textOp: 0.88, beamOp: 0.28, glowOp: 0.40, add: false },
+    { main: 0x0369a1, sub: 0x0284c7, text: 0x0369a1, beam: 0x0ea5e9, ringOp: 0.86, subOp: 0.48, textOp: 0.94, beamOp: 0.22, glowOp: 0.34, add: false },
+    { main: 0x0ea5e9, sub: 0x38bdf8, text: 0x38bdf8, beam: 0x38bdf8, ringOp: 0.80, subOp: 0.46, textOp: 0.92, beamOp: 0.34, glowOp: 0.46, add: false },
+    { main: 0x38bdf8, sub: 0x7dd3fc, text: 0x7dd3fc, beam: 0x7dd3fc, ringOp: 0.84, subOp: 0.48, textOp: 0.96, beamOp: 0.42, glowOp: 0.56, add: true }
   ];
 
   function getCurrentPhaseIndex() {
@@ -277,13 +277,13 @@
     const pal = PHASE_PALETTE[pIdx] || PHASE_PALETTE[0];
     const blend = pal.add ? THREE.AdditiveBlending : THREE.NormalBlending;
 
-    mats.ringMain.color.setHex(pal.main);  mats.ringMain.opacity  = pal.ringOp;  mats.ringMain.blending  = blend;
-    mats.ringSub.color.setHex(pal.sub);    mats.ringSub.opacity   = pal.subOp;   mats.ringSub.blending   = blend;
-    mats.ticks.color.setHex(pal.main);     mats.ticks.opacity     = pal.tickOp;  mats.ticks.blending     = blend;
-    mats.majorTick.color.setHex(pal.text); mats.majorTick.opacity = pal.majorOp; mats.majorTick.blending = blend;
-    mats.node.color.setHex(pal.text);      mats.node.opacity      = pal.textOp * 0.78; mats.node.blending = blend;
-    mats.baseGlow.color.setHex(pal.beam);  mats.baseGlow.opacity  = pal.glowOp;  mats.baseGlow.blending  = THREE.AdditiveBlending;
-    mats.beam.color.setHex(pal.beam);      mats.beam.opacity      = pal.beamOp;  mats.beam.blending      = THREE.AdditiveBlending;
+    mats.ringMain.color.setHex(pal.main);  mats.ringMain.opacity  = pal.ringOp;        mats.ringMain.blending  = blend;
+    mats.ringSub.color.setHex(pal.sub);    mats.ringSub.opacity   = pal.subOp;         mats.ringSub.blending   = blend;
+    mats.ticks.color.setHex(pal.main);     mats.ticks.opacity     = pal.ringOp * 0.85; mats.ticks.blending     = blend;
+    mats.majorTick.color.setHex(pal.text); mats.majorTick.opacity = pal.textOp * 0.92; mats.majorTick.blending = blend;
+    mats.node.color.setHex(pal.text);      mats.node.opacity      = pal.textOp * 0.85; mats.node.blending      = blend;
+    mats.baseGlow.color.setHex(pal.beam);  mats.baseGlow.opacity  = pal.glowOp;        mats.baseGlow.blending  = THREE.AdditiveBlending;
+    mats.beam.color.setHex(pal.beam);      mats.beam.opacity      = pal.beamOp;        mats.beam.blending      = THREE.AdditiveBlending;
 
     mats.kanji.forEach((km) => {
       km.color.setHex(pal.text);
@@ -293,7 +293,7 @@
   }
 
   function applyVisibility() {
-    rootGroup.visible = Boolean(state.unlocked && state.visible && !externalHide);
+    rootGroup.visible = Boolean(state.unlocked && state.visible);
     if (rootGroup.visible) applyTimePalette(true);
     syncSettingsPanelUI();
   }
@@ -395,8 +395,7 @@
   window.CompassRingModule = {
     unlock: () => { state.unlocked = true; state.visible = true; saveState(); applyVisibility(); },
     setVisible: (v) => { state.visible = Boolean(v); if (v) state.unlocked = true; saveState(); applyVisibility(); },
-    setExternalHide: (hide) => { externalHide = Boolean(hide); applyVisibility(); },
-    isVisible: () => Boolean(state.unlocked && state.visible && !externalHide),
+    isVisible: () => Boolean(state.unlocked && state.visible),
     setRadiusOffset: (off) => { if (Number.isFinite(off)) { state.radiusOffset = off; saveState(); buildCompassGeometry(); applyTimePalette(true); } },
     refresh: () => { buildCompassGeometry(); applyTimePalette(true); }
   };
