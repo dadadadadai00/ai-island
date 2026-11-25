@@ -1,19 +1,20 @@
 // ============================================================================
 // 【独立ビジュアルモジュール：sky_time.js】
-// ・二重球体スクリーン（カメラ追従＋カリング無効化で上下視線移動のちらつき解消）
+// ・カメラ画角(FOV)連動サイズ補正（追従カメラ基準でキャラ視点とのギャップ解消）
 // ・観察アプリ・天体観察前・天体観察時の全モードで朝〜夕は星座・星座名を完全非表示
-// ・①観察アプリ(アニメ・表なし)／②天体観察前(シンプルリアル・表あり)／③天体観察時(現実時刻連動スタイリッシュ空)
+// ・二重球体スクリーン（①アニメ・表なし／②シンプルリアル・表あり／③現実時刻連動）
 // ============================================================================
 (function initSkyTimeModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_sky_time_v9';
+  const STORAGE_KEY = 'island_sky_time_v10';
   const RAD = Math.PI / 180;
   const DEG = 180 / Math.PI;
   const SKY_R = 22.0;
   const INNER_DOME_R = 26.0;
   const STAR_R = 27.5;
   const OUTER_DOME_R = 30.0;
+  const BASE_FOLLOW_FOV = 38.0; // 追従カメラ基準画角
 
   const state = {
     viewMode: 'anime', // 'anime'(①観察アプリ) | 'pre_obs'(②天体観察前) | 'obs'(③天体観察時)
@@ -565,7 +566,7 @@
   skyRoot.add(outerSpaceDome);
 
   const starGroup = new THREE.Group();
-  const starPointsMat = new THREE.PointsMaterial({ map: texStarCircleDigital, color: 0xe0f2fe, size: 1.15, transparent: true, opacity: 0.96, blending: THREE.AdditiveBlending, depthWrite: false });
+  const starPointsMat = new THREE.PointsMaterial({ map: texStarCircleDigital, color: 0xe0f2fe, size: 1.0, transparent: true, opacity: 0.96, blending: THREE.AdditiveBlending, depthWrite: false });
   const starLineSolidMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.44, blending: THREE.AdditiveBlending, depthWrite: false });
   const starLineDashMat  = new THREE.LineDashedMaterial({ color: 0xf9a8d4, dashSize: 0.75, gapSize: 0.45, transparent: true, opacity: 0.64, depthWrite: false });
   const starPoints = new THREE.Points(new THREE.BufferGeometry(), starPointsMat);
@@ -580,8 +581,8 @@
   innerSkyDome.renderOrder = -10;
   skyRoot.add(innerSkyDome);
 
-  const sunOrbitMat  = new THREE.LineBasicMaterial({ color: 0xbae6fd, transparent: true, opacity: 0.50, depthWrite: false });
-  const moonOrbitMat = new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.36, depthWrite: false });
+  const sunOrbitMat  = new THREE.LineBasicMaterial({ color: 0xbae6fd, transparent: true, opacity: 0.46, depthWrite: false });
+  const moonOrbitMat = new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.34, depthWrite: false });
   const sunOrbitLine  = new THREE.Line(new THREE.BufferGeometry(), sunOrbitMat);
   const moonOrbitLine = new THREE.Line(new THREE.BufferGeometry(), moonOrbitMat);
   sunOrbitLine.renderOrder = -6;
@@ -601,7 +602,49 @@
 
   skyRoot.traverse((obj) => { obj.frustumCulled = false; });
 
-  // --- 元アプリ側の旧3D星座看板（北斗七星・はくちょう座・オリオン座等）＆旧星座線の完全非表示 ---
+  // --- カメラ画角(FOV)連動のサイズ自動補正 ---
+  let baseSunScale = 3.1;
+  let baseMoonScale = 2.9;
+  let baseStarSize = 1.25;
+  let currentRayMode = 'off';
+
+  function getFovRatio() {
+    if (typeof activeCamera === 'undefined' || !activeCamera || !Number.isFinite(activeCamera.fov)) return 1.0;
+    const raw = Math.tan((activeCamera.fov * 0.5) * RAD) / Math.tan((BASE_FOLLOW_FOV * 0.5) * RAD);
+    return Math.max(0.75, Math.min(2.6, raw));
+  }
+
+  function applyDynamicCameraScales(nowSec) {
+    const fovRatio = getFovRatio();
+    const isAnime = (state.viewMode === 'anime');
+    // ①観察アプリ：追従カメラの太陽サイズを基準にキャラ視点(広角)でも同じ存在感を維持
+    // ②③観察前・観察時：実際の空に近い自然なサイズバランス（広角でも潰れない緩やか補正）
+    const bodyMul = isAnime ? fovRatio : (1 + (fovRatio - 1) * 0.42);
+    const starMul = isAnime ? (1 + (fovRatio - 1) * 0.72) : (1 + (fovRatio - 1) * 0.35);
+
+    const sScale = baseSunScale * bodyMul;
+    const mScale = baseMoonScale * bodyMul;
+    sunSprite.scale.set(sScale, sScale, 1);
+    moonSprite.scale.set(mScale, mScale, 1);
+    starPointsMat.size = baseStarSize * starMul;
+
+    if (sunRaySprite.visible) {
+      if (currentRayMode === 'morning') {
+        sunRayMat.rotation = nowSec * 0.35;
+        const pulse = 1 + 0.07 * Math.sin(nowSec * 4.2);
+        const rScale = sScale * 1.24 * pulse;
+        sunRaySprite.scale.set(rScale, rScale, 1);
+        sunRayMat.opacity = 0.78 + 0.22 * Math.sin(nowSec * 5.0);
+      } else if (currentRayMode === 'noon') {
+        sunRayMat.rotation = nowSec * 0.12;
+        const rScale = sScale * 1.08;
+        sunRaySprite.scale.set(rScale, rScale, 1);
+        sunRayMat.opacity = 0.44 + 0.08 * Math.sin(nowSec * 2.0);
+      }
+    }
+  }
+
+  // --- 元アプリ側の旧3D星座看板＆朝〜夕に残る薄い水色オリオン座線の完全非表示 ---
   const CONST_KW = ['オリオン座', '北斗七星', 'カシオペア', '夏の大三角', 'さそり座', 'こぐま座', 'はくちょう座', 'こと座', 'わし座', 'おおいぬ座', 'しし座', 'ふたご座', 'ペガスス座'];
   const tmpWorldPos = new THREE.Vector3();
 
@@ -620,18 +663,21 @@
       const nm = (obj.name || '').toLowerCase();
       let hide = nm.includes('star') || nm.includes('constell') || nm.includes('orion') || nm.includes('zodiac') || nm.includes('label');
 
-      // 元アプリの旧3D星座名看板（Sprite）や天球上の旧星座線・星粒を検出
       if (!hide && (obj.isSprite || obj.isLine || obj.isLineSegments || obj.isPoints)) {
         obj.getWorldPosition(tmpWorldPos);
         const dist = tmpWorldPos.length();
-        if (obj.isSprite && dist > 6.5) {
+        if (obj.isSprite && dist > 6.0) {
           hide = true;
-        } else if ((obj.isLine || obj.isLineSegments) && dist > 7.5) {
-          hide = true;
+        } else if ((obj.isLine || obj.isLineSegments) && obj.geometry) {
+          if (!obj.geometry.boundingSphere) obj.geometry.computeBoundingSphere();
+          const rad = obj.geometry.boundingSphere ? obj.geometry.boundingSphere.radius : 0;
+          // 中心が原点(0,0,0)の天球星座線も広がり半径(rad > 4.5)で確実に検出して消す
+          if (dist > 6.5 || rad > 4.5) hide = true;
         } else if (obj.isPoints && obj.geometry && obj.geometry.attributes && obj.geometry.attributes.position) {
-          if (obj.geometry.attributes.position.count >= 10) {
-            obj.geometry.computeBoundingSphere();
-            if (obj.geometry.boundingSphere && obj.geometry.boundingSphere.radius > 7.0) hide = true;
+          if (obj.geometry.attributes.position.count >= 8) {
+            if (!obj.geometry.boundingSphere) obj.geometry.computeBoundingSphere();
+            const rad = obj.geometry.boundingSphere ? obj.geometry.boundingSphere.radius : 0;
+            if (rad > 4.5) hide = true;
           }
         }
       }
@@ -659,7 +705,6 @@
   // --- 天体・二重球体スクリーンのメイン更新 ---
   let lastCalcKey = '';
   let lastStatusText = '';
-  let currentRayMode = 'off';
 
   function formatHM(hVal) {
     const hh = Math.floor(((hVal % 24) + 24) % 24);
@@ -694,7 +739,10 @@
     syncTopPhaseBadge(moment.phase);
 
     const key = `${state.viewMode}-${state.obsConstLines}-${moment.turn}-${moment.phase}-${moment.subStep}-${moment.dayTag}-${moment.date.getFullYear()}-${moment.date.getMonth()}-${moment.date.getDate()}-${moment.date.getHours()}-${Math.floor(moment.date.getMinutes() / 2)}-${state.lat.toFixed(2)}-${state.lon.toFixed(2)}`;
-    if (!force && key === lastCalcKey) return;
+    if (!force && key === lastCalcKey) {
+      applyDynamicCameraScales(performance.now() * 0.001);
+      return;
+    }
     lastCalcKey = key;
 
     const isAnime  = (state.viewMode === 'anime');
@@ -752,9 +800,11 @@
       moonOrbitMat.opacity = isNight ? 0.42 : 0.22;
     }
 
-    // 2. 太陽・月の配置
+    // 2. 太陽・月の配置＆基準サイズ設定
     currentRayMode = 'off';
     if (isAnime) {
+      baseSunScale = 3.1;
+      baseMoonScale = 2.9;
       if (!isNight) {
         const dayStep = moment.phase * 5 + moment.subStep;
         const dayProgress = dayStep / 14;
@@ -766,14 +816,13 @@
         sunSprite.position.copy(sVec);
         sunSpriteMat.map = texSunAnime[sunMood];
         sunSpriteMat.opacity = 1.0;
-        sunSprite.scale.set(3.4, 3.4, 1);
         sunSpriteMat.needsUpdate = true;
 
         sunRaySprite.position.copy(sVec).multiplyScalar(1.008);
         if (moment.phase === 0) {
-          currentRayMode = 'morning'; sunRaySprite.visible = true; sunRaySprite.scale.set(4.2, 4.2, 1); sunRayMat.opacity = 0.95;
+          currentRayMode = 'morning'; sunRaySprite.visible = true; sunRayMat.opacity = 0.95;
         } else if (moment.phase === 1) {
-          currentRayMode = 'noon'; sunRaySprite.visible = true; sunRaySprite.scale.set(3.6, 3.6, 1); sunRayMat.opacity = 0.48;
+          currentRayMode = 'noon'; sunRaySprite.visible = true; sunRayMat.opacity = 0.48;
         } else {
           sunRaySprite.visible = false;
         }
@@ -790,20 +839,23 @@
         moonSprite.position.copy(altAzToVec3(alt, az, SKY_R - 1.0));
         moonSpriteMat.map = texMoonAnime[shape][moment.moonMood] || texMoonAnime[shape].calm;
         moonSpriteMat.opacity = moment.moonMood === 'sleepy' ? 0.88 : 1.0;
-        moonSprite.scale.set(3.2, 3.2, 1);
         moonSpriteMat.needsUpdate = true;
       }
     } else {
       sunRaySprite.visible = false;
+      // ②③は現実の空に近い自然なサイズバランス
+      baseSunScale = isPreObs ? 2.15 : 1.65;
+      baseMoonScale = isPreObs ? 1.70 : 1.45;
+
       if (!isNight && sunPos.alt > -0.04) {
         const sVec = altAzToVec3(Math.max(0.05, sunPos.alt), sunPos.az, SKY_R - 0.8);
         const horizonFade = Math.min(1, Math.max(0.55, (sunPos.alt + 0.04) / 0.16));
         sunSprite.visible = true;
         sunSprite.position.copy(sVec);
         if (isPreObs) {
-          sunSpriteMat.map = texSunReal; sunSpriteMat.opacity = 0.98 * horizonFade; sunSprite.scale.set(4.0, 4.0, 1);
+          sunSpriteMat.map = texSunReal; sunSpriteMat.opacity = 0.98 * horizonFade;
         } else {
-          sunSpriteMat.map = texSunObs;  sunSpriteMat.opacity = 0.92; sunSprite.scale.set(2.7, 2.7, 1);
+          sunSpriteMat.map = texSunObs;  sunSpriteMat.opacity = 0.92;
         }
         sunSpriteMat.needsUpdate = true;
       } else {
@@ -815,9 +867,9 @@
         moonSprite.position.copy(altAzToVec3(Math.max(0.04, moonPos.alt), moonPos.az, SKY_R - 1.2));
         if (isPreObs) {
           updateRealMoonTexture(curMoon.phaseDeg);
-          moonSpriteMat.map = texMoonReal; moonSpriteMat.opacity = isNight ? 0.98 : 0.62; moonSprite.scale.set(2.9, 2.9, 1);
+          moonSpriteMat.map = texMoonReal; moonSpriteMat.opacity = isNight ? 0.98 : 0.62;
         } else {
-          moonSpriteMat.map = texMoonObs;  moonSpriteMat.opacity = isNight ? 0.92 : 0.58; moonSprite.scale.set(2.4, 2.4, 1);
+          moonSpriteMat.map = texMoonObs;  moonSpriteMat.opacity = isNight ? 0.92 : 0.58;
         }
         moonSpriteMat.needsUpdate = true;
       } else {
@@ -827,6 +879,7 @@
 
     // 3. 星座（朝〜夕は全モード完全非表示・夜〜深夜のみ表示）
     starGroup.visible = isNight;
+    baseStarSize = isAnime ? 1.25 : 0.82;
     if (isNight) {
       const pArr = [], lArr = [];
       CONSTELLATIONS.forEach((con) => {
@@ -846,7 +899,6 @@
       starPoints.geometry.setAttribute('position', new THREE.Float32BufferAttribute(pArr, 3));
       starPointsMat.map = isAnime ? texStarCirclePastel : texStarCircleDigital;
       starPointsMat.color.setHex(isAnime ? 0xfffbeb : 0xe0f2fe);
-      starPointsMat.size = isAnime ? 1.45 : 1.12;
       starPointsMat.needsUpdate = true;
 
       starLines.geometry.dispose();
@@ -856,6 +908,8 @@
       else if (isPreObs) { starLines.material = starLineSolidMat; starLines.visible = true; }
       else { starLines.material = starLineSolidMat; starLines.visible = Boolean(state.obsConstLines); }
     }
+
+    applyDynamicCameraScales(performance.now() * 0.001);
 
     const mNames = { anime: '①観察アプリ', pre_obs: '②天体観察前', obs: '③天体観察時' };
     const turnProg = isObs ? `現在時刻(太陽高度 ${(sunPos.alt * DEG).toFixed(0)}°)` : `${moment.turn}T目・${PHASE_LABELS[moment.phase]}(${moment.subStep + 1}/5)`;
@@ -1000,24 +1054,13 @@
     if (stEl) stEl.innerText = lastStatusText;
   }
 
-  // --- 毎フレーム監視（旧3D星座看板の即座非表示＋カメラ中心追従＋朝の▲アニメーション） ---
+  // --- 毎フレーム監視（旧星座線非表示＋カメラ中心追従＋画角連動スケール即時反映） ---
   function animateSky(now) {
     hideLegacySkyObjects();
     if (typeof activeCamera !== 'undefined' && activeCamera) {
       skyRoot.position.copy(activeCamera.position);
     }
-    if (sunRaySprite.visible) {
-      const t = now * 0.001;
-      if (currentRayMode === 'morning') {
-        sunRayMat.rotation = t * 0.35;
-        const pulse = 1 + 0.07 * Math.sin(t * 4.2);
-        sunRaySprite.scale.set(4.2 * pulse, 4.2 * pulse, 1);
-        sunRayMat.opacity = 0.78 + 0.22 * Math.sin(t * 5.0);
-      } else if (currentRayMode === 'noon') {
-        sunRayMat.rotation = t * 0.12;
-        sunRayMat.opacity = 0.44 + 0.08 * Math.sin(t * 2.0);
-      }
-    }
+    applyDynamicCameraScales(now * 0.001);
     requestAnimationFrame(animateSky);
   }
 
