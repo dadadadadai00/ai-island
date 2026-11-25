@@ -2,8 +2,8 @@
 // 【独立ビジュアルモジュール：compass_ring.js】
 // ・丸い海の外周へ余白を空けて配置する未来風・青ホログラム3Dコンパス
 // ・東西南北（中心向き直立3層立体＋大型発光土台＆投影光）固定
+// ・朝〜夕は東西南北テキストを高透過＋白色細線縁取りで表示／夜は発光ホログラム
 // ・直立シンプル目盛りリング（4ヶ所のみ長く太い）がゆっくり時計回り
-// ・二重描画廃止＆カリング防止でキャラ視点上下移動時のちらつき解消
 // ============================================================================
 (function initCompassRingModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
@@ -55,7 +55,8 @@
     return { radius, topY };
   }
 
-  function createKanjiHoloTexture(char) {
+  // --- 朝〜夕用：中身は高透過＋外周は白色細線の縁取り ---
+  function createKanjiDayHoloTexture(char) {
     const cv = document.createElement('canvas');
     cv.width = 256; cv.height = 256;
     const ctx = cv.getContext('2d');
@@ -65,14 +66,44 @@
     ctx.textBaseline = 'middle';
     ctx.font = '700 162px "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif';
 
-    ctx.shadowColor = 'rgba(125, 211, 252, 0.92)';
-    ctx.shadowBlur = 18;
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = 'rgba(224, 242, 254, 0.88)';
+    // 中身：空と海がしっかり透ける淡いシアンガラス調
+    ctx.shadowColor = 'rgba(14, 165, 233, 0.35)';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.28)';
+    ctx.fillText(char, 128, 134);
+
+    // 細めのスキャンライン
+    ctx.shadowBlur = 0;
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+    for (let y = 0; y < 256; y += 8) ctx.fillRect(0, y, 256, 2);
+    ctx.globalCompositeOperation = 'source-over';
+
+    // 白色細線の縁取り（後から重ねて細線をシャープに保つ）
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3.2;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.98)';
     ctx.strokeText(char, 128, 134);
 
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = '#ffffff';
+    const tex = new THREE.CanvasTexture(cv);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  // --- 夜・深夜用：発光ホログラム＋白色細線縁取り ---
+  function createKanjiNightHoloTexture(char) {
+    const cv = document.createElement('canvas');
+    cv.width = 256; cv.height = 256;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, 256, 256);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 162px "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif';
+
+    ctx.shadowColor = 'rgba(56, 189, 248, 0.95)';
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = 'rgba(186, 230, 253, 0.68)';
     ctx.fillText(char, 128, 134);
 
     ctx.shadowBlur = 0;
@@ -80,6 +111,11 @@
     ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
     for (let y = 0; y < 256; y += 8) ctx.fillRect(0, y, 256, 2);
     ctx.globalCompositeOperation = 'source-over';
+
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3.6;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.98)';
+    ctx.strokeText(char, 128, 134);
 
     const tex = new THREE.CanvasTexture(cv);
     tex.needsUpdate = true;
@@ -128,13 +164,13 @@
   rootGroup.add(staticGroup, rotatingGroup);
 
   const mats = {
-    ringMain:  new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.48, side: THREE.DoubleSide, depthWrite: false }),
-    ringSub:   new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }),
-    ticks:     new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.42, depthWrite: false }),
-    majorTick: new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.56, side: THREE.DoubleSide, depthWrite: false }),
-    node:      new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.52, side: THREE.DoubleSide, depthWrite: false }),
-    baseGlow:  new THREE.MeshBasicMaterial({ map: createBaseGlowTexture(), color: 0x38bdf8, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false }),
-    beam:      new THREE.MeshBasicMaterial({ map: createBeamGradientTexture(), color: 0x38bdf8, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false }),
+    ringMain:  new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.44, side: THREE.DoubleSide, depthWrite: false }),
+    ringSub:   new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false }),
+    ticks:     new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.38, depthWrite: false }),
+    majorTick: new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.52, side: THREE.DoubleSide, depthWrite: false }),
+    node:      new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false }),
+    baseGlow:  new THREE.MeshBasicMaterial({ map: createBaseGlowTexture(), color: 0x38bdf8, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }),
+    beam:      new THREE.MeshBasicMaterial({ map: createBeamGradientTexture(), color: 0x38bdf8, transparent: true, opacity: 0.20, side: THREE.DoubleSide, depthWrite: false }),
     kanji:     []
   };
 
@@ -218,18 +254,22 @@
       beam.position.set(0, 0.66, -labelDist);
       holder.add(beam);
 
-      const tex = createKanjiHoloTexture(label);
+      const dayTex   = createKanjiDayHoloTexture(label);
+      const nightTex = createKanjiNightHoloTexture(label);
       const layers = [
-        { dz: -0.048, opMul: 0.26, sc: 1.03 },
-        { dz:  0.000, opMul: 0.52, sc: 1.00 },
-        { dz:  0.048, opMul: 0.92, sc: 1.00 }
+        { dz: -0.048, dayMul: 0.16, nightMul: 0.24, sc: 1.03 },
+        { dz:  0.000, dayMul: 0.34, nightMul: 0.50, sc: 1.00 },
+        { dz:  0.048, dayMul: 0.96, nightMul: 0.96, sc: 1.00 }
       ];
       layers.forEach((ly) => {
         const km = new THREE.MeshBasicMaterial({
-          map: tex, color: 0x38bdf8, transparent: true, opacity: 0.62 * ly.opMul,
+          map: dayTex, color: 0xffffff, transparent: true, opacity: 0.56 * ly.dayMul,
           side: THREE.DoubleSide, depthWrite: false
         });
-        km.userData.opMul = ly.opMul;
+        km.userData.dayTex   = dayTex;
+        km.userData.nightTex = nightTex;
+        km.userData.dayMul   = ly.dayMul;
+        km.userData.nightMul = ly.nightMul;
         mats.kanji.push(km);
         const mesh = new THREE.Mesh(plateGeo, km);
         mesh.scale.set(ly.sc, ly.sc, 1);
@@ -240,15 +280,19 @@
       staticGroup.add(holder);
     });
 
-    // 視線上下移動時に一瞬消えるカリングちらつきを防止
     rootGroup.traverse((obj) => { obj.frustumCulled = false; });
   }
 
+  // --- 時間帯パレット（朝〜夕は東西南北テキストをより透過＋白縁を活かして表示） ---
   const PHASE_PALETTE = [
-    { main: 0x0284c7, sub: 0x38bdf8, text: 0x0284c7, beam: 0x38bdf8, ringOp: 0.46, subOp: 0.28, tickOp: 0.40, majorOp: 0.54, textOp: 0.62, beamOp: 0.22, glowOp: 0.30, add: false },
-    { main: 0x0369a1, sub: 0x0284c7, text: 0x0369a1, beam: 0x0ea5e9, ringOp: 0.52, subOp: 0.32, tickOp: 0.46, majorOp: 0.60, textOp: 0.68, beamOp: 0.20, glowOp: 0.28, add: false },
-    { main: 0x0ea5e9, sub: 0x38bdf8, text: 0x38bdf8, beam: 0x38bdf8, ringOp: 0.48, subOp: 0.30, tickOp: 0.42, majorOp: 0.56, textOp: 0.64, beamOp: 0.26, glowOp: 0.34, add: false },
-    { main: 0x38bdf8, sub: 0x7dd3fc, text: 0x7dd3fc, beam: 0x7dd3fc, ringOp: 0.72, subOp: 0.42, tickOp: 0.64, majorOp: 0.80, textOp: 0.88, beamOp: 0.38, glowOp: 0.48, add: true }
+    // 0: 朝
+    { main: 0x0284c7, sub: 0x38bdf8, textOp: 0.56, isNight: false, ringOp: 0.42, subOp: 0.24, tickOp: 0.36, majorOp: 0.50, beamOp: 0.18, glowOp: 0.26, add: false },
+    // 1: 昼
+    { main: 0x0369a1, sub: 0x0284c7, textOp: 0.60, isNight: false, ringOp: 0.46, subOp: 0.28, tickOp: 0.40, majorOp: 0.54, beamOp: 0.16, glowOp: 0.24, add: false },
+    // 2: 夕
+    { main: 0x0ea5e9, sub: 0x38bdf8, textOp: 0.58, isNight: false, ringOp: 0.44, subOp: 0.26, tickOp: 0.38, majorOp: 0.52, beamOp: 0.22, glowOp: 0.30, add: false },
+    // 3: 夜・深夜
+    { main: 0x38bdf8, sub: 0x7dd3fc, textOp: 0.90, isNight: true,  ringOp: 0.72, subOp: 0.42, tickOp: 0.64, majorOp: 0.80, beamOp: 0.38, glowOp: 0.48, add: true }
   ];
 
   function getCurrentPhaseIndex() {
@@ -270,14 +314,20 @@
     mats.ringMain.color.setHex(pal.main);  mats.ringMain.opacity  = pal.ringOp;  mats.ringMain.blending  = blend;
     mats.ringSub.color.setHex(pal.sub);    mats.ringSub.opacity   = pal.subOp;   mats.ringSub.blending   = blend;
     mats.ticks.color.setHex(pal.main);     mats.ticks.opacity     = pal.tickOp;  mats.ticks.blending     = blend;
-    mats.majorTick.color.setHex(pal.text); mats.majorTick.opacity = pal.majorOp; mats.majorTick.blending = blend;
-    mats.node.color.setHex(pal.text);      mats.node.opacity      = pal.textOp * 0.78; mats.node.blending = blend;
-    mats.baseGlow.color.setHex(pal.beam);  mats.baseGlow.opacity  = pal.glowOp;  mats.baseGlow.blending  = THREE.AdditiveBlending;
-    mats.beam.color.setHex(pal.beam);      mats.beam.opacity      = pal.beamOp;  mats.beam.blending      = THREE.AdditiveBlending;
+    mats.majorTick.color.setHex(pal.sub);  mats.majorTick.opacity = pal.majorOp; mats.majorTick.blending = blend;
+    mats.node.color.setHex(pal.sub);       mats.node.opacity      = pal.textOp * 0.68; mats.node.blending = blend;
+    mats.baseGlow.color.setHex(pal.sub);   mats.baseGlow.opacity  = pal.glowOp;  mats.baseGlow.blending  = THREE.AdditiveBlending;
+    mats.beam.color.setHex(pal.sub);       mats.beam.opacity      = pal.beamOp;  mats.beam.blending      = THREE.AdditiveBlending;
 
     mats.kanji.forEach((km) => {
-      km.color.setHex(pal.text);
-      km.opacity = pal.textOp * (km.userData.opMul || 1);
+      const nextTex = pal.isNight ? km.userData.nightTex : km.userData.dayTex;
+      if (km.map !== nextTex) {
+        km.map = nextTex;
+        km.needsUpdate = true;
+      }
+      km.color.setHex(0xffffff); // 白縁と透過水色をそのまま活かす
+      const mul = pal.isNight ? (km.userData.nightMul || 1) : (km.userData.dayMul || 1);
+      km.opacity = pal.textOp * mul;
       km.blending = blend;
     });
   }
@@ -347,7 +397,6 @@
     }
   }
 
-  // --- 時計回りアニメーション（元アプリの描画ループに一本化してちらつき防止） ---
   let lastTs = performance.now();
   function tick(now) {
     const dt = Math.min(0.1, Math.max(0, (now - lastTs) / 1000));
