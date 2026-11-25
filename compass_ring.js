@@ -1,9 +1,8 @@
 // ============================================================================
 // 【独立ビジュアルモジュール：compass_ring.js】
 // ・丸い海の外周へ余白を空けて配置する未来風・青ホログラム3Dコンパス
-// ・東西南北（中心向き直立3層立体＋大型発光土台＆投影光）固定
-// ・朝〜夕は東西南北テキストを高透過＋白色細線縁取りで表示／夜は発光ホログラム
-// ・直立シンプル目盛りリング（4ヶ所のみ長く太い）がゆっくり時計回り
+// ・東西南北テキスト内部の交差縁線を型抜き除去（外周のみ白色細線縁取り）
+// ・③天体観察時：回転停止＆北の1本がピンク点滅→北一致で点灯＆全体フェードアウト
 // ============================================================================
 (function initCompassRingModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
@@ -11,6 +10,14 @@
   const STORAGE_KEY = 'island_compass_ring_v1';
   const state = { unlocked: false, visible: false, rotating: true, radiusOffset: 0.9 };
   let externalHide = false;
+
+  // ③天体観察時（北合わせモード）用状態
+  const alignState = {
+    enabled: false,       // ③天体観察時かつコンパスONのとき true
+    isAligned: false,     // 真北の許容範囲内か
+    lockFlashTimer: 0,    // 北一致・確定直後の発光点灯タイマー（秒）
+    fadeAlpha: 1.0        // 1.0=完全表示 <-> 0.0=ゆっくり消滅
+  };
 
   function loadState() {
     try {
@@ -55,8 +62,8 @@
     return { radius, topY };
   }
 
-  // --- 朝〜夕用：中身は高透過＋外周は白色細線の縁取り ---
-  function createKanjiDayHoloTexture(char) {
+  // --- 内部交差縁線を完全に消した「外周のみ白縁＋高透過塗り」テクスチャ生成 ---
+  function buildCleanKanjiTexture(char, fillRgba, glowRgba, glowBlur, rimWidth) {
     const cv = document.createElement('canvas');
     cv.width = 256; cv.height = 256;
     const ctx = cv.getContext('2d');
@@ -66,56 +73,34 @@
     ctx.textBaseline = 'middle';
     ctx.font = '700 162px "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif';
 
-    // 中身：空と海がしっかり透ける淡いシアンガラス調
-    ctx.shadowColor = 'rgba(14, 165, 233, 0.35)';
-    ctx.shadowBlur = 6;
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.28)';
-    ctx.fillText(char, 128, 134);
+    if (rimWidth > 0) {
+      // 1. 先に白い外周縁を描く
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = rimWidth * 2;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.98)';
+      ctx.strokeText(char, 128, 134);
 
-    // 細めのスキャンライン
+      // 2. 文字の塗り領域で内側を透明に型抜きし、画が交差する内部の白線を完全消去
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = '#000000';
+      ctx.fillText(char, 128, 134);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // 3. くり抜いた内側に高透過の色を流し込む
+    if (glowBlur > 0) {
+      ctx.shadowColor = glowRgba;
+      ctx.shadowBlur = glowBlur;
+    }
+    ctx.fillStyle = fillRgba;
+    ctx.fillText(char, 128, 134);
     ctx.shadowBlur = 0;
+
+    // 4. 控えめなスキャンライン
     ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
     for (let y = 0; y < 256; y += 8) ctx.fillRect(0, y, 256, 2);
     ctx.globalCompositeOperation = 'source-over';
-
-    // 白色細線の縁取り（後から重ねて細線をシャープに保つ）
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 3.2;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.98)';
-    ctx.strokeText(char, 128, 134);
-
-    const tex = new THREE.CanvasTexture(cv);
-    tex.needsUpdate = true;
-    return tex;
-  }
-
-  // --- 夜・深夜用：発光ホログラム＋白色細線縁取り ---
-  function createKanjiNightHoloTexture(char) {
-    const cv = document.createElement('canvas');
-    cv.width = 256; cv.height = 256;
-    const ctx = cv.getContext('2d');
-    ctx.clearRect(0, 0, 256, 256);
-
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = '700 162px "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif';
-
-    ctx.shadowColor = 'rgba(56, 189, 248, 0.95)';
-    ctx.shadowBlur = 18;
-    ctx.fillStyle = 'rgba(186, 230, 253, 0.68)';
-    ctx.fillText(char, 128, 134);
-
-    ctx.shadowBlur = 0;
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
-    for (let y = 0; y < 256; y += 8) ctx.fillRect(0, y, 256, 2);
-    ctx.globalCompositeOperation = 'source-over';
-
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 3.6;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.98)';
-    ctx.strokeText(char, 128, 134);
 
     const tex = new THREE.CanvasTexture(cv);
     tex.needsUpdate = true;
@@ -168,6 +153,7 @@
     ringSub:   new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false }),
     ticks:     new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.38, depthWrite: false }),
     majorTick: new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.52, side: THREE.DoubleSide, depthWrite: false }),
+    northTick: new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.52, side: THREE.DoubleSide, depthWrite: false }),
     node:      new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false }),
     baseGlow:  new THREE.MeshBasicMaterial({ map: createBaseGlowTexture(), color: 0x38bdf8, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }),
     beam:      new THREE.MeshBasicMaterial({ map: createBeamGradientTexture(), color: 0x38bdf8, transparent: true, opacity: 0.20, side: THREE.DoubleSide, depthWrite: false }),
@@ -175,11 +161,13 @@
   };
 
   let builtRadius = 0;
+  let northBarMesh = null;
 
   function buildCompassGeometry() {
     while (staticGroup.children.length) staticGroup.remove(staticGroup.children[0]);
     while (rotatingGroup.children.length) rotatingGroup.remove(rotatingGroup.children[0]);
     mats.kanji.length = 0;
+    northBarMesh = null;
 
     const { radius: seaR, topY } = detectSeaMetrics();
     const R = seaR + state.radiusOffset;
@@ -203,10 +191,12 @@
       if (i % 12 === 0) {
         const holder = new THREE.Group();
         holder.rotation.y = -ang;
-        const bar = new THREE.Mesh(majorBarGeo, mats.majorTick);
+        const isNorth = (i === 0);
+        const bar = new THREE.Mesh(majorBarGeo, isNorth ? mats.northTick : mats.majorTick);
         bar.position.set(0, 0.25, -R);
         holder.add(bar);
         rotatingGroup.add(holder);
+        if (isNorth) northBarMesh = bar;
       } else {
         const x = Math.sin(ang) * R;
         const z = -Math.cos(ang) * R;
@@ -254,20 +244,24 @@
       beam.position.set(0, 0.66, -labelDist);
       holder.add(beam);
 
-      const dayTex   = createKanjiDayHoloTexture(label);
-      const nightTex = createKanjiNightHoloTexture(label);
+      // 一番手前のみ「型抜き済み外周白縁付き」、奥の2層は「白縁なし高透過塗り」で二重線を防止
+      const dayFrontTex   = buildCleanKanjiTexture(label, 'rgba(56, 189, 248, 0.26)', 'rgba(14, 165, 233, 0.3)', 4, 2.8);
+      const dayBackTex    = buildCleanKanjiTexture(label, 'rgba(56, 189, 248, 0.22)', '', 0, 0);
+      const nightFrontTex = buildCleanKanjiTexture(label, 'rgba(186, 230, 253, 0.66)', 'rgba(56, 189, 248, 0.95)', 16, 3.2);
+      const nightBackTex  = buildCleanKanjiTexture(label, 'rgba(125, 211, 252, 0.48)', '', 0, 0);
+
       const layers = [
-        { dz: -0.048, dayMul: 0.16, nightMul: 0.24, sc: 1.03 },
-        { dz:  0.000, dayMul: 0.34, nightMul: 0.50, sc: 1.00 },
-        { dz:  0.048, dayMul: 0.96, nightMul: 0.96, sc: 1.00 }
+        { dz: -0.048, dayTex: dayBackTex,  nightTex: nightBackTex,  dayMul: 0.22, nightMul: 0.26, sc: 1.03 },
+        { dz:  0.000, dayTex: dayBackTex,  nightTex: nightBackTex,  dayMul: 0.42, nightMul: 0.48, sc: 1.00 },
+        { dz:  0.048, dayTex: dayFrontTex, nightTex: nightFrontTex, dayMul: 1.00, nightMul: 1.00, sc: 1.00 }
       ];
       layers.forEach((ly) => {
         const km = new THREE.MeshBasicMaterial({
-          map: dayTex, color: 0xffffff, transparent: true, opacity: 0.56 * ly.dayMul,
+          map: ly.dayTex, color: 0xffffff, transparent: true, opacity: 0.62 * ly.dayMul,
           side: THREE.DoubleSide, depthWrite: false
         });
-        km.userData.dayTex   = dayTex;
-        km.userData.nightTex = nightTex;
+        km.userData.dayTex   = ly.dayTex;
+        km.userData.nightTex = ly.nightTex;
         km.userData.dayMul   = ly.dayMul;
         km.userData.nightMul = ly.nightMul;
         mats.kanji.push(km);
@@ -283,15 +277,10 @@
     rootGroup.traverse((obj) => { obj.frustumCulled = false; });
   }
 
-  // --- 時間帯パレット（朝〜夕は東西南北テキストをより透過＋白縁を活かして表示） ---
   const PHASE_PALETTE = [
-    // 0: 朝
-    { main: 0x0284c7, sub: 0x38bdf8, textOp: 0.56, isNight: false, ringOp: 0.42, subOp: 0.24, tickOp: 0.36, majorOp: 0.50, beamOp: 0.18, glowOp: 0.26, add: false },
-    // 1: 昼
-    { main: 0x0369a1, sub: 0x0284c7, textOp: 0.60, isNight: false, ringOp: 0.46, subOp: 0.28, tickOp: 0.40, majorOp: 0.54, beamOp: 0.16, glowOp: 0.24, add: false },
-    // 2: 夕
-    { main: 0x0ea5e9, sub: 0x38bdf8, textOp: 0.58, isNight: false, ringOp: 0.44, subOp: 0.26, tickOp: 0.38, majorOp: 0.52, beamOp: 0.22, glowOp: 0.30, add: false },
-    // 3: 夜・深夜
+    { main: 0x0284c7, sub: 0x38bdf8, textOp: 0.62, isNight: false, ringOp: 0.42, subOp: 0.24, tickOp: 0.36, majorOp: 0.50, beamOp: 0.18, glowOp: 0.26, add: false },
+    { main: 0x0369a1, sub: 0x0284c7, textOp: 0.66, isNight: false, ringOp: 0.46, subOp: 0.28, tickOp: 0.40, majorOp: 0.54, beamOp: 0.16, glowOp: 0.24, add: false },
+    { main: 0x0ea5e9, sub: 0x38bdf8, textOp: 0.64, isNight: false, ringOp: 0.44, subOp: 0.26, tickOp: 0.38, majorOp: 0.52, beamOp: 0.22, glowOp: 0.30, add: false },
     { main: 0x38bdf8, sub: 0x7dd3fc, textOp: 0.90, isNight: true,  ringOp: 0.72, subOp: 0.42, tickOp: 0.64, majorOp: 0.80, beamOp: 0.38, glowOp: 0.48, add: true }
   ];
 
@@ -303,21 +292,33 @@
     return ((ts % 4) + 4) % 4;
   }
 
+  let currentPal = PHASE_PALETTE[0];
   let lastPhaseApplied = -1;
+
   function applyTimePalette(force = false) {
     const pIdx = getCurrentPhaseIndex();
-    if (!force && pIdx === lastPhaseApplied) return;
-    lastPhaseApplied = pIdx;
-    const pal = PHASE_PALETTE[pIdx] || PHASE_PALETTE[0];
+    if (force || pIdx !== lastPhaseApplied) {
+      lastPhaseApplied = pIdx;
+      currentPal = PHASE_PALETTE[pIdx] || PHASE_PALETTE[0];
+    }
+    const pal = currentPal;
+    const a = alignState.enabled ? alignState.fadeAlpha : 1.0;
     const blend = pal.add ? THREE.AdditiveBlending : THREE.NormalBlending;
 
-    mats.ringMain.color.setHex(pal.main);  mats.ringMain.opacity  = pal.ringOp;  mats.ringMain.blending  = blend;
-    mats.ringSub.color.setHex(pal.sub);    mats.ringSub.opacity   = pal.subOp;   mats.ringSub.blending   = blend;
-    mats.ticks.color.setHex(pal.main);     mats.ticks.opacity     = pal.tickOp;  mats.ticks.blending     = blend;
-    mats.majorTick.color.setHex(pal.sub);  mats.majorTick.opacity = pal.majorOp; mats.majorTick.blending = blend;
-    mats.node.color.setHex(pal.sub);       mats.node.opacity      = pal.textOp * 0.68; mats.node.blending = blend;
-    mats.baseGlow.color.setHex(pal.sub);   mats.baseGlow.opacity  = pal.glowOp;  mats.baseGlow.blending  = THREE.AdditiveBlending;
-    mats.beam.color.setHex(pal.sub);       mats.beam.opacity      = pal.beamOp;  mats.beam.blending      = THREE.AdditiveBlending;
+    mats.ringMain.color.setHex(pal.main);  mats.ringMain.opacity  = pal.ringOp * a;  mats.ringMain.blending  = blend;
+    mats.ringSub.color.setHex(pal.sub);    mats.ringSub.opacity   = pal.subOp * a;   mats.ringSub.blending   = blend;
+    mats.ticks.color.setHex(pal.main);     mats.ticks.opacity     = pal.tickOp * a;  mats.ticks.blending     = blend;
+    mats.majorTick.color.setHex(pal.sub);  mats.majorTick.opacity = pal.majorOp * a; mats.majorTick.blending = blend;
+    mats.node.color.setHex(pal.sub);       mats.node.opacity      = pal.textOp * 0.68 * a; mats.node.blending = blend;
+    mats.baseGlow.color.setHex(pal.sub);   mats.baseGlow.opacity  = pal.glowOp * a;  mats.baseGlow.blending  = THREE.AdditiveBlending;
+    mats.beam.color.setHex(pal.sub);       mats.beam.opacity      = pal.beamOp * a;  mats.beam.blending      = THREE.AdditiveBlending;
+
+    if (!alignState.enabled) {
+      mats.northTick.color.setHex(pal.sub);
+      mats.northTick.opacity = pal.majorOp * a;
+      mats.northTick.blending = blend;
+      if (northBarMesh) northBarMesh.scale.set(1, 1, 1);
+    }
 
     mats.kanji.forEach((km) => {
       const nextTex = pal.isNight ? km.userData.nightTex : km.userData.dayTex;
@@ -325,15 +326,17 @@
         km.map = nextTex;
         km.needsUpdate = true;
       }
-      km.color.setHex(0xffffff); // 白縁と透過水色をそのまま活かす
+      km.color.setHex(0xffffff);
       const mul = pal.isNight ? (km.userData.nightMul || 1) : (km.userData.dayMul || 1);
-      km.opacity = pal.textOp * mul;
+      km.opacity = pal.textOp * mul * a;
       km.blending = blend;
     });
   }
 
   function applyVisibility() {
-    rootGroup.visible = Boolean(state.unlocked && state.visible && !externalHide);
+    const baseOn = Boolean(state.unlocked && state.visible && !externalHide);
+    const alphaOk = !alignState.enabled || alignState.fadeAlpha > 0.01;
+    rootGroup.visible = Boolean(baseOn && alphaOk);
     if (rootGroup.visible) applyTimePalette(true);
     syncSettingsPanelUI();
   }
@@ -372,7 +375,7 @@
       row.id = 'env-compass-row';
       row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;background:#ffffff;border:1px solid #bae6fd;border-radius:9px;padding:7px 9px;';
       row.innerHTML = `
-        <div style="font-size:11px;font-weight:800;color:#0f172a;">🧭 未来風ホログラムコンパス<div style="font-size:9.5px;font-weight:600;color:#64748b;">直立東西南北固定＋直立目盛り時計回り</div></div>
+        <div style="font-size:11px;font-weight:800;color:#0f172a;">🧭 未来風ホログラムコンパス<div style="font-size:9.5px;font-weight:600;color:#64748b;">直立東西南北固定＋③観察時は北合わせ</div></div>
         <button type="button" id="btn-toggle-holo-compass" style="padding:5px 10px;border-radius:8px;border:none;font-size:11px;font-weight:900;cursor:pointer;"></button>
       `;
       panel.appendChild(row);
@@ -382,6 +385,7 @@
           const next = !(state.unlocked && state.visible);
           state.unlocked = next;
           state.visible = next;
+          if (next) alignState.fadeAlpha = 1.0;
           saveState();
           applyVisibility();
           if (typeof showToast === 'function') showToast(next ? '🧭 ホログラムコンパスを表示しました' : '🧭 ホログラムコンパスを非表示にしました');
@@ -397,17 +401,69 @@
     }
   }
 
+  // --- 毎フレームアニメーション（通常回転 vs ③天体観察時の北ピンク点滅→点灯消滅） ---
   let lastTs = performance.now();
   function tick(now) {
     const dt = Math.min(0.1, Math.max(0, (now - lastTs) / 1000));
     lastTs = now;
+    const baseOn = Boolean(state.unlocked && state.visible && !externalHide);
 
-    if (rootGroup.visible) {
-      if (state.rotating) {
-        rotatingGroup.rotation.y -= 0.055 * dt;
+    if (baseOn) {
+      if (alignState.enabled) {
+        // ③天体観察時：目盛りリングの回転停止＆東西南北位置へピタリと揃える
+        rotatingGroup.rotation.y *= Math.max(0, 1 - dt * 10);
+
+        if (alignState.isAligned) {
+          // 北を向いた状態：まずピンク1本が強く発光点灯し、その後コンパス全体がゆっくり消える
+          if (alignState.lockFlashTimer > 0) {
+            alignState.lockFlashTimer = Math.max(0, alignState.lockFlashTimer - dt);
+            alignState.fadeAlpha = Math.min(1.0, alignState.fadeAlpha + dt * 4.0);
+          } else {
+            alignState.fadeAlpha = Math.max(0.0, alignState.fadeAlpha - dt * 0.95);
+          }
+        } else {
+          // スマホの向きが変わって北から外れた：コンパスがゆっくり再表示され位置合わせへ戻る
+          alignState.lockFlashTimer = 0;
+          alignState.fadeAlpha = Math.min(1.0, alignState.fadeAlpha + dt * 1.35);
+        }
+
+        const alphaOk = alignState.fadeAlpha > 0.01;
+        rootGroup.visible = alphaOk;
+
+        if (alphaOk) {
+          applyTimePalette(false);
+          const a = alignState.fadeAlpha;
+          mats.northTick.blending = THREE.AdditiveBlending;
+
+          if (alignState.isAligned) {
+            // 北一致時：強い発光点灯
+            mats.northTick.color.setHex(0xff85c0);
+            mats.northTick.opacity = 1.0 * a;
+            if (northBarMesh) northBarMesh.scale.set(1.35, 1.18, 1.35);
+          } else {
+            // 北ズレ時：ピンク色に変色して発光点滅
+            const pulse = 0.5 + 0.5 * Math.sin(now * 0.0075);
+            mats.northTick.color.setHex(pulse > 0.45 ? 0xff4da6 : 0xf472b6);
+            mats.northTick.opacity = (0.32 + 0.68 * pulse) * a;
+            if (northBarMesh) {
+              const sc = 1.15 + 0.22 * pulse;
+              northBarMesh.scale.set(sc, 1.06 + 0.10 * pulse, sc);
+            }
+          }
+        }
+      } else {
+        // ①観察アプリ・②天体観察前：通常通りゆっくり時計回り回転
+        alignState.fadeAlpha = 1.0;
+        rootGroup.visible = true;
+        if (state.rotating) {
+          rotatingGroup.rotation.y -= 0.055 * dt;
+        }
+        applyTimePalette(false);
       }
-      applyTimePalette(false);
+    } else {
+      rootGroup.visible = false;
     }
+
     requestAnimationFrame(tick);
   }
 
@@ -424,10 +480,44 @@
   requestAnimationFrame(tick);
 
   window.CompassRingModule = {
-    unlock: () => { state.unlocked = true; state.visible = true; saveState(); applyVisibility(); },
-    setVisible: (v) => { state.visible = Boolean(v); if (v) state.unlocked = true; saveState(); applyVisibility(); },
+    unlock: () => { state.unlocked = true; state.visible = true; alignState.fadeAlpha = 1.0; saveState(); applyVisibility(); },
+    setVisible: (v) => { state.visible = Boolean(v); if (v) { state.unlocked = true; alignState.fadeAlpha = 1.0; } saveState(); applyVisibility(); },
+    toggleVisible: () => {
+      const next = !(state.unlocked && state.visible);
+      state.unlocked = next;
+      state.visible = next;
+      if (next) alignState.fadeAlpha = 1.0;
+      saveState();
+      applyVisibility();
+      return next;
+    },
+    isUserEnabled: () => Boolean(state.unlocked && state.visible),
     setExternalHide: (hide) => { externalHide = Boolean(hide); applyVisibility(); },
-    isVisible: () => Boolean(state.unlocked && state.visible && !externalHide),
+    isVisible: () => Boolean(state.unlocked && state.visible && !externalHide && (!alignState.enabled || alignState.fadeAlpha > 0.01)),
+    setObsAlignmentMode: (enabled) => {
+      const next = Boolean(enabled);
+      if (alignState.enabled !== next) {
+        alignState.enabled = next;
+        alignState.isAligned = false;
+        alignState.lockFlashTimer = 0;
+        alignState.fadeAlpha = 1.0;
+        applyVisibility();
+      }
+    },
+    updateNorthAlignment: (isAligned) => {
+      const next = Boolean(isAligned);
+      if (next && !alignState.isAligned) {
+        // 北へ入った瞬間に発光点灯タイマーをセット
+        alignState.lockFlashTimer = 0.85;
+      }
+      alignState.isAligned = next;
+    },
+    triggerNorthLocked: () => {
+      alignState.isAligned = true;
+      alignState.lockFlashTimer = 0.95;
+      alignState.fadeAlpha = 1.0;
+      applyVisibility();
+    },
     setRadiusOffset: (off) => { if (Number.isFinite(off)) { state.radiusOffset = off; saveState(); buildCompassGeometry(); applyTimePalette(true); } },
     refresh: () => { buildCompassGeometry(); applyTimePalette(true); }
   };
