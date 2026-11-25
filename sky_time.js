@@ -2,12 +2,12 @@
 // 【独立ビジュアルモジュール：sky_time.js】
 // ・二重球体スクリーン（カメラ追従＋カリング無効化で上下視線移動のちらつき解消）
 // ・①観察アプリ(アニメ・表なし)／②天体観察前(シンプルリアル・表あり)／③天体観察時(現実時刻連動スタイリッシュ空)
-// ・③天体観察時：縦列アイコン下へコンパス＆ジャイロ(デフォルトOFF)追加＋画面暗転停止
+// ・③天体観察時：ジャイロ廃止（指操作専用・正面北合わせ）＋縦列コンパスアイコン＋画面暗転停止
 // ============================================================================
 (function initSkyTimeModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_sky_time_v12';
+  const STORAGE_KEY = 'island_sky_time_v13';
   const RAD = Math.PI / 180;
   const DEG = 180 / Math.PI;
   const SKY_R = 22.0;
@@ -170,106 +170,17 @@
     }
   });
 
-  // --- ③天体観察時：ジャイロセンサー（デフォルトOFF）＆視線連動の北合わせ制御 ---
-  const gyroState = {
-    enabled: false,   // デフォルトOFF
-    listening: false,
-    lastAlpha: null,
-    alignedNow: false
-  };
+  // --- ③天体観察時：シンプルな正面北合わせ判定（ジャイロなし・指スワイプ連動） ---
+  let northAlignedNow = false;
   const tmpCamDir = new THREE.Vector3();
-  const tmpOffsetVec = new THREE.Vector3();
 
   function shortestAngleDiffDeg(a, b) {
     return ((a - b + 540) % 360) - 180;
   }
 
-  function rotateCameraYawByDeg(deltaRightDeg) {
-    if (typeof activeCamera === 'undefined' || !activeCamera || !Number.isFinite(deltaRightDeg)) return;
-    if (Math.abs(deltaRightDeg) < 0.02 || Math.abs(deltaRightDeg) > 45) return;
-    const rad = -deltaRightDeg * RAD;
-    if (typeof controls !== 'undefined' && controls && controls.target) {
-      tmpOffsetVec.copy(activeCamera.position).sub(controls.target);
-      tmpOffsetVec.applyAxisAngle(new THREE.Vector3(0, 1, 0), rad);
-      activeCamera.position.copy(controls.target).add(tmpOffsetVec);
-      if (typeof controls.update === 'function') controls.update();
-      else activeCamera.lookAt(controls.target);
-    } else {
-      activeCamera.rotation.y += rad;
-    }
-  }
-
-  function snapCameraYawToNorth() {
-    if (typeof activeCamera === 'undefined' || !activeCamera) return;
-    activeCamera.getWorldDirection(tmpCamDir);
-    const curAzDeg = norm360(Math.atan2(tmpCamDir.x, -tmpCamDir.z) * DEG);
-    const diffToNorth = shortestAngleDiffDeg(0, curAzDeg);
-    const rad = -diffToNorth * RAD;
-    if (typeof controls !== 'undefined' && controls && controls.target) {
-      tmpOffsetVec.copy(activeCamera.position).sub(controls.target);
-      tmpOffsetVec.applyAxisAngle(new THREE.Vector3(0, 1, 0), rad);
-      activeCamera.position.copy(controls.target).add(tmpOffsetVec);
-      if (typeof controls.update === 'function') controls.update();
-      else activeCamera.lookAt(controls.target);
-    } else {
-      activeCamera.rotation.y += rad;
-    }
-  }
-
-  function handleDeviceOrientation(e) {
-    if (state.viewMode !== 'obs' || !gyroState.enabled) {
-      gyroState.lastAlpha = null;
-      return;
-    }
-    if (!Number.isFinite(e.alpha)) return;
-
-    if (gyroState.lastAlpha !== null) {
-      const deltaRight = -shortestAngleDiffDeg(e.alpha, gyroState.lastAlpha);
-      rotateCameraYawByDeg(deltaRight);
-    }
-    gyroState.lastAlpha = e.alpha;
-  }
-
-  function enableGyroSensor() {
-    gyroState.enabled = true;
-    gyroState.lastAlpha = null;
-    if (gyroState.listening) return;
-    try {
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        DeviceOrientationEvent.requestPermission().then((res) => {
-          if (res === 'granted') {
-            window.addEventListener('deviceorientation', handleDeviceOrientation, true);
-            gyroState.listening = true;
-          } else {
-            gyroState.enabled = false;
-            updateNorthAlignmentState();
-            if (typeof showToast === 'function') showToast('📱 ジャイロセンサーの権限が許可されませんでした');
-          }
-        }).catch(() => {
-          gyroState.enabled = false;
-          updateNorthAlignmentState();
-        });
-      } else {
-        window.addEventListener('deviceorientation', handleDeviceOrientation, true);
-        gyroState.listening = true;
-      }
-    } catch (e) {
-      gyroState.enabled = false;
-    }
-  }
-
-  function disableGyroSensor() {
-    gyroState.enabled = false;
-    gyroState.lastAlpha = null;
-  }
-
   function updateNorthAlignmentState() {
     const isObsMode = (state.viewMode === 'obs');
     syncScreenWakeLock(isObsMode);
-
-    if (!isObsMode && gyroState.enabled) {
-      disableGyroSensor();
-    }
 
     const compMod = window.CompassRingModule;
     const userCompOn = (compMod && typeof compMod.isUserEnabled === 'function') ? compMod.isUserEnabled() : false;
@@ -278,15 +189,14 @@
     if (compMod && typeof compMod.setObsAlignmentMode === 'function') {
       compMod.setObsAlignmentMode(alignActive);
     }
-    syncObsSideIcons(isObsMode, userCompOn, gyroState.enabled);
+    syncObsSideCompassIcon(isObsMode, userCompOn);
 
     if (!alignActive) {
-      gyroState.alignedNow = false;
-      syncNorthConfirmButton(false, false);
+      northAlignedNow = false;
       return;
     }
 
-    // 現在のカメラ水平視線（-Zが北=0°）から北とのズレ角を算出（ジャイロOFFでも指ドラッグに連動）
+    // カメラの水平視線が3D空間の北（-Z方向 = 方位角0°）の正面にあるかシンプル判定
     let diffDeg = 180;
     if (typeof activeCamera !== 'undefined' && activeCamera) {
       activeCamera.getWorldDirection(tmpCamDir);
@@ -297,94 +207,64 @@
       }
     }
 
-    if (!gyroState.alignedNow && diffDeg <= 12) {
-      gyroState.alignedNow = true;
-    } else if (gyroState.alignedNow && diffDeg >= 16) {
-      gyroState.alignedNow = false;
+    // 画面正面（±12°以内）に「北」が来たら一致、±16°以上外れたら解除
+    if (!northAlignedNow && diffDeg <= 12) {
+      northAlignedNow = true;
+    } else if (northAlignedNow && diffDeg >= 16) {
+      northAlignedNow = false;
     }
 
     if (compMod && typeof compMod.updateNorthAlignment === 'function') {
-      compMod.updateNorthAlignment(gyroState.alignedNow);
+      compMod.updateNorthAlignment(northAlignedNow);
     }
-    syncNorthConfirmButton(true, gyroState.alignedNow);
   }
 
-  // --- ③天体観察時専用：右側縦列アイコンの下へ「コンパス」＆「ジャイロ(デフォルトOFF)」を追加 ---
-  function findRightSideIconContainer() {
-    const allBtns = Array.from(document.querySelectorAll('button'));
-    const rightRoundBtns = allBtns.filter((b) => {
-      if (b.id === 'btn-side-obs-compass' || b.id === 'btn-side-obs-gyro' || b.id === 'btn-obs-north-confirm') return false;
-      const r = b.getBoundingClientRect();
-      return r.width >= 34 && r.width <= 58 && Math.abs(r.width - r.height) <= 8 && r.left > window.innerWidth * 0.72 && r.top > 110 && r.bottom < window.innerHeight - 160;
-    });
-    if (rightRoundBtns.length >= 2) {
-      return { container: rightRoundBtns[0].parentElement, refBtn: rightRoundBtns[0] };
-    }
-    return null;
-  }
-
-  function createSideRoundIcon(id, emoji, badgeId, titleText, fallbackTopPx) {
-    const found = findRightSideIconContainer();
-    const btn = document.createElement('button');
-    btn.id = id;
-    btn.type = 'button';
-    btn.title = titleText;
-
-    if (found && found.container && found.refBtn) {
-      const cs = window.getComputedStyle(found.refBtn);
-      btn.className = found.refBtn.className;
-      btn.style.cssText = `position:relative;width:${cs.width};height:${cs.height};border-radius:${cs.borderRadius || '50%'};background:${cs.backgroundColor || '#ffffff'};box-shadow:${cs.boxShadow || '0 3px 10px rgba(0,0,0,0.22)'};border:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;padding:0;margin-top:2px;`;
-      found.container.appendChild(btn);
-    } else {
-      btn.style.cssText = `position:fixed;right:12px;top:${fallbackTopPx}px;z-index:8820;width:44px;height:44px;border-radius:50%;background:#ffffff;border:2px solid #cbd5e1;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;padding:0;`;
-      document.body.appendChild(btn);
-    }
-
-    btn.innerHTML = `
-      <span style="line-height:1;">${emoji}</span>
-      <span id="${badgeId}" style="position:absolute;bottom:-4px;right:-3px;font-size:8px;font-weight:900;padding:1px 4px;border-radius:6px;color:#ffffff;line-height:1.1;">OFF</span>
-    `;
-    return btn;
-  }
-
-  function syncObsSideIcons(showIcons, isCompOn, isGyroOn) {
+  // --- ③天体観察時専用：右側縦列アイコンの下へ「🧭コンパスアイコン」を追加 ---
+  function syncObsSideCompassIcon(showIcon, isCompOn) {
     let compBtn = document.getElementById('btn-side-obs-compass');
-    let gyroBtn = document.getElementById('btn-side-obs-gyro');
-
-    if (!showIcons) {
+    if (!showIcon) {
       if (compBtn) compBtn.style.display = 'none';
-      if (gyroBtn) gyroBtn.style.display = 'none';
       return;
     }
 
-    // 1. 方位合わせコンパスアイコン
     if (!compBtn) {
-      compBtn = createSideRoundIcon('btn-side-obs-compass', '🧭', 'badge-side-obs-compass', '方位合わせコンパス ON/OFF', 372);
+      const allBtns = Array.from(document.querySelectorAll('button'));
+      const rightRoundBtns = allBtns.filter((b) => {
+        if (b.id === 'btn-side-obs-compass') return false;
+        const r = b.getBoundingClientRect();
+        return r.width >= 34 && r.width <= 58 && Math.abs(r.width - r.height) <= 8 && r.left > window.innerWidth * 0.72 && r.top > 110 && r.bottom < window.innerHeight - 160;
+      });
+
+      compBtn = document.createElement('button');
+      compBtn.id = 'btn-side-obs-compass';
+      compBtn.type = 'button';
+      compBtn.title = '方位合わせコンパス ON/OFF';
+
+      if (rightRoundBtns.length >= 2 && rightRoundBtns[0].parentElement) {
+        const ref = rightRoundBtns[0];
+        const cs = window.getComputedStyle(ref);
+        compBtn.className = ref.className;
+        compBtn.style.cssText = `position:relative;width:${cs.width};height:${cs.height};border-radius:${cs.borderRadius || '50%'};background:${cs.backgroundColor || '#ffffff'};box-shadow:${cs.boxShadow || '0 3px 10px rgba(0,0,0,0.22)'};border:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;padding:0;margin-top:2px;`;
+        rightRoundBtns[0].parentElement.appendChild(compBtn);
+      } else {
+        compBtn.style.cssText = 'position:fixed;right:12px;top:372px;z-index:8820;width:44px;height:44px;border-radius:50%;background:#ffffff;border:2px solid #cbd5e1;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;padding:0;';
+        document.body.appendChild(compBtn);
+      }
+
+      compBtn.innerHTML = `
+        <span style="line-height:1;">🧭</span>
+        <span id="badge-side-obs-compass" style="position:absolute;bottom:-4px;right:-3px;font-size:8px;font-weight:900;padding:1px 4px;border-radius:6px;color:#ffffff;line-height:1.1;">OFF</span>
+      `;
+
       compBtn.onclick = () => {
         const compMod = window.CompassRingModule;
         if (compMod && typeof compMod.toggleVisible === 'function') {
           const next = compMod.toggleVisible();
-          if (next) gyroState.alignedNow = false;
+          if (next) northAlignedNow = false;
           updateNorthAlignmentState();
           if (typeof showToast === 'function') {
-            showToast(next ? '🧭 方位合わせコンパス ON（ピンクの線を北へ合わせてください）' : '🧭 方位合わせコンパス OFF');
+            showToast(next ? '🧭 コンパス ON（スワイプしてピンクの線を正面の北へ合わせてください）' : '🧭 コンパス OFF');
           }
-        }
-      };
-    }
-
-    // 2. ジャイロ連動アイコン（デフォルトOFF・コンパスアイコンの下に追加）
-    if (!gyroBtn) {
-      gyroBtn = createSideRoundIcon('btn-side-obs-gyro', '📱', 'badge-side-obs-gyro', 'ジャイロセンサー連動 ON/OFF（デフォルトOFF）', 424);
-      gyroBtn.onclick = () => {
-        if (gyroState.enabled) {
-          disableGyroSensor();
-          updateNorthAlignmentState();
-          if (typeof showToast === 'function') showToast('📱 ジャイロ連動 OFF（指ドラッグ操作）');
-        } else {
-          enableGyroSensor();
-          updateNorthAlignmentState();
-          if (typeof showToast === 'function') showToast('📱 ジャイロ連動 ON（スマホの向きに連動）');
         }
       };
     }
@@ -397,47 +277,6 @@
       compBadge.textContent = isCompOn ? 'ON' : 'OFF';
       compBadge.style.background = isCompOn ? '#e11d48' : '#64748b';
     }
-
-    gyroBtn.style.display = 'flex';
-    gyroBtn.style.borderColor = isGyroOn ? '#0284c7' : '#cbd5e1';
-    gyroBtn.style.opacity = isGyroOn ? '1' : '0.84';
-    const gyroBadge = document.getElementById('badge-side-obs-gyro');
-    if (gyroBadge) {
-      gyroBadge.textContent = isGyroOn ? 'ON' : 'OFF';
-      gyroBadge.style.background = isGyroOn ? '#0284c7' : '#64748b';
-    }
-  }
-
-  // --- ③天体観察時専用：誤差解消用の小型「🧭 この向きを北に確定」ボタン ---
-  function syncNorthConfirmButton(showBtn, isAligned) {
-    let btn = document.getElementById('btn-obs-north-confirm');
-    if (!showBtn) {
-      if (btn) btn.style.display = 'none';
-      return;
-    }
-    if (!btn) {
-      btn = document.createElement('button');
-      btn.id = 'btn-obs-north-confirm';
-      btn.type = 'button';
-      btn.style.cssText = 'position:fixed;left:50%;bottom:214px;transform:translateX(-50%);z-index:8815;padding:6px 13px;border-radius:999px;border:1.5px solid #f472b6;background:rgba(15,23,42,0.82);color:#fdf2f8;font-size:10.5px;font-weight:900;letter-spacing:0.03em;box-shadow:0 3px 12px rgba(244,114,182,0.32);backdrop-filter:blur(4px);cursor:pointer;white-space:nowrap;transition:opacity 0.35s ease;';
-      btn.textContent = '🧭 この向きを北に確定';
-      btn.onclick = () => {
-        gyroState.lastAlpha = null;
-        snapCameraYawToNorth();
-        gyroState.alignedNow = true;
-        const compMod = window.CompassRingModule;
-        if (compMod && typeof compMod.triggerNorthLocked === 'function') {
-          compMod.triggerNorthLocked();
-        }
-        if (typeof showToast === 'function') {
-          showToast('🧭 現在の向きを「真北」に確定しました');
-        }
-      };
-      document.body.appendChild(btn);
-    }
-    btn.style.display = 'block';
-    btn.style.opacity = isAligned ? '0.45' : '0.96';
-    btn.style.borderColor = isAligned ? '#38bdf8' : '#f472b6';
   }
 
   // --- 天文計算 ---
@@ -1378,7 +1217,6 @@
   window.SkyTimeModule = {
     setMode: (m) => { if (['anime','pre_obs','obs'].includes(m)) { state.viewMode = m; saveState(); updateCelestialExhibit(true); } },
     setObsConstLines: (v) => { state.obsConstLines = Boolean(v); saveState(); updateCelestialExhibit(true); },
-    setGyroEnabled: (v) => { if (v && state.viewMode === 'obs') enableGyroSensor(); else disableGyroSensor(); updateNorthAlignmentState(); },
     advanceTurn,
     resetTurns,
     requestGPS: openGpsConsentModal,
