@@ -1,20 +1,20 @@
 // ============================================================================
 // 【独立ビジュアルモジュール：sky_time.js】
-// ・カメラ画角(FOV)連動サイズ補正（追従カメラ基準でキャラ視点とのギャップ解消）
-// ・観察アプリ・天体観察前・天体観察時の全モードで朝〜夕は星座・星座名を完全非表示
-// ・二重球体スクリーン（①アニメ・表なし／②シンプルリアル・表あり／③現実時刻連動）
+// ・二重球体スクリーン（カメラ追従＋カリング無効化で上下視線移動のちらつき解消）
+// ・①観察アプリ(アニメ・表なし)／②天体観察前(シンプルリアル・表あり)／③天体観察時(現実時刻連動スタイリッシュ空)
+// ・③天体観察時：右側縦列コンパスアイコン追加＋ジャイロ連動北合わせ＋「この向きを北に確定」ボタン
 // ============================================================================
 (function initSkyTimeModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_sky_time_v10';
+  const STORAGE_KEY = 'island_sky_time_v11';
   const RAD = Math.PI / 180;
   const DEG = 180 / Math.PI;
   const SKY_R = 22.0;
   const INNER_DOME_R = 26.0;
   const STAR_R = 27.5;
   const OUTER_DOME_R = 30.0;
-  const BASE_FOLLOW_FOV = 38.0; // 追従カメラ基準画角
+  const BASE_FOLLOW_FOV = 38.0;
 
   const state = {
     viewMode: 'anime', // 'anime'(①観察アプリ) | 'pre_obs'(②天体観察前) | 'obs'(③天体観察時)
@@ -120,7 +120,7 @@
     window.showToast._skyToastHooked = true;
   }
 
-  // --- 上部バッジの時間帯テキスト同期（朝・昼・夕・夜・深夜） ---
+  // --- 上部バッジの時間帯テキスト同期 ---
   const PHASE_LABELS = ['朝', '昼', '夕', '夜', '深夜'];
   function syncTopPhaseBadge(phaseIdx) {
     const label = PHASE_LABELS[phaseIdx] || '朝';
@@ -138,6 +138,236 @@
         }
       }
     }
+  }
+
+  // --- ③天体観察時：ジャイロセンサー＆視線連動の北合わせ制御 ---
+  const gyroState = {
+    listening: false,
+    lastAlpha: null,
+    alignedNow: false
+  };
+  const tmpCamDir = new THREE.Vector3();
+  const tmpOffsetVec = new THREE.Vector3();
+
+  function shortestAngleDiffDeg(a, b) {
+    let d = ((a - b + 540) % 360) - 180;
+    return d;
+  }
+
+  function rotateCameraYawByDeg(deltaRightDeg) {
+    if (typeof activeCamera === 'undefined' || !activeCamera || !Number.isFinite(deltaRightDeg)) return;
+    if (Math.abs(deltaRightDeg) < 0.02 || Math.abs(deltaRightDeg) > 45) return;
+    const rad = -deltaRightDeg * RAD;
+    if (typeof controls !== 'undefined' && controls && controls.target) {
+      tmpOffsetVec.copy(activeCamera.position).sub(controls.target);
+      tmpOffsetVec.applyAxisAngle(new THREE.Vector3(0, 1, 0), rad);
+      activeCamera.position.copy(controls.target).add(tmpOffsetVec);
+      if (typeof controls.update === 'function') controls.update();
+      else activeCamera.lookAt(controls.target);
+    } else {
+      activeCamera.rotation.y += rad;
+    }
+  }
+
+  function snapCameraYawToNorth() {
+    if (typeof activeCamera === 'undefined' || !activeCamera) return;
+    activeCamera.getWorldDirection(tmpCamDir);
+    const curAzDeg = norm360(Math.atan2(tmpCamDir.x, -tmpCamDir.z) * DEG);
+    const diffToNorth = shortestAngleDiffDeg(0, curAzDeg); // 北(0°)へ回す角度
+    const rad = -diffToNorth * RAD;
+    if (typeof controls !== 'undefined' && controls && controls.target) {
+      tmpOffsetVec.copy(activeCamera.position).sub(controls.target);
+      tmpOffsetVec.applyAxisAngle(new THREE.Vector3(0, 1, 0), rad);
+      activeCamera.position.copy(controls.target).add(tmpOffsetVec);
+      if (typeof controls.update === 'function') controls.update();
+      else activeCamera.lookAt(controls.target);
+    } else {
+      activeCamera.rotation.y += rad;
+    }
+  }
+
+  function handleDeviceOrientation(e) {
+    if (state.viewMode !== 'obs') {
+      gyroState.lastAlpha = null;
+      return;
+    }
+    const compMod = window.CompassRingModule;
+    if (!compMod || typeof compMod.isUserEnabled !== 'function' || !compMod.isUserEnabled()) {
+      gyroState.lastAlpha = null;
+      return;
+    }
+    if (!Number.isFinite(e.alpha)) return;
+
+    if (gyroState.lastAlpha !== null) {
+      // スマホを右(時計回り)へ回すと alpha は減るため反転してカメラ右回転へ反映
+      const deltaRight = -shortestAngleDiffDeg(e.alpha, gyroState.lastAlpha);
+      rotateCameraYawByDeg(deltaRight);
+    }
+    gyroState.lastAlpha = e.alpha;
+  }
+
+  function ensureGyroListener() {
+    if (gyroState.listening) return;
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission().then((res) => {
+          if (res === 'granted') {
+            window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+            gyroState.listening = true;
+          }
+        }).catch(() => {});
+      } else {
+        window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+        gyroState.listening = true;
+      }
+    } catch (e) {}
+  }
+
+  function updateNorthAlignmentState() {
+    const compMod = window.CompassRingModule;
+    if (!compMod || typeof compMod.setObsAlignmentMode !== 'function') return;
+
+    const isObsMode = (state.viewMode === 'obs');
+    const userOn = typeof compMod.isUserEnabled === 'function' ? compMod.isUserEnabled() : false;
+    const alignActive = Boolean(isObsMode && userOn);
+
+    compMod.setObsAlignmentMode(alignActive);
+    syncObsCompassSideIcon(isObsMode, userOn);
+
+    if (!alignActive) {
+      gyroState.alignedNow = false;
+      syncNorthConfirmButton(false, false);
+      return;
+    }
+
+    ensureGyroListener();
+
+    // 現在のカメラ水平視線（-Zが北=0°）から北とのズレ角を算出
+    let diffDeg = 180;
+    if (typeof activeCamera !== 'undefined' && activeCamera) {
+      activeCamera.getWorldDirection(tmpCamDir);
+      const horizLen = Math.hypot(tmpCamDir.x, tmpCamDir.z);
+      if (horizLen > 0.04) {
+        const azDeg = norm360(Math.atan2(tmpCamDir.x, -tmpCamDir.z) * DEG);
+        diffDeg = Math.abs(shortestAngleDiffDeg(azDeg, 0));
+      }
+    }
+
+    // ヒステリシス付き北一致判定（±12°以内で一致、±16°以上で解除）
+    if (!gyroState.alignedNow && diffDeg <= 12) {
+      gyroState.alignedNow = true;
+    } else if (gyroState.alignedNow && diffDeg >= 16) {
+      gyroState.alignedNow = false;
+    }
+
+    if (typeof compMod.updateNorthAlignment === 'function') {
+      compMod.updateNorthAlignment(gyroState.alignedNow);
+    }
+    syncNorthConfirmButton(true, gyroState.alignedNow);
+  }
+
+  // --- ③天体観察時専用：右側縦列コンパスアイコン自動追加 ---
+  function syncObsCompassSideIcon(showIcon, isCompOn) {
+    let btn = document.getElementById('btn-side-obs-compass');
+    if (!showIcon) {
+      if (btn) btn.style.display = 'none';
+      return;
+    }
+
+    if (!btn) {
+      // 右側縦列アイコンの親コンテナを自動検出
+      let sideContainer = null;
+      const allBtns = Array.from(document.querySelectorAll('button'));
+      const rightRoundBtns = allBtns.filter((b) => {
+        if (b.id === 'btn-side-obs-compass' || b.id === 'btn-obs-north-confirm') return false;
+        const r = b.getBoundingClientRect();
+        return r.width >= 34 && r.width <= 58 && Math.abs(r.width - r.height) <= 8 && r.left > window.innerWidth * 0.72 && r.top > 110 && r.bottom < window.innerHeight - 160;
+      });
+
+      if (rightRoundBtns.length >= 2) {
+        sideContainer = rightRoundBtns[0].parentElement;
+      }
+
+      btn = document.createElement('button');
+      btn.id = 'btn-side-obs-compass';
+      btn.type = 'button';
+      btn.title = '方位合わせコンパス ON/OFF';
+
+      if (sideContainer && rightRoundBtns[0]) {
+        const ref = rightRoundBtns[0];
+        const cs = window.getComputedStyle(ref);
+        btn.className = ref.className;
+        btn.style.cssText = `position:relative;width:${cs.width};height:${cs.height};border-radius:${cs.borderRadius || '50%'};background:${cs.backgroundColor || '#ffffff'};box-shadow:${cs.boxShadow || '0 3px 10px rgba(0,0,0,0.22)'};border:2px solid #38bdf8;display:flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer;padding:0;margin-top:2px;`;
+        sideContainer.appendChild(btn);
+      } else {
+        btn.style.cssText = 'position:fixed;right:12px;top:372px;z-index:8820;width:44px;height:44px;border-radius:50%;background:#ffffff;border:2px solid #38bdf8;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer;padding:0;';
+        document.body.appendChild(btn);
+      }
+
+      btn.innerHTML = `
+        <span style="line-height:1;">🧭</span>
+        <span id="badge-side-obs-compass" style="position:absolute;bottom:-4px;right:-3px;font-size:8.5px;font-weight:900;padding:1px 4px;border-radius:6px;color:#ffffff;line-height:1.1;"></span>
+      `;
+
+      btn.onclick = () => {
+        ensureGyroListener();
+        const compMod = window.CompassRingModule;
+        if (compMod && typeof compMod.toggleVisible === 'function') {
+          const next = compMod.toggleVisible();
+          if (next) {
+            gyroState.lastAlpha = null;
+            gyroState.alignedNow = false;
+          }
+          updateNorthAlignmentState();
+          if (typeof showToast === 'function') {
+            showToast(next ? '🧭 方位合わせコンパス ON（ピンクの線を北へ合わせてください）' : '🧭 方位合わせコンパス OFF');
+          }
+        }
+      };
+    }
+
+    btn.style.display = 'flex';
+    btn.style.borderColor = isCompOn ? '#0284c7' : '#cbd5e1';
+    btn.style.opacity = isCompOn ? '1' : '0.82';
+    const badge = document.getElementById('badge-side-obs-compass');
+    if (badge) {
+      badge.textContent = isCompOn ? 'ON' : 'OFF';
+      badge.style.background = isCompOn ? '#e11d48' : '#64748b';
+    }
+  }
+
+  // --- ③天体観察時専用：誤差解消用の小型「🧭 この向きを北に確定」ボタン ---
+  function syncNorthConfirmButton(showBtn, isAligned) {
+    let btn = document.getElementById('btn-obs-north-confirm');
+    if (!showBtn) {
+      if (btn) btn.style.display = 'none';
+      return;
+    }
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'btn-obs-north-confirm';
+      btn.type = 'button';
+      btn.style.cssText = 'position:fixed;left:50%;bottom:214px;transform:translateX(-50%);z-index:8815;padding:6px 13px;border-radius:999px;border:1.5px solid #f472b6;background:rgba(15,23,42,0.82);color:#fdf2f8;font-size:10.5px;font-weight:900;letter-spacing:0.03em;box-shadow:0 3px 12px rgba(244,114,182,0.32);backdrop-filter:blur(4px);cursor:pointer;white-space:nowrap;transition:opacity 0.35s ease;';
+      btn.textContent = '🧭 この向きを北に確定';
+      btn.onclick = () => {
+        ensureGyroListener();
+        gyroState.lastAlpha = null;
+        snapCameraYawToNorth();
+        gyroState.alignedNow = true;
+        const compMod = window.CompassRingModule;
+        if (compMod && typeof compMod.triggerNorthLocked === 'function') {
+          compMod.triggerNorthLocked();
+        }
+        if (typeof showToast === 'function') {
+          showToast('🧭 現在の向きを「真北」に確定しました');
+        }
+      };
+      document.body.appendChild(btn);
+    }
+    btn.style.display = 'block';
+    // 北一致済み（コンパス消滅後）は邪魔にならないよう半透明に控えめ表示
+    btn.style.opacity = isAligned ? '0.45' : '0.96';
+    btn.style.borderColor = isAligned ? '#38bdf8' : '#f472b6';
   }
 
   // --- 天文計算 ---
@@ -222,7 +452,7 @@
     const now = new Date();
     const { realPhase, skyDayBase, times, nowH } = getRealTimeInfo(now);
     const turn = state.turnCount;
-    const turnPhase = Math.floor(turn / 5) % 5; // 5ターンごとに 0:朝, 1:昼, 2:夕, 3:夜, 4:深夜
+    const turnPhase = Math.floor(turn / 5) % 5;
     const subStep = turn % 5;
 
     if (state.viewMode === 'obs') {
@@ -306,18 +536,18 @@
 
   const SKY_PALETTES = {
     anime: [
-      { stops: [[0,'#7dd3fc'],[0.34,'#bae6fd'],[0.49,'#fde68a'],[0.54,'#fbcfe8'],[1,'#bae6fd']], op: 1.00 }, // 0:朝
-      { stops: [[0,'#38bdf8'],[0.32,'#7dd3fc'],[0.50,'#e0f2fe'],[0.56,'#bae6fd'],[1,'#7dd3fc']], op: 1.00 }, // 1:昼
-      { stops: [[0,'#818cf8'],[0.28,'#f472b6'],[0.48,'#fdba74'],[0.55,'#fde68a'],[1,'#c4b5fd']], op: 1.00 }, // 2:夕
-      { stops: [[0,'#1e1b4b'],[0.35,'#312e81'],[0.52,'#4c1d95'],[1,'#1e1b4b']], op: 0.48 },                   // 3:夜
-      { stops: [[0,'#090d24'],[0.38,'#11183c'],[0.54,'#1e2959'],[1,'#090d24']], op: 0.24 }                    // 4:深夜
+      { stops: [[0,'#7dd3fc'],[0.34,'#bae6fd'],[0.49,'#fde68a'],[0.54,'#fbcfe8'],[1,'#bae6fd']], op: 1.00 },
+      { stops: [[0,'#38bdf8'],[0.32,'#7dd3fc'],[0.50,'#e0f2fe'],[0.56,'#bae6fd'],[1,'#7dd3fc']], op: 1.00 },
+      { stops: [[0,'#818cf8'],[0.28,'#f472b6'],[0.48,'#fdba74'],[0.55,'#fde68a'],[1,'#c4b5fd']], op: 1.00 },
+      { stops: [[0,'#1e1b4b'],[0.35,'#312e81'],[0.52,'#4c1d95'],[1,'#1e1b4b']], op: 0.48 },
+      { stops: [[0,'#090d24'],[0.38,'#11183c'],[0.54,'#1e2959'],[1,'#090d24']], op: 0.24 }
     ],
     pre_obs: [
-      { stops: [[0,'#3b82f6'],[0.40,'#93c5fd'],[0.51,'#fed7aa'],[1,'#64748b']], op: 1.00 }, // 0:朝
-      { stops: [[0,'#2563eb'],[0.42,'#60a5fa'],[0.54,'#dbeafe'],[1,'#64748b']], op: 1.00 }, // 1:昼
-      { stops: [[0,'#1e3a8a'],[0.36,'#7c3aed'],[0.50,'#fb923c'],[1,'#334155']], op: 1.00 }, // 2:夕
-      { stops: [[0,'#091326'],[0.45,'#172554'],[1,'#091326']], op: 0.40 },                   // 3:夜
-      { stops: [[0,'#020617'],[0.45,'#0f172a'],[1,'#020617']], op: 0.18 }                    // 4:深夜
+      { stops: [[0,'#3b82f6'],[0.40,'#93c5fd'],[0.51,'#fed7aa'],[1,'#64748b']], op: 1.00 },
+      { stops: [[0,'#2563eb'],[0.42,'#60a5fa'],[0.54,'#dbeafe'],[1,'#64748b']], op: 1.00 },
+      { stops: [[0,'#1e3a8a'],[0.36,'#7c3aed'],[0.50,'#fb923c'],[1,'#334155']], op: 1.00 },
+      { stops: [[0,'#091326'],[0.45,'#172554'],[1,'#091326']], op: 0.40 },
+      { stops: [[0,'#020617'],[0.45,'#0f172a'],[1,'#020617']], op: 0.18 }
     ]
   };
   const skyDomeTexCache = {};
@@ -617,8 +847,6 @@
   function applyDynamicCameraScales(nowSec) {
     const fovRatio = getFovRatio();
     const isAnime = (state.viewMode === 'anime');
-    // ①観察アプリ：追従カメラの太陽サイズを基準にキャラ視点(広角)でも同じ存在感を維持
-    // ②③観察前・観察時：実際の空に近い自然なサイズバランス（広角でも潰れない緩やか補正）
     const bodyMul = isAnime ? fovRatio : (1 + (fovRatio - 1) * 0.42);
     const starMul = isAnime ? (1 + (fovRatio - 1) * 0.72) : (1 + (fovRatio - 1) * 0.35);
 
@@ -671,7 +899,6 @@
         } else if ((obj.isLine || obj.isLineSegments) && obj.geometry) {
           if (!obj.geometry.boundingSphere) obj.geometry.computeBoundingSphere();
           const rad = obj.geometry.boundingSphere ? obj.geometry.boundingSphere.radius : 0;
-          // 中心が原点(0,0,0)の天球星座線も広がり半径(rad > 4.5)で確実に検出して消す
           if (dist > 6.5 || rad > 4.5) hide = true;
         } else if (obj.isPoints && obj.geometry && obj.geometry.attributes && obj.geometry.attributes.position) {
           if (obj.geometry.attributes.position.count >= 8) {
@@ -726,6 +953,7 @@
 
   function updateCelestialExhibit(force = false) {
     hideLegacySkyObjects();
+    updateNorthAlignmentState();
 
     if (typeof activeCamera !== 'undefined' && activeCamera) {
       skyRoot.position.copy(activeCamera.position);
@@ -754,7 +982,6 @@
     const sunPos = raDecToAltAz(curSun.raDeg, curSun.decDeg, curLst, state.lat);
     const moonPos = raDecToAltAz(curMoon.raDeg, curMoon.decDeg, curLst, state.lat);
 
-    // 朝〜夕(false) と 夜〜深夜(true) の判定（全3モードとも朝〜夕は星座・星座名を必ず非表示）
     const isNight = isObs ? (sunPos.alt * DEG < -5.0) : (moment.phase >= 3);
 
     // 0. スクリーン表示
@@ -781,7 +1008,7 @@
       outerSpaceDome.visible = isNight;
     }
 
-    // 1. 軌道線（①観察アプリなし／②天体観察前・③天体観察時あり）
+    // 1. 軌道線
     const y = moment.date.getFullYear(), mo = moment.date.getMonth(), da = moment.date.getDate();
     if (isAnime) {
       sunOrbitLine.visible = false;
@@ -843,7 +1070,6 @@
       }
     } else {
       sunRaySprite.visible = false;
-      // ②③は現実の空に近い自然なサイズバランス
       baseSunScale = isPreObs ? 2.15 : 1.65;
       baseMoonScale = isPreObs ? 1.70 : 1.45;
 
@@ -1022,6 +1248,7 @@
       box.querySelectorAll('[data-skymode]').forEach((btn) => {
         btn.onclick = () => {
           state.viewMode = btn.getAttribute('data-skymode');
+          if (state.viewMode === 'obs') ensureGyroListener();
           saveState();
           updateCelestialExhibit(true);
         };
@@ -1054,9 +1281,10 @@
     if (stEl) stEl.innerText = lastStatusText;
   }
 
-  // --- 毎フレーム監視（旧星座線非表示＋カメラ中心追従＋画角連動スケール即時反映） ---
+  // --- 毎フレーム監視 ---
   function animateSky(now) {
     hideLegacySkyObjects();
+    updateNorthAlignmentState();
     if (typeof activeCamera !== 'undefined' && activeCamera) {
       skyRoot.position.copy(activeCamera.position);
     }
@@ -1079,7 +1307,7 @@
   requestAnimationFrame(animateSky);
 
   window.SkyTimeModule = {
-    setMode: (m) => { if (['anime','pre_obs','obs'].includes(m)) { state.viewMode = m; saveState(); updateCelestialExhibit(true); } },
+    setMode: (m) => { if (['anime','pre_obs','obs'].includes(m)) { state.viewMode = m; if (m === 'obs') ensureGyroListener(); saveState(); updateCelestialExhibit(true); } },
     setObsConstLines: (v) => { state.obsConstLines = Boolean(v); saveState(); updateCelestialExhibit(true); },
     advanceTurn,
     resetTurns,
