@@ -1,13 +1,13 @@
 // ============================================================================
 // 【独立ビジュアルモジュール：sky_time.js】
 // ・二重球体スクリーン（カメラ追従＋カリング無効化で上下視線移動のちらつき解消）
+// ・観察アプリ・天体観察前・天体観察時の全モードで朝〜夕は星座・星座名を完全非表示
 // ・①観察アプリ(アニメ・表なし)／②天体観察前(シンプルリアル・表あり)／③天体観察時(現実時刻連動スタイリッシュ空)
-// ・「今すぐ考える」＆自動思考と連動（1思考＝1ターン、5ターンごとに朝→昼→夕→夜→深夜）
 // ============================================================================
 (function initSkyTimeModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_sky_time_v8';
+  const STORAGE_KEY = 'island_sky_time_v9';
   const RAD = Math.PI / 180;
   const DEG = 180 / Math.PI;
   const SKY_R = 22.0;
@@ -224,7 +224,6 @@
     const turnPhase = Math.floor(turn / 5) % 5; // 5ターンごとに 0:朝, 1:昼, 2:夕, 3:夜, 4:深夜
     const subStep = turn % 5;
 
-    // ③ 天体観察時：スマホ現在時刻そのまま
     if (state.viewMode === 'obs') {
       let moonMood = 'calm';
       if (realPhase === 3 && nowH < 22.0) moonMood = 'energetic';
@@ -232,13 +231,11 @@
       return { date: now, phase: realPhase, subStep: 2, turn, times, moonMood, dayTag: '現実リアルタイム' };
     }
 
-    // ① 観察アプリ：表を元にしない（5ターン周期のみ）
     if (state.viewMode === 'anime') {
       const moonMood = turnPhase === 3 ? 'energetic' : 'sleepy';
       return { date: now, phase: turnPhase, subStep, turn, times, moonMood, dayTag: 'ゲーム周期(表なし)' };
     }
 
-    // ② 天体観察前：表を元にした（5ターン時間帯 × 現在時刻の当日/翌日判定）
     const refBase = new Date(skyDayBase.getTime());
     const isNextDay = Math.min(3, turnPhase) < Math.min(3, realPhase);
     if (isNextDay) refBase.setDate(refBase.getDate() + 1);
@@ -286,7 +283,6 @@
     return tex;
   }
 
-  // 外側ドーム（宇宙・星空スクリーン）
   const texOuterSpace = makeCanvasTex(1024, 512, (ctx, w, h) => {
     const g = ctx.createLinearGradient(0, 0, 0, h);
     g.addColorStop(0.00, '#020617');
@@ -307,7 +303,6 @@
     }
   });
 
-  // ①観察アプリ(パステル) ＆ ②天体観察前(①と③の中間のシンプルリアル空)
   const SKY_PALETTES = {
     anime: [
       { stops: [[0,'#7dd3fc'],[0.34,'#bae6fd'],[0.49,'#fde68a'],[0.54,'#fbcfe8'],[1,'#bae6fd']], op: 1.00 }, // 0:朝
@@ -316,7 +311,6 @@
       { stops: [[0,'#1e1b4b'],[0.35,'#312e81'],[0.52,'#4c1d95'],[1,'#1e1b4b']], op: 0.48 },                   // 3:夜
       { stops: [[0,'#090d24'],[0.38,'#11183c'],[0.54,'#1e2959'],[1,'#090d24']], op: 0.24 }                    // 4:深夜
     ],
-    // ②天体観察前：余計な装飾を抑えたすっきりシンプルな空色
     pre_obs: [
       { stops: [[0,'#3b82f6'],[0.40,'#93c5fd'],[0.51,'#fed7aa'],[1,'#64748b']], op: 1.00 }, // 0:朝
       { stops: [[0,'#2563eb'],[0.42,'#60a5fa'],[0.54,'#dbeafe'],[1,'#64748b']], op: 1.00 }, // 1:昼
@@ -341,7 +335,6 @@
     return { tex: skyDomeTexCache[key], opacity: def.op };
   }
 
-  // ③天体観察時：現実の太陽高度角(altDeg)から刻々と変化するスタイリッシュ空スクリーン
   const obsSkyCanvas = document.createElement('canvas');
   obsSkyCanvas.width = 32; obsSkyCanvas.height = 256;
   const texObsDynamicSky = new THREE.CanvasTexture(obsSkyCanvas);
@@ -357,12 +350,10 @@
   }
 
   function getRealtimeStylishSky(sunAltDeg) {
-    // 太陽高度角(-20°〜+40°)を 0.5° 刻みでキャッシュ更新
     const bucket = Math.round(sunAltDeg * 2);
     let zenith, mid, horizon, ground, opacity;
 
     if (sunAltDeg >= 18) {
-      // 澄んだ昼のスタイリッシュブルー
       const t = Math.min(1, (sunAltDeg - 18) / 25);
       zenith  = lerpHex('#1d4ed8', '#0f3d91', t);
       mid     = lerpHex('#3b82f6', '#2563eb', t);
@@ -370,7 +361,6 @@
       ground  = '#334155';
       opacity = 1.0;
     } else if (sunAltDeg >= 4) {
-      // 日の出後・日没前の爽やかな斜光空
       const t = (sunAltDeg - 4) / 14;
       zenith  = lerpHex('#1e293b', '#1d4ed8', t);
       mid     = lerpHex('#475569', '#3b82f6', t);
@@ -378,23 +368,20 @@
       ground  = '#1e293b';
       opacity = 1.0;
     } else if (sunAltDeg >= -5) {
-      // 日の出・夕焼けのゴールデン〜マジックアワー
-      const t = (sunAltDeg + 5) / 9; // 0(日没後-5°) -> 1(高度+4°)
+      const t = (sunAltDeg + 5) / 9;
       zenith  = lerpHex('#090d24', '#1e293b', t);
       mid     = lerpHex('#312e81', '#6d28d9', t);
       horizon = lerpHex('#fb7185', '#fdba74', t);
       ground  = '#0f172a';
-      opacity = 0.72 + t * 0.28; // 日没直後から少しずつ星空が透け始める
+      opacity = 0.72 + t * 0.28;
     } else if (sunAltDeg >= -14) {
-      // 薄明〜夜への移行（星座が浮かび上がる時間帯）
-      const t = (sunAltDeg + 14) / 9; // 0(-14°夜) -> 1(-5°薄明)
+      const t = (sunAltDeg + 14) / 9;
       zenith  = lerpHex('#020617', '#090d24', t);
       mid     = lerpHex('#091326', '#312e81', t);
       horizon = lerpHex('#1e293b', '#fb7185', t);
       ground  = '#020617';
       opacity = 0.22 + t * 0.50;
     } else {
-      // 深い夜〜深夜（天体観察ベストコンディション）
       zenith  = '#020617';
       mid     = '#071024';
       horizon = '#0f172a';
@@ -612,11 +599,11 @@
   moonSprite.renderOrder = -3;
   skyRoot.add(sunRaySprite, sunSprite, moonSprite);
 
-  // カメラ上下移動時に球体やスプライトが一瞬消えるカリングちらつきを完全防止
   skyRoot.traverse((obj) => { obj.frustumCulled = false; });
 
-  // --- 旧星空＆旧オリオン座看板の自動非表示 ---
-  const CONST_KW = ['オリオン座', '北斗七星', 'カシオペア', '夏の大三角', 'さそり座', 'こぐま座'];
+  // --- 元アプリ側の旧3D星座看板（北斗七星・はくちょう座・オリオン座等）＆旧星座線の完全非表示 ---
+  const CONST_KW = ['オリオン座', '北斗七星', 'カシオペア', '夏の大三角', 'さそり座', 'こぐま座', 'はくちょう座', 'こと座', 'わし座', 'おおいぬ座', 'しし座', 'ふたご座', 'ペガスス座'];
+  const tmpWorldPos = new THREE.Vector3();
 
   function isOwnObject(obj) {
     let cur = obj;
@@ -631,31 +618,39 @@
     scene.traverse((obj) => {
       if (!obj || isOwnObject(obj) || !obj.visible) return;
       const nm = (obj.name || '').toLowerCase();
-      let hide = nm.includes('star') || nm.includes('constell') || nm.includes('orion') || nm.includes('zodiac');
-      if (!hide && obj.isPoints && obj.geometry && obj.geometry.attributes && obj.geometry.attributes.position) {
-        if (obj.geometry.attributes.position.count >= 12) {
-          obj.geometry.computeBoundingSphere();
-          if (obj.geometry.boundingSphere && obj.geometry.boundingSphere.radius > 7.5) hide = true;
-        }
-      }
-      if (!hide && (obj.isLine || obj.isLineSegments || obj.isMesh)) {
-        const wp = new THREE.Vector3();
-        obj.getWorldPosition(wp);
-        if (wp.length() > 9.0 && wp.y > 1.2) {
-          if (obj.isLine || obj.isLineSegments) hide = true;
-          else if (obj.material && obj.material.color) {
-            const col = obj.material.color;
-            if (col.r > 0.82 && col.g > 0.70 && col.b < 0.52) hide = true;
+      let hide = nm.includes('star') || nm.includes('constell') || nm.includes('orion') || nm.includes('zodiac') || nm.includes('label');
+
+      // 元アプリの旧3D星座名看板（Sprite）や天球上の旧星座線・星粒を検出
+      if (!hide && (obj.isSprite || obj.isLine || obj.isLineSegments || obj.isPoints)) {
+        obj.getWorldPosition(tmpWorldPos);
+        const dist = tmpWorldPos.length();
+        if (obj.isSprite && dist > 6.5) {
+          hide = true;
+        } else if ((obj.isLine || obj.isLineSegments) && dist > 7.5) {
+          hide = true;
+        } else if (obj.isPoints && obj.geometry && obj.geometry.attributes && obj.geometry.attributes.position) {
+          if (obj.geometry.attributes.position.count >= 10) {
+            obj.geometry.computeBoundingSphere();
+            if (obj.geometry.boundingSphere && obj.geometry.boundingSphere.radius > 7.0) hide = true;
           }
         }
       }
+
+      if (!hide && obj.isMesh) {
+        obj.getWorldPosition(tmpWorldPos);
+        if (tmpWorldPos.length() > 9.0 && tmpWorldPos.y > 1.2 && obj.material && obj.material.color) {
+          const col = obj.material.color;
+          if (col.r > 0.82 && col.g > 0.70 && col.b < 0.52) hide = true;
+        }
+      }
+
       if (hide) obj.visible = false;
     });
 
     document.querySelectorAll('div, span').forEach((el) => {
       if (!el || el.id === 'env-skytime-status' || el.style.display === 'none') return;
       const txt = (el.textContent || '').trim();
-      if (txt.length > 0 && txt.length <= 18 && CONST_KW.some((kw) => txt.includes(kw))) {
+      if (txt.length > 0 && txt.length <= 20 && CONST_KW.some((kw) => txt.includes(kw))) {
         el.style.display = 'none';
       }
     });
@@ -710,9 +705,11 @@
     const curMoon = getMoonInfo(moment.date);
     const sunPos = raDecToAltAz(curSun.raDeg, curSun.decDeg, curLst, state.lat);
     const moonPos = raDecToAltAz(curMoon.raDeg, curMoon.decDeg, curLst, state.lat);
+
+    // 朝〜夕(false) と 夜〜深夜(true) の判定（全3モードとも朝〜夕は星座・星座名を必ず非表示）
     const isNight = isObs ? (sunPos.alt * DEG < -5.0) : (moment.phase >= 3);
 
-    // 0. スクリーン表示（①アニメ／②シンプルリアル／③現実時刻で日の出〜夕焼け〜夜空へ変化）
+    // 0. スクリーン表示
     if (isAnime) {
       const domeStyle = getStaticSkyDomeStyle('anime', moment.phase);
       innerSkyDome.visible = true;
@@ -733,7 +730,7 @@
       innerSkyMat.map = obsDome.tex;
       innerSkyMat.opacity = obsDome.opacity;
       innerSkyMat.needsUpdate = true;
-      outerSpaceDome.visible = (sunPos.alt * DEG < 4.0);
+      outerSpaceDome.visible = isNight;
     }
 
     // 1. 軌道線（①観察アプリなし／②天体観察前・③天体観察時あり）
@@ -759,7 +756,7 @@
     currentRayMode = 'off';
     if (isAnime) {
       if (!isNight) {
-        const dayStep = moment.phase * 5 + moment.subStep; // 0..14
+        const dayStep = moment.phase * 5 + moment.subStep;
         const dayProgress = dayStep / 14;
         const az = (96 + dayProgress * 168) * RAD;
         const alt = (0.10 + Math.sin(dayProgress * Math.PI) * 0.72);
@@ -784,7 +781,7 @@
       } else {
         sunSprite.visible = false;
         sunRaySprite.visible = false;
-        const nightStep = (moment.phase - 3) * 5 + moment.subStep; // 0..9
+        const nightStep = (moment.phase - 3) * 5 + moment.subStep;
         const nightProgress = nightStep / 9;
         const az = (120 + nightProgress * 120) * RAD;
         const alt = (0.18 + Math.sin(nightProgress * Math.PI) * 0.52);
@@ -828,7 +825,7 @@
       }
     }
 
-    // 3. 星座（夜・深夜のみ／星はすべて●型）
+    // 3. 星座（朝〜夕は全モード完全非表示・夜〜深夜のみ表示）
     starGroup.visible = isNight;
     if (isNight) {
       const pArr = [], lArr = [];
@@ -1003,8 +1000,9 @@
     if (stEl) stEl.innerText = lastStatusText;
   }
 
-  // --- 軽量アニメーション＆カメラ中心追従（二重描画なしでちらつきゼロ） ---
+  // --- 毎フレーム監視（旧3D星座看板の即座非表示＋カメラ中心追従＋朝の▲アニメーション） ---
   function animateSky(now) {
+    hideLegacySkyObjects();
     if (typeof activeCamera !== 'undefined' && activeCamera) {
       skyRoot.position.copy(activeCamera.position);
     }
