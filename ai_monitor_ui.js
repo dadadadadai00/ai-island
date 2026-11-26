@@ -1,8 +1,8 @@
 // ============================================================================
 // 【分割AI通信モジュール 4/4：ai_monitor_ui.js】
-// ・1ターン答え合わせ2タブモーダル（目標メモ/詳細指定の独立行表示）・コピペ・設定UI
-// ・自動「⚡ 今すぐ考える」連続再生（5段階間隔・モニター開いたら即完全停止）
-// ・全モーダル共通の非崩れピンチ拡大縮小（内部スクロール保護付き）
+// ・1ターン答え合わせ2タブモーダル（5ページ日記帳確認対応）・コピペ・設定UI
+// ・設定画面の「📡 通信・AI」タブ内へのコントロール配置・60秒間隔対応
+// ・「本当の輪っか」可視化インジケーター（①体サイン ➡ ②Ai通信 ➡ ③現実更新/エラー停止）
 // ============================================================================
 (function initAiMonitorUiModule() {
   const SYS = window.AI_SYS;
@@ -20,7 +20,8 @@
     { ms: 5000,  label: '② 5.0秒（標準・有料枠向け）' },
     { ms: 10000, label: '③ 10秒（やや遅め・軽負荷）' },
     { ms: 16000, label: '④ 16秒（無料枠・安定推奨）' },
-    { ms: 25000, label: '⑤ 25秒（無料枠・超安全）' }
+    { ms: 25000, label: '⑤ 25秒（無料枠・超安全）' },
+    { ms: 60000, label: '⑥ 60秒（通信節約・ゆっくり思考）' }
   ];
 
   let currentMonitorTab = 'before';
@@ -32,15 +33,105 @@
   let autoBusy = false;
 
   function getAutoIntervalMs() {
-    const raw = (typeof safeStorage !== 'undefined') ? Number(safeStorage.getItem(AUTO_INTERVAL_KEY)) : 16000;
+    const raw = (typeof safeStorage !== 'undefined') ? Number(safeStorage.getItem(AUTO_INTERVAL_KEY)) : 60000;
     const hit = AUTO_INTERVAL_OPTIONS.find(o => o.ms === raw);
-    return hit ? hit.ms : 16000;
+    return hit ? hit.ms : 60000;
   }
 
   function isAnyModalOpen() {
     return Array.from(document.querySelectorAll('.modal-overlay')).some(
       el => el.classList.contains('active') || (el.style.display && el.style.display !== 'none')
     );
+  }
+
+  // --- 本当の輪っか 可視化バーの注入・状態更新 ---
+  function injectTrueLoopVisualizer() {
+    const bottomPanel = document.getElementById('bottom-panel');
+    const msgBox = document.getElementById('message-box');
+    if (!bottomPanel || !msgBox || document.getElementById('true-loop-visualizer')) return;
+
+    const wrap = document.createElement('div');
+    wrap.id = 'true-loop-visualizer';
+    wrap.style.cssText = 'background:#f0f9ff;border:1.5px solid #38bdf8;border-radius:10px;padding:5px 8px;display:flex;flex-direction:column;gap:4px;transition:all 0.25s;';
+    wrap.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:3px;font-size:10px;font-weight:900;text-align:center;">
+        <span id="loop-node-1" style="flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:2px 3px;color:#334155;">① 体サイン</span>
+        <span style="color:#64748b;">➡</span>
+        <span id="loop-node-2" style="flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:2px 3px;color:#334155;">② Ai通信</span>
+        <span style="color:#64748b;">➡</span>
+        <span id="loop-node-3" style="flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:2px 3px;color:#334155;">③ 現実が動く</span>
+        <span id="loop-diary-pill" style="background:#fef9c3;border:1px solid #facc15;color:#854d0e;border-radius:999px;padding:2px 6px;white-space:nowrap;">📖 0/5P</span>
+      </div>
+      <div id="loop-detail-line" style="font-size:10px;font-weight:800;color:#0369a1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+        待機中：輪っかが1周すると日記保存＆数字が回復します
+      </div>
+    `;
+    bottomPanel.insertBefore(wrap, msgBox);
+  }
+
+  function setTrueLoopState(mode, detailText = '') {
+    injectTrueLoopVisualizer();
+    const wrap = document.getElementById('true-loop-visualizer');
+    const n1 = document.getElementById('loop-node-1');
+    const n2 = document.getElementById('loop-node-2');
+    const n3 = document.getElementById('loop-node-3');
+    const line = document.getElementById('loop-detail-line');
+    const pill = document.getElementById('loop-diary-pill');
+    if (!wrap || !n1 || !n2 || !n3) return;
+
+    const resetNode = (el) => {
+      el.style.background = '#ffffff';
+      el.style.borderColor = '#cbd5e1';
+      el.style.color = '#334155';
+    };
+    const setNodeOk = (el) => {
+      el.style.background = '#dcfce7';
+      el.style.borderColor = '#22c55e';
+      el.style.color = '#166534';
+    };
+    const setNodeActive = (el) => {
+      el.style.background = '#dbeafe';
+      el.style.borderColor = '#3b82f6';
+      el.style.color = '#1e40af';
+    };
+    const setNodeErr = (el) => {
+      el.style.background = '#fee2e2';
+      el.style.borderColor = '#ef4444';
+      el.style.color = '#991b1b';
+    };
+
+    resetNode(n1); resetNode(n2); resetNode(n3);
+    wrap.style.background = '#f0f9ff';
+    wrap.style.borderColor = '#38bdf8';
+    if (line) line.style.color = '#0369a1';
+
+    if (mode === 'step1') {
+      setNodeActive(n1);
+    } else if (mode === 'step2') {
+      setNodeOk(n1);
+      setNodeActive(n2);
+    } else if (mode === 'step3') {
+      wrap.style.background = '#f0fdf4';
+      wrap.style.borderColor = '#22c55e';
+      setNodeOk(n1); setNodeOk(n2); setNodeOk(n3);
+      if (line) line.style.color = '#166534';
+    } else if (mode === 'error') {
+      wrap.style.background = '#fef2f2';
+      wrap.style.borderColor = '#ef4444';
+      setNodeOk(n1);
+      setNodeErr(n2);
+      if (line) line.style.color = '#dc2626';
+    }
+
+    if (pill && typeof ROBOT !== 'undefined') {
+      const cnt = Array.isArray(ROBOT.diaryPages) ? ROBOT.diaryPages.length : 0;
+      const flags = [];
+      if (ROBOT.isInjured) flags.push('🩹');
+      if (ROBOT.isSick) flags.push('😷');
+      if (ROBOT.ghostNear) flags.push('👻');
+      pill.innerText = `${flags.join('')}📖 ${cnt}/5P`;
+    }
+    if (line && detailText) line.innerText = detailText;
   }
 
   function updateAutoPlayButtonUI() {
@@ -103,7 +194,6 @@
     }
     autoBusy = false;
 
-    // 通信中に停止またはモニターが開かれていた場合は次を絶対に予約しない
     if (!autoPlayEnabled) return;
     if (isAnyModalOpen()) {
       stopAutoPlay('⏹ モニター/設定画面を開いたため自動思考を停止しました');
@@ -112,8 +202,8 @@
     if (ST.lastTurnAudit && ST.lastTurnAudit.error) {
       const is429 = String(ST.lastTurnAudit.error).includes('429');
       stopAutoPlay(is429
-        ? '⚠️ レート制限(429)で停止：⚙️設定で間隔を④16秒〜⑤25秒へ広げてください'
-        : '⚠️ 通信エラーのため自動思考を停止しました');
+        ? '⚠️ レート制限(429)で停止：⚙️設定で間隔を⑥60秒へ広げてください'
+        : '❌ 通信エラーのため輪っかと自動思考を停止しました');
       return;
     }
     if (typeof life !== 'undefined' && life && life.getState && life.getState().mode === 'DEAD') {
@@ -174,13 +264,13 @@
       `通信方式: A案(記号マップ送信) / 使用モデル: ${a.modelId}`,
       `視野状態: 行動前=${a.isMovingBefore ? '移動視点' : 'クリア(停止180°)'}（向き:${a.facingBefore}） → 行動後=${a.isMovingAfter ? '移動視点' : 'クリア(停止180°)'}（向き:${a.facingAfter}）`,
       '', '--- [1] AIへ送信した情報文（今すぐ考える前） ---', a.promptText || '(なし)',
-      '', '--- [2] AIからの返答（しゃべり・目標・判断・動き） ---'
+      '', '--- [2] AIからの返答（やさしい例え話・判断・動き） ---'
     ];
     if (a.error) {
       lines.push(`エラー: ${a.error}`, `生データ: ${a.rawResponse || '-'}`);
     } else {
       lines.push(`思考・しゃべり: ${a.thoughtText}`);
-      if (a.goalText) lines.push(`目標メモ(goal): ${a.goalText}`);
+      if (a.goalText) lines.push(`日記状態: ${a.goalText}`);
       lines.push(`選んだ行動 / 方角: ${a.actionId} / ${a.dirName}`);
       lines.push(`詳細指定: ${formatDetailParams(a)}`);
       lines.push(`表情・動き(モーション): ${a.motionLabel}`, `生返答JSON: ${a.rawResponse}`);
@@ -279,7 +369,6 @@
       if (nowVis !== prevVis) {
         prevVis = nowVis;
         resetZoom();
-        // いずれかのモーダルが開いた瞬間に自動思考を即停止
         if (nowVis && autoPlayEnabled) stopAutoPlay('⏹ 画面を開いたため自動思考を停止しました');
       }
     }).observe(overlay, { attributes: true, attributeFilter: ['style', 'class'] });
@@ -351,7 +440,7 @@
     }
   }
 
-  // --- 統一2タブ式モニター描画 ＆ 設定UI・自動再生ボタン注入 ---
+  // --- 統一2タブ式モニター描画 ＆ 設定UI（「📡 通信・AI」タブへ配置）---
   function applyDimOverlayState(isMovingDim) {
     currentDimMoving = Boolean(isMovingDim);
     const lM = document.getElementById('mon-dim-left'), rM = document.getElementById('mon-dim-right');
@@ -390,14 +479,14 @@
         return;
       }
       if (a.error) {
-        if (rSumEl) rSumEl.innerHTML = `<div style="color:#dc2626;font-weight:900;">⚠️ 通信エラー：${API.escapeHtml(a.error).replace(/\n/g, '<br>')}</div>`;
+        if (rSumEl) rSumEl.innerHTML = `<div style="color:#dc2626;font-weight:900;">❌ 通信エラー（輪っか停止）：${API.escapeHtml(a.error).replace(/\n/g, '<br>')}</div>`;
       } else {
         const detail = formatDetailParams(a);
-        const goalLine = a.goalText ? `<div><strong>🎯 目標メモ：</strong>${API.escapeHtml(a.goalText)}</div>` : '';
+        const goalLine = a.goalText ? `<div><strong>📖 5ページ日記状態：</strong>${API.escapeHtml(a.goalText)}</div>` : '';
         if (rSumEl) {
           rSumEl.innerHTML = [
             goalLine,
-            `<div><strong>💬 思考・しゃべり：</strong>${API.escapeHtml(a.thoughtText)}</div>`,
+            `<div><strong>💬 やさしい例え話・思考：</strong>${API.escapeHtml(a.thoughtText)}</div>`,
             `<div><strong>🧭 行動 / 方角：</strong><code>${API.escapeHtml(a.actionId)}</code> ／ <strong>${API.escapeHtml(a.dirName)}</strong>　<strong>🤖 動き：</strong>${API.escapeHtml(a.motionLabel)}</div>`,
             `<div><strong>⚙️ 詳細指定：</strong><code>${API.escapeHtml(detail)}</code></div>`
           ].filter(Boolean).join('');
@@ -415,7 +504,7 @@
         applyDimOverlayState(live.isMoving);
         if (pLblEl) pLblEl.innerText = '📤 AIへ送る予定の情報文（まだ送信前）';
         if (pEl) { pEl.textContent = live.promptText || ''; pEl.scrollTop = 0; }
-        fillReply('📥 AIからの返答（しゃべり・目標・判断・詳細）');
+        fillReply('📥 AIからの返答（やさしい例え話・判断・詳細）');
         return;
       }
       if (metaEl) metaEl.innerText = `第${a.turnNo}ターン(${a.day}日目 ${a.time}) ／ 行動前 ／ ${a.isMovingBefore ? '🏃移動視点(自動)' : '🧍クリア(自動)'} ／ 向き:${a.facingBefore}`;
@@ -423,7 +512,7 @@
       applyDimOverlayState(a.isMovingBefore);
       if (pLblEl) pLblEl.innerText = '📤 AIへ送信した情報文（今すぐ考える前）';
       if (pEl) { pEl.textContent = a.promptText || ''; pEl.scrollTop = 0; }
-      fillReply('📥 AIからの返答（しゃべり・目標・判断・詳細）');
+      fillReply('📥 AIからの返答（やさしい例え話・判断・詳細）');
     } else {
       const live = CORE.buildPerceptionPayload('map', ST.lastTurnWasMoving);
       if (metaEl) metaEl.innerText = `${a.hasData ? `第${a.turnNo}ターン後(${a.day}日目 ${a.time})` : '現在状態（未実行）'} ／ 次の送信状態 ／ ${live.isMoving ? '🏃移動視点(自動)' : '🧍クリア(自動)'} ／ 向き:${CAM.rotToShortDirName(ROBOT.rotY || 0)}`;
@@ -431,12 +520,11 @@
       applyDimOverlayState(live.isMoving);
       if (pLblEl) pLblEl.innerText = '📤 現在の状態文（次に送る予定の情報）';
       if (pEl) { pEl.textContent = live.promptText || ''; pEl.scrollTop = 0; }
-      fillReply('📥 直前ターンのAI返答（しゃべり・目標・判断・詳細）');
+      fillReply('📥 直前ターンのAI返答（やさしい例え話・判断・詳細）');
     }
   }
 
   function openVisionMonitor(initialTab = null) {
-    // モニターを開いたら即座に自動思考を完全停止
     if (autoPlayEnabled) stopAutoPlay('👁️ モニターを開いたため自動思考を停止しました');
     const modal = document.getElementById('modal-ai-vision');
     if (!modal) return;
@@ -478,11 +566,14 @@
   }
 
   function injectVisionControlsUI() {
+    injectTrueLoopVisualizer();
     injectAutoPlayButton();
 
     const settingsModal = document.getElementById('modal-settings');
     if (settingsModal && !document.getElementById('setting-ai-vision-mode')) {
-      const commCard = settingsModal.querySelector('.comm-toggle-card');
+      // 新設した「📡 通信・AI」タブパネル内へ配置
+      const commPanel = document.getElementById('settings-tab-panel-comm') || settingsModal;
+      const commCard = commPanel.querySelector('.comm-toggle-card');
       const group = document.createElement('div');
       group.className = 'setting-group';
       group.style.cssText = 'background:#f0f9ff;border:1.5px solid #7dd3fc;border-radius:12px;padding:8px 10px;gap:6px;';
@@ -494,13 +585,14 @@
           <option value="image" ${CONST.B_MODE_LOCKED ? 'disabled' : ''}>${CONST.B_MODE_LOCKED ? '🔒 B案：キャラ視点3Dカメラ画像（A案安定まで使用停止）' : 'B案：キャラ視点3Dカメラ画像'}</option>
         </select>
         ${CONST.B_MODE_LOCKED ? '<div style="background:#334155;color:#94a3b8;border:1px solid #475569;border-radius:8px;padding:6px 8px;font-size:10.5px;font-weight:800;opacity:0.85;">🔒 B案（3Dカメラ画像のAI送信）：使用停止中（機能温存・A案安定次第解放）</div>' : ''}
-        <label class="setting-label" style="color:#0369a1;margin-top:2px;">▶ 自動思考の実行間隔（5段階・無料枠は④〜⑤推奨）</label>
+        <label class="setting-label" style="color:#0369a1;margin-top:2px;">▶ 自動思考の実行間隔（既存5段階＋⑥60秒追加）</label>
         <select id="setting-auto-interval" class="setting-input">${intervalOptsHtml}</select>
         <label class="setting-label" style="color:#0369a1;margin-top:2px;">🤖 Groqモデル手動指定（空欄で自動検出）</label>
         <input id="setting-groq-manual-model" type="text" class="setting-input" placeholder="例: openai/gpt-oss-120b（空欄推奨）">
         <button type="button" id="btn-open-vision-mon-from-settings" class="btn-sub" style="padding:6px;font-size:11px;">👁️ 1ターン答え合わせ・キャラ視点を確認する</button>
       `;
       if (commCard && commCard.parentNode) commCard.parentNode.insertBefore(group, commCard.nextSibling);
+      else commPanel.appendChild(group);
 
       const sel = document.getElementById('setting-ai-vision-mode');
       if (sel) { sel.value = ST.visionMode; sel.addEventListener('change', () => CORE.setVisionMode(sel.value)); }
@@ -601,7 +693,8 @@
   SYS.ui = {
     openVisionMonitor, closeVisionMonitor,
     enablePinchZoomOnAllModals, resetAllModalZooms,
-    buildTurnCopyText, setAutoPlay, stopAutoPlay, isAutoPlay: () => autoPlayEnabled
+    buildTurnCopyText, setAutoPlay, stopAutoPlay, isAutoPlay: () => autoPlayEnabled,
+    setTrueLoopState
   };
 
   injectVisionControlsUI();
