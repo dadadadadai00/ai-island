@@ -52,18 +52,30 @@
     #bottom-panel { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.98); border-top-left-radius: 20px; border-top-right-radius: 20px; box-shadow: 0 -4px 20px rgba(0,0,0,0.2); padding: 12px 15px 14px; z-index: 10; display: flex; flex-direction: column; gap: 8px; }
     .panel-header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 800; color: #475569; }
     .ai-badge { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: bold; }
-    #message-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 600; color: #1e293b; height: 64px; overflow-y: auto; line-height: 1.45; }
+    #message-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 600; color: #1e293b; height: 64px; overflow-y: auto; line-height: 1.45; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
     .action-history { font-size: 11px; color: #64748b; display: flex; justify-content: space-between; align-items: center; font-weight: 700; gap: 6px; }
     .history-tag { background: #f1f5f9; padding: 2px 8px; border-radius: 8px; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 58%; }
     .btn-think { background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%); color: #fff; border: none; border-radius: 12px; padding: 12px; font-size: 15px; font-weight: 900; text-align: center; box-shadow: 0 4px 0 #2563eb; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; }
     .btn-think:active { transform: translateY(3px); box-shadow: 0 1px 0 #2563eb; }
     .btn-think:disabled { opacity: 0.6; pointer-events: none; }
     #toast { position: fixed; top: 106px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,0.92); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 100; white-space: nowrap; }
-    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.75); z-index: 50; display: none; justify-content: center; align-items: center; }
+
+    /* ▼ モーダル共通（スマホ画面はみ出し＆スクロール不可対策済み） */
+    .modal-overlay { position: fixed; inset: 0; width: 100%; height: 100dvh; background: rgba(15,23,42,0.75); z-index: 50; display: none; justify-content: center; align-items: center; padding: 12px 0; }
     .modal-overlay.active { display: flex; }
-    .modal-content { background: #fff; width: 94%; max-width: 416px; max-height: 90vh; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); position: relative; overflow-y: auto; }
+    .modal-content { background: #fff; width: 94%; max-width: 416px; max-height: calc(100dvh - 28px); border-radius: 18px; padding: 14px 14px 22px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); position: relative; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain; }
     .modal-close { position: absolute; top: 12px; right: 15px; font-size: 20px; font-weight: bold; color: #94a3b8; cursor: pointer; z-index: 10; }
-    .modal-title { font-size: 15px; font-weight: 900; color: #1e293b; display: flex; align-items: center; gap: 6px; }
+    .modal-title { font-size: 15px; font-weight: 900; color: #1e293b; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+    /* ▼ 設定モーダル専用（タブ切替＋内部スクロール＋固定フッター） */
+    #modal-settings .modal-content { overflow: hidden; padding-bottom: 12px; }
+    .settings-tab-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; background: #f1f5f9; padding: 4px; border-radius: 12px; flex-shrink: 0; }
+    .settings-tab-btn { border: 1.5px solid transparent; background: transparent; color: #64748b; border-radius: 9px; padding: 7px 4px; font-size: 11px; font-weight: 900; cursor: pointer; text-align: center; transition: all 0.15s; white-space: nowrap; }
+    .settings-tab-btn.active { background: #ffffff; color: #1d4ed8; border-color: #3b82f6; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+    #settings-scroll-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; padding: 2px 2px 14px; }
+    .settings-tab-panel { display: flex; flex-direction: column; gap: 8px; }
+    #settings-fixed-footer { flex-shrink: 0; padding-top: 8px; border-top: 1px solid #e2e8f0; background: #ffffff; }
+
     .dream-banner-box { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1.5px solid #f59e0b; border-radius: 11px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; }
     .dream-banner-label { font-size: 10.5px; font-weight: 900; color: #92400e; }
     .dream-banner-val { font-size: 13px; font-weight: 900; color: #b45309; }
@@ -89,16 +101,16 @@
     .toggle-slider::before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: #fff; transition: 0.25s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.25); }
     .toggle-switch input:checked + .toggle-slider { background: #7c3aed; }
     .toggle-switch input:checked + .toggle-slider::before { transform: translateX(22px); }
-    .btn-primary { background: #3b82f6; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: 900; cursor: pointer; width: 100%; }
+    .btn-primary { background: #3b82f6; color: #fff; border: none; padding: 11px; border-radius: 10px; font-weight: 900; font-size: 13px; cursor: pointer; width: 100%; }
     .btn-accent { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: #fff; border: none; padding: 11px; border-radius: 12px; font-weight: 900; font-size: 13px; cursor: pointer; width: 100%; box-shadow: 0 3px 10px rgba(109,40,217,0.3); }
     .btn-pink { background: #ec4899; color: #fff; border: none; padding: 11px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
     .btn-sub { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 9px; border-radius: 10px; font-weight: 800; cursor: pointer; width: 100%; }
-    .btn-danger { background: #ef4848; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
+    .btn-danger { background: #ef4444; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
     .rig-tab-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #f1f5f9; padding: 4px; border-radius: 12px; }
     .rig-tab-btn { padding: 7px 5px; border-radius: 9px; font-size: 11.5px; font-weight: 900; text-align: center; cursor: pointer; color: #64748b; border: 2px solid transparent; transition: all 0.15s; }
     .rig-tab-btn.active { background: #fff; color: #1d4ed8; border-color: #3b82f6; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
     .rig-tab-btn.active-danger { background: #fff1f2; color: #be123c; border-color: #f43f5e; box-shadow: 0 2px 6px rgba(244,63,94,0.15); }
-    .expr-list-container { display: flex; flex-direction: column; gap: 6px; max-height: 48vh; overflow-y: auto; padding: 4px 2px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
+    .expr-list-container { display: flex; flex-direction: column; gap: 6px; max-height: 48vh; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; padding: 4px 2px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
     .expr-row { display: flex; align-items: center; gap: 6px; background: #f8fafc; padding: 5px; border-radius: 10px; border: 1.5px solid #e2e8f0; }
     .expr-row.selected { border-color: #3b82f6; background: #eff6ff; }
     .expr-left-btn { width: 118px; flex-shrink: 0; display: flex; align-items: center; gap: 5px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 6px 6px; cursor: pointer; font-size: 11px; font-weight: 900; color: #1e293b; text-align: left; }
@@ -111,14 +123,14 @@
     .param-row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: #1e293b; }
     .param-label { width: 114px; flex-shrink: 0; display: flex; align-items: center; gap: 3px; white-space: nowrap; }
     .param-slider { flex: 1; accent-color: #3b82f6; height: 6px; cursor: pointer; }
-    .param-val { width: 30px; text-align: right; font-weight: 900; color: #2563eb; font-size: 11px; }
+    .param-val { width: 38px; text-align: right; font-weight: 900; color: #2563eb; font-size: 10.5px; }
     .param-row.locked-dark { background: #1e293b; color: #64748b; border-radius: 7px; padding: 4px 6px; opacity: 0.72; pointer-events: none; }
     .param-row.locked-dark .param-val { color: #64748b; }
     .eff-bar-wrap { flex: 1; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; position: relative; }
     .eff-bar-fill { height: 100%; background: #3b82f6; border-radius: 999px; transition: width 0.25s, background-color 0.25s; }
     .eff-bar-fill.up { background: #f97316; }
     .eff-bar-fill.down { background: #8b5cf6; }
-    .eff-val-box { width: 64px; text-align: right; font-size: 10.5px; font-weight: 900; white-space: nowrap; }
+    .eff-val-box { width: 72px; text-align: right; font-size: 10px; font-weight: 900; white-space: nowrap; }
     .diff-plus { color: #ea580c; }
     .diff-minus { color: #7c3aed; }
     .diff-zero { color: #64748b; }
@@ -202,12 +214,12 @@
 
 <div id="toast">💾 データを保存したよ</div>
 
-<!-- 📖 ロボット手帳モーダル -->
+<!-- 📖 ロボット手帳モーダル（下までスクロール完全対応） -->
 <div class="modal-overlay" id="modal-diary" style="display:none;">
-  <div class="modal-content">
+  <div class="modal-content" data-allow-inner-scroll="1">
     <div class="modal-close" onclick="closeModal('modal-diary')">✕</div>
-    <div class="modal-title">📖 1号機の手帳（全16エリア・5つの夢・カバン）</div>
-    <div style="display:flex; align-items:center; gap:10px; background:#f8fafc; padding:7px 10px; border-radius:12px; border:1px solid #e2e8f0;">
+    <div class="modal-title">📖 1号機の手帳（5ページ日記・夢ゲージ・カバン）</div>
+    <div style="display:flex; align-items:center; gap:10px; background:#f8fafc; padding:7px 10px; border-radius:12px; border:1px solid #e2e8f0; flex-shrink:0;">
       <div style="font-size:28px;" id="diary-emo-icon">🙂</div>
       <div style="flex:1; min-width:0;">
         <div style="font-weight:900; font-size:12.5px; color:#1e293b;" id="diary-robo-name">1号機（🎲サイコロ箱型・生存 1日目）</div>
@@ -216,12 +228,12 @@
       </div>
     </div>
 
-    <div class="dream-banner-box">
+    <div class="dream-banner-box" style="flex-shrink:0;">
       <span class="dream-banner-label">🌟 いまの夢（称号）</span>
       <span class="dream-banner-val" id="diary-dream-title">『🧭 探検家・勇者』</span>
     </div>
 
-    <div class="area-diary-box">
+    <div class="area-diary-box" style="flex-shrink:0;">
       <div style="min-width:0;">
         <div id="diary-area-label">📍 🏠 マイホーム（パステル島・創作保存ON）</div>
         <div id="diary-pet-label" style="font-size:10px; color:#be185d;">🐾 ついてくる相棒：まだいません</div>
@@ -229,11 +241,11 @@
       <button type="button" class="btn-mini-home" onclick="if(window.switchAreaById){window.switchAreaById('home', true);} closeModal('modal-diary');">🏠 住居へ戻る</button>
     </div>
 
-    <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
       <span style="font-size:11px; font-weight:900; color:#0f766e;">📏 大きさ(高さ：分割1〜5ブロック)</span>
       <button type="button" onclick="setTinySlimPreset()" style="font-size:9.5px; font-weight:900; padding:2px 7px; border-radius:6px; border:1px solid #14b8a6; background:#f0fdfa; color:#0f766e; cursor:pointer;">🧚 極小×やせっちょ(1×1)にする</button>
     </div>
-    <div class="spec-switch-row-5">
+    <div class="spec-switch-row-5" style="flex-shrink:0;">
       <div class="spec-chip" id="size-chip-giant" onclick="changeRobotSizeFromDiary('giant')">巨大<br>(高5)</div>
       <div class="spec-chip" id="size-chip-large" onclick="changeRobotSizeFromDiary('large')">大<br>(高4)</div>
       <div class="spec-chip" id="size-chip-medium" onclick="changeRobotSizeFromDiary('medium')">標準<br>(高3)</div>
@@ -241,8 +253,8 @@
       <div class="spec-chip" id="size-chip-tiny" onclick="changeRobotSizeFromDiary('tiny')">極小<br>(高1)</div>
     </div>
 
-    <div style="font-size:11px; font-weight:900; color:#0f766e;">🐛 太さ(横幅：分割1〜5ブロック)</div>
-    <div class="spec-switch-row-5">
+    <div style="font-size:11px; font-weight:900; color:#0f766e; flex-shrink:0;">🐛 太さ(横幅：分割1〜5ブロック)</div>
+    <div class="spec-switch-row-5" style="flex-shrink:0;">
       <div class="spec-chip" id="body-chip-fat5" onclick="changeRobotBodyFromDiary('fat5')">でぶっちょ<br>(幅5)</div>
       <div class="spec-chip" id="body-chip-fat4" onclick="changeRobotBodyFromDiary('fat4')">ちょいでぶ<br>(幅4)</div>
       <div class="spec-chip" id="body-chip-normal3" onclick="changeRobotBodyFromDiary('normal3')">標準<br>(幅3)</div>
@@ -250,40 +262,40 @@
       <div class="spec-chip" id="body-chip-slim1" onclick="changeRobotBodyFromDiary('slim1')">やせっちょ<br>(幅1)</div>
     </div>
 
-    <div class="rig-tab-bar">
-      <div class="rig-tab-btn active" id="tab-diary-base" onclick="switchDiaryParamTab('base')">🟢 5つの夢ゲージ(表)</div>
-      <div class="rig-tab-btn" id="tab-diary-hidden" onclick="switchDiaryParamTab('hidden')">🔴 裏ゲージ＆トラウマ(裏)</div>
+    <div class="rig-tab-bar" style="flex-shrink:0;">
+      <div class="rig-tab-btn active" id="tab-diary-base" onclick="switchDiaryParamTab('base')">🟢 願いゲージ(デフォルト50)</div>
+      <div class="rig-tab-btn" id="tab-diary-hidden" onclick="switchDiaryParamTab('hidden')">🔴 裏ゲージ(体験0スタート＋トラウマ)</div>
     </div>
 
-    <div class="lab-panel" id="diary-panel-base">
+    <div class="lab-panel" id="diary-panel-base" style="flex-shrink:0;">
       <div style="font-size:10.5px; font-weight:900; color:#1e3a8a; display:flex; justify-content:space-between;">
-        <span>🌈 行動で育つ「5つの夢ゲージ」</span>
+        <span>🌈 願いゲージ(50) ＋ 体験(0〜)</span>
         <span style="font-size:9.5px; color:#64748b;">※最高値で夢が変化</span>
       </div>
       <div class="param-row">
         <span class="param-label">🗡️ ぼうけん(探検家)</span>
         <input type="range" min="0" max="100" id="param-curiosity" class="param-slider" oninput="onParamSliderInput('curiosity', this.value)">
-        <span class="param-val" id="val-param-curiosity">60</span>
+        <span class="param-val" id="val-param-curiosity">50+0</span>
       </div>
       <div class="param-row">
         <span class="param-label">🎵 げいじゅつ(音楽家)</span>
         <input type="range" min="0" max="100" id="param-cautionLimiter" class="param-slider" oninput="onParamSliderInput('cautionLimiter', this.value)">
-        <span class="param-val" id="val-param-cautionLimiter">50</span>
+        <span class="param-val" id="val-param-cautionLimiter">50+0</span>
       </div>
       <div class="param-row">
         <span class="param-label">💪 ちから(大工さん)</span>
         <input type="range" min="0" max="100" id="param-power" class="param-slider" oninput="onParamSliderInput('power', this.value)">
-        <span class="param-val" id="val-param-power">50</span>
+        <span class="param-val" id="val-param-power">50+0</span>
       </div>
       <div class="param-row">
         <span class="param-label">💖 やさしさ(お花屋)</span>
         <input type="range" min="0" max="100" id="param-eco" class="param-slider" oninput="onParamSliderInput('eco', this.value)">
-        <span class="param-val" id="val-param-eco">40</span>
+        <span class="param-val" id="val-param-eco">50+0</span>
       </div>
       <div class="param-row">
         <span class="param-label">💡 かしこさ(学者)</span>
         <input type="range" min="0" max="100" id="param-logic" class="param-slider" oninput="onParamSliderInput('logic', this.value)">
-        <span class="param-val" id="val-param-logic">50</span>
+        <span class="param-val" id="val-param-logic">50+0</span>
       </div>
       <div class="param-row locked-dark" title="予備パラメータ（現在は暗転ロック中）">
         <span class="param-label">🔒 忠誠心(予備)</span>
@@ -291,40 +303,40 @@
         <span class="param-val">50</span>
       </div>
       <div class="trauma-display-box">
-        <div style="font-weight:900; font-size:10px; color:#9f1239;">⚡ 現在キャラが抱えているトラウマ（表示のみ）</div>
+        <div style="font-weight:900; font-size:10px; color:#9f1239;">⚡ 現在のケガ・病気・トラウマ（表示のみ）</div>
         <div class="trauma-tag-list" id="base-trauma-tag-list"></div>
       </div>
     </div>
 
-    <div class="lab-panel hidden-tab" id="diary-panel-hidden" style="display:none;">
+    <div class="lab-panel hidden-tab" id="diary-panel-hidden" style="display:none; flex-shrink:0;">
       <div style="font-size:10.5px; font-weight:900; color:#9f1239; display:flex; justify-content:space-between;">
-        <span>🧠 AIが実際に使う「裏の夢ゲージ（最終値）」</span>
+        <span>🧠 裏の夢ゲージ（願い50＋体験0スタート）</span>
         <span style="font-size:9.5px; color:#be123c;">※トラウマで＋－変動</span>
       </div>
       <div class="param-row">
         <span class="param-label">🗡️ ぼうけん(探検家)</span>
-        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-curiosity" style="width:60%"></div></div>
-        <span class="eff-val-box" id="eff-val-curiosity">60 (±0)</span>
+        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-curiosity" style="width:50%"></div></div>
+        <span class="eff-val-box" id="eff-val-curiosity">50 (体験+0)</span>
       </div>
       <div class="param-row">
         <span class="param-label">🎵 げいじゅつ(音楽家)</span>
         <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-cautionLimiter" style="width:50%"></div></div>
-        <span class="eff-val-box" id="eff-val-cautionLimiter">50 (±0)</span>
+        <span class="eff-val-box" id="eff-val-cautionLimiter">50 (体験+0)</span>
       </div>
       <div class="param-row">
         <span class="param-label">💪 ちから(大工さん)</span>
         <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-power" style="width:50%"></div></div>
-        <span class="eff-val-box" id="eff-val-power">50 (±0)</span>
+        <span class="eff-val-box" id="eff-val-power">50 (体験+0)</span>
       </div>
       <div class="param-row">
         <span class="param-label">💖 やさしさ(お花屋)</span>
-        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-eco" style="width:40%"></div></div>
-        <span class="eff-val-box" id="eff-val-eco">40 (±0)</span>
+        <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-eco" style="width:50%"></div></div>
+        <span class="eff-val-box" id="eff-val-eco">50 (体験+0)</span>
       </div>
       <div class="param-row">
         <span class="param-label">💡 かしこさ(学者)</span>
         <div class="eff-bar-wrap"><div class="eff-bar-fill" id="eff-bar-logic" style="width:50%"></div></div>
-        <span class="eff-val-box" id="eff-val-logic">50 (±0)</span>
+        <span class="eff-val-box" id="eff-val-logic">50 (体験+0)</span>
       </div>
       <div class="param-row locked-dark">
         <span class="param-label">🔒 忠誠心(予備)</span>
@@ -338,11 +350,11 @@
       <div class="trauma-btn-grid" id="trauma-btn-grid"></div>
     </div>
 
-    <div style="font-size:11.5px; font-weight:bold; color:#0369a1;">🎒 カバンの「どうぐ・素材」（🪨小段差積み / 🧴オイル滑り抜け / 🍎食事）</div>
-    <div class="bag-grid" id="bag-grid"></div>
-    <div style="font-size:11.5px; font-weight:bold; color:#475569;">📝 世代のきろく・思い出</div>
-    <div id="diary-logs" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px; font-size:10.5px; color:#334155; max-height:70px; overflow-y:auto; line-height:1.4;"></div>
-    <button class="btn-sub" onclick="closeModal('modal-diary')">手帳を閉じる</button>
+    <div style="font-size:11.5px; font-weight:bold; color:#0369a1; flex-shrink:0;">🎒 カバンの「どうぐ・素材」（🪨小段差 / 🧴オイル / 🍎リンゴ）</div>
+    <div class="bag-grid" id="bag-grid" style="flex-shrink:0;"></div>
+    <div style="font-size:11.5px; font-weight:bold; color:#475569; flex-shrink:0;">📝 5ページ日記帳（記憶喪失の頼り）＆ 思い出</div>
+    <div id="diary-logs" data-allow-inner-scroll="1" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; font-size:10.5px; color:#334155; min-height:90px; max-height:160px; overflow-y:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y; line-height:1.45; flex-shrink:0;"></div>
+    <button class="btn-sub" style="flex-shrink:0; margin-top:4px;" onclick="closeModal('modal-diary')">手帳を閉じる</button>
   </div>
 </div>
 
@@ -368,109 +380,149 @@
   </div>
 </div>
 
-<!-- ⚙️ システム設定モーダル -->
+<!-- ⚙️ システム設定モーダル（3タブ整理＋最下部に初期化＋固定フッターに保存して閉じる） -->
 <div class="modal-overlay" id="modal-settings" style="display:none;">
   <div class="modal-content">
     <div class="modal-close" onclick="closeModal('modal-settings')">✕</div>
     <div class="modal-title">⚙️ システム設定</div>
 
-    <!-- 📡 通信ON/OFFトグル（ON: Groq思考 / OFF: サイコロ思考） -->
-    <div class="comm-toggle-card">
-      <div class="comm-toggle-text">
-        <div class="comm-toggle-title" id="comm-toggle-label">🎲 通信 OFF（サイコロ行動思考）</div>
-        <div class="comm-toggle-sub">ONでGroqが行動そのものを決定・OFFで完全オフライン</div>
+    <!-- 3つのグループタブ -->
+    <div class="settings-tab-bar">
+      <button type="button" class="settings-tab-btn active" id="tab-set-chara" onclick="switchSettingsTab('chara')">🤖 キャラ・世界</button>
+      <button type="button" class="settings-tab-btn" id="tab-set-comm" onclick="switchSettingsTab('comm')">📡 通信・AI</button>
+      <button type="button" class="settings-tab-btn" id="tab-set-obs" onclick="switchSettingsTab('obs')">🔭 観察・空</button>
+    </div>
+
+    <!-- スクロール本体 -->
+    <div id="settings-scroll-body" data-allow-inner-scroll="1">
+
+      <!-- 【タブ1】キャラ・世界設定 -->
+      <div id="settings-tab-panel-chara" class="settings-tab-panel">
+        <button type="button" class="btn-accent" onclick="openExpressionModalFromSettings()">🎭 キャラ基本表現（20種バランス調整・骨組み切替）</button>
+
+        <div class="setting-group">
+          <label class="setting-label">👁️ 観察モード（4つの介入・記憶ルール切替）</label>
+          <select id="setting-obs-mode" class="setting-input">
+            <option value="wild">🌿 1. 野生モード（毎ターン記憶喪失・自力のみ）</option>
+            <option value="rescue">🚑 2. 救援モード（アイテム付与）</option>
+            <option value="trial">⚡ 3. 試練モード（段差や穴で試練）</option>
+            <option value="ai_mode">🤖 4. AI搭載モード（神様におねだり）</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">🗺️ テスト用エリア移動（全16エリア切替）</label>
+          <select id="setting-jump-area" class="setting-input">
+            <option value="">── 今いるエリアのまま ──</option>
+            <option value="home">🏠 マイホーム（パステル島・創作保存）</option>
+            <option value="sky_1">☀️ 天1：そよ風の丘</option>
+            <option value="sky_2">☁️ 天2：わたぐもテラス</option>
+            <option value="sky_3">🌈 天3：にじの段々畑</option>
+            <option value="sky_4">🌠 天4：ほしぞら展望台</option>
+            <option value="sky_5">👑 天5：天空のいただき</option>
+            <option value="earth_1">⛏️ 地1：しめり土の入り口</option>
+            <option value="earth_2">🍄 地2：ひかり苔のほら穴</option>
+            <option value="earth_3">💎 地3：パステル水晶の鉱脈</option>
+            <option value="earth_4">🦴 地4：こだい化石のねむる層</option>
+            <option value="earth_5">🐢 地5：巨大ガメのせなか</option>
+            <option value="side_1">🗡️ 育成1：ぼうけんアスレチック</option>
+            <option value="side_2">🎵 育成2：おんがく星空テラス</option>
+            <option value="side_3">💪 育成3：だいくの岩場道場</option>
+            <option value="side_4">💖 育成4：おはな畑の農園</option>
+            <option value="side_5">💡 育成5：なぞとき発明ラボ</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">🎥 追従カメラの観察窓（スポット透過）・分割線</label>
+          <select id="setting-cam-style" class="setting-input">
+            <option value="hide">③ 観察窓くっきり消去＋削り断面のみ立体表示（推奨）</option>
+            <option value="glass_noline">① 観察窓すりガラス透過（分割線なし）</option>
+            <option value="glass_line">② 詳細5×5×5分割線あり・すりガラス透過</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">📏 1号機の大きさ（高さ5段階：分割1〜5ブロック）</label>
+          <select id="setting-size-level" class="setting-input">
+            <option value="giant">巨大（分割5ブロック＝1ブロック高）</option>
+            <option value="large">大（分割4ブロック）</option>
+            <option value="medium">標準（分割3ブロック）</option>
+            <option value="small">小（分割2ブロック）</option>
+            <option value="tiny">極小（分割1ブロック）</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">🐛 1号機の太さ（横幅5段階：分割1〜5ブロック）</label>
+          <select id="setting-body-type" class="setting-input">
+            <option value="fat5">でぶっちょ（分割5ブロック＝1ブロック幅）</option>
+            <option value="fat4">ちょいでぶ（分割4ブロック）</option>
+            <option value="normal3">標準（分割3ブロック）</option>
+            <option value="slim2">ちょいやせ（分割2ブロック）</option>
+            <option value="slim1">やせっちょ（分割1ブロック）</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">⚡ 移動スピード</label>
+          <select id="setting-speed" class="setting-input">
+            <option value="3">速度 3（通常・マスの中央に安全停止）</option>
+            <option value="5">速度 5（猛ダッシュ・海へ飛び出し＆海トラウマ発生注意！）</option>
+          </select>
+        </div>
       </div>
-      <label class="toggle-switch">
-        <input type="checkbox" id="setting-ai-comm-toggle" onchange="if(window.toggleAiCommSwitch){window.toggleAiCommSwitch(this.checked);}">
-        <span class="toggle-slider"></span>
-      </label>
+
+      <!-- 【タブ2】通信・AI設定 -->
+      <div id="settings-tab-panel-comm" class="settings-tab-panel" style="display:none;">
+        <!-- 📡 通信ON/OFFトグル -->
+        <div class="comm-toggle-card">
+          <div class="comm-toggle-text">
+            <div class="comm-toggle-title" id="comm-toggle-label">🎲 通信 OFF（輪っか停止）</div>
+            <div class="comm-toggle-sub">ONでGroqと通信して輪っかが稼働・OFFで完全停止</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="setting-ai-comm-toggle" onchange="if(window.toggleAiCommSwitch){window.toggleAiCommSwitch(this.checked);}">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">🤖 使う頭脳（Groq思考一本に統一済み）</label>
+          <select id="setting-ai-type" class="setting-input locked-dark" disabled>
+            <option value="groq" selected>🟪 Groq 自律思考一本（上の通信ON/OFFで切替）</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">🟪 Groq APIキー (gsk_...)</label>
+          <input type="password" id="setting-groq-key" class="setting-input" placeholder="Groqキーを貼り付け（変更時のみ入力）">
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">🔒 Gemini APIキー（制限・通信不可のため使用不可）</label>
+          <input type="password" id="setting-gemini-key" class="setting-input locked-dark" disabled placeholder="🔒 使用不可（Groq一本に統一）">
+        </div>
+      </div>
+
+      <!-- 【タブ3】観察・空・コンパス設定 -->
+      <div id="settings-tab-panel-obs" class="settings-tab-panel" style="display:none;">
+        <div id="settings-obs-sky-placeholder" style="font-size:11px; color:#64748b; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:10px; padding:8px 10px;">
+          🔭 コンパス・二重球体・現在地の空設定はこのタブに表示されます。
+        </div>
+      </div>
+
+      <!-- スクロール最下部：初期化ボタン -->
+      <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #cbd5e1;">
+        <button type="button" class="btn-danger" onclick="resetGameDirectly()">🔄 データを消して最初からやり直す（初期化）</button>
+      </div>
+
     </div>
 
-    <button class="btn-accent" onclick="openExpressionModalFromSettings()">🎭 キャラ基本表現（20種バランス調整・骨組み切替）</button>
-
-    <div class="setting-group">
-      <label class="setting-label">👁️ 観察モード（4つの介入・記憶ルール切替）</label>
-      <select id="setting-obs-mode" class="setting-input">
-        <option value="wild">🌿 1. 野生モード（AI記憶なし・自力のみ）</option>
-        <option value="rescue">🚑 2. 救援モード（AI記憶なし・アイテム付与）</option>
-        <option value="trial">⚡ 3. 試練モード（AI記憶なし・段差や穴で試練）</option>
-        <option value="ai_mode">🤖 4. AI搭載モード（AI記憶あり・神様におねだり）</option>
-      </select>
+    <!-- 固定フッター：設定を保存して閉じる -->
+    <div id="settings-fixed-footer">
+      <button type="button" class="btn-primary" onclick="saveSettings()">設定を保存して閉じる</button>
     </div>
-    <div class="setting-group">
-      <label class="setting-label">🗺️ テスト用エリア移動（全16エリア切替）</label>
-      <select id="setting-jump-area" class="setting-input">
-        <option value="">── 今いるエリアのまま ──</option>
-        <option value="home">🏠 マイホーム（パステル島・創作保存）</option>
-        <option value="sky_1">☀️ 天1：そよ風の丘</option>
-        <option value="sky_2">☁️ 天2：わたぐもテラス</option>
-        <option value="sky_3">🌈 天3：にじの段々畑</option>
-        <option value="sky_4">🌠 天4：ほしぞら展望台</option>
-        <option value="sky_5">👑 天5：天空のいただき</option>
-        <option value="earth_1">⛏️ 地1：しめり土の入り口</option>
-        <option value="earth_2">🍄 地2：ひかり苔のほら穴</option>
-        <option value="earth_3">💎 地3：パステル水晶の鉱脈</option>
-        <option value="earth_4">🦴 地4：こだい化石のねむる層</option>
-        <option value="earth_5">🐢 地5：巨大ガメのせなか</option>
-        <option value="side_1">🗡️ 育成1：ぼうけんアスレチック</option>
-        <option value="side_2">🎵 育成2：おんがく星空テラス</option>
-        <option value="side_3">💪 育成3：だいくの岩場道場</option>
-        <option value="side_4">💖 育成4：おはな畑の農園</option>
-        <option value="side_5">💡 育成5：なぞとき発明ラボ</option>
-      </select>
-    </div>
-    <div class="setting-group">
-      <label class="setting-label">🎥 追従カメラの観察窓（スポット透過）・分割線</label>
-      <select id="setting-cam-style" class="setting-input">
-        <option value="hide">③ 観察窓くっきり消去＋削り断面のみ立体表示（推奨）</option>
-        <option value="glass_noline">① 観察窓すりガラス透過（分割線なし）</option>
-        <option value="glass_line">② 詳細5×5×5分割線あり・すりガラス透過</option>
-      </select>
-    </div>
-    <div class="setting-group">
-      <label class="setting-label">📏 1号機の大きさ（高さ5段階：分割1〜5ブロック）</label>
-      <select id="setting-size-level" class="setting-input">
-        <option value="giant">巨大（分割5ブロック＝1ブロック高）</option>
-        <option value="large">大（分割4ブロック）</option>
-        <option value="medium">標準（分割3ブロック）</option>
-        <option value="small">小（分割2ブロック）</option>
-        <option value="tiny">極小（分割1ブロック）</option>
-      </select>
-    </div>
-    <div class="setting-group">
-      <label class="setting-label">🐛 1号機の太さ（横幅5段階：分割1〜5ブロック）</label>
-      <select id="setting-body-type" class="setting-input">
-        <option value="fat5">でぶっちょ（分割5ブロック＝1ブロック幅）</option>
-        <option value="fat4">ちょいでぶ（分割4ブロック）</option>
-        <option value="normal3">標準（分割3ブロック）</option>
-        <option value="slim2">ちょいやせ（分割2ブロック）</option>
-        <option value="slim1">やせっちょ（分割1ブロック）</option>
-      </select>
-    </div>
-    <div class="setting-group">
-      <label class="setting-label">🤖 使う頭脳（Groq思考一本に統一済み）</label>
-      <select id="setting-ai-type" class="setting-input locked-dark" disabled>
-        <option value="groq" selected>🟪 Groq 自律思考一本（上の通信ON/OFFで切替）</option>
-      </select>
-    </div>
-    <div class="setting-group">
-      <label class="setting-label">⚡ 移動スピード</label>
-      <select id="setting-speed" class="setting-input">
-        <option value="3">速度 3（通常・マスの中央に安全停止）</option>
-        <option value="5">速度 5（猛ダッシュ・海へ飛び出し＆海トラウマ発生注意！）</option>
-      </select>
-    </div>
-    <div class="setting-group">
-      <label class="setting-label">🔒 Gemini APIキー（制限・通信不可のため使用不可）</label>
-      <input type="password" id="setting-gemini-key" class="setting-input locked-dark" disabled placeholder="🔒 使用不可（Groq一本に統一）">
-    </div>
-    <div class="setting-group">
-      <label class="setting-label">🟪 Groq APIキー (gsk_...)</label>
-      <input type="password" id="setting-groq-key" class="setting-input" placeholder="Groqキーを貼り付け">
-    </div>
-    <button class="btn-primary" onclick="saveSettings()">設定を保存して閉じる</button>
-    <hr style="border:0; border-top:1px solid #e2e8f0; margin:2px 0;">
-    <button class="btn-danger" onclick="resetGameDirectly()">🔄 データを消して最初からやり直す（初期化）</button>
   </div>
 </div>
 
@@ -497,6 +549,21 @@
     </div>
   </div>
 </div>
+
+<script>
+  // 設定ページの3タブ切り替え関数
+  window.switchSettingsTab = function(tabName) {
+    const tabs = ['chara', 'comm', 'obs'];
+    tabs.forEach(t => {
+      const btn = document.getElementById('tab-set-' + t);
+      const panel = document.getElementById('settings-tab-panel-' + t);
+      if (btn) btn.classList.toggle('active', t === tabName);
+      if (panel) panel.style.display = (t === tabName) ? 'flex' : 'none';
+    });
+    const body = document.getElementById('settings-scroll-body');
+    if (body) body.scrollTop = 0;
+  };
+</script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -532,8 +599,8 @@
 <script src="sky_time.js"></script>
 
 <script>
-  // Groq思考一本化 ＆ 通信OFF時の完全オフライン遮断
-  (function enforceGroqSingleBrain() {
+  // Groq思考一本化 ＆ 後付けUI要素（観察環境・通信設定・奇想天外ボタン）の自動タブ振り分け
+  (function enforceGroqAndAutoOrganizeSettings() {
     const aiSel = document.getElementById('setting-ai-type');
     if (aiSel) aiSel.value = 'groq';
     if (typeof safeStorage !== 'undefined') safeStorage.setItem('ai_type', 'groq');
@@ -553,6 +620,28 @@
         if (typeof safeStorage !== 'undefined') safeStorage.setItem('ai_type', 'groq');
         if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
       };
+    }
+
+    // compass_ring.js / sky_time.js 等が .modal-content 末尾に追加する要素を自動で「🔭 観察・空」タブへ収める
+    function organizeInjectedSettingsNodes() {
+      const modalContent = document.querySelector('#modal-settings .modal-content');
+      const obsPanel = document.getElementById('settings-tab-panel-obs');
+      const placeholder = document.getElementById('settings-obs-sky-placeholder');
+      if (!modalContent || !obsPanel) return;
+
+      const fixedIds = new Set(['settings-scroll-body', 'settings-fixed-footer']);
+      Array.from(modalContent.children).forEach(child => {
+        if (fixedIds.has(child.id)) return;
+        if (child.classList.contains('modal-close') || child.classList.contains('modal-title') || child.classList.contains('settings-tab-bar')) return;
+        obsPanel.appendChild(child);
+        if (placeholder) placeholder.style.display = 'none';
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => setTimeout(organizeInjectedSettingsNodes, 120));
+    } else {
+      setTimeout(organizeInjectedSettingsNodes, 120);
     }
   })();
 </script>
