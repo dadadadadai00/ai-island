@@ -337,7 +337,6 @@ let ROBOT = {
   posture: 'stand',
   emotion: 'normal',
   bulbEmotion: null,
-  // ユーザーの願いゲージ（デフォルト50ずつ）
   params: {
     curiosity: 50,
     cautionLimiter: 50,
@@ -346,7 +345,6 @@ let ROBOT = {
     logic: 50,
     loyalty: 50
   },
-  // キャラが体験したポイントで育つ裏ゲージ（0スタート）
   expParams: {
     curiosity: 0,
     cautionLimiter: 0,
@@ -354,11 +352,9 @@ let ROBOT = {
     eco: 0,
     logic: 0
   },
-  // ケガ・病気・お化け接近状態
   isInjured: false,
   isSick: false,
   ghostNear: false,
-  // 最大5ページの日記帳（毎ターン記憶喪失の頼り）
   diaryPages: [],
   traumas: [],
   workStreak: 0
@@ -373,7 +369,6 @@ function addExpPoint(paramKey, basePts = 1) {
     ROBOT.expParams = { curiosity: 0, cautionLimiter: 0, power: 0, eco: 0, logic: 0 };
   }
   if (typeof ROBOT.expParams[paramKey] !== 'number') return;
-  // ごきげん70以上で体験ポイント2倍！
   const mult = (life && life.mental >= 70) ? 2 : 1;
   ROBOT.expParams[paramKey] = Math.min(100, ROBOT.expParams[paramKey] + basePts * mult);
 }
@@ -384,12 +379,10 @@ function applyTurnVitalsAndConditions() {
   const beforeMental = life.mental;
   const notes = [];
 
-  // 1ターン基本消費：たいりょく-10、おなか-15、ごきげん-5
   life.stamina = Math.max(0, life.stamina - 10);
   life.energy = Math.max(0, life.energy - 15);
   life.mental = Math.max(0, life.mental - 5);
 
-  // おなか0の時はたいりょく毎ターン追加-10 ＆ 病気リスク
   if (life.energy === 0) {
     life.stamina = Math.max(0, life.stamina - 10);
     notes.push('おなか0でたいりょく追加-10');
@@ -399,19 +392,16 @@ function applyTurnVitalsAndConditions() {
     }
   }
 
-  // ケガ中ならたいりょく追加-5
   if (ROBOT.isInjured) {
     life.stamina = Math.max(0, life.stamina - 5);
     notes.push('🩹ケガでたいりょく追加-5');
   }
 
-  // たいりょく30以下 または ごきげん20以下でケガリスク
   if (!ROBOT.isInjured && (life.stamina <= 30 || life.mental <= 20) && Math.random() < 0.35) {
     ROBOT.isInjured = true;
     notes.push('🩹無理してケガをした！');
   }
 
-  // 夜時間帯（TIME_STEP >= 14）はお化けが出やすい（記憶喪失＆日記帳頼りで逃走）
   if (!ROBOT.ghostNear && TIME_STEP >= 14 && Math.random() < 0.22) {
     ROBOT.ghostNear = true;
     notes.push('👻お化けが現れた！');
@@ -447,7 +437,6 @@ function hasTrauma(traumaId) {
   return Array.isArray(ROBOT.traumas) && ROBOT.traumas.includes(traumaId);
 }
 
-// 裏ゲージ＝「ユーザーの願い（デフォルト50）」＋「体験ポイント（0スタート）」＋「トラウマ」
 function getEffectiveParams() {
   const base = ROBOT.params || { curiosity: 50, cautionLimiter: 50, power: 50, eco: 50, logic: 50, loyalty: 50 };
   const exp = ROBOT.expParams || { curiosity: 0, cautionLimiter: 0, power: 0, eco: 0, logic: 0 };
@@ -1553,15 +1542,18 @@ function cancelExpressionModal() {
 function ensureQuirkyPromptModalDOM() {
   const settingsModal = document.getElementById('modal-settings');
   if (settingsModal && !document.getElementById('btn-open-quirky-prompts')) {
-    const exprBtn = settingsModal.querySelector('[onclick*="openExpressionModalFromSettings"]');
+    const charaPanel = document.getElementById('settings-tab-panel-chara') || settingsModal;
+    const exprBtn = charaPanel.querySelector('[onclick*="openExpressionModalFromSettings"]');
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.id = 'btn-open-quirky-prompts';
-    btn.style.cssText = 'width:100%; padding:10px 12px; margin:6px 0; border-radius:10px; border:1px solid #38bdf8; background:linear-gradient(135deg,#0284c7,#0369a1); color:#fff; font-weight:bold; font-size:13px; cursor:pointer; box-shadow:0 2px 8px rgba(2,132,199,0.35);';
+    btn.style.cssText = 'width:100%; padding:10px 12px; margin:2px 0; border-radius:10px; border:1px solid #38bdf8; background:linear-gradient(135deg,#0284c7,#0369a1); color:#fff; font-weight:bold; font-size:13px; cursor:pointer; box-shadow:0 2px 8px rgba(2,132,199,0.35);';
     btn.innerText = '🌀 キャラ奇想天外プロンプト一覧（ON/OFF・短文編集）';
     btn.onclick = () => openQuirkyPromptsModalFromSettings();
     if (exprBtn && exprBtn.parentNode) {
       exprBtn.parentNode.insertBefore(btn, exprBtn.nextSibling);
+    } else {
+      charaPanel.appendChild(btn);
     }
   }
 
@@ -1571,7 +1563,7 @@ function ensureQuirkyPromptModalDOM() {
     modal.className = 'modal-overlay';
     modal.style.cssText = 'display:none; position:fixed; inset:0; z-index:999; background:rgba(2,6,23,0.78); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding:12px;';
     modal.innerHTML = `
-      <div class="modal-card" style="width:100%; max-width:440px; max-height:86vh; overflow-y:auto; background:#0f172a; border:1px solid #38bdf8; border-radius:16px; padding:14px; color:#f8fafc; display:flex; flex-direction:column; gap:10px; box-shadow:0 12px 32px rgba(0,0,0,0.6);">
+      <div class="modal-card" style="width:100%; max-width:440px; max-height:86vh; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#0f172a; border:1px solid #38bdf8; border-radius:16px; padding:14px; color:#f8fafc; display:flex; flex-direction:column; gap:10px; box-shadow:0 12px 32px rgba(0,0,0,0.6);">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1e293b; padding-bottom:8px;">
           <div style="font-weight:bold; font-size:14px; color:#7dd3fc;">🌀 キャラ奇想天外プロンプト一覧</div>
           <button type="button" onclick="closeModal('modal-quirky-prompts')" style="background:#1e293b; color:#cbd5e1; border:none; border-radius:8px; padding:4px 10px; font-size:12px; cursor:pointer;">✕ 閉じる</button>
@@ -1781,14 +1773,25 @@ function openModal(id) {
     renderDiaryModal();
   }
   if (id === 'modal-settings') {
+    if (typeof window.switchSettingsTab === 'function') window.switchSettingsTab('chara');
     const obsSel = document.getElementById('setting-obs-mode');
     if (obsSel) obsSel.value = OBS_MODE;
-    document.getElementById('setting-cam-style').value = CAM_VISUAL_STYLE;
-    document.getElementById('setting-size-level').value = ROBOT.sizeLevel;
-    document.getElementById('setting-body-type').value = ROBOT.bodyType;
+    const camSel = document.getElementById('setting-cam-style');
+    if (camSel) camSel.value = CAM_VISUAL_STYLE;
+    const sizeSel = document.getElementById('setting-size-level');
+    if (sizeSel) sizeSel.value = ROBOT.sizeLevel;
+    const bodySel = document.getElementById('setting-body-type');
+    if (bodySel) bodySel.value = ROBOT.bodyType;
+    const groqInp = document.getElementById('setting-groq-key');
+    if (groqInp) groqInp.value = safeStorage.getItem('api_groq') || '';
   }
   const el = document.getElementById(id);
-  if (el) { el.style.display = 'flex'; el.classList.add('active'); }
+  if (el) {
+    el.style.display = 'flex';
+    el.classList.add('active');
+    const mc = el.querySelector('.modal-content');
+    if (mc) mc.scrollTop = 0;
+  }
 }
 
 function closeModal(id) {
@@ -1881,7 +1884,6 @@ function renderDiaryModal() {
     grid.appendChild(slot);
   }
 
-  // 5ページ限定日記帳（毎ターン記憶喪失の頼り）＋ 思い出ログを表示
   const pages = Array.isArray(ROBOT.diaryPages) ? ROBOT.diaryPages : [];
   const fivePageHtml = [
     `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">` +
