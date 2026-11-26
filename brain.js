@@ -119,23 +119,23 @@ function updateModeUI() {
   const titleEl = document.getElementById('panel-header-title');
   if (titleEl) {
     const titles = {
-      wild: '🌿 野生モード（AI記憶なし・自力のみ）',
-      rescue: '🚑 救援モード（AI記憶なし・アイテム付与）',
-      trial: '⚡ 試練モード（AI記憶なし・試練配置）',
-      ai_mode: '🤖 AI搭載モード（AI記憶あり・おねだり）'
+      wild: '🌿 野生モード（毎ターン記憶喪失・5ページ日記）',
+      rescue: '🚑 救援モード（アイテム付与・5ページ日記）',
+      trial: '⚡ 試練モード（段差や穴・5ページ日記）',
+      ai_mode: '🤖 AI搭載モード（5ページ日記・神様交信）'
     };
     titleEl.innerText = titles[OBS_MODE] || '💭 ロボのきもち';
   }
 }
 
 function getCurrentDreamTitle() {
-  const p = (typeof ROBOT !== 'undefined' && ROBOT.params) ? ROBOT.params : { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50 };
+  const eff = getEffectiveParams();
   const entries = [
-    { key: 'curiosity', title: '🧭 探検家・勇者', val: p.curiosity ?? 60 },
-    { key: 'cautionLimiter', title: '🎶 音楽家・アーティスト', val: p.cautionLimiter ?? 50 },
-    { key: 'logic', title: '👓 学者・発明家', val: p.logic ?? 50 },
-    { key: 'power', title: '🔨 たのもしい大工さん', val: p.power ?? 50 },
-    { key: 'eco', title: '🌷 優しいお花屋さん', val: p.eco ?? 40 }
+    { key: 'curiosity', title: '🧭 探検家・勇者', val: eff.curiosity ?? 50 },
+    { key: 'cautionLimiter', title: '🎶 音楽家・アーティスト', val: eff.cautionLimiter ?? 50 },
+    { key: 'logic', title: '👓 学者・発明家', val: eff.logic ?? 50 },
+    { key: 'power', title: '🔨 たのもしい大工さん', val: eff.power ?? 50 },
+    { key: 'eco', title: '🌷 優しいお花屋さん', val: eff.eco ?? 50 }
   ];
   entries.sort((a, b) => b.val - a.val);
   return `『${entries[0].title}』`;
@@ -196,9 +196,9 @@ const safeStorage = {
 
 class LifeCore {
   constructor(save = null) {
-    this.energy = (save && typeof save.energy === 'number') ? save.energy : 100;
-    this.stamina = (save && typeof save.stamina === 'number') ? save.stamina : 100;
-    this.mental = (save && typeof save.mental === 'number') ? save.mental : 100;
+    this.energy = (save && typeof save.energy === 'number') ? save.energy : 100;  // おなか
+    this.stamina = (save && typeof save.stamina === 'number') ? save.stamina : 100; // たいりょく
+    this.mental = (save && typeof save.mental === 'number') ? save.mental : 100;  // ごきげん
   }
   clamp() {
     this.energy = Math.max(0, Math.min(100, Math.round(this.energy)));
@@ -319,8 +319,8 @@ function getDirNameFromRot(rotY) {
 }
 
 let life = new LifeCore(), GAME_DAY = 1, TIME_STEP = 0;
-let BAG = ['stone', 'oil', 'apple', 'stone', 'grass'];
-let DIARY_LOGS = ['🌱 1日目：4つの観察モード＆5つの夢ゲージを備えた1号機が誕生！'];
+let BAG = ['stone', 'oil', 'apple', 'apple', 'grass'];
+let DIARY_LOGS = ['🌱 1日目：本当の輪っか＆5ページ日記帳を備えた1号機が誕生！'];
 let CAM_VISUAL_STYLE = safeStorage.getItem('cam_visual_style_v15') || 'hide';
 let HEIGHT_MAP = {}, CHIP_MAP = {}, WATER_MAP = {};
 let currentDiaryTab = 'base';
@@ -337,18 +337,91 @@ let ROBOT = {
   posture: 'stand',
   emotion: 'normal',
   bulbEmotion: null,
+  // ユーザーの願いゲージ（デフォルト50ずつ）
   params: {
-    curiosity: 60,
+    curiosity: 50,
     cautionLimiter: 50,
     power: 50,
-    eco: 40,
+    eco: 50,
     logic: 50,
     loyalty: 50
   },
+  // キャラが体験したポイントで育つ裏ゲージ（0スタート）
+  expParams: {
+    curiosity: 0,
+    cautionLimiter: 0,
+    power: 0,
+    eco: 0,
+    logic: 0
+  },
+  // ケガ・病気・お化け接近状態
+  isInjured: false,
+  isSick: false,
+  ghostNear: false,
+  // 最大5ページの日記帳（毎ターン記憶喪失の頼り）
+  diaryPages: [],
   traumas: [],
   workStreak: 0
 };
 let WORLD_ITEMS = [{ type: 'apple', x: -1, z: 1 }, { type: 'apple', x: 1, z: 0 }];
+
+// ============================================================================
+// 【新バランス調整：3ゲージ消費 ＋ ケガ・病気 ＋ 0スタート体験ゲージ】
+// ============================================================================
+function addExpPoint(paramKey, basePts = 1) {
+  if (!ROBOT.expParams) {
+    ROBOT.expParams = { curiosity: 0, cautionLimiter: 0, power: 0, eco: 0, logic: 0 };
+  }
+  if (typeof ROBOT.expParams[paramKey] !== 'number') return;
+  // ごきげん70以上で体験ポイント2倍！
+  const mult = (life && life.mental >= 70) ? 2 : 1;
+  ROBOT.expParams[paramKey] = Math.min(100, ROBOT.expParams[paramKey] + basePts * mult);
+}
+
+function applyTurnVitalsAndConditions() {
+  const beforeStamina = life.stamina;
+  const beforeEnergy = life.energy;
+  const beforeMental = life.mental;
+  const notes = [];
+
+  // 1ターン基本消費：たいりょく-10、おなか-15、ごきげん-5
+  life.stamina = Math.max(0, life.stamina - 10);
+  life.energy = Math.max(0, life.energy - 15);
+  life.mental = Math.max(0, life.mental - 5);
+
+  // おなか0の時はたいりょく毎ターン追加-10 ＆ 病気リスク
+  if (life.energy === 0) {
+    life.stamina = Math.max(0, life.stamina - 10);
+    notes.push('おなか0でたいりょく追加-10');
+    if (!ROBOT.isSick && Math.random() < 0.45) {
+      ROBOT.isSick = true;
+      notes.push('😷病気になった！');
+    }
+  }
+
+  // ケガ中ならたいりょく追加-5
+  if (ROBOT.isInjured) {
+    life.stamina = Math.max(0, life.stamina - 5);
+    notes.push('🩹ケガでたいりょく追加-5');
+  }
+
+  // たいりょく30以下 または ごきげん20以下でケガリスク
+  if (!ROBOT.isInjured && (life.stamina <= 30 || life.mental <= 20) && Math.random() < 0.35) {
+    ROBOT.isInjured = true;
+    notes.push('🩹無理してケガをした！');
+  }
+
+  // 夜時間帯（TIME_STEP >= 14）はお化けが出やすい（記憶喪失＆日記帳頼りで逃走）
+  if (!ROBOT.ghostNear && TIME_STEP >= 14 && Math.random() < 0.22) {
+    ROBOT.ghostNear = true;
+    notes.push('👻お化けが現れた！');
+  }
+
+  life.clamp();
+  const baseText = `たいりょく${beforeStamina}→${life.stamina}, おなか${beforeEnergy}→${life.energy}, ごきげん${beforeMental}→${life.mental}`;
+  const extraText = notes.length ? `（${notes.join(' / ')}）` : '';
+  return { summary: baseText + extraText };
+}
 
 function applyRobotBulbColor() {
   if (typeof sharedBulbMat !== 'undefined' && sharedBulbMat) {
@@ -374,14 +447,16 @@ function hasTrauma(traumaId) {
   return Array.isArray(ROBOT.traumas) && ROBOT.traumas.includes(traumaId);
 }
 
+// 裏ゲージ＝「ユーザーの願い（デフォルト50）」＋「体験ポイント（0スタート）」＋「トラウマ」
 function getEffectiveParams() {
-  const base = ROBOT.params || { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50, loyalty: 50 };
+  const base = ROBOT.params || { curiosity: 50, cautionLimiter: 50, power: 50, eco: 50, logic: 50, loyalty: 50 };
+  const exp = ROBOT.expParams || { curiosity: 0, cautionLimiter: 0, power: 0, eco: 0, logic: 0 };
   const eff = {
-    curiosity: base.curiosity ?? 60,
-    cautionLimiter: base.cautionLimiter ?? 50,
-    power: base.power ?? 50,
-    eco: base.eco ?? 40,
-    logic: base.logic ?? 50,
+    curiosity: (base.curiosity ?? 50) + (exp.curiosity ?? 0),
+    cautionLimiter: (base.cautionLimiter ?? 50) + (exp.cautionLimiter ?? 0),
+    power: (base.power ?? 50) + (exp.power ?? 0),
+    eco: (base.eco ?? 50) + (exp.eco ?? 0),
+    logic: (base.logic ?? 50) + (exp.logic ?? 0),
     loyalty: 50
   };
   let forceZeroCaution = false, forceMaxEco = false;
@@ -531,11 +606,24 @@ function applyLoadedWorldData(d) {
     ROBOT.posture = d.robot.posture === 'crawl' ? 'crawl' : 'stand';
     ROBOT.emotion = POSE_TABLE[d.robot.emotion] ? d.robot.emotion : 'normal';
     ROBOT.bulbEmotion = POSE_TABLE[d.robot.bulbEmotion] ? d.robot.bulbEmotion : null;
+    ROBOT.isInjured = Boolean(d.robot.isInjured);
+    ROBOT.isSick = Boolean(d.robot.isSick);
+    ROBOT.ghostNear = Boolean(d.robot.ghostNear);
+    if (Array.isArray(d.robot.diaryPages)) {
+      ROBOT.diaryPages = d.robot.diaryPages.slice(-5);
+    }
     clampCharSubPosForBodySize();
     if (d.robot.params && typeof d.robot.params === 'object') {
       ['curiosity', 'cautionLimiter', 'power', 'eco', 'logic'].forEach(k => {
         if (typeof d.robot.params[k] === 'number') {
           ROBOT.params[k] = Math.max(0, Math.min(100, Math.round(d.robot.params[k])));
+        }
+      });
+    }
+    if (d.robot.expParams && typeof d.robot.expParams === 'object') {
+      ['curiosity', 'cautionLimiter', 'power', 'eco', 'logic'].forEach(k => {
+        if (typeof d.robot.expParams[k] === 'number') {
+          ROBOT.expParams[k] = Math.max(0, Math.min(100, Math.round(d.robot.expParams[k])));
         }
       });
     }
@@ -1088,7 +1176,8 @@ async function askAIQuirkyReaction(categoryId, factSummary) {
     : '';
   const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.tiny;
   const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
-  const memoryText = (OBS_MODE === 'ai_mode' && AI_MEMORY.length > 0) ? `\n【過去の記憶】${AI_MEMORY.slice(-3).join(' / ')}` : '';
+  const diaryPages = Array.isArray(ROBOT.diaryPages) ? ROBOT.diaryPages : [];
+  const memoryText = diaryPages.length > 0 ? `\n【5ページ日記帳】${diaryPages.map(p => p.text).join(' / ')}` : '';
 
   const minimalPrompt = `${basePersona}
 体格:${sSpec.label}(高${sSpec.subH})・${bSpec.label}(幅${bSpec.reqWidth})
@@ -1114,14 +1203,11 @@ function applyQuirkyAIResultToRobot(aiRes, lockPhysicalPose = false) {
     ROBOT.bulbEmotion = null;
   }
   applyRobotBulbColor();
-  if (OBS_MODE === 'ai_mode' && typeof aiRes.thought === 'string' && aiRes.thought.trim()) {
-    AI_MEMORY.push(`自分の発言:${aiRes.thought.trim()}`);
-  }
   return (typeof aiRes.thought === 'string' && aiRes.thought.trim()) ? aiRes.thought.trim() : null;
 }
 
 // ============================================================================
-// 【メインターン実行：行動決定は100%物理計算・ハプニング時のみ奇想天外API】
+// 【フォールバックターン実行（ai_core.js 未接続時の予備）】
 // ============================================================================
 async function executeTurn() {
   const btn = document.getElementById('btn-action'); btn.disabled = true;
@@ -1130,371 +1216,56 @@ async function executeTurn() {
   updateEnvironmentAndUI();
 
   if (++TIME_STEP >= 20) { TIME_STEP = 0; GAME_DAY++; DIARY_LOGS.push(`🌅 ${GAME_DAY}日目の朝を迎えたよ！`); }
+  applyTurnVitalsAndConditions();
 
   const curH = getRobotHeightLevel();
   const sSpec = SIZE_SPECS[ROBOT.sizeLevel] || SIZE_SPECS.tiny;
   const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
   let thoughtText = '', actionLabel = '';
-  let quirkyCategory = null, quirkyFact = '', lockPose = false;
 
-  if (curH === -99) {
-    ROBOT.pos.x = Math.max(-2, Math.min(2, ROBOT.pos.x));
-    ROBOT.pos.z = Math.max(-2, Math.min(2, ROBOT.pos.z));
-    ROBOT.pos.lv = HEIGHT_MAP[`${ROBOT.pos.x},${ROBOT.pos.z}`] ?? 0;
-    ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
-    ROBOT.posture = getSafePostureAt(ROBOT.pos.x, ROBOT.pos.z, ROBOT.pos.lv);
-    ROBOT.emotion = 'surprise';
-    life.stamina -= 18; life.mental -= 15;
-    addTraumaById('sea', true);
-    actionLabel = '🌊 白波で大ダメージ！「海トラウマ」発症';
-    thoughtText = 'うわぁぁっ！！海の白い波に飲まれて大ダメージを受けたよ…！「🌊海トラウマ」になっちゃった！';
-    quirkyCategory = 'trauma_panic';
-    quirkyFact = '海の白波に飲まれて海トラウマ発症';
+  const moveEvaluations = ALL_DIRS.map(d => ({
+    dir: d,
+    check: checkMoveAndPosture(ROBOT.pos.x, ROBOT.pos.z, curH, d)
+  }));
+  const validMoves = moveEvaluations.filter(m => m.check.canMove);
+
+  if (ROBOT.ghostNear) {
+    ROBOT.ghostNear = false;
+    ROBOT.emotion = 'fear';
+    life.stamina = Math.max(0, life.stamina - 5);
+    addExpPoint('curiosity', 2);
+    actionLabel = '👻💨 お化けから全力で逃げた！';
+    thoughtText = 'お化けが出てびっくりしたけど、全力で走って逃げたよ！日記帳に書いておこう！';
+  } else if (life.energy <= 50 && BAG.includes('apple')) {
+    BAG.splice(BAG.indexOf('apple'), 1);
+    const heal = ROBOT.isSick ? 25 : 50;
+    life.energy = Math.min(100, life.energy + heal);
+    life.mental = Math.min(100, life.mental + 12);
+    addExpPoint('eco', 1);
+    ROBOT.emotion = 'joy';
+    actionLabel = `🍎 リンゴを食べておなか+${heal}`;
+    thoughtText = `おなかが空っぽになる前にリンゴを食べたよ！おなかが+${heal}回復して元気いっぱい！`;
+  } else if (life.stamina <= 40 || ROBOT.isInjured || ROBOT.isSick) {
+    life.stamina = Math.min(100, life.stamina + 35);
+    ROBOT.isInjured = false;
+    ROBOT.isSick = false;
+    addExpPoint('eco', 1);
+    ROBOT.emotion = 'sleep';
+    actionLabel = '💤 ゆっくり休んでたいりょく+35回復';
+    thoughtText = 'スマホの充電みたいにゆっくりお休みして、たいりょくが回復したよ！';
+  } else if (validMoves.length) {
+    const chosenMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+    const d = chosenMove.dir, chk = chosenMove.check;
+    ROBOT.pos.x += d.dx; ROBOT.pos.z += d.dz; ROBOT.pos.lv = chk.targetLv;
+    ROBOT.pos.sx = 2; ROBOT.pos.sz = 2; ROBOT.rotY = d.rot; ROBOT.posture = chk.posture;
+    addExpPoint('curiosity', 1);
+    ROBOT.emotion = 'fun';
+    actionLabel = `👟 ${d.name}へ移動（${sSpec.label}・${bSpec.label}）`;
+    thoughtText = `${d.name}へお散歩したよ！体験ポイントが少しずつ育っているよ！`;
   } else {
-    const isAtSeaEdge = (Math.abs(ROBOT.pos.x) === 2 || Math.abs(ROBOT.pos.z) === 2);
-    const moveEvaluations = ALL_DIRS.map(d => ({
-      dir: d,
-      check: checkMoveAndPosture(ROBOT.pos.x, ROBOT.pos.z, curH, d)
-    }));
-    const validMoves = moveEvaluations.filter(m => m.check.canMove);
-    const blockedByFat = moveEvaluations.find(m => m.check.reason === 'too_fat');
-    const blockedByHighStep = moveEvaluations.find(m => m.check.reason === 'too_high_step');
-    const blockedByCorner = moveEvaluations.find(m => m.check.reason === 'blocked_by_corner');
-
-    if (blockedByFat) addTraumaById('narrow', true);
-    if (curH >= 3 && Math.random() < 0.45) addTraumaById('height', true);
-    if (TIME_STEP >= 14 && Math.random() < 0.22) addTraumaById('monster', true);
-
-    const effP = getEffectiveParams();
-    let chosenMove = null, wantDig = false, wantCrawlDig = false, wantRest = false, wantGodContact = false;
-    let wantSolveHighStep = false, wantSolveNarrow = false, wantSolveCorner = false, wantObserveWonder = false;
-    let traumaReaction = null;
-
-    if (hasTrauma('height') && curH >= 2 && Math.random() < 0.75) {
-      traumaReaction = 'height';
-    } else if (hasTrauma('sea') && isAtSeaEdge && Math.random() < 0.75) {
-      traumaReaction = 'sea';
-    } else if (hasTrauma('overwork') && Math.random() < 0.60) {
-      traumaReaction = 'overwork';
-    } else if (hasTrauma('monster') && TIME_STEP >= 13 && Math.random() < 0.65) {
-      traumaReaction = 'monster';
-    }
-
-    const restThreshold = 20 + Math.round(effP.eco * 0.38);
-    if (!traumaReaction) {
-      if (OBS_MODE === 'ai_mode' && Math.random() < 0.22) {
-        wantGodContact = true;
-      } else if (life.stamina <= restThreshold) {
-        wantRest = true;
-      } else if (blockedByHighStep && Math.random() < 0.72) {
-        wantSolveHighStep = true;
-      } else if (blockedByFat && Math.random() < 0.75) {
-        wantSolveNarrow = true;
-      } else if (blockedByCorner && Math.random() < 0.75) {
-        wantSolveCorner = true;
-      } else if ((isAtSeaEdge || TIME_STEP >= 13) && Math.random() < 0.28) {
-        wantObserveWonder = true;
-      } else {
-        const stepMoves = validMoves.filter(m => ['scramble_climb', 'stairs_up', 'safe_landing', 'stairs_down'].includes(m.check.reason));
-        const apple = WORLD_ITEMS.find(it => it.type === 'apple');
-        if (stepMoves.length > 0 && Math.random() < 0.65) {
-          chosenMove = stepMoves[Math.floor(Math.random() * stepMoves.length)];
-        } else if (apple && validMoves.length && !hasTrauma('stomach')) {
-          validMoves.sort((a, b) => Math.hypot(ROBOT.pos.x + a.dir.dx - apple.x, ROBOT.pos.z + a.dir.dz - apple.z) - Math.hypot(ROBOT.pos.x + b.dir.dx - apple.x, ROBOT.pos.z + b.dir.dz - apple.z));
-          chosenMove = validMoves[0];
-        } else if (validMoves.length) {
-          chosenMove = validMoves[Math.floor(Math.random() * validMoves.length)];
-        } else {
-          wantDig = true;
-        }
-      }
-    }
-
-    if (traumaReaction === 'height') {
-      ROBOT.posture = getSafePostureAt(ROBOT.pos.x, ROBOT.pos.z, curH);
-      ROBOT.emotion = 'shiver';
-      actionLabel = `🧗 高所トラウマ発動(裏げいじゅつ:${effP.cautionLimiter})：足がすくむ`;
-      thoughtText = `「🧗高所トラウマ」で高い場所が怖くて足がガタガタ震えるよ〜😭`;
-      quirkyCategory = 'trauma_panic';
-      quirkyFact = `地上${curH}段目で高所トラウマ発動`;
-    } else if (traumaReaction === 'sea') {
-      const inlandMoves = validMoves.filter(m => m.check.reason !== 'sea' && Math.abs(ROBOT.pos.x + m.dir.dx) <= 1 && Math.abs(ROBOT.pos.z + m.dir.dz) <= 1);
-      if (inlandMoves.length > 0) {
-        const esc = inlandMoves[Math.floor(Math.random() * inlandMoves.length)];
-        ROBOT.pos.x += esc.dir.dx; ROBOT.pos.z += esc.dir.dz; ROBOT.pos.lv = esc.check.targetLv; ROBOT.rotY = esc.dir.rot;
-        ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
-      }
-      ROBOT.posture = getSafePostureAt(ROBOT.pos.x, ROBOT.pos.z, ROBOT.pos.lv);
-      ROBOT.emotion = 'fear';
-      actionLabel = `🌊 海トラウマ発動：内陸へ避難`;
-      thoughtText = `「🌊海トラウマ」で白波が怖くて内陸へ後ずさりしたよ😰`;
-      quirkyCategory = 'trauma_panic';
-      quirkyFact = '海の近くで海トラウマが発動して後ずさり';
-    } else if (traumaReaction === 'overwork') {
-      ROBOT.posture = getSafePostureAt(ROBOT.pos.x, ROBOT.pos.z, curH);
-      ROBOT.emotion = 'sleep';
-      life.stamina += 30; ROBOT.workStreak = 0;
-      actionLabel = `⛏️ 過労トラウマ発動：サボって居眠り`;
-      thoughtText = `「⛏️過労トラウマ」で腰が痛いからサボって居眠りしちゃうよ…💤`;
-      quirkyCategory = 'trauma_panic';
-      quirkyFact = '働きすぎの過労トラウマでサボり居眠り';
-    } else if (traumaReaction === 'monster') {
-      ROBOT.posture = getSafePostureAt(ROBOT.pos.x, ROBOT.pos.z, curH);
-      ROBOT.emotion = 'surprise';
-      actionLabel = `👻 ビックリ生物トラウマ：暗闇でパニック`;
-      thoughtText = `「👻ビックリ生物トラウマ」で暗闇にお化けや虫がいそうでパニックだよ😲`;
-      quirkyCategory = 'trauma_panic';
-      quirkyFact = '夜の暗闇でビックリ生物トラウマ発動';
-    } else if (wantGodContact) {
-      ROBOT.posture = getSafePostureAt(ROBOT.pos.x, ROBOT.pos.z, curH);
-      ROBOT.emotion = 'wave';
-      lockPose = true;
-      ROBOT.params.cautionLimiter = Math.min(100, (ROBOT.params.cautionLimiter || 50) + 2);
-      actionLabel = `🤖 AI搭載モード交信：神様（プレイヤー）におねだり！`;
-      thoughtText = `おーい！画面の向こうの神様〜！ボクのいまの夢は${getCurrentDreamTitle()}だよ！🍎リンゴか🪨石をプレゼントして〜！`;
-      quirkyCategory = 'god_contact';
-      quirkyFact = '空から見守る神様（プレイヤー）に手を振っておねだり交信した';
-    } else if (wantObserveWonder) {
-      ROBOT.posture = getSafePostureAt(ROBOT.pos.x, ROBOT.pos.z, curH);
-      ROBOT.emotion = 'peek';
-      lockPose = true;
-      life.mental = Math.min(100, life.mental + 15);
-      ROBOT.params.cautionLimiter = Math.min(100, (ROBOT.params.cautionLimiter || 50) + 3);
-      if (TIME_STEP >= 13) {
-        const constellations = ['🦢はくちょう座', '👑カシオペア座', '🥄北斗七星', '🏹オリオン座'];
-        const pickedStar = constellations[Math.floor(Math.random() * constellations.length)];
-        actionLabel = `🌌 夜空の星座観察：「${pickedStar}」を見上げた！`;
-        thoughtText = `わぁ〜！夜空を見上げたらキラキラ光る「${pickedStar}」を見つけたよ！🎵げいじゅつ夢ゲージが伸びたよ✨`;
-        quirkyCategory = 'stage_wonder';
-        quirkyFact = `夜空に輝く${pickedStar}を発見して見上げた`;
-      } else {
-        const isTurtle = Math.random() < 0.5;
-        actionLabel = isTurtle ? `🐢 島の端からのぞき込み：地下の「巨大な亀」を発見！` : `🌊 島の端からのぞき込み：「大滝と白波」を観察！`;
-        thoughtText = isTurtle
-          ? `島の端っこから下をのぞき込んだら、この島を背中で支えている「巨大な亀さん」と目が合ったよ！`
-          : `島の端から勢いよく流れ落ちる大滝と白い水しぶきをのぞき込んだよ！マイナスイオンたっぷり！`;
-        quirkyCategory = 'stage_wonder';
-        quirkyFact = isTurtle ? '島を背中で支える巨大な亀を下に見つけた' : '島の端の大滝と水しぶきをのぞき込んだ';
-      }
-      DIARY_LOGS.push(`🔍 ${GAME_DAY}日目：${actionLabel}`);
-    } else if (wantSolveCorner && blockedByCorner) {
-      const d = blockedByCorner.dir;
-      const sideDir = ALL_DIRS.find(dxz => dxz.dx === d.dx && dxz.dz === 0) || ALL_DIRS[0];
-      ROBOT.rotY = sideDir.rot;
-      stepCharCloseToWallForDig(sideDir);
-      digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, sideDir, ROBOT.posture === 'crawl', effP.power);
-      ROBOT.emotion = 'swing_v';
-      lockPose = true;
-      ROBOT.params.power = Math.min(100, (ROBOT.params.power || 50) + 2);
-      actionLabel = `📐 角抜けエラー解決(${bSpec.label})：邪魔な${sideDir.name}の角壁を削った！`;
-      thoughtText = `斜め(${d.name})に進みたいのに角の壁がおなかに引っかかる！邪魔な${sideDir.name}の壁から削ってやるーっ😡`;
-      quirkyCategory = 'corner_hit';
-      quirkyFact = `${d.name}へ進もうとして角の壁に引っかかり、${sideDir.name}の壁を削り始めた`;
-      DIARY_LOGS.push(`⛏️ ${GAME_DAY}日目：斜めに進むため邪魔な角の壁を削った！`);
-    } else if (wantSolveHighStep && blockedByHighStep) {
-      const d = blockedByHighStep.dir;
-      ROBOT.rotY = d.rot;
-      const stoneIdx = BAG.indexOf('stone');
-      if (stoneIdx !== -1 && Math.random() < 0.6) {
-        BAG.splice(stoneIdx, 1);
-        addSubStepFootholdAt(ROBOT.pos.x, ROBOT.pos.z, Math.max(1, sSpec.subH));
-        ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
-        ROBOT.posture = getSafePostureAt(ROBOT.pos.x, ROBOT.pos.z, ROBOT.pos.lv);
-        ROBOT.emotion = 'carry';
-        lockPose = true;
-        ROBOT.params.logic = Math.min(100, (ROBOT.params.logic || 50) + 3);
-        actionLabel = `🪜 段差エラー解決(${sSpec.label}・高${sSpec.subH})：カバンの石で足元に踏み台を積んだ！`;
-        thoughtText = `${d.name}の段差(分割${blockedByHighStep.check.stepDiff}ブロック)が身長(分割${sSpec.subH})より高くて登れないから、石で踏み台を積んだよ！💡かしこさUP！`;
-        quirkyCategory = 'high_wall';
-        quirkyFact = `目の前の高さ${blockedByHighStep.check.stepDiff}段の壁が登れず、石で踏み台を積んだ`;
-        DIARY_LOGS.push(`🪜 ${GAME_DAY}日目：高い段差を登るために石で踏み台を作った！`);
-      } else {
-        stepCharCloseToWallForDig(d);
-        const curSubH = getSurfaceSubUnits(ROBOT.pos.x, ROBOT.pos.z, curH);
-        carveFrontStepToClimbable(ROBOT.pos.x + d.dx, ROBOT.pos.z + d.dz, curSubH, sSpec.subH);
-        ROBOT.emotion = 'swing_v';
-        lockPose = true;
-        ROBOT.params.power = Math.min(100, (ROBOT.params.power || 50) + 3);
-        actionLabel = `⛏️ 段差エラー解決(${sSpec.label}・高${sSpec.subH})：${d.name}の壁の手前に立って階段に削った！`;
-        thoughtText = `${d.name}の壁が高すぎて登れないから、壁の手前に立ってよじ登れる高さまで階段状に削ったよ！💪ちからUP！`;
-        quirkyCategory = 'high_wall';
-        quirkyFact = `目の前の壁が高すぎて登れず、壁を削って階段にした`;
-        DIARY_LOGS.push(`⛏️ ${GAME_DAY}日目：壁の手前に立って自分の身長に合う階段を削った！`);
-      }
-    } else if (wantSolveNarrow && blockedByFat) {
-      const d = blockedByFat.dir;
-      ROBOT.rotY = d.rot;
-      const oilIdx = BAG.indexOf('oil');
-      if (oilIdx !== -1) {
-        BAG.splice(oilIdx, 1);
-        ROBOT.pos.x += d.dx; ROBOT.pos.z += d.dz;
-        ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
-        ROBOT.posture = 'crawl';
-        ROBOT.emotion = 'joy';
-        ROBOT.traumas = (ROBOT.traumas || []).filter(t => t !== 'narrow');
-        ROBOT.params.logic = Math.min(100, (ROBOT.params.logic || 50) + 3);
-        actionLabel = `🧴 太さエラー解決(${bSpec.label}・幅${bSpec.reqWidth})：スライムオイルで狭い穴をツルッと突破！`;
-        thoughtText = `太さ「${bSpec.label}(幅${bSpec.reqWidth})」で穴につかえたけど、🧴スライムオイルを塗ってツルッと滑り抜けたよ！`;
-        quirkyCategory = 'narrow_hole';
-        quirkyFact = `狭い穴にお腹がつかえたがオイルを塗って滑り抜けた`;
-        DIARY_LOGS.push(`🧴 ${GAME_DAY}日目：スライムオイルで狭い穴を滑り抜けてトラウマ克服！`);
-      } else {
-        stepCharCloseToWallForDig(d);
-        carveCrawlTunnelBlock(ROBOT.pos.x + d.dx, ROBOT.pos.z + d.dz, curH + 1, bSpec.reqWidth, Math.max(2, sSpec.crawlH));
-        ROBOT.emotion = 'push';
-        lockPose = true;
-        ROBOT.params.power = Math.min(100, (ROBOT.params.power || 50) + 3);
-        actionLabel = `👐 太さエラー解決(${bSpec.label}・幅${bSpec.reqWidth})：狭い穴を自分の太さに削り広げた！`;
-        thoughtText = `狭い穴にお腹がつかえて動けないから、${d.name}の穴を幅${bSpec.reqWidth}ブロック分まで削り広げたよ！`;
-        quirkyCategory = 'narrow_hole';
-        quirkyFact = `狭い穴にお腹がつかえて通れず、必死に壁を削り広げた`;
-      }
-    } else if (wantRest) {
-      life.stamina += 35; life.energy -= 5; life.mental += 10;
-      ROBOT.posture = getSafePostureAt(ROBOT.pos.x, ROBOT.pos.z, curH);
-      ROBOT.workStreak = 0;
-      ROBOT.emotion = (life.energy <= 30) ? 'sad' : 'sleep';
-      ROBOT.params.eco = Math.min(100, (ROBOT.params.eco || 40) + 2);
-      actionLabel = `💤 省エネ休憩（姿勢:${ROBOT.posture === 'crawl' ? 'ほふく維持' : '立ち'}）`;
-      thoughtText = ROBOT.posture === 'crawl'
-        ? `天井が低いトンネルの中だから、頭をぶつけないようにほふく前進のままコックリ居眠り中だよ…💤`
-        : `マイペースにコックリ居眠りしてバッテリー温存中だよ…💤 💖やさしさ夢ゲージUP！`;
-    } else if (wantDig) {
-      const digDir = ALL_DIRS[Math.floor(Math.random() * ALL_DIRS.length)];
-      ROBOT.rotY = digDir.rot;
-      const digRes = digFromCharacterFront(ROBOT.pos.x, ROBOT.pos.z, curH, digDir, wantCrawlDig || ROBOT.posture === 'crawl', effP.power);
-      life.stamina -= 9; life.mental += 10;
-      ROBOT.workStreak = (ROBOT.workStreak || 0) + 1;
-      ROBOT.params.power = Math.min(100, (ROBOT.params.power || 50) + 2);
-      if (ROBOT.workStreak >= 3 && life.stamina <= 55) addTraumaById('overwork', true);
-
-      ROBOT.emotion = 'swing_v';
-      lockPose = true;
-      if (digRes.blockedDiagFirst) {
-        actionLabel = `📐 斜め奥は角壁が邪魔！まず${digRes.sideDirName}の壁を幅${bSpec.reqWidth}で削った`;
-        thoughtText = `斜め奥を掘ろうとしたけど手前の角壁が邪魔だから、まず${digRes.sideDirName}の壁の手前に立って削ったよ！`;
-        quirkyCategory = 'corner_hit';
-        quirkyFact = `斜め掘りで手前の角に引っかかり${digRes.sideDirName}の壁を削った`;
-      } else if (digRes.completedLevel) {
-        if (BAG.length < 10) BAG.push('stone');
-        if (digRes.targetX === ROBOT.pos.x && digRes.targetZ === ROBOT.pos.z) ROBOT.pos.lv = digRes.newLv;
-        ROBOT.emotion = 'joy';
-        lockPose = false;
-        actionLabel = `⛏️ ${digDir.name}を掘り抜いて${formatHeightText(digRes.newLv)}開通！`;
-        thoughtText = `${digDir.name}の壁を掘り抜いて道が開通したよ！カバンに🪨石素材をゲット！`;
-      } else {
-        actionLabel = `⛏️ ${digDir.name}の壁の手前で掘削中(幅${bSpec.reqWidth}×高${sSpec.subH}・残${digRes.leftCount})`;
-        thoughtText = `${digDir.name}の壁の手前にピタッと立って、ボクのサイズ(幅${bSpec.reqWidth}×高${sSpec.subH})で土を削っているよ！`;
-      }
-    } else if (chosenMove) {
-      const d = chosenMove.dir, chk = chosenMove.check;
-      ROBOT.pos.x += d.dx; ROBOT.pos.z += d.dz; ROBOT.pos.lv = chk.targetLv;
-      ROBOT.pos.sx = 2; ROBOT.pos.sz = 2; ROBOT.rotY = d.rot; ROBOT.posture = chk.posture;
-
-      life.energy -= 6; life.stamina -= 7; life.mental += 10;
-      ROBOT.params.curiosity = Math.min(100, (ROBOT.params.curiosity || 60) + 2);
-
-      if (chk.reason === 'scramble_climb') {
-        ROBOT.emotion = 'struggle';
-        lockPose = true;
-        life.stamina -= 4;
-        actionLabel = `🧗 バタバタよじ登り(${sSpec.label}:高${sSpec.subH})：分割${chk.stepDiff}ブロックの段差を登った！`;
-        thoughtText = `分割${chk.stepDiff}ブロックの段差はボク(${sSpec.label}・高${sSpec.subH})には壁だから、足をバタバタさせて一生けんめいよじ登ったよ！`;
-        DIARY_LOGS.push(`🧗 ${GAME_DAY}日目：${sSpec.label}(高${sSpec.subH})で分割${chk.stepDiff}ブロックの段差をバタバタよじ登った！`);
-      } else if (chk.reason === 'stairs_up') {
-        ROBOT.emotion = 'fun';
-        actionLabel = `🪜 スイスイ階段上り(${sSpec.label}:高${sSpec.subH})：分割${chk.stepDiff}ブロック段差を通過`;
-        thoughtText = `分割${chk.stepDiff}ブロックの段差なら、${sSpec.label}(高さ${sSpec.subH})のボクにはスイスイ歩ける階段だよ♪`;
-      } else if (chk.reason === 'safe_landing') {
-        ROBOT.emotion = 'pickup';
-        lockPose = true;
-        actionLabel = `🦸 着地ポーズで安全降下(${sSpec.label}:高${sSpec.subH})：分割${Math.abs(chk.stepDiff)}ブロック下りた！`;
-        thoughtText = `分割${Math.abs(chk.stepDiff)}ブロックの高さから飛び降りて、シュタッ！と着地ポーズでカッコよく降りたよ！`;
-        quirkyCategory = 'gravity_fall';
-        quirkyFact = `分割${Math.abs(chk.stepDiff)}ブロックの段差を飛び降りて着地ポーズを決めた`;
-      } else if (chk.reason === 'stairs_down') {
-        ROBOT.emotion = 'normal';
-        actionLabel = `🪜 スイスイ階段下り(${sSpec.label}:高${sSpec.subH})：分割${Math.abs(chk.stepDiff)}ブロック下りた`;
-        thoughtText = `小さな段差をトントンと階段みたいに歩いて下りたよ！`;
-      } else if (chk.reason === 'high_drop_damage') {
-        ROBOT.emotion = 'surprise';
-        life.stamina -= 16; life.mental -= 12;
-        addTraumaById('height', true);
-        actionLabel = `💥 身長超えの崖(${Math.abs(chk.stepDiff)}段)から重力落下！ダメージ＆高所トラウマ`;
-        thoughtText = `わわっ！！自分の身長(分割${sSpec.subH}ブロック)より高い${Math.abs(chk.stepDiff)}ブロックの崖から落ちてお尻をぶつけたよ…！「🧗高所トラウマ」になっちゃった😭`;
-        quirkyCategory = 'gravity_fall';
-        quirkyFact = `身長より深い${Math.abs(chk.stepDiff)}段の崖から重力落下してお尻をぶつけた`;
-      } else if (chk.posture === 'crawl') {
-        ROBOT.emotion = 'fun';
-        actionLabel = `🐛 ほふく前進(高${sSpec.crawlH}×幅${bSpec.reqWidth})で通過！`;
-        thoughtText = `高さを半分(分割${sSpec.crawlH}ブロック)に丸めて「ほふく前進」で${d.name}へくぐり抜けたよ！`;
-      } else {
-        ROBOT.emotion = (effP.curiosity >= 75 || ROBOT.speed === 5) ? 'run' : 'fun';
-        actionLabel = `👟 ${d.name}へ移動（${sSpec.label}高${sSpec.subH}・${bSpec.label}幅${bSpec.reqWidth}）`;
-        thoughtText = `${d.name}へ進んだよ！🗡️ぼうけん夢ゲージが育っているよ！`;
-      }
-    }
-  }
-
-  const charSubY = getSurfaceSubUnitsForChar(ROBOT.pos.x, ROBOT.pos.z, bSpec.reqWidth, getRobotHeightLevel());
-  const itemIdx = WORLD_ITEMS.findIndex(it => {
-    if (it.x !== ROBOT.pos.x || it.z !== ROBOT.pos.z) return false;
-    const itemSubY = getSurfaceSubUnitsForChar(it.x, it.z, 3, null);
-    return Math.abs(charSubY - itemSubY) <= 1;
-  });
-
-  if (itemIdx !== -1) {
-    const targetItem = WORLD_ITEMS[itemIdx];
-    const safePostureHere = getSafePostureAt(ROBOT.pos.x, ROBOT.pos.z, getRobotHeightLevel());
-    if (targetItem.type === 'apple' && hasTrauma('stomach') && Math.random() < 0.72) {
-      ROBOT.posture = safePostureHere;
-      ROBOT.emotion = 'fear';
-      actionLabel = '🤢 はらいたトラウマ発動！リンゴを食べずに後ずさり';
-      thoughtText = '足元に🍎リンゴがあるけど、「🤢はらいたトラウマ」でおなかが痛くなるのが怖くて食べられないよ〜！';
-      quirkyCategory = 'trauma_panic';
-      quirkyFact = 'リンゴを見つけたが、はらいたトラウマで怖くて食べられない';
-    } else {
-      const picked = WORLD_ITEMS.splice(itemIdx, 1)[0];
-      if (picked.type === 'apple') {
-        if (Math.random() < 0.16) {
-          life.energy += 15; life.mental -= 12;
-          ROBOT.posture = safePostureHere;
-          ROBOT.emotion = 'sad';
-          addTraumaById('stomach', true);
-          actionLabel = '🤢 傷んだリンゴでおなかイタイ！「はらいたトラウマ」発症';
-          thoughtText = 'うぅぅ…食べたリンゴが傷んでいておなかが痛くなっちゃった…！「🤢はらいたトラウマ」になっちゃったよ😭';
-          quirkyCategory = 'trauma_panic';
-          quirkyFact = '傷んだリンゴを食べておなかを壊し、はらいたトラウマ発症';
-        } else {
-          life.energy += 45; life.mental += 15;
-          ROBOT.posture = safePostureHere;
-          ROBOT.emotion = 'joy';
-          ROBOT.traumas = (ROBOT.traumas || []).filter(t => t !== 'stomach');
-          ROBOT.params.eco = Math.min(100, (ROBOT.params.eco || 40) + 3);
-          actionLabel = '🍎 おいしいリンゴを食べて大喜び！';
-          thoughtText = 'わーい！！甘くておいしいリンゴを食べたよ！嬉しくてバンザイジャンプ！！💖やさしさUP！';
-        }
-      } else {
-        if (BAG.length < 10) BAG.push(picked.type);
-        life.mental += 10;
-        ROBOT.posture = safePostureHere;
-        ROBOT.emotion = 'pickup';
-        lockPose = true;
-        actionLabel = `🤲 アイテムをしゃがんでカバンに拾った`;
-        thoughtText = '足元にいいものが落ちていたから、しゃがんでカバンに拾ったよ！';
-      }
-    }
-  }
-
-  if (quirkyCategory && quirkyFact) {
-    document.getElementById('ai-status').innerText = '🌀 奇想天外API通信中...';
-    const aiRes = await askAIQuirkyReaction(quirkyCategory, quirkyFact);
-    const customThought = applyQuirkyAIResultToRobot(aiRes, lockPose);
-    if (customThought) {
-      thoughtText = customThought;
-    }
-  } else {
-    applyRobotBulbColor();
+    ROBOT.emotion = 'think';
+    actionLabel = '💡 まわりを観察中';
+    thoughtText = 'まわりをキョロキョロ観察しているよ！';
   }
 
   if (thoughtText) DIARY_LOGS.push(`💭 ${GAME_DAY}日目：${thoughtText}`);
@@ -1511,24 +1282,6 @@ async function executeTurn() {
   cameraDirty = true;
   if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
   saveWorldState();
-
-  if (life.getState().mode === 'DEAD') {
-    ROBOT.emotion = 'sad';
-    document.getElementById('message-box').innerText = `力尽きて倒れてしまった…。パラメータとトラウマ記憶を引き継ぎ、次の1号機（第${ROBOT.gen + 1}世代）が誕生します！`;
-    setTimeout(() => {
-      ROBOT.gen += 1; ROBOT.pos = { x: 0, z: 0, lv: -1, sx: 2, sz: 2 }; ROBOT.rotY = Math.PI; ROBOT.posture = 'stand'; ROBOT.emotion = 'joy'; ROBOT.bulbEmotion = null; AI_MEMORY = [];
-      GAME_DAY = 1; TIME_STEP = 0; life = new LifeCore();
-      DIARY_LOGS.push(`📖 記憶を引き継いで1号機（第${ROBOT.gen}世代）が誕生した！`);
-      if (!WORLD_ITEMS.length) WORLD_ITEMS.push({ type: 'apple', x: -1, z: 1 });
-      if (typeof manualCameraMode !== 'undefined' && manualCameraMode === 'robot' && typeof resetFpvToRobotFront === 'function') resetFpvToRobotFront();
-      if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
-      if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition(true);
-      applyRobotBulbColor(); cameraDirty = true;
-      if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
-      saveWorldState(); btn.disabled = false;
-    }, 2000);
-    return;
-  }
 
   setTimeout(() => {
     document.getElementById('ai-status').innerText = getActiveBrainBadgeText();
@@ -1551,6 +1304,7 @@ async function quickDigDown() {
     msg = `足元を幅${reqWidth}で掘ったけど、まだ周りの土に体が引っかかって落ちていないよ！`;
   } else if (dropSub <= sSpec.subH) {
     ROBOT.emotion = 'pickup';
+    addExpPoint('power', 1);
     act = `🦸 足元掘り＆安全着地(${sSpec.label}高${sSpec.subH}×${bSpec.label}幅${reqWidth})`;
     msg = `足元を「幅${reqWidth}」で掘って分割${dropSub}ブロック分ストンと重力落下！着地ポーズでカッコよく降りたよ！`;
     DIARY_LOGS.push(`🦸 ${GAME_DAY}日目：足元を幅${reqWidth}で掘って分割${dropSub}ブロック着地した！`);
@@ -1558,12 +1312,11 @@ async function quickDigDown() {
     ROBOT.emotion = 'surprise';
     lockPose = false;
     life.stamina = Math.max(5, life.stamina - 15);
+    ROBOT.isInjured = true;
     addTraumaById('height', true);
-    act = `💥 足元掘り＆深穴落下ダメージ(${dropSub}段落下)`;
+    act = `💥 足元掘り＆深穴落下ダメージ(${dropSub}段落下・ケガ)`;
     msg = `わわっ！足元を掘ったら自分の身長(${sSpec.subH})より深い分割${dropSub}ブロックも重力落下してお尻をぶつけたよ…！`;
   }
-
-  if (OBS_MODE === 'ai_mode') AI_MEMORY.push(`神様が足元を掘って${dropSub}段落下した`);
 
   if (dropSub > 0) {
     const aiRes = await askAIQuirkyReaction('gravity_fall', `足元を幅${reqWidth}で掘って分割${dropSub}ブロック落下した`);
@@ -1640,10 +1393,11 @@ function switchDiaryParamTab(tabKey) {
 
 function onParamSliderInput(paramKey, val) {
   const num = Math.max(0, Math.min(100, Number(val) || 0));
-  if (!ROBOT.params) ROBOT.params = { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50, loyalty: 50 };
+  if (!ROBOT.params) ROBOT.params = { curiosity: 50, cautionLimiter: 50, power: 50, eco: 50, logic: 50, loyalty: 50 };
   ROBOT.params[paramKey] = num;
   const valEl = document.getElementById(`val-param-${paramKey}`);
-  if (valEl) valEl.innerText = num;
+  const expVal = (ROBOT.expParams && typeof ROBOT.expParams[paramKey] === 'number') ? ROBOT.expParams[paramKey] : 0;
+  if (valEl) valEl.innerText = `${num}+${expVal}`;
   const dreamEl = document.getElementById('diary-dream-title');
   if (dreamEl) dreamEl.innerText = getCurrentDreamTitle();
   updateHiddenParamsUI();
@@ -1681,10 +1435,12 @@ function clearAllTraumas() {
 }
 
 function updateHiddenParamsUI() {
-  const base = ROBOT.params || { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50 };
+  const base = ROBOT.params || { curiosity: 50, cautionLimiter: 50, power: 50, eco: 50, logic: 50 };
+  const exp = ROBOT.expParams || { curiosity: 0, cautionLimiter: 0, power: 0, eco: 0, logic: 0 };
   const eff = getEffectiveParams();
   ['curiosity', 'cautionLimiter', 'power', 'eco', 'logic'].forEach(k => {
     const bVal = base[k] ?? 50;
+    const xVal = exp[k] ?? 0;
     const eVal = eff[k] ?? 50;
     const diff = eVal - bVal;
     const barEl = document.getElementById(`eff-bar-${k}`);
@@ -1694,9 +1450,9 @@ function updateHiddenParamsUI() {
       barEl.className = 'eff-bar-fill' + (diff > 0 ? ' up' : (diff < 0 ? ' down' : ''));
     }
     if (valEl) {
-      if (diff > 0) valEl.innerHTML = `${eVal} <span class="diff-plus">(+${diff})</span>`;
+      if (diff > 0) valEl.innerHTML = `${eVal} <span class="diff-plus">(体験+${xVal})</span>`;
       else if (diff < 0) valEl.innerHTML = `${eVal} <span class="diff-minus">(${diff})</span>`;
-      else valEl.innerHTML = `${eVal} <span class="diff-zero">(±0)</span>`;
+      else valEl.innerHTML = `${eVal} <span class="diff-zero">(体験+${xVal})</span>`;
     }
   });
 }
@@ -1900,9 +1656,9 @@ async function applyRealityEventSummaryToGrowth() {
   const cDelta = aiRes && Number.isFinite(Number(aiRes.cautionDelta)) ? Number(aiRes.cautionDelta) : 10;
   const qDelta = aiRes && Number.isFinite(Number(aiRes.curiosityDelta)) ? Number(aiRes.curiosityDelta) : 10;
 
-  ROBOT.params.power = Math.min(100, (ROBOT.params.power || 50) + pDelta);
-  ROBOT.params.cautionLimiter = Math.min(100, (ROBOT.params.cautionLimiter || 50) + cDelta);
-  ROBOT.params.curiosity = Math.min(100, (ROBOT.params.curiosity || 60) + qDelta);
+  addExpPoint('power', Math.max(1, Math.round(pDelta / 3)));
+  addExpPoint('cautionLimiter', Math.max(1, Math.round(cDelta / 3)));
+  addExpPoint('curiosity', Math.max(1, Math.round(qDelta / 3)));
 
   const sizeOrder = ['tiny', 'small', 'medium', 'large', 'giant'];
   const curSizeIdx = sizeOrder.indexOf(ROBOT.sizeLevel);
@@ -1916,7 +1672,7 @@ async function applyRealityEventSummaryToGrowth() {
   ROBOT.bulbEmotion = null;
 
   const sSpec = SIZE_SPECS[ROBOT.sizeLevel];
-  const msg = aiRes?.thought || `📡 現実の出来事「${summaryText}」からエネルギーをもらって、夢ゲージが成長＆体格も「${sSpec.label}(高${sSpec.subH})」になったよ！`;
+  const msg = aiRes?.thought || `📡 現実の出来事「${summaryText}」からエネルギーをもらって、体験ゲージが成長＆体格も「${sSpec.label}(高${sSpec.subH})」になったよ！`;
   document.getElementById('history-action').innerText = `⚡ 現実連動パワーアップ（いまの夢:${getCurrentDreamTitle()}）`;
   document.getElementById('message-box').innerText = msg;
   DIARY_LOGS.push(`📡 ${GAME_DAY}日目：${msg}`);
@@ -1927,7 +1683,7 @@ async function applyRealityEventSummaryToGrowth() {
   applyRobotBulbColor(); cameraDirty = true;
   if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
   saveWorldState();
-  showToast('⚡ 現実イベント要約で夢ゲージと体格が成長したよ！');
+  showToast('⚡ 現実イベント要約で体験ゲージと体格が成長したよ！');
 }
 
 function cycleBodyAndCrawlTest() {
@@ -1944,7 +1700,7 @@ function cycleBodyAndCrawlTest() {
   const bSpec = BODY_SPECS[ROBOT.bodyType];
   if (typeof manualCameraMode !== 'undefined' && manualCameraMode === 'robot' && typeof resetFpvToRobotFront === 'function') resetFpvToRobotFront();
 
-  const msg = `📏 体格プリセット切替：高さ「${sSpec.label}(分割${sSpec.subH}ブロック)」×太さ「${bSpec.label}(分割${bSpec.reqWidth}ブロック)」！（壁や天井にめり込まないよう自動調整済み）`;
+  const msg = `📏 体格プリセット切替：高さ「${sSpec.label}(分割${sSpec.subH}ブロック)」×太さ「${bSpec.label}(分割${bSpec.reqWidth}ブロック)」！`;
   document.getElementById('message-box').innerText = msg;
   if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
   if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition();
@@ -1966,11 +1722,10 @@ function quickDiagonalOrFrontDig() {
   const bSpec = BODY_SPECS[ROBOT.bodyType] || BODY_SPECS.slim1;
   const curH = getRobotHeightLevel();
   const res = digFromCharacterFront(x, z, curH, chosenDir, true, 50);
-  if (OBS_MODE === 'ai_mode') AI_MEMORY.push(`神様が目の前の壁を削った`);
   if (typeof manualCameraMode !== 'undefined' && manualCameraMode === 'robot' && typeof resetFpvToRobotFront === 'function') resetFpvToRobotFront();
   const msg = res.blockedDiagFirst
     ? `⛏️ 斜め奥(${chosenDir.name})を掘るには手前の壁が邪魔！まず${res.sideDirName}の壁の手前に立って幅${bSpec.reqWidth}×高${sSpec.crawlH}で削ったよ！`
-    : `⛏️ ${chosenDir.name}の壁の手前（顔がめり込まない位置）に立って、自分のサイズ(幅${bSpec.reqWidth}×ほふく高${sSpec.crawlH})でピンポイントに削ったよ！`;
+    : `⛏️ ${chosenDir.name}の壁の手前に立って、自分のサイズ(幅${bSpec.reqWidth}×ほふく高${sSpec.crawlH})でピンポイントに削ったよ！`;
   document.getElementById('message-box').innerText = msg;
   if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
   if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition();
@@ -1987,9 +1742,19 @@ function closeFanMenu() {
 
 function quickDropApple() {
   WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z });
-  if (OBS_MODE === 'ai_mode') AI_MEMORY.push('神様が足元にリンゴをプレゼントしてくれた');
+  if (BAG.length < 10) BAG.push('apple');
   if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
-  cameraDirty = true; saveWorldState(); closeFanMenu(); showToast('🍎 足元にリンゴを置いたよ！');
+  cameraDirty = true; saveWorldState(); closeFanMenu(); showToast('🍎 リンゴを補充したよ（おなか+50回復用）！');
+}
+
+function triggerGhostTestFromDiary() {
+  ROBOT.ghostNear = true;
+  ROBOT.emotion = 'fear';
+  applyRobotBulbColor();
+  saveWorldState();
+  renderDiaryModal();
+  if (typeof updateEnvironmentAndUI === 'function') updateEnvironmentAndUI();
+  showToast('👻 お化け接近フラグON！次の思考で記憶喪失＋日記頼りで逃げます');
 }
 
 function quickStackSubStep() {
@@ -1999,7 +1764,6 @@ function quickStackSubStep() {
   ROBOT.pos.sx = 2; ROBOT.pos.sz = 2;
   ROBOT.posture = getSafePostureAt(x, z, ROBOT.pos.lv);
   ROBOT.emotion = 'carry';
-  if (OBS_MODE === 'ai_mode') AI_MEMORY.push('神様が足元に分割1ブロックの段差を作った');
   if (typeof manualCameraMode !== 'undefined' && manualCameraMode === 'robot' && typeof resetFpvToRobotFront === 'function') resetFpvToRobotFront();
   if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
   if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition();
@@ -2040,32 +1804,44 @@ function renderDiaryModal() {
   const eSpec = getExpressionSpec(ROBOT.emotion);
   const rigName = ROBOT.rigType === 'stick' ? '🦴3D骨組み(◯と線)' : '🎲サイコロ箱型';
 
+  const condFlags = [];
+  if (ROBOT.isInjured) condFlags.push('🩹ケガ中');
+  if (ROBOT.isSick) condFlags.push('😷病気中');
+  if (ROBOT.ghostNear) condFlags.push('👻お化け接近中');
+  const condStr = condFlags.length ? ` / 状態:${condFlags.join('・')}` : ' / 状態:健康';
+
   document.getElementById('diary-emo-icon').innerText = eSpec.icon;
-  document.getElementById('diary-robo-name').innerText = `${ROBOT.unitModel}号機（${rigName}・生存 ${GAME_DAY}日目）`;
+  document.getElementById('diary-robo-name').innerText = `${ROBOT.unitModel}号機（${rigName}・生存 ${GAME_DAY}日目${condStr}）`;
   document.getElementById('diary-robo-height').innerText = `現在：${formatHeightText(getRobotHeightLevel())} / 高さ：${sSpec.label}(分割${sSpec.subH}) / 太さ：${bSpec.label}(分割${bSpec.reqWidth})`;
   document.getElementById('diary-step-rule').innerText = `🪜 スイスイ階段:${sSpec.stairMax}段 / 🧗 よじ登り・安全着地:${sSpec.subH}段 / 🐛 ほふく高:${sSpec.crawlH}`;
 
   const dreamEl = document.getElementById('diary-dream-title');
   if (dreamEl) dreamEl.innerText = getCurrentDreamTitle();
 
-  const p = ROBOT.params || { curiosity: 60, cautionLimiter: 50, power: 50, eco: 40, logic: 50 };
+  const p = ROBOT.params || { curiosity: 50, cautionLimiter: 50, power: 50, eco: 50, logic: 50 };
+  const exp = ROBOT.expParams || { curiosity: 0, cautionLimiter: 0, power: 0, eco: 0, logic: 0 };
   ['curiosity', 'cautionLimiter', 'power', 'eco', 'logic'].forEach(k => {
     const sl = document.getElementById(`param-${k}`);
     const vl = document.getElementById(`val-param-${k}`);
     if (sl) sl.value = p[k] ?? 50;
-    if (vl) vl.innerText = p[k] ?? 50;
+    if (vl) vl.innerText = `${p[k] ?? 50}+${exp[k] ?? 0}`;
   });
 
   const baseTagList = document.getElementById('base-trauma-tag-list');
   if (baseTagList) {
     const activeIds = Array.isArray(ROBOT.traumas) ? ROBOT.traumas : [];
-    if (activeIds.length === 0) {
-      baseTagList.innerHTML = `<span style="color:#94a3b8; font-size:10px;">現在抱えているトラウマはありません（健康そのもの！）</span>`;
+    const statusChips = [];
+    if (ROBOT.isInjured) statusChips.push(`<span class="trauma-tag">🩹 ケガ中（毎ターンたいりょく追加-5）</span>`);
+    if (ROBOT.isSick) statusChips.push(`<span class="trauma-tag">😷 病気中（リンゴ効果半分+25）</span>`);
+    if (ROBOT.ghostNear) statusChips.push(`<span class="trauma-tag">👻 お化け接近中（日記頼りで逃走）</span>`);
+    activeIds.forEach(id => {
+      const sp = TRAUMA_SPECS.find(t => t.id === id);
+      if (sp) statusChips.push(`<span class="trauma-tag">${sp.icon} ${sp.name}</span>`);
+    });
+    if (statusChips.length === 0) {
+      baseTagList.innerHTML = `<span style="color:#94a3b8; font-size:10px;">ケガ・病気・トラウマなし（健康そのもの！）</span>`;
     } else {
-      baseTagList.innerHTML = activeIds.map(id => {
-        const sp = TRAUMA_SPECS.find(t => t.id === id);
-        return sp ? `<span class="trauma-tag">${sp.icon} ${sp.name}</span>` : '';
-      }).join('');
+      baseTagList.innerHTML = statusChips.join('');
     }
   }
 
@@ -2104,7 +1880,21 @@ function renderDiaryModal() {
     if (item) slot.onclick = () => useBagItem(i);
     grid.appendChild(slot);
   }
-  document.getElementById('diary-logs').innerHTML = DIARY_LOGS.slice().reverse().map(l => `<div>・${l}</div>`).join('');
+
+  // 5ページ限定日記帳（毎ターン記憶喪失の頼り）＋ 思い出ログを表示
+  const pages = Array.isArray(ROBOT.diaryPages) ? ROBOT.diaryPages : [];
+  const fivePageHtml = [
+    `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">` +
+      `<strong style="color:#92400e;">📖 5ページの日記帳（${pages.length}/5ページ・毎ターン記憶喪失の頼り）</strong>` +
+      `<button type="button" onclick="triggerGhostTestFromDiary()" style="font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:6px;border:1px solid #94a3b8;background:#fff;color:#334155;cursor:pointer;">👻お化けテスト</button>` +
+    `</div>`,
+    pages.length === 0
+      ? `<div style="color:#64748b;margin-bottom:6px;">（まだ白紙です。通信成功時のみ体験が1ページずつ書かれます）</div>`
+      : pages.map((p, idx) => `<div style="background:#fefce8;border-left:3px solid #eab308;padding:3px 6px;margin-bottom:3px;border-radius:4px;"><b>${idx + 1}P(${p.time || ''}):</b> ${p.text}</div>`).join(''),
+    `<hr style="border:0;border-top:1px dashed #cbd5e1;margin:5px 0;">`
+  ].join('');
+
+  document.getElementById('diary-logs').innerHTML = fivePageHtml + DIARY_LOGS.slice().reverse().map(l => `<div>・${l}</div>`).join('');
 }
 
 async function useBagItem(index) {
@@ -2113,6 +1903,7 @@ async function useBagItem(index) {
     const ok = addSubStepFootholdAt(ROBOT.pos.x, ROBOT.pos.z, 2);
     if (!ok) { showToast('ここは第一エリアの地上上限（5段目）だよ！'); return; }
     BAG.splice(index, 1);
+    addExpPoint('power', 1);
     ROBOT.posture = getSafePostureAt(ROBOT.pos.x, ROBOT.pos.z, ROBOT.pos.lv);
     ROBOT.emotion = 'carry';
     showToast('🪨 足元に分割2ブロックの踏み台（階段）を積んだよ！');
@@ -2122,10 +1913,10 @@ async function useBagItem(index) {
     TIME_STEP = Math.max(TIME_STEP, 14);
     ROBOT.posture = getSafePostureAt(ROBOT.pos.x, ROBOT.pos.z, getRobotHeightLevel());
     ROBOT.emotion = 'peek';
-    ROBOT.params.cautionLimiter = Math.min(100, (ROBOT.params.cautionLimiter || 50) + 4);
+    addExpPoint('cautionLimiter', 2);
     const constellations = ['🦢はくちょう座', '👑カシオペア座', '🥄北斗七星', '🏹オリオン座'];
     const pickedStar = constellations[Math.floor(Math.random() * constellations.length)];
-    let msg = `🌿 草ブロックを使ってごきげん大回復！夜空に輝く「${pickedStar}」を見上げて🎵げいじゅつ夢ゲージが伸びたよ✨`;
+    let msg = `🌿 草ブロックを使ってごきげん大回復(+30)！夜空に輝く「${pickedStar}」を見上げたよ✨`;
     const aiRes = await askAIQuirkyReaction('stage_wonder', `草ブロックを使って夜空の${pickedStar}を見上げた`);
     const customThought = applyQuirkyAIResultToRobot(aiRes, true);
     if (customThought) msg = customThought;
@@ -2136,12 +1927,18 @@ async function useBagItem(index) {
   } else if (item === 'oil') {
     BAG.splice(index, 1);
     ROBOT.traumas = (ROBOT.traumas || []).filter(t => t !== 'narrow');
+    life.mental = Math.min(100, life.mental + 15);
+    addExpPoint('logic', 1);
     ROBOT.emotion = 'joy';
-    showToast('🧴 スライムオイルを塗ったよ！狭所トラウマが消えて狭い隙間もツルッと通れるよ！');
+    showToast('🧴 スライムオイルを塗ったよ！狭所トラウマが消えてごきげん+15！');
   } else if (item === 'apple') {
-    WORLD_ITEMS.push({ type: 'apple', x: ROBOT.pos.x, z: ROBOT.pos.z });
     BAG.splice(index, 1);
-    showToast('足元に🍎リンゴを置いたよ！');
+    const heal = ROBOT.isSick ? 25 : 50;
+    life.energy = Math.min(100, life.energy + heal);
+    life.mental = Math.min(100, life.mental + 12);
+    addExpPoint('eco', 1);
+    ROBOT.emotion = 'joy';
+    showToast(`🍎 リンゴを食べておなか+${heal}回復したよ！`);
   }
   if (typeof rebuildTerrainAndItems === 'function') rebuildTerrainAndItems();
   if (typeof syncRobot3DPosition === 'function') syncRobot3DPosition();
