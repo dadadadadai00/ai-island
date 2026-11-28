@@ -1,12 +1,12 @@
 // ============================================================================
 // 【独立ビジュアルモジュール：compass_ring.js】
 // ・丸い海の外周へ余白を空けて配置する未来風・青ホログラム3Dコンパス
-// ・①ゲーム＆②天体観察前：くるくる回転 ／ ③天体観察時：回転停止＋北合わせ発光
+// ・①ゲーム：くるくる回転 ／ ②天体観察前：実機連動時は方位固定(非連動時は回転) ／ ③天体観察時：北合わせ発光
 // ============================================================================
 (function initCompassRingModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_compass_ring_v2';
+  const STORAGE_KEY = 'island_compass_ring_v3';
   const state = { unlocked: true, visible: true, rotating: true, radiusOffset: 0.9 };
   let externalHide = false;
 
@@ -343,6 +343,11 @@
     lastTs = now;
     const baseOn = Boolean(state.unlocked && state.visible && !externalHide);
 
+    const skyMod = window.SkyTimeModule;
+    const isNativeLinked = skyMod && typeof skyMod.isNativeCompassActive === 'function'
+      ? skyMod.isNativeCompassActive()
+      : false;
+
     if (baseOn) {
       if (alignState.enabled) {
         // ③天体観察時：目盛りリング回転停止＆東西南北へピタリと揃える＋北ピンク点滅
@@ -382,8 +387,14 @@
             }
           }
         }
+      } else if (isNativeLinked) {
+        // ②天体観察前（実機連動ON時）：回転を止めて東西南北基準へピタリと合わせる
+        alignState.fadeAlpha = 1.0;
+        rootGroup.visible = true;
+        rotatingGroup.rotation.y *= Math.max(0, 1 - dt * 10);
+        applyTimePalette(false);
       } else {
-        // ①ゲーム ／ ②天体観察前：くるくる回転
+        // ①ゲーム ／ ②天体観察前（実機連動OFF時）：くるくる回転
         alignState.fadeAlpha = 1.0;
         rootGroup.visible = true;
         if (state.rotating) {
