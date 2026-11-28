@@ -1,14 +1,14 @@
 // ============================================================================
 // 【独立ビジュアルモジュール：sky_time.js】
 // ・Androidネイティブ(Kotlin)の高精度/子ども向けコンパス＆純正GPSへ直結
-// ・①ゲーム(アニメ空・カメラそのまま・キャラ思考＆移動)
-// ・②天体観察前(リアル風外スクリーン・キャラ思考＆移動・各カメラの水平方角のみコンパス連動)
-// ・③天体観察時(キャラその場に停止・全カメラ方位統一＋上下見上げ＋リアル空＋暗転停止)
+// ・①ゲーム(アニメ空・通常カメラ・キャラ思考＆移動)
+// ・②天体観察前(北合わせウィンドウ➡確定後、全5カメラを通常ゲーム用に戻してリアル風外スクリーンでプレイ)
+// ・③天体観察時(北合わせウィンドウ➡確定後、キャラ位置固定・全カメラ方位統一＋上下見上げ＋リアル空＋暗転停止)
 // ============================================================================
 (function initSkyTimeModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_sky_time_v19';
+  const STORAGE_KEY = 'island_sky_time_v20';
   const RAD = Math.PI / 180;
   const DEG = 180 / Math.PI;
   const SKY_R = 22.0;
@@ -186,13 +186,20 @@
     isUpright: false,
     accuracy: 2,
     userTouching: false,
-    userPausedTracking: false,
     alignedNow: false,
     postureSynced: false,
     obsPitchRad: 0.24,      // ③天体観察時の空見上げ角度（ラジアン）
     touchStartY: 0,
     touchStartPitch: 0.24,
     lockedRobotPos: null    // ③天体観察時にキャラがいた位置をロック
+  };
+
+  // 北ターゲット・ロックオン管理状態
+  const northTarget = {
+    locked: false,          // 北が確定済みか
+    modalOpen: false,       // 「くるっと回って北を向こう」ウィンドウが開いているか
+    northOffsetDeg: 0,      // 確定時の北基準オフセット
+    flashUntilMs: 0         // 縦列アイコン🎯が5秒間光る終了時刻
   };
 
   const tmpCamDir = new THREE.Vector3();
@@ -205,7 +212,7 @@
 
   window.addEventListener('pointermove', (e) => {
     if (!nativeBridge.userTouching) return;
-    if (state.viewMode === 'obs' && nativeBridge.connected && !nativeBridge.userPausedTracking) {
+    if (state.viewMode === 'obs' && northTarget.locked && !northTarget.modalOpen) {
       const dy = (e.clientY || 0) - nativeBridge.touchStartY;
       nativeBridge.obsPitchRad = Math.max(-0.15, Math.min(1.25, nativeBridge.touchStartPitch + dy * 0.0045));
     }
@@ -239,13 +246,13 @@
     return '西';
   }
 
-  function isNativeCompassActive() {
-    if (state.viewMode === 'anime') return false;
-    return Boolean(nativeBridge.connected && !nativeBridge.userPausedTracking);
-  }
-
   function getSelectedNativeAzimuth() {
     return (state.compassStyle === 'kid') ? nativeBridge.kidAzimuth : nativeBridge.precisionAzimuth;
+  }
+
+  // 北確定済みオフセットを加味した現在の方位角（0°=確定した北）
+  function getCalibratedAzimuthDeg() {
+    return norm360(getSelectedNativeAzimuth() - northTarget.northOffsetDeg);
   }
 
   function pollNativeBridge() {
@@ -283,9 +290,182 @@
     } catch (e) {}
   }
 
+  // ============================================================================
+  // --- 「くるっと回って北を向こう」ウィンドウ（北ターゲット確定＆解除） ---
+  // ============================================================================
+  function ensureNorthAlignModal() {
+    let modal = document.getElementById('north-align-guide-modal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'north-align-guide-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9600;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,0.72);backdrop-filter:blur(4px);padding:16px;';
+    modal.innerHTML = `
+      <div style="width:100%;max-width:340px;background:linear-gradient(180deg,#0f172a 0%,#1e293b 100%);border:2px solid #38bdf8;border-radius:20px;padding:18px 16px;color:#f8fafc;box-shadow:0 16px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;">
+        <div id="north-guide-mode-pill" style="font-size:10.5px;font-weight:900;padding:3px 10px;border-radius:999px;background:#0284c7;color:#ffffff;">🔭 天体観察前</div>
+        <div id="north-guide-dial" style="width:76px;height:76px;border-radius:50%;background:radial-gradient(circle,#1e293b 0%,#0f172a 100%);border:3px solid #38bdf8;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(56,189,248,0.35);transition:transform 0.12s ease,border-color 0.2s ease;">
+          <div style="font-size:28px;line-height:1;">🧭</div>
+          <div id="north-guide-n-tag" style="font-size:10px;font-weight:900;color:#7dd3fc;margin-top:2px;">北(N)</div>
+        </div>
+        <div style="font-size:16px;font-weight:900;color:#ffffff;letter-spacing:0.02em;">くるっと回って北を向こう！</div>
+        <div id="north-guide-live-dir" style="width:100%;background:rgba(2,132,199,0.22);border:1px solid #38bdf8;border-radius:12px;padding:8px 10px;font-size:12.5px;font-weight:900;color:#e0f2fe;line-height:1.45;">
+          いまの向き：計測中...
+        </div>
+        <div id="north-guide-desc" style="font-size:11px;font-weight:700;color:#cbd5e1;line-height:1.45;">
+          スマホを持ったまま体を回して「北」を向いたら、下の確定ボタンを押してください。
+        </div>
+        <button type="button" id="btn-confirm-north-lock" style="width:100%;padding:12px 10px;border-radius:12px;border:none;background:linear-gradient(135deg,#0284c7 0%,#0ea5e9 100%);color:#ffffff;font-size:14px;font-weight:900;cursor:pointer;box-shadow:0 4px 14px rgba(14,165,233,0.4);">
+          ✅ 北を確定（ロックオン）
+        </button>
+        <button type="button" id="btn-cancel-north-to-game" style="padding:5px 12px;border-radius:8px;border:1px solid #475569;background:transparent;color:#94a3b8;font-size:10.5px;font-weight:800;cursor:pointer;">
+          ① ゲームモードへ戻る
+        </button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('btn-confirm-north-lock').onclick = confirmNorthLockOn;
+    document.getElementById('btn-cancel-north-to-game').onclick = () => {
+      northTarget.modalOpen = false;
+      northTarget.locked = false;
+      northTarget.flashUntilMs = 0;
+      modal.style.display = 'none';
+      state.viewMode = 'anime';
+      saveState();
+      updateCelestialExhibit(true);
+      if (typeof showToast === 'function') showToast('🎮 ①ゲームモードへ戻りました');
+    };
+
+    return modal;
+  }
+
+  function openNorthAlignModal() {
+    const modal = ensureNorthAlignModal();
+    northTarget.locked = false;
+    northTarget.modalOpen = true;
+    northTarget.flashUntilMs = 0;
+
+    // 設定モーダルが開いていたら自動で閉じる
+    const settingsModal = document.getElementById('modal-settings');
+    if (settingsModal && (settingsModal.classList.contains('active') || settingsModal.style.display !== 'none')) {
+      if (typeof closeModal === 'function') closeModal('modal-settings');
+      else {
+        settingsModal.classList.remove('active');
+        settingsModal.style.display = 'none';
+      }
+    }
+
+    const pill = document.getElementById('north-guide-mode-pill');
+    const desc = document.getElementById('north-guide-desc');
+    if (pill) {
+      pill.textContent = (state.viewMode === 'obs') ? '🔭 ③ 天体観察時' : '🔭 ② 天体観察前';
+    }
+    if (desc) {
+      desc.textContent = (state.viewMode === 'obs')
+        ? '北を向いて確定すると、その場から実際の空と天体を見上げられます。'
+        : '北を向いて確定すると、カメラは通常のゲーム用に戻り、リアル風の太陽軌道と夜空で遊べます。';
+    }
+
+    modal.style.display = 'flex';
+    updateNorthAlignModalLive();
+  }
+
+  function updateNorthAlignModalLive() {
+    if (!northTarget.modalOpen) return;
+    const modal = document.getElementById('north-align-guide-modal');
+    if (!modal || modal.style.display === 'none') return;
+
+    const liveEl = document.getElementById('north-guide-live-dir');
+    const dialEl = document.getElementById('north-guide-dial');
+    const btnEl  = document.getElementById('btn-confirm-north-lock');
+    if (!liveEl || !btnEl) return;
+
+    if (!nativeBridge.connected) {
+      liveEl.innerHTML = '🌐 ブラウザ確認モード<br><span style="font-size:10.5px;color:#93c5fd;">そのまま確定ボタンで北をロックオンできます</span>';
+      btnEl.style.background = 'linear-gradient(135deg,#0284c7 0%,#0ea5e9 100%)';
+      return;
+    }
+
+    const rawDeg = getSelectedNativeAzimuth();
+    const degInt = Math.round(rawDeg) % 360;
+    const diffFromNorth = shortestAngleDiffDeg(rawDeg, 0);
+    const absDiff = Math.abs(diffFromNorth);
+    const isNearNorth = (absDiff <= 15);
+
+    if (dialEl) {
+      dialEl.style.transform = `rotate(${-rawDeg}deg)`;
+      dialEl.style.borderColor = isNearNorth ? '#22c55e' : '#38bdf8';
+      dialEl.style.boxShadow = isNearNorth ? '0 0 24px rgba(34,197,94,0.65)' : '0 0 20px rgba(56,189,248,0.35)';
+    }
+
+    if (isNearNorth) {
+      liveEl.innerHTML = `✨ 北（${degInt}°）を向いています！<br><span style="font-size:11px;color:#86efac;">今すぐ下の「北を確定」を押してください</span>`;
+      liveEl.style.borderColor = '#22c55e';
+      liveEl.style.background = 'rgba(22,163,74,0.28)';
+      btnEl.style.background = 'linear-gradient(135deg,#16a34a 0%,#22c55e 100%)';
+    } else {
+      const dirName = (state.compassStyle === 'kid') ? getDirectionName4(degInt) : `${getDirectionName8(degInt)} ${degInt}°`;
+      const turnHint = diffFromNorth > 0 ? '⬅ 左へくるっと回ろう' : '➡ 右へくるっと回ろう';
+      liveEl.innerHTML = `いまの向き：【${dirName}】<br><span style="font-size:11px;color:#fde047;">${turnHint}</span>`;
+      liveEl.style.borderColor = '#38bdf8';
+      liveEl.style.background = 'rgba(2,132,199,0.22)';
+      btnEl.style.background = 'linear-gradient(135deg,#0284c7 0%,#0ea5e9 100%)';
+    }
+  }
+
+  function confirmNorthLockOn() {
+    // 確定した瞬間の実機コンパスの向きが真北(0°)付近ならそのまま0°基準、少しズレていればその差を補正
+    if (nativeBridge.connected) {
+      const curDeg = getSelectedNativeAzimuth();
+      const diff = shortestAngleDiffDeg(curDeg, 0);
+      northTarget.northOffsetDeg = (Math.abs(diff) <= 25) ? 0 : curDeg;
+    } else {
+      northTarget.northOffsetDeg = 0;
+    }
+
+    northTarget.locked = true;
+    northTarget.modalOpen = false;
+    northTarget.flashUntilMs = performance.now() + 5000; // 縦列🎯アイコンを5秒間ゆっくり光らせる
+
+    const modal = document.getElementById('north-align-guide-modal');
+    if (modal) modal.style.display = 'none';
+
+    const compMod = window.CompassRingModule;
+    if (compMod && typeof compMod.triggerNorthLocked === 'function') {
+      compMod.triggerNorthLocked();
+    }
+
+    // ②天体観察前の場合：北確定後に5つのカメラをすべて通常のゲーム用カメラへ戻す
+    if (state.viewMode === 'pre_obs') {
+      if (typeof window.updateAllCamerasTransform === 'function') {
+        window.updateAllCamerasTransform();
+      }
+      if (typeof showToast === 'function') {
+        showToast('🎯 北を確定！通常カメラでリアル風の空と太陽軌道を観察できます');
+      }
+    } else if (state.viewMode === 'obs') {
+      if (typeof showToast === 'function') {
+        showToast('🎯 北を確定！上下指スライドで夜空・天体を見上げられます');
+      }
+    }
+
+    updateCelestialExhibit(true);
+  }
+
+  function unlockNorthTargetAndReopen() {
+    northTarget.locked = false;
+    northTarget.flashUntilMs = 0;
+    nativeBridge.lockedRobotPos = null;
+    if (typeof showToast === 'function') {
+      showToast('🔓 北ターゲットを解除しました（もう一度北を向いて確定できます）');
+    }
+    openNorthAlignModal();
+    updateCompassAndCameraLoop();
+  }
+
   // --- ③天体観察時専用：キャラのマップ移動ロック（思考はそのまま・位置は固定） ---
   function enforceObsPositionLock() {
-    if (state.viewMode !== 'obs') {
+    if (state.viewMode !== 'obs' || !northTarget.locked) {
       nativeBridge.lockedRobotPos = null;
       return;
     }
@@ -315,108 +495,63 @@
     }
   }
 
-  // --- カメラ方位連動（キャラ本体の向き ROBOT.rotY は変更しない） ---
+  // --- カメラ方位連動 ---
+  // ・①ゲーム ／ ②天体観察前（北確定後）：5カメラすべて通常のゲーム用カメラをそのまま維持（一切上書きしない）
+  // ・③天体観察時：キャラがいた位置から実機コンパス方位＋上下スライド仰角で空を見上げる
   function applyModeCameraOrientation() {
-    if (state.viewMode === 'anime') return;
-    if (!nativeBridge.connected || nativeBridge.userPausedTracking) return;
+    if (state.viewMode !== 'obs') return;
+    if (!nativeBridge.connected) return;
 
-    const azDeg = getSelectedNativeAzimuth();
+    const azDeg = getCalibratedAzimuthDeg();
     const azRad = azDeg * RAD;
-    // 北(0°)=(0, -1), 東(90°)=(+1, 0), 南(180°)=(0, +1), 西(270°)=(-1, 0)
     const dirX = Math.sin(azRad);
     const dirZ = -Math.cos(azRad);
+    const pitch = nativeBridge.obsPitchRad;
     const camMode = (typeof manualCameraMode !== 'undefined') ? manualCameraMode : 'follow';
 
-    // 【② 天体観察前】：各カメラの通常ゲームアングル（距離・高さ・見下ろし角度）を維持したまま水平方角のみ連動
-    if (state.viewMode === 'pre_obs') {
-      if (nativeBridge.userTouching) return;
-
-      // 1. キャラ視点（🤖内カメラ）のとき：上下視線角度はそのまま水平方角だけ同期
-      if (camMode === 'robot' && typeof innerRobotCam !== 'undefined' && innerRobotCam) {
-        innerRobotCam.getWorldDirection(tmpCamDir);
-        const sinP = tmpCamDir.y;
-        const cosP = Math.sqrt(Math.max(0.001, 1 - sinP * sinP));
-        const eyeX = innerRobotCam.position.x;
-        const eyeY = innerRobotCam.position.y;
-        const eyeZ = innerRobotCam.position.z;
-        innerRobotCam.lookAt(
-          eyeX + 20 * cosP * dirX,
-          eyeY + 20 * sinP,
-          eyeZ + 20 * cosP * dirZ
-        );
-        return;
-      }
-
-      // 2. 追従・地上・地下カメラのとき：controlsに頼らず現在のカメラ視線から注視点と距離を算出して水平回転
-      if (typeof activeCamera !== 'undefined' && activeCamera) {
-        const isFixedIslandCam = (camMode === 'ground' || camMode === 'underground');
-        const pivotX = isFixedIslandCam ? 0 : ((typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.x : 0);
-        const pivotZ = isFixedIslandCam ? 0 : ((typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.z : 0);
-
-        const dx = activeCamera.position.x - pivotX;
-        const dz = activeCamera.position.z - pivotZ;
-        const horizDist = Math.max(0.5, Math.hypot(dx, dz));
-
-        activeCamera.getWorldDirection(tmpCamDir);
-        const horizLen = Math.max(0.001, Math.hypot(tmpCamDir.x, tmpCamDir.z));
-        const targetY = activeCamera.position.y + (tmpCamDir.y / horizLen) * horizDist;
-
-        activeCamera.position.x = pivotX - dirX * horizDist;
-        activeCamera.position.z = pivotZ - dirZ * horizDist;
-        activeCamera.lookAt(pivotX, targetY, pivotZ);
-      }
+    if (camMode === 'robot' && typeof innerRobotCam !== 'undefined' && innerRobotCam) {
+      const eyeX = innerRobotCam.position.x;
+      const eyeY = innerRobotCam.position.y;
+      const eyeZ = innerRobotCam.position.z;
+      const cosP = Math.cos(pitch);
+      innerRobotCam.lookAt(
+        eyeX + 20 * cosP * dirX,
+        eyeY + 20 * Math.sin(pitch),
+        eyeZ + 20 * cosP * dirZ
+      );
       return;
     }
 
-    // 【③ 天体観察時】：キャラのいた位置基準で実機コンパス連動＋上下指スライドで見上げ
-    if (state.viewMode === 'obs') {
-      const pitch = nativeBridge.obsPitchRad;
+    if (typeof activeCamera !== 'undefined' && activeCamera) {
+      if (camMode === 'ground') {
+        const dist = 9.5;
+        const camY = 2.8;
+        activeCamera.position.set(-dirX * dist, camY, -dirZ * dist);
+        const lookDist = 22.0;
+        const lookY = camY + Math.sin(pitch) * lookDist;
+        activeCamera.lookAt(dirX * (lookDist - dist), lookY, dirZ * (lookDist - dist));
+      } else if (camMode === 'underground') {
+        const horizDist = Math.max(3.5, Math.hypot(activeCamera.position.x, activeCamera.position.z));
+        activeCamera.getWorldDirection(tmpCamDir);
+        const horizLen = Math.max(0.001, Math.hypot(tmpCamDir.x, tmpCamDir.z));
+        const targetY = activeCamera.position.y + (tmpCamDir.y / horizLen) * horizDist;
+        activeCamera.position.x = -dirX * horizDist;
+        activeCamera.position.z = -dirZ * horizDist;
+        activeCamera.lookAt(0, targetY, 0);
+      } else {
+        const lp = nativeBridge.lockedRobotPos;
+        const baseX = lp ? lp.wx : ((typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.x : 0);
+        const baseY = lp ? lp.wy : ((typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.y : 0);
+        const baseZ = lp ? lp.wz : ((typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.z : 0);
+        const backDist = 4.2;
+        const eyeY = baseY + 1.25;
+        activeCamera.position.set(baseX - dirX * backDist, eyeY, baseZ - dirZ * backDist);
 
-      if (camMode === 'robot' && typeof innerRobotCam !== 'undefined' && innerRobotCam) {
-        const eyeX = innerRobotCam.position.x;
-        const eyeY = innerRobotCam.position.y;
-        const eyeZ = innerRobotCam.position.z;
-        const cosP = Math.cos(pitch);
-        innerRobotCam.lookAt(
-          eyeX + 20 * cosP * dirX,
-          eyeY + 20 * Math.sin(pitch),
-          eyeZ + 20 * cosP * dirZ
-        );
-        return;
-      }
-
-      if (typeof activeCamera !== 'undefined' && activeCamera) {
-        if (camMode === 'ground') {
-          const dist = 9.5;
-          const camY = 2.8;
-          activeCamera.position.set(-dirX * dist, camY, -dirZ * dist);
-          const lookDist = 22.0;
-          const lookY = camY + Math.sin(pitch) * lookDist;
-          activeCamera.lookAt(dirX * (lookDist - dist), lookY, dirZ * (lookDist - dist));
-        } else if (camMode === 'underground') {
-          const horizDist = Math.max(3.5, Math.hypot(activeCamera.position.x, activeCamera.position.z));
-          activeCamera.getWorldDirection(tmpCamDir);
-          const horizLen = Math.max(0.001, Math.hypot(tmpCamDir.x, tmpCamDir.z));
-          const targetY = activeCamera.position.y + (tmpCamDir.y / horizLen) * horizDist;
-          activeCamera.position.x = -dirX * horizDist;
-          activeCamera.position.z = -dirZ * horizDist;
-          activeCamera.lookAt(0, targetY, 0);
-        } else {
-          // 追従カメラ：キャラがいた位置基準で実機コンパスの方角＆見上げ仰角を反映
-          const lp = nativeBridge.lockedRobotPos;
-          const baseX = lp ? lp.wx : ((typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.x : 0);
-          const baseY = lp ? lp.wy : ((typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.y : 0);
-          const baseZ = lp ? lp.wz : ((typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.z : 0);
-          const backDist = 4.2;
-          const eyeY = baseY + 1.25;
-          activeCamera.position.set(baseX - dirX * backDist, eyeY, baseZ - dirZ * backDist);
-
-          const lookDist = 20.0;
-          const targetX = baseX + dirX * lookDist;
-          const targetY = eyeY + Math.sin(pitch) * lookDist;
-          const targetZ = baseZ + dirZ * lookDist;
-          activeCamera.lookAt(targetX, targetY, targetZ);
-        }
+        const lookDist = 20.0;
+        const targetX = baseX + dirX * lookDist;
+        const targetY = eyeY + Math.sin(pitch) * lookDist;
+        const targetZ = baseZ + dirZ * lookDist;
+        activeCamera.lookAt(targetX, targetY, targetZ);
       }
     }
   }
@@ -429,8 +564,10 @@
       const _origUpdateAll = window.updateAllCamerasTransform;
       window.updateAllCamerasTransform = function() {
         const res = _origUpdateAll.apply(this, arguments);
-        enforceObsPositionLock();
-        applyModeCameraOrientation();
+        if (state.viewMode === 'obs') {
+          enforceObsPositionLock();
+          applyModeCameraOrientation();
+        }
         return res;
       };
       cameraHookInstalled = true;
@@ -440,8 +577,10 @@
       const _origRender = renderer.render.bind(renderer);
       renderer.render = function(sc, cam) {
         if (sc === scene && (cam === activeCamera || cam === innerRobotCam)) {
-          enforceObsPositionLock();
-          applyModeCameraOrientation();
+          if (state.viewMode === 'obs') {
+            enforceObsPositionLock();
+            applyModeCameraOrientation();
+          }
           if (typeof activeCamera !== 'undefined' && activeCamera) {
             skyRoot.position.copy(activeCamera.position);
           }
@@ -452,10 +591,11 @@
     }
   }
 
-  function updateCompassAndCameraLoop() {
+  function updateCompassAndCameraLoop(nowMs = performance.now()) {
     ensureCameraHooks();
     pollNativeBridge();
     enforceObsPositionLock();
+    updateNorthAlignModalLive();
 
     const isPreObs = (state.viewMode === 'pre_obs');
     const isObsMode = (state.viewMode === 'obs');
@@ -463,7 +603,7 @@
 
     syncScreenWakeLock(isObsMode);
 
-    if (showObsTools) {
+    if (isObsMode) {
       applyModeCameraOrientation();
     }
 
@@ -478,8 +618,8 @@
     // 北一致判定（③天体観察時）
     if (alignActive) {
       let diffDeg = 180;
-      if (nativeBridge.connected && !nativeBridge.userPausedTracking) {
-        diffDeg = Math.abs(shortestAngleDiffDeg(getSelectedNativeAzimuth(), 0));
+      if (nativeBridge.connected) {
+        diffDeg = Math.abs(shortestAngleDiffDeg(getCalibratedAzimuthDeg(), 0));
       } else if (typeof activeCamera !== 'undefined' && activeCamera) {
         activeCamera.getWorldDirection(tmpCamDir);
         if (Math.hypot(tmpCamDir.x, tmpCamDir.z) > 0.04) {
@@ -497,12 +637,14 @@
       nativeBridge.alignedNow = false;
     }
 
-    // ②天体観察前・③天体観察時の両方で右側縦並び🧭・📱アイコン＆上部方位バッジを表示
-    syncObsSideIcons(showObsTools, userCompOn, showObsTools && !nativeBridge.userPausedTracking);
-    syncCompassHudBadge(showObsTools);
+    // 右側縦列アイコンの出し分け：
+    // ・②天体観察前：🎯（北ターゲット）のみ表示
+    // ・③天体観察時：🧭（コンパス表示/非表示）＋ 🎯（北ターゲット）の両方を表示
+    syncObsSideIcons(isPreObs, isObsMode, userCompOn, nowMs);
+    syncCompassHudBadge(isObsMode && northTarget.locked);
   }
 
-  // --- 上部方位HUDバッジ（②天体観察前 ＆ ③天体観察時） ---
+  // --- 上部方位HUDバッジ（③天体観察時の北確定後のみ表示） ---
   function syncCompassHudBadge(showHud) {
     let hud = document.getElementById('obs-compass-hud-badge');
     if (!showHud) {
@@ -518,7 +660,7 @@
 
     let dispDeg = 0;
     if (nativeBridge.connected) {
-      dispDeg = Math.round(getSelectedNativeAzimuth()) % 360;
+      dispDeg = Math.round(getCalibratedAzimuthDeg()) % 360;
     } else if (typeof activeCamera !== 'undefined' && activeCamera) {
       activeCamera.getWorldDirection(tmpCamDir);
       if (Math.hypot(tmpCamDir.x, tmpCamDir.z) > 0.02) {
@@ -527,14 +669,10 @@
     }
 
     const postureTag = nativeBridge.isUpright ? '立て持ち' : '寝かせ持ち';
-    const modeTag = (state.viewMode === 'pre_obs') ? '観察前' : '観察中';
 
     if (!nativeBridge.connected) {
-      hud.textContent = `🧭 ${modeTag}（APK起動で実機センサー連動）`;
-      hud.style.borderColor = '#94a3b8';
-    } else if (nativeBridge.userPausedTracking) {
-      hud.textContent = `✋ ${modeTag}・一時停止中（右の📱で連動再開）`;
-      hud.style.borderColor = '#f59e0b';
+      hud.textContent = `🔭 天体観察中（北確定済み・上下スライドで見上げ）`;
+      hud.style.borderColor = '#38bdf8';
     } else if (state.compassStyle === 'kid') {
       const dir4 = getDirectionName4(dispDeg);
       const snapMark = nativeBridge.kidSnapped ? '✨ぴったり！' : 'ゆらっと追従';
@@ -549,7 +687,7 @@
     hud.style.display = 'block';
   }
 
-  // --- 右側縦列アイコンの下へ「🧭ホログラム」＆「📱追従一時停止/再開」を追加 ---
+  // --- 右側縦列アイコン生成・制御 ---
   function findRightSideIconContainer() {
     const sideCol = document.getElementById('side-icon-column');
     if (sideCol) {
@@ -569,72 +707,98 @@
     if (found && found.container && found.refBtn) {
       const cs = window.getComputedStyle(found.refBtn);
       btn.className = found.refBtn.className;
-      btn.style.cssText = `position:relative;width:${cs.width};height:${cs.height};border-radius:${cs.borderRadius || '50%'};background:${cs.backgroundColor || '#ffffff'};box-shadow:${cs.boxShadow || '0 3px 10px rgba(0,0,0,0.22)'};border:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;padding:0;`;
+      btn.style.cssText = `position:relative;width:${cs.width};height:${cs.height};border-radius:${cs.borderRadius || '50%'};background:${cs.backgroundColor || '#ffffff'};box-shadow:${cs.boxShadow || '0 3px 10px rgba(0,0,0,0.22)'};border:2.5px solid #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer;padding:0;transition:box-shadow 0.2s,border-color 0.2s,background-color 0.2s;`;
       found.container.appendChild(btn);
     } else {
-      btn.style.cssText = `position:fixed;right:12px;top:${fallbackTopPx}px;z-index:8820;width:44px;height:44px;border-radius:50%;background:#ffffff;border:2px solid #cbd5e1;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;padding:0;`;
+      btn.style.cssText = `position:fixed;right:12px;top:${fallbackTopPx}px;z-index:8820;width:44px;height:44px;border-radius:50%;background:#ffffff;border:2.5px solid #cbd5e1;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer;padding:0;transition:box-shadow 0.2s,border-color 0.2s,background-color 0.2s;`;
       document.body.appendChild(btn);
     }
 
     btn.innerHTML = `
       <span style="line-height:1;">${emoji}</span>
-      <span id="${badgeId}" style="position:absolute;bottom:-4px;right:-3px;font-size:8px;font-weight:900;padding:1px 4px;border-radius:6px;color:#ffffff;line-height:1.1;">OFF</span>
+      <span id="${badgeId}" style="position:absolute;bottom:-5px;right:-4px;font-size:8px;font-weight:900;padding:1px 4px;border-radius:6px;color:#ffffff;line-height:1.1;white-space:nowrap;">OFF</span>
     `;
     return btn;
   }
 
-  function syncObsSideIcons(showIcons, isCompOn, isTrackingOn) {
-    let compBtn = document.getElementById('btn-side-obs-compass');
-    let gyroBtn = document.getElementById('btn-side-obs-gyro');
+  function syncObsSideIcons(isPreObs, isObsMode, isCompOn, nowMs) {
+    let compBtn   = document.getElementById('btn-side-obs-compass');
+    let targetBtn = document.getElementById('btn-side-north-target');
 
-    if (!showIcons) {
-      if (compBtn) compBtn.style.display = 'none';
-      if (gyroBtn) gyroBtn.style.display = 'none';
-      return;
-    }
-
-    if (!compBtn) {
-      compBtn = createSideRoundIcon('btn-side-obs-compass', '🧭', 'badge-side-obs-compass', 'ホログラムコンパス表示 ON/OFF（北合わせ）', 372);
-      compBtn.onclick = () => {
-        const compMod = window.CompassRingModule;
-        if (compMod && typeof compMod.toggleVisible === 'function') {
-          const next = compMod.toggleVisible();
-          if (next) {
-            nativeBridge.userPausedTracking = false;
+    // 1. 🧭 コンパス表示/非表示アイコン（③天体観察時のみ表示、②天体観察前では非表示）
+    if (isObsMode) {
+      if (!compBtn) {
+        compBtn = createSideRoundIcon('btn-side-obs-compass', '🧭', 'badge-side-obs-compass', '3Dホログラムコンパス表示 ON/OFF', 372);
+        compBtn.onclick = () => {
+          const compMod = window.CompassRingModule;
+          if (compMod && typeof compMod.toggleVisible === 'function') {
+            const next = compMod.toggleVisible();
+            if (typeof showToast === 'function') {
+              showToast(next ? '🧭 3Dコンパス表示 ON' : '🧭 3Dコンパス表示 OFF');
+            }
+            updateCompassAndCameraLoop();
           }
-          if (typeof showToast === 'function') {
-            showToast(next ? '🧭 ホログラムコンパス ON（北基準）' : '🧭 ホログラムコンパス OFF');
+        };
+      }
+      compBtn.style.display = 'flex';
+      compBtn.style.borderColor = isCompOn ? '#0284c7' : '#cbd5e1';
+      const compBadge = document.getElementById('badge-side-obs-compass');
+      if (compBadge) {
+        compBadge.textContent = isCompOn ? 'ON' : 'OFF';
+        compBadge.style.background = isCompOn ? '#0284c7' : '#64748b';
+      }
+    } else if (compBtn) {
+      compBtn.style.display = 'none';
+    }
+
+    // 2. 🎯 北ターゲット（ロックオン・解除）アイコン（②天体観察前 ＆ ③天体観察時で表示）
+    if (isPreObs || isObsMode) {
+      if (!targetBtn) {
+        targetBtn = createSideRoundIcon('btn-side-north-target', '🎯', 'badge-side-north-target', '北ターゲット（タップで北ロック解除・再設定）', 424);
+        targetBtn.onclick = () => {
+          if (northTarget.locked) {
+            unlockNorthTargetAndReopen();
+          } else {
+            openNorthAlignModal();
           }
-          updateCompassAndCameraLoop();
+        };
+      }
+      targetBtn.style.display = 'flex';
+
+      const targetBadge = document.getElementById('badge-side-north-target');
+      const isFlashing = (northTarget.locked && nowMs < northTarget.flashUntilMs);
+
+      if (isFlashing) {
+        // 北確定直後から約5秒間、ゆっくり明滅して光る
+        const pulse = 0.5 + 0.5 * Math.sin(nowMs * 0.0055);
+        targetBtn.style.borderColor = '#f43f5e';
+        targetBtn.style.backgroundColor = `rgba(255, 228, 230, ${0.45 + 0.55 * pulse})`;
+        targetBtn.style.boxShadow = `0 0 ${Math.round(6 + 16 * pulse)}px rgba(244, 63, 94, ${(0.35 + 0.65 * pulse).toFixed(2)})`;
+        if (targetBadge) {
+          targetBadge.textContent = '北確定!';
+          targetBadge.style.background = '#e11d48';
         }
-      };
-    }
-
-    if (!gyroBtn) {
-      gyroBtn = createSideRoundIcon('btn-side-obs-gyro', '📱', 'badge-side-obs-gyro', '実機コンパス追従 一時停止/再開', 424);
-      gyroBtn.onclick = () => {
-        nativeBridge.userPausedTracking = !nativeBridge.userPausedTracking;
-        updateCompassAndCameraLoop();
-        if (typeof showToast === 'function') {
-          showToast(nativeBridge.userPausedTracking ? '✋ 実機コンパス追従を一時停止（指操作可）' : '📱 実機コンパス追従を再開しました');
+      } else if (northTarget.locked) {
+        // 5秒経過後は通常のロックオン状態（タップで北ロック解除）
+        targetBtn.style.borderColor = '#0284c7';
+        targetBtn.style.backgroundColor = '#ffffff';
+        targetBtn.style.boxShadow = '0 3px 10px rgba(0,0,0,0.22)';
+        if (targetBadge) {
+          targetBadge.textContent = '北固定';
+          targetBadge.style.background = '#0284c7';
         }
-      };
-    }
-
-    compBtn.style.display = 'flex';
-    compBtn.style.borderColor = isCompOn ? '#0284c7' : '#cbd5e1';
-    const compBadge = document.getElementById('badge-side-obs-compass');
-    if (compBadge) {
-      compBadge.textContent = isCompOn ? 'ON' : 'OFF';
-      compBadge.style.background = isCompOn ? '#0284c7' : '#64748b';
-    }
-
-    gyroBtn.style.display = 'flex';
-    gyroBtn.style.borderColor = isTrackingOn ? '#16a34a' : '#f59e0b';
-    const gyroBadge = document.getElementById('badge-side-obs-gyro');
-    if (gyroBadge) {
-      gyroBadge.textContent = isTrackingOn ? '連動' : '停止';
-      gyroBadge.style.background = isTrackingOn ? '#16a34a' : '#f59e0b';
+      } else {
+        // 未確定（ロック解除中）
+        targetBtn.style.borderColor = '#f59e0b';
+        targetBtn.style.backgroundColor = '#ffffff';
+        targetBtn.style.boxShadow = '0 3px 10px rgba(0,0,0,0.22)';
+        if (targetBadge) {
+          targetBadge.textContent = '未確定';
+          targetBadge.style.background = '#f59e0b';
+        }
+      }
+    } else if (targetBtn) {
+      targetBtn.style.display = 'none';
     }
   }
 
@@ -733,7 +897,7 @@
       return { date: now, phase: turnPhase, subStep, turn, times, moonMood, dayTag: 'ゲーム周期' };
     }
 
-    // ②天体観察前：GPS座標＋暦日基準で朝・昼・夕・夜・深夜の正確な天体位置をリアル風外スクリーンで表示
+    // ②天体観察前：表の時間帯（朝・昼・夕・夜・夜中）に沿ったリアル風外スクリーン
     const refBase = new Date(skyDayBase.getTime());
     const isNextDay = Math.min(3, turnPhase) < Math.min(3, realPhase);
     if (isNextDay) refBase.setDate(refBase.getDate() + 1);
@@ -1474,7 +1638,7 @@
 
         <!-- 2. コンパス構造切替（高精度 vs 子ども向け磁石吸着） -->
         <div style="background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:11px;padding:8px 9px;display:flex;flex-direction:column;gap:6px;">
-          <div style="font-size:11px;font-weight:900;color:#0f172a;">🧭 実機コンパスの構造切替（②観察前・③観察時）</div>
+          <div style="font-size:11px;font-weight:900;color:#0f172a;">🧭 実機コンパスの構造切替（北合わせ・観察時）</div>
           <div style="display:flex;gap:5px;">
             <button type="button" data-compstyle="precision" style="flex:1;padding:7px 5px;border-radius:8px;border:1px solid #cbd5e1;font-size:10.5px;font-weight:900;cursor:pointer;">🔬 高精度コンパス<div style="font-size:9px;font-weight:600;opacity:0.85;">1°単位の正確計測</div></button>
             <button type="button" data-compstyle="kid" style="flex:1;padding:7px 5px;border-radius:8px;border:1px solid #cbd5e1;font-size:10.5px;font-weight:900;cursor:pointer;">🧭 子ども向けコンパス<div style="font-size:9px;font-weight:600;opacity:0.85;">東西南北に磁石吸着</div></button>
@@ -1511,14 +1675,20 @@
 
       box.querySelectorAll('[data-skymode]').forEach((btn) => {
         btn.onclick = () => {
-          state.viewMode = btn.getAttribute('data-skymode');
-          nativeBridge.userPausedTracking = false;
-          if (state.viewMode === 'pre_obs' || state.viewMode === 'obs') {
-            const compMod = window.CompassRingModule;
-            if (compMod && typeof compMod.setVisible === 'function') compMod.setVisible(true);
-          }
+          const nextMode = btn.getAttribute('data-skymode');
+          state.viewMode = nextMode;
           saveState();
           updateCelestialExhibit(true);
+
+          if (nextMode === 'pre_obs' || nextMode === 'obs') {
+            openNorthAlignModal();
+          } else {
+            northTarget.locked = false;
+            northTarget.modalOpen = false;
+            northTarget.flashUntilMs = 0;
+            const m = document.getElementById('north-align-guide-modal');
+            if (m) m.style.display = 'none';
+          }
         };
       });
 
@@ -1574,11 +1744,11 @@
     const ruleHint = document.getElementById('sky-mode-rule-hint');
     if (ruleHint) {
       if (state.viewMode === 'anime') {
-        ruleHint.textContent = '・①ゲーム：アニメ空、キャラは通常通り思考・移動、コンパス輪はくるくる回転します。';
+        ruleHint.textContent = '・①ゲーム：アニメ空、カメラは通常通り、コンパス輪はくるくる回転します。';
       } else if (state.viewMode === 'pre_obs') {
-        ruleHint.textContent = '・②天体観察前：リアル風の外スクリーン＋正確な天体位置。キャラは通常移動し、右の🧭/📱アイコンで各カメラの水平方角を実機コンパスと連動できます。';
+        ruleHint.textContent = '・②天体観察前：北を確定したあと、カメラは通常ゲーム用のままリアル風の外スクリーン（太陽軌道・夜空）で遊べます。右の🎯で北ロック解除ができます。';
       } else {
-        ruleHint.textContent = '・③天体観察時：キャラはその場に停止。キャラがいた位置から全カメラの方位を実機コンパスと統一し、上下指スライドで空を見上げられます。';
+        ruleHint.textContent = '・③天体観察時：北を確定したあと、キャラの位置から実機コンパスと上下指スライドで実際の空と天体を見上げられます。';
       }
     }
 
@@ -1623,7 +1793,7 @@
   // --- 毎フレーム監視 ---
   function animateSky(now) {
     hideLegacySkyObjects();
-    updateCompassAndCameraLoop();
+    updateCompassAndCameraLoop(now);
     if (typeof activeCamera !== 'undefined' && activeCamera) {
       skyRoot.position.copy(activeCamera.position);
     }
@@ -1646,9 +1816,18 @@
   requestAnimationFrame(animateSky);
 
   window.SkyTimeModule = {
-    setMode: (m) => { if (['anime', 'pre_obs', 'obs'].includes(m)) { state.viewMode = m; saveState(); updateCelestialExhibit(true); } },
+    setMode: (m) => {
+      if (['anime', 'pre_obs', 'obs'].includes(m)) {
+        state.viewMode = m;
+        saveState();
+        updateCelestialExhibit(true);
+        if (m === 'pre_obs' || m === 'obs') openNorthAlignModal();
+      }
+    },
     getMode: () => state.viewMode,
-    isNativeCompassActive,
+    isNorthLocked: () => northTarget.locked,
+    openNorthAlignModal,
+    unlockNorthTarget: unlockNorthTargetAndReopen,
     setObsConstLines: (v) => { state.obsConstLines = Boolean(v); saveState(); updateCelestialExhibit(true); },
     advanceTurn,
     resetTurns,
