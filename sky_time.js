@@ -1,14 +1,13 @@
 // ============================================================================
 // 【独立ビジュアルモジュール：sky_time.js】
-// ・不安定なブラウザセンサー計算を削ぎ落とし、Androidネイティブ(Kotlin)の高精度/子ども向けコンパス＆純正GPSへ直結
-// ・二重球体スクリーン（外側スクリーンで星空・朝日・夕焼け・天体位置を表示）
-// ・設定「🔭 観察・空」タブへ統合：
-//   ①ゲーム（くるくる回転）／ ②天体観察前（ハイブリッド切替）／ ③天体観察時（実機コンパス固定＋暗転停止）
+// ・Androidネイティブ(Kotlin)の高精度/子ども向けコンパス＆純正GPSへ直結
+// ・①ゲーム(カメラそのまま) ／ ②天体観察前(カメラそのまま・正確位置のリアル風天体＆ハイブリッド)
+//   ／ ③天体観察時(全5視点カメラ方位統一＋リアル空＋暗転停止)
 // ============================================================================
 (function initSkyTimeModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_sky_time_v15';
+  const STORAGE_KEY = 'island_sky_time_v16';
   const RAD = Math.PI / 180;
   const DEG = 180 / Math.PI;
   const SKY_R = 22.0;
@@ -190,13 +189,29 @@
     userTouching: false,
     userPausedTracking: false,
     alignedNow: false,
-    postureSynced: false
+    postureSynced: false,
+    obsPitchRad: 0.22, // ③天体観察時の空見上げ角度（ラジアン：約+12.6°見上げ）
+    touchStartY: 0,
+    touchStartPitch: 0.22
   };
 
   const tmpCamDir = new THREE.Vector3();
-  const tmpOffsetVec = new THREE.Vector3();
 
-  window.addEventListener('pointerdown', () => { nativeBridge.userTouching = true; }, { passive: true });
+  window.addEventListener('pointerdown', (e) => {
+    nativeBridge.userTouching = true;
+    nativeBridge.touchStartY = e.clientY || 0;
+    nativeBridge.touchStartPitch = nativeBridge.obsPitchRad;
+  }, { passive: true });
+
+  window.addEventListener('pointermove', (e) => {
+    if (!nativeBridge.userTouching) return;
+    if (state.viewMode === 'obs' && isNativeCompassActive() && nativeBridge.connected && !nativeBridge.userPausedTracking) {
+      // ③天体観察時の実機コンパス連動中は、上下指ドラッグで地平線(-0.15)〜天頂(+1.25)まで仰角を調整
+      const dy = (e.clientY || 0) - nativeBridge.touchStartY;
+      nativeBridge.obsPitchRad = Math.max(-0.15, Math.min(1.25, nativeBridge.touchStartPitch + dy * 0.0045));
+    }
+  }, { passive: true });
+
   window.addEventListener('pointerup', () => { nativeBridge.userTouching = false; }, { passive: true });
   window.addEventListener('pointercancel', () => { nativeBridge.userTouching = false; }, { passive: true });
 
@@ -270,30 +285,107 @@
     } catch (e) {}
   }
 
-  // 3Dカメラの上下仰角は保ったまま、水平方角だけを targetAzDeg（0°=北）へ合わせる
-  function applyCameraAzimuthDeg(targetAzDeg) {
-    if (typeof activeCamera === 'undefined' || !activeCamera) return;
-    const azRad = targetAzDeg * RAD;
+  // --- ③天体観察時専用：全5視点カメラ（キャラ視点・追従・地上・地下・AI視点）の絶対方位統一 ---
+  function applyObservationCameraPose() {
+    // ①ゲーム・②天体観察前はカメラ視点を一切変更しない（そのまま維持）
+    if (state.viewMode !== 'obs') return;
+    if (!nativeBridge.connected || nativeBridge.userPausedTracking) return;
+
+    const azDeg = getSelectedNativeAzimuth();
+    const azRad = azDeg * RAD;
+    // 3Dワールド共通基準：北(0°)=(0, -1), 東(90°)=(+1, 0), 南(180°)=(0, +1), 西(270°)=(-1, 0)
     const dirX = Math.sin(azRad);
     const dirZ = -Math.cos(azRad);
+    const pitch = nativeBridge.obsPitchRad;
 
-    if (typeof controls !== 'undefined' && controls && controls.target) {
-      tmpOffsetVec.copy(activeCamera.position).sub(controls.target);
-      const horizDist = Math.hypot(tmpOffsetVec.x, tmpOffsetVec.z);
-      if (horizDist > 0.001) {
-        activeCamera.position.x = controls.target.x - dirX * horizDist;
-        activeCamera.position.z = controls.target.z - dirZ * horizDist;
-        if (typeof controls.update === 'function') controls.update();
-        else activeCamera.lookAt(controls.target);
+    // 1. キャラの向き（ROBOT.rotY）とAI視点判定基準を実機コンパス方位へ同期
+    // ai_camera.js の基準: sin(rotY)=dirX, cos(rotY)=dirZ => rotY = Math.PI - azRad
+    if (typeof ROBOT !== 'undefined' && ROBOT) {
+      ROBOT.rotY = Math.PI - azRad;
+      if (typeof robotGroup !== 'undefined' && robotGroup) {
+        robotGroup.rotation.y = ROBOT.rotY;
       }
-    } else {
-      const euler = new THREE.Euler().setFromQuaternion(activeCamera.quaternion, 'YXZ');
-      euler.y = -azRad;
-      activeCamera.quaternion.setFromEuler(euler);
+    }
+
+    const camMode = (typeof manualCameraMode !== 'undefined') ? manualCameraMode : 'follow';
+
+    // 2. キャラ視点（🤖内カメラ）のとき
+    if (camMode === 'robot' && typeof innerRobotCam !== 'undefined' && innerRobotCam) {
+      const eyeX = innerRobotCam.position.x;
+      const eyeY = innerRobotCam.position.y;
+      const eyeZ = innerRobotCam.position.z;
+      const cosP = Math.cos(pitch);
+      innerRobotCam.lookAt(
+        eyeX + 20 * cosP * dirX,
+        eyeY + 20 * Math.sin(pitch),
+        eyeZ + 20 * cosP * dirZ
+      );
+      return;
+    }
+
+    // 3. 追従カメラ・地上カメラ（🌌）・地下カメラ（⛏️）のとき
+    if (typeof activeCamera !== 'undefined' && activeCamera) {
+      if (camMode === 'ground') {
+        // 地上カメラ（🌌）：島全体＋外スクリーンの空とコンパスリングが見渡せる観察アングル
+        const dist = 10.5;
+        const camY = 3.2;
+        activeCamera.position.set(-dirX * dist, camY, -dirZ * dist);
+        const lookDist = 22.0;
+        const lookY = camY + Math.sin(pitch) * lookDist;
+        if (typeof controls !== 'undefined' && controls && controls.target) {
+          controls.target.set(dirX * (lookDist - dist), lookY, dirZ * (lookDist - dist));
+          activeCamera.lookAt(controls.target);
+        } else {
+          activeCamera.lookAt(dirX * (lookDist - dist), lookY, dirZ * (lookDist - dist));
+        }
+      } else if (camMode === 'underground') {
+        // 地下カメラ（⛏️）：地下の深さを保ったまま水平方角を実機コンパス方位へ統一
+        if (typeof controls !== 'undefined' && controls && controls.target) {
+          const dx = activeCamera.position.x - controls.target.x;
+          const dz = activeCamera.position.z - controls.target.z;
+          const horizDist = Math.max(3.5, Math.hypot(dx, dz));
+          activeCamera.position.x = controls.target.x - dirX * horizDist;
+          activeCamera.position.z = controls.target.z - dirZ * horizDist;
+          activeCamera.lookAt(controls.target);
+        }
+      } else {
+        // 追従カメラ（デフォルト）：キャラの少し斜め後ろから水平線〜星空を見上げる観察アングル
+        const baseX = (typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.x : 0;
+        const baseY = (typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.y : 0;
+        const baseZ = (typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.z : 0;
+        const backDist = 4.6;
+        const eyeY = baseY + 1.35;
+        activeCamera.position.set(baseX - dirX * backDist, eyeY, baseZ - dirZ * backDist);
+
+        const lookDist = 20.0;
+        const targetX = baseX + dirX * lookDist;
+        const targetY = eyeY + Math.sin(pitch) * lookDist;
+        const targetZ = baseZ + dirZ * lookDist;
+        if (typeof controls !== 'undefined' && controls && controls.target) {
+          controls.target.set(targetX, targetY, targetZ);
+        }
+        activeCamera.lookAt(targetX, targetY, targetZ);
+      }
+    }
+  }
+
+  // メインのカメラ変換関数をラップし、更新直後に③天体観察時の方位統一を適用（押し戻し防止）
+  let cameraHookInstalled = false;
+  function ensureCameraTransformHook() {
+    if (cameraHookInstalled) return;
+    if (typeof window.updateAllCamerasTransform === 'function') {
+      const _origUpdateAll = window.updateAllCamerasTransform;
+      window.updateAllCamerasTransform = function() {
+        const res = _origUpdateAll.apply(this, arguments);
+        applyObservationCameraPose();
+        return res;
+      };
+      cameraHookInstalled = true;
     }
   }
 
   function updateCompassAndCameraLoop() {
+    ensureCameraTransformHook();
     pollNativeBridge();
 
     const isObsMode = (state.viewMode === 'obs');
@@ -302,8 +394,8 @@
 
     syncScreenWakeLock(isObsMode);
 
-    if (compassActive && nativeBridge.connected && !nativeBridge.userPausedTracking && !nativeBridge.userTouching) {
-      applyCameraAzimuthDeg(getSelectedNativeAzimuth());
+    if (isObsMode) {
+      applyObservationCameraPose();
     }
 
     const compMod = window.CompassRingModule;
@@ -317,7 +409,9 @@
     // 北一致判定（③天体観察時）
     if (alignActive) {
       let diffDeg = 180;
-      if (typeof activeCamera !== 'undefined' && activeCamera) {
+      if (nativeBridge.connected && !nativeBridge.userPausedTracking) {
+        diffDeg = Math.abs(shortestAngleDiffDeg(getSelectedNativeAzimuth(), 0));
+      } else if (typeof activeCamera !== 'undefined' && activeCamera) {
         activeCamera.getWorldDirection(tmpCamDir);
         if (Math.hypot(tmpCamDir.x, tmpCamDir.z) > 0.04) {
           const azDeg = norm360(Math.atan2(tmpCamDir.x, -tmpCamDir.z) * DEG);
@@ -367,7 +461,7 @@
     const postureTag = nativeBridge.isUpright ? '立て持ち' : '寝かせ持ち';
 
     if (!compassActive) {
-      hud.textContent = `🔄 くるくる回転モード（指ドラッグ視点）`;
+      hud.textContent = `🔄 くるくる回転モード（カメラ視点そのまま）`;
       hud.style.borderColor = '#38bdf8';
     } else if (!nativeBridge.connected) {
       hud.textContent = `🧭 ブラウザ表示中（APK起動で実機センサー連動）`;
@@ -574,6 +668,7 @@
       return { date: now, phase: turnPhase, subStep, turn, times, moonMood, dayTag: 'ゲーム周期' };
     }
 
+    // ②天体観察前：正確なGPS座標＋暦日基準で朝・昼・夕・夜・深夜の天体位置をシミュレート
     const refBase = new Date(skyDayBase.getTime());
     const isNextDay = Math.min(3, turnPhase) < Math.min(3, realPhase);
     if (isNextDay) refBase.setDate(refBase.getDate() + 1);
@@ -743,7 +838,7 @@
     return { tex: texObsDynamicSky, opacity };
   }
 
-  // --- かわいい顔＆天体スプライト ---
+  // --- かわいい顔＆リアル風イラスト天体スプライト ---
   function drawCuteFace(ctx, cx, cy, mood, ink, cheekRgba, isProfile = false) {
     ctx.fillStyle = cheekRgba;
     if (isProfile) {
@@ -825,11 +920,19 @@
     });
   });
 
+  // ②天体観察前用：リアル風イラストの太陽（くっきりした光球＋コロナ輪郭）
   const texSunReal = makeCanvasTex(256, 256, (ctx, s) => {
-    const c = s / 2, g = ctx.createRadialGradient(c, c, 14, c, c, 124);
-    g.addColorStop(0, 'rgba(255,255,250,1)'); g.addColorStop(0.28, 'rgba(255,244,214,0.96)');
-    g.addColorStop(0.46, 'rgba(253,224,150,0.48)'); g.addColorStop(0.75, 'rgba(186,230,253,0.14)'); g.addColorStop(1, 'rgba(56,189,248,0)');
+    const c = s / 2;
+    const g = ctx.createRadialGradient(c, c, 28, c, c, 124);
+    g.addColorStop(0.00, 'rgba(255,253,240,1)');
+    g.addColorStop(0.36, 'rgba(253,224,71,0.92)');
+    g.addColorStop(0.54, 'rgba(251,146,60,0.45)');
+    g.addColorStop(0.80, 'rgba(253,186,116,0.14)');
+    g.addColorStop(1.00, 'rgba(56,189,248,0)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(c, c, 48, 0, Math.PI * 2); ctx.stroke();
   });
 
   const moonRealCanvas = document.createElement('canvas');
@@ -843,16 +946,16 @@
     const ctx = moonRealCanvas.getContext('2d'), s = 256, c = 128, r = 82;
     ctx.clearRect(0, 0, s, s);
     const halo = ctx.createRadialGradient(c, c, r * 0.85, c, c, 124);
-    halo.addColorStop(0, 'rgba(224,242,254,0.28)'); halo.addColorStop(1, 'rgba(224,242,254,0)');
+    halo.addColorStop(0, 'rgba(224,242,254,0.32)'); halo.addColorStop(1, 'rgba(224,242,254,0)');
     ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(c, c, 124, 0, Math.PI * 2); ctx.fill();
     ctx.save(); ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.clip();
     const bg = ctx.createRadialGradient(c - 18, c - 18, 12, c, c, r);
-    bg.addColorStop(0, '#f8fafc'); bg.addColorStop(0.7, '#e2e8f0'); bg.addColorStop(1, '#cbd5e1');
+    bg.addColorStop(0, '#fefce8'); bg.addColorStop(0.7, '#fef08a'); bg.addColorStop(1, '#fde047');
     ctx.fillStyle = bg; ctx.fillRect(0, 0, s, s);
-    ctx.fillStyle = 'rgba(148,163,184,0.28)';
+    ctx.fillStyle = 'rgba(161,98,7,0.22)';
     [[c-22,c-18,22],[c+18,c-8,16],[c-6,c+24,20],[c+26,c+22,12]].forEach(([x,y,cr]) => { ctx.beginPath(); ctx.arc(x,y,cr,0,Math.PI*2); ctx.fill(); });
     const k = Math.cos(phaseDeg * RAD);
-    ctx.fillStyle = 'rgba(15,23,42,0.86)'; ctx.beginPath();
+    ctx.fillStyle = 'rgba(15,23,42,0.84)'; ctx.beginPath();
     if (phaseDeg <= 180) {
       ctx.arc(c, c, r + 1, Math.PI / 2, Math.PI * 1.5, false);
       ctx.ellipse(c, c, Math.abs(k) * r, r + 1, 0, -Math.PI / 2, Math.PI / 2, k < 0);
@@ -1177,8 +1280,8 @@
       }
     } else {
       sunRaySprite.visible = false;
-      baseSunScale = isPreObs ? 2.15 : 1.65;
-      baseMoonScale = isPreObs ? 1.70 : 1.45;
+      baseSunScale = isPreObs ? 2.35 : 1.65;
+      baseMoonScale = isPreObs ? 1.85 : 1.45;
 
       if (!isNight && sunPos.alt > -0.04) {
         const sVec = altAzToVec3(Math.max(0.05, sunPos.alt), sunPos.az, SKY_R - 0.8);
@@ -1420,11 +1523,11 @@
     const ruleHint = document.getElementById('sky-mode-rule-hint');
     if (ruleHint) {
       if (state.viewMode === 'anime') {
-        ruleHint.textContent = '・①ゲーム：外スクリーンはアニメ空、コンパス輪はくるくる回転します。';
+        ruleHint.textContent = '・①ゲーム：カメラ視点はそのまま、コンパス輪はくるくる回転します。';
       } else if (state.viewMode === 'pre_obs') {
-        ruleHint.textContent = '・②天体観察前：外スクリーンで軌道と天体を予習。下のハイブリッド切替でコンパス動作を選べます。';
+        ruleHint.textContent = '・②天体観察前：カメラ視点はそのまま、GPS連動の正確な位置にリアル風太陽・月・軌道を表示します。';
       } else {
-        ruleHint.textContent = '・③天体観察時：GPSと現在時刻のリアル星空／朝日／夕焼けを表示し、実機コンパス連動に固定（暗転停止）します。';
+        ruleHint.textContent = '・③天体観察時：全カメラ（キャラ/追従/地上/地下/AI視点）の方位を実機コンパスと統一し、空を見渡せます。';
       }
     }
 
