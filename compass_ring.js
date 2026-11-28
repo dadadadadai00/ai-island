@@ -1,7 +1,7 @@
 // ============================================================================
 // 【独立ビジュアルモジュール：compass_ring.js】
 // ・丸い海の外周へ余白を空けて配置する未来風・青ホログラム3Dコンパス
-// ・①ゲーム：くるくる回転 ／ ②天体観察前：ハイブリッド連動 ／ ③天体観察時：実機方位固定＋北合わせ発光
+// ・①ゲーム＆②天体観察前：くるくる回転 ／ ③天体観察時：回転停止＋北合わせ発光
 // ============================================================================
 (function initCompassRingModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
@@ -343,11 +343,6 @@
     lastTs = now;
     const baseOn = Boolean(state.unlocked && state.visible && !externalHide);
 
-    const skyMod = window.SkyTimeModule;
-    const isNativeLinked = skyMod && typeof skyMod.isNativeCompassActive === 'function'
-      ? skyMod.isNativeCompassActive()
-      : false;
-
     if (baseOn) {
       if (alignState.enabled) {
         // ③天体観察時：目盛りリング回転停止＆東西南北へピタリと揃える＋北ピンク点滅
@@ -387,14 +382,8 @@
             }
           }
         }
-      } else if (isNativeLinked) {
-        // ②天体観察前（ハイブリッド＝実機コンパス連動時）：回転を止めて方角基準へ固定
-        alignState.fadeAlpha = 1.0;
-        rootGroup.visible = true;
-        rotatingGroup.rotation.y *= Math.max(0, 1 - dt * 10);
-        applyTimePalette(false);
       } else {
-        // ①ゲーム ／ ②天体観察前（くるくる回転時）：従来通りゆっくり回転
+        // ①ゲーム ／ ②天体観察前：くるくる回転
         alignState.fadeAlpha = 1.0;
         rootGroup.visible = true;
         if (state.rotating) {
