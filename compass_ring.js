@@ -1,14 +1,13 @@
 // ============================================================================
 // 【独立ビジュアルモジュール：compass_ring.js】
 // ・丸い海の外周へ余白を空けて配置する未来風・青ホログラム3Dコンパス
-// ・東西南北テキスト内部の交差縁線を型抜き除去（外周のみ白色細線縁取り）
-// ・③天体観察時：回転停止＆北の1本がピンク点滅→北一致で点灯＆全体フェードアウト
+// ・①ゲーム：くるくる回転 ／ ②天体観察前：ハイブリッド連動 ／ ③天体観察時：実機方位固定＋北合わせ発光
 // ============================================================================
 (function initCompassRingModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_compass_ring_v1';
-  const state = { unlocked: false, visible: false, rotating: true, radiusOffset: 0.9 };
+  const STORAGE_KEY = 'island_compass_ring_v2';
+  const state = { unlocked: true, visible: true, rotating: true, radiusOffset: 0.9 };
   let externalHide = false;
 
   // ③天体観察時（北合わせモード）用状態
@@ -62,7 +61,6 @@
     return { radius, topY };
   }
 
-  // --- 内部交差縁線を完全に消した「外周のみ白縁＋高透過塗り」テクスチャ生成 ---
   function buildCleanKanjiTexture(char, fillRgba, glowRgba, glowBlur, rimWidth) {
     const cv = document.createElement('canvas');
     cv.width = 256; cv.height = 256;
@@ -74,20 +72,17 @@
     ctx.font = '700 162px "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif';
 
     if (rimWidth > 0) {
-      // 1. 先に白い外周縁を描く
       ctx.lineJoin = 'round';
       ctx.lineWidth = rimWidth * 2;
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.98)';
       ctx.strokeText(char, 128, 134);
 
-      // 2. 文字の塗り領域で内側を透明に型抜きし、画が交差する内部の白線を完全消去
       ctx.globalCompositeOperation = 'destination-out';
       ctx.fillStyle = '#000000';
       ctx.fillText(char, 128, 134);
       ctx.globalCompositeOperation = 'source-over';
     }
 
-    // 3. くり抜いた内側に高透過の色を流し込む
     if (glowBlur > 0) {
       ctx.shadowColor = glowRgba;
       ctx.shadowBlur = glowBlur;
@@ -96,7 +91,6 @@
     ctx.fillText(char, 128, 134);
     ctx.shadowBlur = 0;
 
-    // 4. 控えめなスキャンライン
     ctx.globalCompositeOperation = 'destination-out';
     ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
     for (let y = 0; y < 256; y += 8) ctx.fillRect(0, y, 256, 2);
@@ -244,7 +238,6 @@
       beam.position.set(0, 0.66, -labelDist);
       holder.add(beam);
 
-      // 一番手前のみ「型抜き済み外周白縁付き」、奥の2層は「白縁なし高透過塗り」で二重線を防止
       const dayFrontTex   = buildCleanKanjiTexture(label, 'rgba(56, 189, 248, 0.26)', 'rgba(14, 165, 233, 0.3)', 4, 2.8);
       const dayBackTex    = buildCleanKanjiTexture(label, 'rgba(56, 189, 248, 0.22)', '', 0, 0);
       const nightFrontTex = buildCleanKanjiTexture(label, 'rgba(186, 230, 253, 0.66)', 'rgba(56, 189, 248, 0.95)', 16, 3.2);
@@ -338,83 +331,29 @@
     const alphaOk = !alignState.enabled || alignState.fadeAlpha > 0.01;
     rootGroup.visible = Boolean(baseOn && alphaOk);
     if (rootGroup.visible) applyTimePalette(true);
-    syncSettingsPanelUI();
-  }
-
-  function ensureEnvSettingsPanel() {
-    let panel = document.getElementById('env-hologram-settings-panel');
-    if (panel) return panel;
-
-    const modals = Array.from(document.querySelectorAll('.modal-overlay'));
-    let targetContent = null;
-    for (let i = 0; i < modals.length; i++) {
-      const idLow = (modals[i].id || '').toLowerCase();
-      const titleEl = modals[i].querySelector('.modal-title');
-      const titleTxt = titleEl ? titleEl.innerText : '';
-      if (idLow.includes('setting') || idLow.includes('config') || titleTxt.includes('設定')) {
-        targetContent = modals[i].querySelector('.modal-content');
-        break;
-      }
-    }
-    if (!targetContent) return null;
-
-    panel = document.createElement('div');
-    panel.id = 'env-hologram-settings-panel';
-    panel.style.cssText = 'margin-top:8px;padding:10px;border-radius:12px;background:#f0f9ff;border:1.5px solid #7dd3fc;display:flex;flex-direction:column;gap:8px;text-align:left;';
-    panel.innerHTML = '<div style="font-size:11.5px;font-weight:900;color:#0369a1;">🧪 観察環境・機能設定</div>';
-    targetContent.appendChild(panel);
-    return panel;
-  }
-
-  function syncSettingsPanelUI() {
-    const panel = ensureEnvSettingsPanel();
-    if (!panel) return;
-    let row = document.getElementById('env-compass-row');
-    if (!row) {
-      row = document.createElement('div');
-      row.id = 'env-compass-row';
-      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;background:#ffffff;border:1px solid #bae6fd;border-radius:9px;padding:7px 9px;';
-      row.innerHTML = `
-        <div style="font-size:11px;font-weight:800;color:#0f172a;">🧭 未来風ホログラムコンパス<div style="font-size:9.5px;font-weight:600;color:#64748b;">直立東西南北固定＋③観察時は北合わせ</div></div>
-        <button type="button" id="btn-toggle-holo-compass" style="padding:5px 10px;border-radius:8px;border:none;font-size:11px;font-weight:900;cursor:pointer;"></button>
-      `;
-      panel.appendChild(row);
-      const btn = document.getElementById('btn-toggle-holo-compass');
-      if (btn) {
-        btn.onclick = () => {
-          const next = !(state.unlocked && state.visible);
-          state.unlocked = next;
-          state.visible = next;
-          if (next) alignState.fadeAlpha = 1.0;
-          saveState();
-          applyVisibility();
-          if (typeof showToast === 'function') showToast(next ? '🧭 ホログラムコンパスを表示しました' : '🧭 ホログラムコンパスを非表示にしました');
-        };
-      }
-    }
-    const btn = document.getElementById('btn-toggle-holo-compass');
-    if (btn) {
-      const on = Boolean(state.unlocked && state.visible);
-      btn.innerText = on ? '表示中 (ON)' : '非表示 (OFF)';
-      btn.style.background = on ? '#0284c7' : '#e2e8f0';
-      btn.style.color = on ? '#ffffff' : '#475569';
+    if (window.SkyTimeModule && typeof window.SkyTimeModule.syncSettingsUI === 'function') {
+      window.SkyTimeModule.syncSettingsUI();
     }
   }
 
-  // --- 毎フレームアニメーション（通常回転 vs ③天体観察時の北ピンク点滅→点灯消滅） ---
+  // --- 毎フレームアニメーション ---
   let lastTs = performance.now();
   function tick(now) {
     const dt = Math.min(0.1, Math.max(0, (now - lastTs) / 1000));
     lastTs = now;
     const baseOn = Boolean(state.unlocked && state.visible && !externalHide);
 
+    const skyMod = window.SkyTimeModule;
+    const isNativeLinked = skyMod && typeof skyMod.isNativeCompassActive === 'function'
+      ? skyMod.isNativeCompassActive()
+      : false;
+
     if (baseOn) {
       if (alignState.enabled) {
-        // ③天体観察時：目盛りリングの回転停止＆東西南北位置へピタリと揃える
+        // ③天体観察時：目盛りリング回転停止＆東西南北へピタリと揃える＋北ピンク点滅
         rotatingGroup.rotation.y *= Math.max(0, 1 - dt * 10);
 
         if (alignState.isAligned) {
-          // 北を向いた状態：まずピンク1本が強く発光点灯し、その後コンパス全体がゆっくり消える
           if (alignState.lockFlashTimer > 0) {
             alignState.lockFlashTimer = Math.max(0, alignState.lockFlashTimer - dt);
             alignState.fadeAlpha = Math.min(1.0, alignState.fadeAlpha + dt * 4.0);
@@ -422,7 +361,6 @@
             alignState.fadeAlpha = Math.max(0.0, alignState.fadeAlpha - dt * 0.95);
           }
         } else {
-          // スマホの向きが変わって北から外れた：コンパスがゆっくり再表示され位置合わせへ戻る
           alignState.lockFlashTimer = 0;
           alignState.fadeAlpha = Math.min(1.0, alignState.fadeAlpha + dt * 1.35);
         }
@@ -436,12 +374,10 @@
           mats.northTick.blending = THREE.AdditiveBlending;
 
           if (alignState.isAligned) {
-            // 北一致時：強い発光点灯
             mats.northTick.color.setHex(0xff85c0);
             mats.northTick.opacity = 1.0 * a;
             if (northBarMesh) northBarMesh.scale.set(1.35, 1.18, 1.35);
           } else {
-            // 北ズレ時：ピンク色に変色して発光点滅
             const pulse = 0.5 + 0.5 * Math.sin(now * 0.0075);
             mats.northTick.color.setHex(pulse > 0.45 ? 0xff4da6 : 0xf472b6);
             mats.northTick.opacity = (0.32 + 0.68 * pulse) * a;
@@ -451,8 +387,14 @@
             }
           }
         }
+      } else if (isNativeLinked) {
+        // ②天体観察前（ハイブリッド＝実機コンパス連動時）：回転を止めて方角基準へ固定
+        alignState.fadeAlpha = 1.0;
+        rootGroup.visible = true;
+        rotatingGroup.rotation.y *= Math.max(0, 1 - dt * 10);
+        applyTimePalette(false);
       } else {
-        // ①観察アプリ・②天体観察前：通常通りゆっくり時計回り回転
+        // ①ゲーム ／ ②天体観察前（くるくる回転時）：従来通りゆっくり回転
         alignState.fadeAlpha = 1.0;
         rootGroup.visible = true;
         if (state.rotating) {
@@ -475,7 +417,6 @@
       buildCompassGeometry();
       applyTimePalette(true);
     }
-    syncSettingsPanelUI();
   }, 1000);
   requestAnimationFrame(tick);
 
@@ -507,7 +448,6 @@
     updateNorthAlignment: (isAligned) => {
       const next = Boolean(isAligned);
       if (next && !alignState.isAligned) {
-        // 北へ入った瞬間に発光点灯タイマーをセット
         alignState.lockFlashTimer = 0.85;
       }
       alignState.isAligned = next;
