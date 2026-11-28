@@ -2,13 +2,13 @@
 // 【独立ビジュアルモジュール：sky_time.js】
 // ・Androidネイティブ(Kotlin)の高精度/子ども向けコンパス＆純正GPSへ直結
 // ・①ゲーム(アニメ空・通常カメラ・キャラ思考＆移動)
-// ・②天体観察前(北合わせウィンドウ➡確定後、全5カメラを通常ゲーム用に戻してリアル風外スクリーンでプレイ)
-// ・③天体観察時(北合わせウィンドウ➡確定後、キャラ位置固定・全カメラ方位統一＋上下見上げ＋リアル空＋暗転停止)
+// ・②天体観察前(初回1回案内➡右縦列🎯でターゲットON[5秒発光]/解除・通常カメラ＋リアル風外スクリーン)
+// ・③天体観察時(初回1回案内➡右縦列🧭表示切替＋🎯ターゲットON/解除・観察カメラ＋リアル空＋暗転停止)
 // ============================================================================
 (function initSkyTimeModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_sky_time_v20';
+  const STORAGE_KEY = 'island_sky_time_v21';
   const RAD = Math.PI / 180;
   const DEG = 180 / Math.PI;
   const SKY_R = 22.0;
@@ -22,6 +22,7 @@
     compassStyle: 'kid',        // 'precision'(高精度コンパス) | 'kid'(子ども向け磁石吸着コンパス)
     postureMode: 0,             // 0:自動判定, 1:寝かせ持ち固定, 2:立て持ち固定
     obsConstLines: true,
+    seenTargetGuide: false,     // 初回1回だけのターゲット案内ウィンドウ表示済みフラグ
     turnCount: 0,
     lat: 35.68,
     lon: 139.77,
@@ -38,6 +39,7 @@
         if (['precision', 'kid'].includes(parsed.compassStyle)) state.compassStyle = parsed.compassStyle;
         if ([0, 1, 2].includes(parsed.postureMode)) state.postureMode = parsed.postureMode;
         if (typeof parsed.obsConstLines === 'boolean') state.obsConstLines = parsed.obsConstLines;
+        if (typeof parsed.seenTargetGuide === 'boolean') state.seenTargetGuide = parsed.seenTargetGuide;
         if (Number.isFinite(parsed.turnCount) && parsed.turnCount >= 0) state.turnCount = Math.floor(parsed.turnCount);
         if (Number.isFinite(parsed.lat)) state.lat = parsed.lat;
         if (Number.isFinite(parsed.lon)) state.lon = parsed.lon;
@@ -194,12 +196,11 @@
     lockedRobotPos: null    // ③天体観察時にキャラがいた位置をロック
   };
 
-  // 北ターゲット・ロックオン管理状態
+  // 北ターゲット（縦列🎯アイコンでON/解除）管理状態
   const northTarget = {
-    locked: false,          // 北が確定済みか
-    modalOpen: false,       // 「くるっと回って北を向こう」ウィンドウが開いているか
-    northOffsetDeg: 0,      // 確定時の北基準オフセット
-    flashUntilMs: 0         // 縦列アイコン🎯が5秒間光る終了時刻
+    locked: false,          // 縦列🎯ボタンでターゲットON中か
+    northOffsetDeg: 0,      // 🎯を押した瞬間の北基準オフセット
+    flashUntilMs: 0         // 縦列🎯アイコンが5秒間光る終了時刻
   };
 
   const tmpCamDir = new THREE.Vector3();
@@ -212,7 +213,7 @@
 
   window.addEventListener('pointermove', (e) => {
     if (!nativeBridge.userTouching) return;
-    if (state.viewMode === 'obs' && northTarget.locked && !northTarget.modalOpen) {
+    if (state.viewMode === 'obs') {
       const dy = (e.clientY || 0) - nativeBridge.touchStartY;
       nativeBridge.obsPitchRad = Math.max(-0.15, Math.min(1.25, nativeBridge.touchStartPitch + dy * 0.0045));
     }
@@ -250,8 +251,9 @@
     return (state.compassStyle === 'kid') ? nativeBridge.kidAzimuth : nativeBridge.precisionAzimuth;
   }
 
-  // 北確定済みオフセットを加味した現在の方位角（0°=確定した北）
+  // ターゲットON済みオフセットを加味した現在の方位角（0°=北）
   function getCalibratedAzimuthDeg() {
+    if (!northTarget.locked) return getSelectedNativeAzimuth();
     return norm360(getSelectedNativeAzimuth() - northTarget.northOffsetDeg);
   }
 
@@ -291,61 +293,12 @@
   }
 
   // ============================================================================
-  // --- 「くるっと回って北を向こう」ウィンドウ（北ターゲット確定＆解除） ---
+  // --- 初回1回だけのターゲット練習案内ウィンドウ（「確認」ボタンで閉じるだけ） ---
   // ============================================================================
-  function ensureNorthAlignModal() {
-    let modal = document.getElementById('north-align-guide-modal');
-    if (modal) return modal;
+  function showFirstTimeTargetGuideIfNeeded() {
+    if (state.seenTargetGuide) return;
 
-    modal = document.createElement('div');
-    modal.id = 'north-align-guide-modal';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:9600;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,0.72);backdrop-filter:blur(4px);padding:16px;';
-    modal.innerHTML = `
-      <div style="width:100%;max-width:340px;background:linear-gradient(180deg,#0f172a 0%,#1e293b 100%);border:2px solid #38bdf8;border-radius:20px;padding:18px 16px;color:#f8fafc;box-shadow:0 16px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;">
-        <div id="north-guide-mode-pill" style="font-size:10.5px;font-weight:900;padding:3px 10px;border-radius:999px;background:#0284c7;color:#ffffff;">🔭 天体観察前</div>
-        <div id="north-guide-dial" style="width:76px;height:76px;border-radius:50%;background:radial-gradient(circle,#1e293b 0%,#0f172a 100%);border:3px solid #38bdf8;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(56,189,248,0.35);transition:transform 0.12s ease,border-color 0.2s ease;">
-          <div style="font-size:28px;line-height:1;">🧭</div>
-          <div id="north-guide-n-tag" style="font-size:10px;font-weight:900;color:#7dd3fc;margin-top:2px;">北(N)</div>
-        </div>
-        <div style="font-size:16px;font-weight:900;color:#ffffff;letter-spacing:0.02em;">くるっと回って北を向こう！</div>
-        <div id="north-guide-live-dir" style="width:100%;background:rgba(2,132,199,0.22);border:1px solid #38bdf8;border-radius:12px;padding:8px 10px;font-size:12.5px;font-weight:900;color:#e0f2fe;line-height:1.45;">
-          いまの向き：計測中...
-        </div>
-        <div id="north-guide-desc" style="font-size:11px;font-weight:700;color:#cbd5e1;line-height:1.45;">
-          スマホを持ったまま体を回して「北」を向いたら、下の確定ボタンを押してください。
-        </div>
-        <button type="button" id="btn-confirm-north-lock" style="width:100%;padding:12px 10px;border-radius:12px;border:none;background:linear-gradient(135deg,#0284c7 0%,#0ea5e9 100%);color:#ffffff;font-size:14px;font-weight:900;cursor:pointer;box-shadow:0 4px 14px rgba(14,165,233,0.4);">
-          ✅ 北を確定（ロックオン）
-        </button>
-        <button type="button" id="btn-cancel-north-to-game" style="padding:5px 12px;border-radius:8px;border:1px solid #475569;background:transparent;color:#94a3b8;font-size:10.5px;font-weight:800;cursor:pointer;">
-          ① ゲームモードへ戻る
-        </button>
-      </div>
-    `;
-    document.body.appendChild(modal);
-
-    document.getElementById('btn-confirm-north-lock').onclick = confirmNorthLockOn;
-    document.getElementById('btn-cancel-north-to-game').onclick = () => {
-      northTarget.modalOpen = false;
-      northTarget.locked = false;
-      northTarget.flashUntilMs = 0;
-      modal.style.display = 'none';
-      state.viewMode = 'anime';
-      saveState();
-      updateCelestialExhibit(true);
-      if (typeof showToast === 'function') showToast('🎮 ①ゲームモードへ戻りました');
-    };
-
-    return modal;
-  }
-
-  function openNorthAlignModal() {
-    const modal = ensureNorthAlignModal();
-    northTarget.locked = false;
-    northTarget.modalOpen = true;
-    northTarget.flashUntilMs = 0;
-
-    // 設定モーダルが開いていたら自動で閉じる
+    // 設定モーダルが開いていたら自動で閉じて右側の縦列アイコンを見せる
     const settingsModal = document.getElementById('modal-settings');
     if (settingsModal && (settingsModal.classList.contains('active') || settingsModal.style.display !== 'none')) {
       if (typeof closeModal === 'function') closeModal('modal-settings');
@@ -355,117 +308,74 @@
       }
     }
 
-    const pill = document.getElementById('north-guide-mode-pill');
-    const desc = document.getElementById('north-guide-desc');
-    if (pill) {
-      pill.textContent = (state.viewMode === 'obs') ? '🔭 ③ 天体観察時' : '🔭 ② 天体観察前';
-    }
-    if (desc) {
-      desc.textContent = (state.viewMode === 'obs')
-        ? '北を向いて確定すると、その場から実際の空と天体を見上げられます。'
-        : '北を向いて確定すると、カメラは通常のゲーム用に戻り、リアル風の太陽軌道と夜空で遊べます。';
-    }
+    let modal = document.getElementById('first-time-target-guide-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'first-time-target-guide-modal';
+      modal.style.cssText = 'position:fixed;inset:0;z-index:9600;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.68);backdrop-filter:blur(3px);padding:16px;';
+      modal.innerHTML = `
+        <div style="width:100%;max-width:320px;background:linear-gradient(180deg,#0f172a 0%,#1e293b 100%);border:2px solid #38bdf8;border-radius:20px;padding:18px 16px;color:#f8fafc;box-shadow:0 16px 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;">
+          <div style="width:68px;height:68px;border-radius:50%;background:rgba(244,63,94,0.16);border:2.5px solid #fb7185;display:flex;align-items:center;justify-content:center;font-size:34px;box-shadow:0 0 18px rgba(244,63,94,0.35);">
+            🎯
+          </div>
+          <div style="font-size:15px;font-weight:900;color:#ffffff;line-height:1.45;">
+            北をくるっと回って<br>右のこのアイコン（🎯）を<br>ポチッと押してね！
+          </div>
+          <div style="font-size:11px;font-weight:700;color:#cbd5e1;line-height:1.5;background:rgba(15,23,42,0.55);border:1px solid #334155;border-radius:10px;padding:8px 10px;">
+            コンパスで「北」を向いたら、画面右側の縦列にある <strong style="color:#fda4af;">🎯</strong> を押すとターゲットON（5秒発光）、もう一度押すと解除できます。
+          </div>
+          <button type="button" id="btn-close-first-target-guide" style="width:100%;padding:11px 10px;border-radius:12px;border:none;background:linear-gradient(135deg,#0284c7 0%,#0ea5e9 100%);color:#ffffff;font-size:14px;font-weight:900;cursor:pointer;box-shadow:0 4px 12px rgba(14,165,233,0.35);">
+            確認
+          </button>
+        </div>
+      `;
+      document.body.appendChild(modal);
 
-    modal.style.display = 'flex';
-    updateNorthAlignModalLive();
-  }
-
-  function updateNorthAlignModalLive() {
-    if (!northTarget.modalOpen) return;
-    const modal = document.getElementById('north-align-guide-modal');
-    if (!modal || modal.style.display === 'none') return;
-
-    const liveEl = document.getElementById('north-guide-live-dir');
-    const dialEl = document.getElementById('north-guide-dial');
-    const btnEl  = document.getElementById('btn-confirm-north-lock');
-    if (!liveEl || !btnEl) return;
-
-    if (!nativeBridge.connected) {
-      liveEl.innerHTML = '🌐 ブラウザ確認モード<br><span style="font-size:10.5px;color:#93c5fd;">そのまま確定ボタンで北をロックオンできます</span>';
-      btnEl.style.background = 'linear-gradient(135deg,#0284c7 0%,#0ea5e9 100%)';
-      return;
-    }
-
-    const rawDeg = getSelectedNativeAzimuth();
-    const degInt = Math.round(rawDeg) % 360;
-    const diffFromNorth = shortestAngleDiffDeg(rawDeg, 0);
-    const absDiff = Math.abs(diffFromNorth);
-    const isNearNorth = (absDiff <= 15);
-
-    if (dialEl) {
-      dialEl.style.transform = `rotate(${-rawDeg}deg)`;
-      dialEl.style.borderColor = isNearNorth ? '#22c55e' : '#38bdf8';
-      dialEl.style.boxShadow = isNearNorth ? '0 0 24px rgba(34,197,94,0.65)' : '0 0 20px rgba(56,189,248,0.35)';
-    }
-
-    if (isNearNorth) {
-      liveEl.innerHTML = `✨ 北（${degInt}°）を向いています！<br><span style="font-size:11px;color:#86efac;">今すぐ下の「北を確定」を押してください</span>`;
-      liveEl.style.borderColor = '#22c55e';
-      liveEl.style.background = 'rgba(22,163,74,0.28)';
-      btnEl.style.background = 'linear-gradient(135deg,#16a34a 0%,#22c55e 100%)';
+      document.getElementById('btn-close-first-target-guide').onclick = () => {
+        state.seenTargetGuide = true;
+        saveState();
+        modal.style.display = 'none';
+      };
     } else {
-      const dirName = (state.compassStyle === 'kid') ? getDirectionName4(degInt) : `${getDirectionName8(degInt)} ${degInt}°`;
-      const turnHint = diffFromNorth > 0 ? '⬅ 左へくるっと回ろう' : '➡ 右へくるっと回ろう';
-      liveEl.innerHTML = `いまの向き：【${dirName}】<br><span style="font-size:11px;color:#fde047;">${turnHint}</span>`;
-      liveEl.style.borderColor = '#38bdf8';
-      liveEl.style.background = 'rgba(2,132,199,0.22)';
-      btnEl.style.background = 'linear-gradient(135deg,#0284c7 0%,#0ea5e9 100%)';
+      modal.style.display = 'flex';
     }
   }
 
-  function confirmNorthLockOn() {
-    // 確定した瞬間の実機コンパスの向きが真北(0°)付近ならそのまま0°基準、少しズレていればその差を補正
-    if (nativeBridge.connected) {
-      const curDeg = getSelectedNativeAzimuth();
-      const diff = shortestAngleDiffDeg(curDeg, 0);
-      northTarget.northOffsetDeg = (Math.abs(diff) <= 25) ? 0 : curDeg;
-    } else {
-      northTarget.northOffsetDeg = 0;
-    }
+  // --- 右縦列 🎯 ボタンによるターゲットON（5秒発光） / ターゲット解除 ---
+  function toggleNorthTargetLock() {
+    if (!northTarget.locked) {
+      // ターゲットON
+      if (nativeBridge.connected) {
+        const curDeg = getSelectedNativeAzimuth();
+        const diff = shortestAngleDiffDeg(curDeg, 0);
+        northTarget.northOffsetDeg = (Math.abs(diff) <= 25) ? 0 : curDeg;
+      } else {
+        northTarget.northOffsetDeg = 0;
+      }
+      northTarget.locked = true;
+      northTarget.flashUntilMs = performance.now() + 5000; // 5秒間ゆっくり光らせる
 
-    northTarget.locked = true;
-    northTarget.modalOpen = false;
-    northTarget.flashUntilMs = performance.now() + 5000; // 縦列🎯アイコンを5秒間ゆっくり光らせる
-
-    const modal = document.getElementById('north-align-guide-modal');
-    if (modal) modal.style.display = 'none';
-
-    const compMod = window.CompassRingModule;
-    if (compMod && typeof compMod.triggerNorthLocked === 'function') {
-      compMod.triggerNorthLocked();
-    }
-
-    // ②天体観察前の場合：北確定後に5つのカメラをすべて通常のゲーム用カメラへ戻す
-    if (state.viewMode === 'pre_obs') {
-      if (typeof window.updateAllCamerasTransform === 'function') {
-        window.updateAllCamerasTransform();
+      const compMod = window.CompassRingModule;
+      if (compMod && typeof compMod.triggerNorthLocked === 'function') {
+        compMod.triggerNorthLocked();
       }
       if (typeof showToast === 'function') {
-        showToast('🎯 北を確定！通常カメラでリアル風の空と太陽軌道を観察できます');
+        showToast('🎯 北ターゲットON！（北をロックオンしました）');
       }
-    } else if (state.viewMode === 'obs') {
+    } else {
+      // ターゲット解除
+      northTarget.locked = false;
+      northTarget.flashUntilMs = 0;
       if (typeof showToast === 'function') {
-        showToast('🎯 北を確定！上下指スライドで夜空・天体を見上げられます');
+        showToast('🔓 北ターゲットを解除しました');
       }
     }
-
-    updateCelestialExhibit(true);
-  }
-
-  function unlockNorthTargetAndReopen() {
-    northTarget.locked = false;
-    northTarget.flashUntilMs = 0;
-    nativeBridge.lockedRobotPos = null;
-    if (typeof showToast === 'function') {
-      showToast('🔓 北ターゲットを解除しました（もう一度北を向いて確定できます）');
-    }
-    openNorthAlignModal();
     updateCompassAndCameraLoop();
   }
 
   // --- ③天体観察時専用：キャラのマップ移動ロック（思考はそのまま・位置は固定） ---
   function enforceObsPositionLock() {
-    if (state.viewMode !== 'obs' || !northTarget.locked) {
+    if (state.viewMode !== 'obs') {
       nativeBridge.lockedRobotPos = null;
       return;
     }
@@ -496,7 +406,7 @@
   }
 
   // --- カメラ方位連動 ---
-  // ・①ゲーム ／ ②天体観察前（北確定後）：5カメラすべて通常のゲーム用カメラをそのまま維持（一切上書きしない）
+  // ・①ゲーム ／ ②天体観察前：5カメラすべて通常のゲーム用カメラをそのまま維持（一切上書きしない）
   // ・③天体観察時：キャラがいた位置から実機コンパス方位＋上下スライド仰角で空を見上げる
   function applyModeCameraOrientation() {
     if (state.viewMode !== 'obs') return;
@@ -595,7 +505,6 @@
     ensureCameraHooks();
     pollNativeBridge();
     enforceObsPositionLock();
-    updateNorthAlignModalLive();
 
     const isPreObs = (state.viewMode === 'pre_obs');
     const isObsMode = (state.viewMode === 'obs');
@@ -638,13 +547,13 @@
     }
 
     // 右側縦列アイコンの出し分け：
-    // ・②天体観察前：🎯（北ターゲット）のみ表示
-    // ・③天体観察時：🧭（コンパス表示/非表示）＋ 🎯（北ターゲット）の両方を表示
+    // ・②天体観察前：🎯（ターゲットON/解除）のみ表示（コンパス表示は設定ページで切替）
+    // ・③天体観察時：🧭（コンパス表示/非表示）＋ 🎯（ターゲットON/解除）の両方を表示
     syncObsSideIcons(isPreObs, isObsMode, userCompOn, nowMs);
-    syncCompassHudBadge(isObsMode && northTarget.locked);
+    syncCompassHudBadge(showObsTools);
   }
 
-  // --- 上部方位HUDバッジ（③天体観察時の北確定後のみ表示） ---
+  // --- 上部方位HUDバッジ（②天体観察前のコンパス練習 ＆ ③天体観察時） ---
   function syncCompassHudBadge(showHud) {
     let hud = document.getElementById('obs-compass-hud-badge');
     if (!showHud) {
@@ -669,19 +578,20 @@
     }
 
     const postureTag = nativeBridge.isUpright ? '立て持ち' : '寝かせ持ち';
+    const lockTag = northTarget.locked ? '🎯固定中' : '練習中';
 
     if (!nativeBridge.connected) {
-      hud.textContent = `🔭 天体観察中（北確定済み・上下スライドで見上げ）`;
-      hud.style.borderColor = '#38bdf8';
+      hud.textContent = `🎯 ${lockTag}（右の🎯でターゲットON/解除）`;
+      hud.style.borderColor = northTarget.locked ? '#0284c7' : '#94a3b8';
     } else if (state.compassStyle === 'kid') {
       const dir4 = getDirectionName4(dispDeg);
       const snapMark = nativeBridge.kidSnapped ? '✨ぴったり！' : 'ゆらっと追従';
-      hud.textContent = `🧭 子ども向け：【${dir4}】${snapMark}（${postureTag}）`;
+      hud.textContent = `${lockTag}：【${dir4}】${snapMark}（${postureTag}）`;
       hud.style.borderColor = nativeBridge.kidSnapped ? '#22c55e' : '#f59e0b';
     } else {
       const dir8 = getDirectionName8(dispDeg);
       const warn = nativeBridge.accuracy <= 1 ? ' ※8の字補正' : '';
-      hud.textContent = `🔬 高精度：${dir8} ${dispDeg}°（${postureTag}）${warn}`;
+      hud.textContent = `${lockTag}：${dir8} ${dispDeg}°（${postureTag}）${warn}`;
       hud.style.borderColor = nativeBridge.alignedNow ? '#f472b6' : '#38bdf8';
     }
     hud.style.display = 'block';
@@ -751,17 +661,11 @@
       compBtn.style.display = 'none';
     }
 
-    // 2. 🎯 北ターゲット（ロックオン・解除）アイコン（②天体観察前 ＆ ③天体観察時で表示）
+    // 2. 🎯 北ターゲット（ON / 解除）アイコン（②天体観察前 ＆ ③天体観察時で表示）
     if (isPreObs || isObsMode) {
       if (!targetBtn) {
-        targetBtn = createSideRoundIcon('btn-side-north-target', '🎯', 'badge-side-north-target', '北ターゲット（タップで北ロック解除・再設定）', 424);
-        targetBtn.onclick = () => {
-          if (northTarget.locked) {
-            unlockNorthTargetAndReopen();
-          } else {
-            openNorthAlignModal();
-          }
-        };
+        targetBtn = createSideRoundIcon('btn-side-north-target', '🎯', 'badge-side-north-target', '北ターゲット ON / 解除', 424);
+        targetBtn.onclick = toggleNorthTargetLock;
       }
       targetBtn.style.display = 'flex';
 
@@ -769,17 +673,17 @@
       const isFlashing = (northTarget.locked && nowMs < northTarget.flashUntilMs);
 
       if (isFlashing) {
-        // 北確定直後から約5秒間、ゆっくり明滅して光る
+        // ターゲットON直後から約5秒間、ゆっくり明滅して光る
         const pulse = 0.5 + 0.5 * Math.sin(nowMs * 0.0055);
         targetBtn.style.borderColor = '#f43f5e';
         targetBtn.style.backgroundColor = `rgba(255, 228, 230, ${0.45 + 0.55 * pulse})`;
         targetBtn.style.boxShadow = `0 0 ${Math.round(6 + 16 * pulse)}px rgba(244, 63, 94, ${(0.35 + 0.65 * pulse).toFixed(2)})`;
         if (targetBadge) {
-          targetBadge.textContent = '北確定!';
+          targetBadge.textContent = '北固定!';
           targetBadge.style.background = '#e11d48';
         }
       } else if (northTarget.locked) {
-        // 5秒経過後は通常のロックオン状態（タップで北ロック解除）
+        // 5秒経過後は通常のターゲットON表示（もう一度押すと解除）
         targetBtn.style.borderColor = '#0284c7';
         targetBtn.style.backgroundColor = '#ffffff';
         targetBtn.style.boxShadow = '0 3px 10px rgba(0,0,0,0.22)';
@@ -788,13 +692,13 @@
           targetBadge.style.background = '#0284c7';
         }
       } else {
-        // 未確定（ロック解除中）
-        targetBtn.style.borderColor = '#f59e0b';
+        // ターゲット解除状態（北を向いて押すとターゲットON）
+        targetBtn.style.borderColor = '#cbd5e1';
         targetBtn.style.backgroundColor = '#ffffff';
         targetBtn.style.boxShadow = '0 3px 10px rgba(0,0,0,0.22)';
         if (targetBadge) {
-          targetBadge.textContent = '未確定';
-          targetBadge.style.background = '#f59e0b';
+          targetBadge.textContent = '解除';
+          targetBadge.style.background = '#64748b';
         }
       }
     } else if (targetBtn) {
@@ -1638,7 +1542,7 @@
 
         <!-- 2. コンパス構造切替（高精度 vs 子ども向け磁石吸着） -->
         <div style="background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:11px;padding:8px 9px;display:flex;flex-direction:column;gap:6px;">
-          <div style="font-size:11px;font-weight:900;color:#0f172a;">🧭 実機コンパスの構造切替（北合わせ・観察時）</div>
+          <div style="font-size:11px;font-weight:900;color:#0f172a;">🧭 実機コンパスの構造切替（②観察前・③観察時）</div>
           <div style="display:flex;gap:5px;">
             <button type="button" data-compstyle="precision" style="flex:1;padding:7px 5px;border-radius:8px;border:1px solid #cbd5e1;font-size:10.5px;font-weight:900;cursor:pointer;">🔬 高精度コンパス<div style="font-size:9px;font-weight:600;opacity:0.85;">1°単位の正確計測</div></button>
             <button type="button" data-compstyle="kid" style="flex:1;padding:7px 5px;border-radius:8px;border:1px solid #cbd5e1;font-size:10.5px;font-weight:900;cursor:pointer;">🧭 子ども向けコンパス<div style="font-size:9px;font-weight:600;opacity:0.85;">東西南北に磁石吸着</div></button>
@@ -1681,13 +1585,7 @@
           updateCelestialExhibit(true);
 
           if (nextMode === 'pre_obs' || nextMode === 'obs') {
-            openNorthAlignModal();
-          } else {
-            northTarget.locked = false;
-            northTarget.modalOpen = false;
-            northTarget.flashUntilMs = 0;
-            const m = document.getElementById('north-align-guide-modal');
-            if (m) m.style.display = 'none';
+            showFirstTimeTargetGuideIfNeeded();
           }
         };
       });
@@ -1746,9 +1644,9 @@
       if (state.viewMode === 'anime') {
         ruleHint.textContent = '・①ゲーム：アニメ空、カメラは通常通り、コンパス輪はくるくる回転します。';
       } else if (state.viewMode === 'pre_obs') {
-        ruleHint.textContent = '・②天体観察前：北を確定したあと、カメラは通常ゲーム用のままリアル風の外スクリーン（太陽軌道・夜空）で遊べます。右の🎯で北ロック解除ができます。';
+        ruleHint.textContent = '・②天体観察前：カメラは通常ゲーム用のままリアル風の外スクリーン（太陽軌道・夜空）で遊べます。北を向いて右縦列の🎯を押すとターゲットON（5秒発光）/解除ができます。';
       } else {
-        ruleHint.textContent = '・③天体観察時：北を確定したあと、キャラの位置から実機コンパスと上下指スライドで実際の空と天体を見上げられます。';
+        ruleHint.textContent = '・③天体観察時：キャラの位置から実機コンパスと上下指スライドで実際の空と天体を見上げられます。右縦列の🧭でコンパス表示、🎯でターゲットON/解除ができます。';
       }
     }
 
@@ -1821,13 +1719,12 @@
         state.viewMode = m;
         saveState();
         updateCelestialExhibit(true);
-        if (m === 'pre_obs' || m === 'obs') openNorthAlignModal();
+        if (m === 'pre_obs' || m === 'obs') showFirstTimeTargetGuideIfNeeded();
       }
     },
     getMode: () => state.viewMode,
     isNorthLocked: () => northTarget.locked,
-    openNorthAlignModal,
-    unlockNorthTarget: unlockNorthTargetAndReopen,
+    toggleNorthTargetLock,
     setObsConstLines: (v) => { state.obsConstLines = Boolean(v); saveState(); updateCelestialExhibit(true); },
     advanceTurn,
     resetTurns,
