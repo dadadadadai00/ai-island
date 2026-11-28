@@ -1,21 +1,23 @@
 // ============================================================================
 // 【独立ビジュアルモジュール：compass_ring.js】
 // ・丸い海の外周へ余白を空けて配置する未来風・青ホログラム3Dコンパス
-// ・①ゲーム：くるくる回転 ／ ②天体観察前：実機連動時は方位固定(非連動時は回転) ／ ③天体観察時：北合わせ発光
+// ・①ゲーム＆②天体観察前：くるくる回転（北確定時に発光演出）
+// ・③天体観察時：回転停止＋北合わせ発光・確定後フェードアウト
 // ============================================================================
 (function initCompassRingModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_compass_ring_v3';
+  const STORAGE_KEY = 'island_compass_ring_v4';
   const state = { unlocked: true, visible: true, rotating: true, radiusOffset: 0.9 };
   let externalHide = false;
 
-  // ③天体観察時（北合わせモード）用状態
+  // ③天体観察時（北合わせモード）および北確定発光演出用状態
   const alignState = {
     enabled: false,       // ③天体観察時かつコンパスONのとき true
     isAligned: false,     // 真北の許容範囲内か
     lockFlashTimer: 0,    // 北一致・確定直後の発光点灯タイマー（秒）
-    fadeAlpha: 1.0        // 1.0=完全表示 <-> 0.0=ゆっくり消滅
+    fadeAlpha: 1.0,       // 1.0=完全表示 <-> 0.0=ゆっくり消滅
+    preObsPulseTimer: 0   // ②天体観察前で北確定した瞬間の発光タイマー
   };
 
   function loadState() {
@@ -306,7 +308,7 @@
     mats.baseGlow.color.setHex(pal.sub);   mats.baseGlow.opacity  = pal.glowOp * a;  mats.baseGlow.blending  = THREE.AdditiveBlending;
     mats.beam.color.setHex(pal.sub);       mats.beam.opacity      = pal.beamOp * a;  mats.beam.blending      = THREE.AdditiveBlending;
 
-    if (!alignState.enabled) {
+    if (!alignState.enabled && alignState.preObsPulseTimer <= 0) {
       mats.northTick.color.setHex(pal.sub);
       mats.northTick.opacity = pal.majorOp * a;
       mats.northTick.blending = blend;
@@ -342,11 +344,6 @@
     const dt = Math.min(0.1, Math.max(0, (now - lastTs) / 1000));
     lastTs = now;
     const baseOn = Boolean(state.unlocked && state.visible && !externalHide);
-
-    const skyMod = window.SkyTimeModule;
-    const isNativeLinked = skyMod && typeof skyMod.isNativeCompassActive === 'function'
-      ? skyMod.isNativeCompassActive()
-      : false;
 
     if (baseOn) {
       if (alignState.enabled) {
@@ -387,20 +384,23 @@
             }
           }
         }
-      } else if (isNativeLinked) {
-        // ②天体観察前（実機連動ON時）：回転を止めて東西南北基準へピタリと合わせる
-        alignState.fadeAlpha = 1.0;
-        rootGroup.visible = true;
-        rotatingGroup.rotation.y *= Math.max(0, 1 - dt * 10);
-        applyTimePalette(false);
       } else {
-        // ①ゲーム ／ ②天体観察前（実機連動OFF時）：くるくる回転
+        // ①ゲーム ／ ②天体観察前：くるくる回転（北確定直後は2.5秒間北目盛り発光）
         alignState.fadeAlpha = 1.0;
         rootGroup.visible = true;
         if (state.rotating) {
           rotatingGroup.rotation.y -= 0.055 * dt;
         }
         applyTimePalette(false);
+
+        if (alignState.preObsPulseTimer > 0) {
+          alignState.preObsPulseTimer = Math.max(0, alignState.preObsPulseTimer - dt);
+          const pulse = 0.5 + 0.5 * Math.sin(now * 0.01);
+          mats.northTick.blending = THREE.AdditiveBlending;
+          mats.northTick.color.setHex(0xff85c0);
+          mats.northTick.opacity = 0.5 + 0.5 * pulse;
+          if (northBarMesh) northBarMesh.scale.set(1.32, 1.15, 1.32);
+        }
       }
     } else {
       rootGroup.visible = false;
@@ -454,7 +454,8 @@
     },
     triggerNorthLocked: () => {
       alignState.isAligned = true;
-      alignState.lockFlashTimer = 0.95;
+      alignState.lockFlashTimer = 1.2;
+      alignState.preObsPulseTimer = 2.5;
       alignState.fadeAlpha = 1.0;
       applyVisibility();
     },
