@@ -8,7 +8,7 @@
 (function initSkyTimeModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_sky_time_v18';
+  const STORAGE_KEY = 'island_sky_time_v19';
   const RAD = Math.PI / 180;
   const DEG = 180 / Math.PI;
   const SKY_R = 22.0;
@@ -327,33 +327,43 @@
     const dirZ = -Math.cos(azRad);
     const camMode = (typeof manualCameraMode !== 'undefined') ? manualCameraMode : 'follow';
 
-    // 【② 天体観察前】：各カメラの通常ゲームアングル（見下ろし角度・距離）を維持したまま水平方角のみ連動
+    // 【② 天体観察前】：各カメラの通常ゲームアングル（距離・高さ・見下ろし角度）を維持したまま水平方角のみ連動
     if (state.viewMode === 'pre_obs') {
       if (nativeBridge.userTouching) return;
 
+      // 1. キャラ視点（🤖内カメラ）のとき：上下視線角度はそのまま水平方角だけ同期
       if (camMode === 'robot' && typeof innerRobotCam !== 'undefined' && innerRobotCam) {
+        innerRobotCam.getWorldDirection(tmpCamDir);
+        const sinP = tmpCamDir.y;
+        const cosP = Math.sqrt(Math.max(0.001, 1 - sinP * sinP));
         const eyeX = innerRobotCam.position.x;
         const eyeY = innerRobotCam.position.y;
         const eyeZ = innerRobotCam.position.z;
-        const pitch = -0.13;
-        const cosP = Math.cos(pitch);
         innerRobotCam.lookAt(
           eyeX + 20 * cosP * dirX,
-          eyeY + 20 * Math.sin(pitch),
+          eyeY + 20 * sinP,
           eyeZ + 20 * cosP * dirZ
         );
         return;
       }
 
-      if (typeof activeCamera !== 'undefined' && activeCamera && typeof controls !== 'undefined' && controls && controls.target) {
-        const dx = activeCamera.position.x - controls.target.x;
-        const dz = activeCamera.position.z - controls.target.z;
-        const horizDist = Math.hypot(dx, dz);
-        if (horizDist > 0.05) {
-          activeCamera.position.x = controls.target.x - dirX * horizDist;
-          activeCamera.position.z = controls.target.z - dirZ * horizDist;
-          activeCamera.lookAt(controls.target);
-        }
+      // 2. 追従・地上・地下カメラのとき：controlsに頼らず現在のカメラ視線から注視点と距離を算出して水平回転
+      if (typeof activeCamera !== 'undefined' && activeCamera) {
+        const isFixedIslandCam = (camMode === 'ground' || camMode === 'underground');
+        const pivotX = isFixedIslandCam ? 0 : ((typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.x : 0);
+        const pivotZ = isFixedIslandCam ? 0 : ((typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.z : 0);
+
+        const dx = activeCamera.position.x - pivotX;
+        const dz = activeCamera.position.z - pivotZ;
+        const horizDist = Math.max(0.5, Math.hypot(dx, dz));
+
+        activeCamera.getWorldDirection(tmpCamDir);
+        const horizLen = Math.max(0.001, Math.hypot(tmpCamDir.x, tmpCamDir.z));
+        const targetY = activeCamera.position.y + (tmpCamDir.y / horizLen) * horizDist;
+
+        activeCamera.position.x = pivotX - dirX * horizDist;
+        activeCamera.position.z = pivotZ - dirZ * horizDist;
+        activeCamera.lookAt(pivotX, targetY, pivotZ);
       }
       return;
     }
@@ -382,21 +392,15 @@
           activeCamera.position.set(-dirX * dist, camY, -dirZ * dist);
           const lookDist = 22.0;
           const lookY = camY + Math.sin(pitch) * lookDist;
-          if (typeof controls !== 'undefined' && controls && controls.target) {
-            controls.target.set(dirX * (lookDist - dist), lookY, dirZ * (lookDist - dist));
-            activeCamera.lookAt(controls.target);
-          } else {
-            activeCamera.lookAt(dirX * (lookDist - dist), lookY, dirZ * (lookDist - dist));
-          }
+          activeCamera.lookAt(dirX * (lookDist - dist), lookY, dirZ * (lookDist - dist));
         } else if (camMode === 'underground') {
-          if (typeof controls !== 'undefined' && controls && controls.target) {
-            const dx = activeCamera.position.x - controls.target.x;
-            const dz = activeCamera.position.z - controls.target.z;
-            const horizDist = Math.max(3.5, Math.hypot(dx, dz));
-            activeCamera.position.x = controls.target.x - dirX * horizDist;
-            activeCamera.position.z = controls.target.z - dirZ * horizDist;
-            activeCamera.lookAt(controls.target);
-          }
+          const horizDist = Math.max(3.5, Math.hypot(activeCamera.position.x, activeCamera.position.z));
+          activeCamera.getWorldDirection(tmpCamDir);
+          const horizLen = Math.max(0.001, Math.hypot(tmpCamDir.x, tmpCamDir.z));
+          const targetY = activeCamera.position.y + (tmpCamDir.y / horizLen) * horizDist;
+          activeCamera.position.x = -dirX * horizDist;
+          activeCamera.position.z = -dirZ * horizDist;
+          activeCamera.lookAt(0, targetY, 0);
         } else {
           // 追従カメラ：キャラがいた位置基準で実機コンパスの方角＆見上げ仰角を反映
           const lp = nativeBridge.lockedRobotPos;
@@ -411,9 +415,6 @@
           const targetX = baseX + dirX * lookDist;
           const targetY = eyeY + Math.sin(pitch) * lookDist;
           const targetZ = baseZ + dirZ * lookDist;
-          if (typeof controls !== 'undefined' && controls && controls.target) {
-            controls.target.set(targetX, targetY, targetZ);
-          }
           activeCamera.lookAt(targetX, targetY, targetZ);
         }
       }
@@ -421,9 +422,10 @@
   }
 
   let cameraHookInstalled = false;
-  function ensureCameraTransformHook() {
-    if (cameraHookInstalled) return;
-    if (typeof window.updateAllCamerasTransform === 'function') {
+  let renderHookInstalled = false;
+
+  function ensureCameraHooks() {
+    if (!cameraHookInstalled && typeof window.updateAllCamerasTransform === 'function') {
       const _origUpdateAll = window.updateAllCamerasTransform;
       window.updateAllCamerasTransform = function() {
         const res = _origUpdateAll.apply(this, arguments);
@@ -433,10 +435,25 @@
       };
       cameraHookInstalled = true;
     }
+
+    if (!renderHookInstalled && typeof renderer !== 'undefined' && renderer && typeof renderer.render === 'function') {
+      const _origRender = renderer.render.bind(renderer);
+      renderer.render = function(sc, cam) {
+        if (sc === scene && (cam === activeCamera || cam === innerRobotCam)) {
+          enforceObsPositionLock();
+          applyModeCameraOrientation();
+          if (typeof activeCamera !== 'undefined' && activeCamera) {
+            skyRoot.position.copy(activeCamera.position);
+          }
+        }
+        return _origRender(sc, cam);
+      };
+      renderHookInstalled = true;
+    }
   }
 
   function updateCompassAndCameraLoop() {
-    ensureCameraTransformHook();
+    ensureCameraHooks();
     pollNativeBridge();
     enforceObsPositionLock();
 
