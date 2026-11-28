@@ -1,13 +1,14 @@
 // ============================================================================
 // 【独立ビジュアルモジュール：sky_time.js】
-// ・Android回転ベクトル＋立て持ち/寝かせ持ち自動リマップ＋初回即時北基準取得を融合
-// ・二重球体スクリーン（カメラ追従＋カリング無効化で上下視線移動のちらつき解消）
-// ・①観察アプリ(アニメ・表なし)／②天体観察前(シンプルリアル・表あり)／③天体観察時(現実時刻連動＋暗転停止)
+// ・不安定なブラウザセンサー計算を削ぎ落とし、Androidネイティブ(Kotlin)の高精度/子ども向けコンパス＆純正GPSへ直結
+// ・二重球体スクリーン（外側スクリーンで星空・朝日・夕焼け・天体位置を表示）
+// ・設定「🔭 観察・空」タブへ統合：
+//   ①ゲーム（くるくる回転）／ ②天体観察前（ハイブリッド切替）／ ③天体観察時（実機コンパス固定＋暗転停止）
 // ============================================================================
 (function initSkyTimeModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_sky_time_v14';
+  const STORAGE_KEY = 'island_sky_time_v15';
   const RAD = Math.PI / 180;
   const DEG = 180 / Math.PI;
   const SKY_R = 22.0;
@@ -17,7 +18,10 @@
   const BASE_FOLLOW_FOV = 38.0;
 
   const state = {
-    viewMode: 'anime', // 'anime'(①観察アプリ) | 'pre_obs'(②天体観察前) | 'obs'(③天体観察時)
+    viewMode: 'anime',          // 'anime'(①ゲーム) | 'pre_obs'(②天体観察前) | 'obs'(③天体観察時)
+    preObsHybrid: 'native',     // 'spin'(くるくる回転) | 'native'(実機コンパス連動)
+    compassStyle: 'kid',        // 'precision'(高精度コンパス) | 'kid'(子ども向け磁石吸着コンパス)
+    postureMode: 0,             // 0:自動判定, 1:寝かせ持ち固定, 2:立て持ち固定
     obsConstLines: true,
     turnCount: 0,
     lat: 35.68,
@@ -32,6 +36,9 @@
       if (raw) {
         const parsed = JSON.parse(raw);
         if (['anime', 'pre_obs', 'obs'].includes(parsed.viewMode)) state.viewMode = parsed.viewMode;
+        if (['spin', 'native'].includes(parsed.preObsHybrid)) state.preObsHybrid = parsed.preObsHybrid;
+        if (['precision', 'kid'].includes(parsed.compassStyle)) state.compassStyle = parsed.compassStyle;
+        if ([0, 1, 2].includes(parsed.postureMode)) state.postureMode = parsed.postureMode;
         if (typeof parsed.obsConstLines === 'boolean') state.obsConstLines = parsed.obsConstLines;
         if (Number.isFinite(parsed.turnCount) && parsed.turnCount >= 0) state.turnCount = Math.floor(parsed.turnCount);
         if (Number.isFinite(parsed.lat)) state.lat = parsed.lat;
@@ -127,7 +134,7 @@
     const badges = document.querySelectorAll('span, div');
     for (let i = 0; i < badges.length; i++) {
       const el = badges[i];
-      if (el.children.length > 0 || el.closest('#env-hologram-settings-panel')) continue;
+      if (el.children.length > 0 || el.closest('#settings-tab-panel-obs')) continue;
       const rect = el.getBoundingClientRect();
       if (rect.top > 130 || rect.height === 0) continue;
       const t = (el.textContent || '').trim();
@@ -166,35 +173,32 @@
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && wakeLockWanted) {
-      // アプリを開き直した瞬間、待ち時間なしで現在の向きと北を再取得する（Android onResume相当）
-      sensorCompass.isFirstUpdate = true;
       syncScreenWakeLock(true);
     }
   });
 
   // ============================================================================
-  // --- Android回転ベクトル＆立て持ち/寝かせ持ち自動リマップ融合エンジン ---
+  // --- Androidネイティブ（Kotlin）コンパス＆純正GPS直結ブリッジ ---
   // ============================================================================
-  const sensorCompass = {
-    enabled: false,       // デフォルトOFF（コンパスアイコンクリックで即ON）
-    listening: false,
-    hasAbsolute: false,
-    currentAzimuth: 0,
-    isFirstUpdate: true,
-    isVertical: false,
-    isLowAccuracy: false,
-    hasSensorData: false,
+  const nativeBridge = {
+    connected: false,
+    precisionAzimuth: 0,
+    kidAzimuth: 0,
+    kidSnapped: false,
+    isUpright: false,
+    accuracy: 2,
+    userTouching: false,
+    userPausedTracking: false,
     alignedNow: false,
-    userTouching: false
+    postureSynced: false
   };
 
   const tmpCamDir = new THREE.Vector3();
   const tmpOffsetVec = new THREE.Vector3();
 
-  // 指操作中はカメラ上書きを一時停止して操作干渉を防止
-  window.addEventListener('pointerdown', () => { sensorCompass.userTouching = true; }, { passive: true });
-  window.addEventListener('pointerup', () => { sensorCompass.userTouching = false; }, { passive: true });
-  window.addEventListener('pointercancel', () => { sensorCompass.userTouching = false; }, { passive: true });
+  window.addEventListener('pointerdown', () => { nativeBridge.userTouching = true; }, { passive: true });
+  window.addEventListener('pointerup', () => { nativeBridge.userTouching = false; }, { passive: true });
+  window.addEventListener('pointercancel', () => { nativeBridge.userTouching = false; }, { passive: true });
 
   function norm360(v) { return ((v % 360) + 360) % 360; }
   function shortestAngleDiffDeg(a, b) {
@@ -213,100 +217,63 @@
     return '北西';
   }
 
-  // W3C DeviceOrientation (alpha, beta, gamma) から Android同等の方位角を計算
-  function computeTiltAdjustedAzimuth(e) {
-    if (Number.isFinite(e.webkitCompassHeading)) {
-      sensorCompass.isLowAccuracy = Number.isFinite(e.webkitCompassAccuracy) && e.webkitCompassAccuracy < 0;
-      return norm360(e.webkitCompassHeading);
+  function getDirectionName4(degree) {
+    const d = Math.round(norm360(degree)) % 360;
+    if (d >= 315 || d < 45) return '北';
+    if (d < 135) return '東';
+    if (d < 225) return '南';
+    return '西';
+  }
+
+  function isNativeCompassActive() {
+    if (state.viewMode === 'obs') return true;
+    if (state.viewMode === 'pre_obs' && state.preObsHybrid === 'native') return true;
+    return false;
+  }
+
+  function getSelectedNativeAzimuth() {
+    return (state.compassStyle === 'kid') ? nativeBridge.kidAzimuth : nativeBridge.precisionAzimuth;
+  }
+
+  function pollNativeBridge() {
+    const bridge = window.AndroidCompass;
+    if (!bridge || typeof bridge.getSensorJson !== 'function') {
+      nativeBridge.connected = false;
+      return;
     }
-    if (!Number.isFinite(e.alpha) || !Number.isFinite(e.beta) || !Number.isFinite(e.gamma)) {
-      return null;
-    }
+    try {
+      const raw = bridge.getSensorJson();
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      nativeBridge.connected = true;
+      if (Number.isFinite(d.p)) nativeBridge.precisionAzimuth = norm360(d.p);
+      if (Number.isFinite(d.k)) nativeBridge.kidAzimuth = norm360(d.k);
+      nativeBridge.kidSnapped = (d.ks === 1);
+      nativeBridge.isUpright = (d.up === 1);
+      if (Number.isFinite(d.acc)) nativeBridge.accuracy = d.acc;
 
-    const a = e.alpha * RAD;
-    const b = e.beta * RAD;
-    const g = e.gamma * RAD;
-    const cA = Math.cos(a), sA = Math.sin(a);
-    const cB = Math.cos(b), sB = Math.sin(b);
-    const cG = Math.cos(g), sG = Math.sin(g);
-
-    // 端末座標系(X:右, Y:上, Z:画面手前) -> 地球座標系(東, 北, 天頂) 回転行列
-    const r1 = -cB * sA;                        // 端末+Y(上端)の東成分
-    const r2 = cA * sG + cG * sA * sB;          // 端末+Z(手前)の東成分
-    const r4 = cA * cB;                         // 端末+Y(上端)の北成分
-    const r5 = sA * sG - cA * cG * sB;          // 端末+Z(手前)の北成分
-    const r7 = sB;                              // 端末+Y(上端)の天頂成分（Androidの r[7]）
-
-    // スマホの傾き具合（0.0 = 完全に水平、1.0 = 完全に垂直）
-    const tiltY = Math.abs(r7);
-
-    if (sensorCompass.isFirstUpdate) {
-      // 開いた直後は現在の姿勢（約40度以上なら立て持ち）を即確定
-      sensorCompass.isVertical = tiltY >= 0.65;
-    } else {
-      // 境界付近でパタパタ切り替わらないようヒステリシスを持たせる
-      if (!sensorCompass.isVertical && tiltY > 0.78) {
-        sensorCompass.isVertical = true;   // 立て持ちへ
-      } else if (sensorCompass.isVertical && tiltY < 0.52) {
-        sensorCompass.isVertical = false;  // 寝かせ持ちへ
+      if (!nativeBridge.postureSynced && typeof bridge.setPostureMode === 'function') {
+        bridge.setPostureMode(state.postureMode);
+        nativeBridge.postureSynced = true;
       }
-    }
 
-    let east, north;
-    if (sensorCompass.isVertical) {
-      // 立て持ち（AXIS_X, AXIS_Z リマップ相当）：背面カメラ(-Z)の向きを基準にする
-      east = -r2;
-      north = -r5;
-    } else {
-      // 寝かせ持ち：スマホ上端(+Y)の向きを基準にする
-      east = r1;
-      north = r4;
-    }
-
-    // ほぼ真上・真下を向いて水平成分が極小の場合は現在値を維持
-    if (Math.hypot(east, north) < 1e-4) {
-      return sensorCompass.currentAzimuth;
-    }
-
-    return norm360(Math.atan2(east, north) * DEG);
+      if (d.gps === 1 && Number.isFinite(d.lat) && Number.isFinite(d.lon)) {
+        const moved = Math.abs(state.lat - d.lat) > 0.002 || Math.abs(state.lon - d.lon) > 0.002;
+        if (!state.gpsApplied || moved) {
+          state.lat = Number(d.lat.toFixed(4));
+          state.lon = Number(d.lon.toFixed(4));
+          state.gpsApplied = true;
+          saveState();
+          lastCalcKey = '';
+        }
+      }
+    } catch (e) {}
   }
 
-  function handleAbsoluteOrientation(e) {
-    sensorCompass.hasAbsolute = true;
-    processSensorOrientation(e);
-  }
-
-  function handleRelativeOrientation(e) {
-    if (sensorCompass.hasAbsolute && e.absolute !== true) return;
-    processSensorOrientation(e);
-  }
-
-  function processSensorOrientation(e) {
-    if (state.viewMode !== 'obs' || !sensorCompass.enabled) return;
-    const targetAzimuth = computeTiltAdjustedAzimuth(e);
-    if (targetAzimuth === null) return;
-
-    sensorCompass.hasSensorData = true;
-    if (sensorCompass.isFirstUpdate) {
-      // 1発目は遅延なしで即座に北基準へ合わせる
-      sensorCompass.currentAzimuth = targetAzimuth;
-      sensorCompass.isFirstUpdate = false;
-    } else {
-      // 2回目以降は小刻みな震えを抑えて滑らかに追従（係数 0.25）
-      const diff = shortestAngleDiffDeg(targetAzimuth, sensorCompass.currentAzimuth);
-      sensorCompass.currentAzimuth = norm360(sensorCompass.currentAzimuth + diff * 0.25);
-    }
-
-    if (!sensorCompass.userTouching) {
-      applyCameraAzimuthDeg(sensorCompass.currentAzimuth);
-    }
-  }
-
-  // 3Dカメラの上下仰角は保ったまま、水平方角だけを targetAzDeg（0°=北）へ確実に合わせる
+  // 3Dカメラの上下仰角は保ったまま、水平方角だけを targetAzDeg（0°=北）へ合わせる
   function applyCameraAzimuthDeg(targetAzDeg) {
     if (typeof activeCamera === 'undefined' || !activeCamera) return;
     const azRad = targetAzDeg * RAD;
-    // 北(0°)=(0, -1), 東(90°)=(+1, 0), 南(180°)=(0, +1), 西(270°)=(-1, 0)
     const dirX = Math.sin(azRad);
     const dirZ = -Math.cos(azRad);
 
@@ -314,7 +281,6 @@
       tmpOffsetVec.copy(activeCamera.position).sub(controls.target);
       const horizDist = Math.hypot(tmpOffsetVec.x, tmpOffsetVec.z);
       if (horizDist > 0.001) {
-        // カメラ位置は target の反対側(-dir)に置くことで視線が +dir を向く
         activeCamera.position.x = controls.target.x - dirX * horizDist;
         activeCamera.position.z = controls.target.z - dirZ * horizDist;
         if (typeof controls.update === 'function') controls.update();
@@ -327,89 +293,53 @@
     }
   }
 
-  function startSensorCompass() {
-    sensorCompass.enabled = true;
-    sensorCompass.isFirstUpdate = true;
-    sensorCompass.hasSensorData = false;
+  function updateCompassAndCameraLoop() {
+    pollNativeBridge();
 
-    // クリックした瞬間、センサー応答前でもまず即座に北(0°)を向かせる
-    applyCameraAzimuthDeg(0);
-
-    if (sensorCompass.listening) return;
-    try {
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        DeviceOrientationEvent.requestPermission().then((res) => {
-          if (res === 'granted') {
-            window.addEventListener('deviceorientationabsolute', handleAbsoluteOrientation, true);
-            window.addEventListener('deviceorientation', handleRelativeOrientation, true);
-            sensorCompass.listening = true;
-          } else {
-            if (typeof showToast === 'function') showToast('🧭 センサー権限がないため北(0°)正面へ固定しました');
-          }
-        }).catch(() => {});
-      } else {
-        window.addEventListener('deviceorientationabsolute', handleAbsoluteOrientation, true);
-        window.addEventListener('deviceorientation', handleRelativeOrientation, true);
-        sensorCompass.listening = true;
-      }
-    } catch (e) {}
-  }
-
-  function stopSensorCompass() {
-    sensorCompass.enabled = false;
-    sensorCompass.isFirstUpdate = true;
-  }
-
-  function updateNorthAlignmentState() {
     const isObsMode = (state.viewMode === 'obs');
+    const isHybridPreObs = (state.viewMode === 'pre_obs');
+    const compassActive = isNativeCompassActive();
+
     syncScreenWakeLock(isObsMode);
 
-    const compMod = window.CompassRingModule;
-    if (!isObsMode) {
-      if (sensorCompass.enabled) stopSensorCompass();
-      if (compMod && typeof compMod.setObsAlignmentMode === 'function') compMod.setObsAlignmentMode(false);
-      syncObsSideIcons(false, false, false);
-      syncCompassHudBadge(false);
-      return;
+    if (compassActive && nativeBridge.connected && !nativeBridge.userPausedTracking && !nativeBridge.userTouching) {
+      applyCameraAzimuthDeg(getSelectedNativeAzimuth());
     }
 
+    const compMod = window.CompassRingModule;
     const userCompOn = (compMod && typeof compMod.isUserEnabled === 'function') ? compMod.isUserEnabled() : false;
     const alignActive = Boolean(isObsMode && userCompOn);
 
     if (compMod && typeof compMod.setObsAlignmentMode === 'function') {
       compMod.setObsAlignmentMode(alignActive);
     }
-    syncObsSideIcons(true, userCompOn, sensorCompass.enabled);
-    syncCompassHudBadge(sensorCompass.enabled || userCompOn);
 
-    if (!alignActive) {
-      sensorCompass.alignedNow = false;
-      return;
-    }
-
-    // 現在のカメラ水平視線（-Zが北=0°）から北とのズレ角を算出
-    let diffDeg = 180;
-    if (typeof activeCamera !== 'undefined' && activeCamera) {
-      activeCamera.getWorldDirection(tmpCamDir);
-      const horizLen = Math.hypot(tmpCamDir.x, tmpCamDir.z);
-      if (horizLen > 0.04) {
-        const azDeg = norm360(Math.atan2(tmpCamDir.x, -tmpCamDir.z) * DEG);
-        diffDeg = Math.abs(shortestAngleDiffDeg(azDeg, 0));
+    // 北一致判定（③天体観察時）
+    if (alignActive) {
+      let diffDeg = 180;
+      if (typeof activeCamera !== 'undefined' && activeCamera) {
+        activeCamera.getWorldDirection(tmpCamDir);
+        if (Math.hypot(tmpCamDir.x, tmpCamDir.z) > 0.04) {
+          const azDeg = norm360(Math.atan2(tmpCamDir.x, -tmpCamDir.z) * DEG);
+          diffDeg = Math.abs(shortestAngleDiffDeg(azDeg, 0));
+        }
       }
+      if (!nativeBridge.alignedNow && diffDeg <= 12) nativeBridge.alignedNow = true;
+      else if (nativeBridge.alignedNow && diffDeg >= 16) nativeBridge.alignedNow = false;
+
+      if (compMod && typeof compMod.updateNorthAlignment === 'function') {
+        compMod.updateNorthAlignment(nativeBridge.alignedNow);
+      }
+    } else {
+      nativeBridge.alignedNow = false;
     }
 
-    if (!sensorCompass.alignedNow && diffDeg <= 12) {
-      sensorCompass.alignedNow = true;
-    } else if (sensorCompass.alignedNow && diffDeg >= 16) {
-      sensorCompass.alignedNow = false;
-    }
-
-    if (compMod && typeof compMod.updateNorthAlignment === 'function') {
-      compMod.updateNorthAlignment(sensorCompass.alignedNow);
-    }
+    const showSideControls = (isObsMode || isHybridPreObs);
+    syncObsSideIcons(showSideControls, userCompOn, compassActive && !nativeBridge.userPausedTracking);
+    syncCompassHudBadge(showSideControls && (compassActive || userCompOn));
   }
 
-  // --- ③天体観察時専用：Android仕様の方位・角度・持ち方バッジ ---
+  // --- 上部方位HUDバッジ（高精度モード vs 子ども向け東西南北モード） ---
   function syncCompassHudBadge(showHud) {
     let hud = document.getElementById('obs-compass-hud-badge');
     if (!showHud) {
@@ -419,13 +349,14 @@
     if (!hud) {
       hud = document.createElement('div');
       hud.id = 'obs-compass-hud-badge';
-      hud.style.cssText = 'position:fixed;left:50%;top:116px;transform:translateX(-50%);z-index:8810;padding:5px 12px;border-radius:999px;background:rgba(15,23,42,0.78);border:1.5px solid #38bdf8;color:#f0f9ff;font-size:11px;font-weight:900;letter-spacing:0.03em;backdrop-filter:blur(4px);pointer-events:none;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,0.25);';
+      hud.style.cssText = 'position:fixed;left:50%;top:116px;transform:translateX(-50%);z-index:8810;padding:5px 13px;border-radius:999px;background:rgba(15,23,42,0.84);border:1.5px solid #38bdf8;color:#f0f9ff;font-size:11.5px;font-weight:900;letter-spacing:0.03em;backdrop-filter:blur(4px);pointer-events:none;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,0.28);';
       document.body.appendChild(hud);
     }
 
+    const compassActive = isNativeCompassActive();
     let dispDeg = 0;
-    if (sensorCompass.enabled && sensorCompass.hasSensorData) {
-      dispDeg = Math.round(sensorCompass.currentAzimuth) % 360;
+    if (compassActive && nativeBridge.connected) {
+      dispDeg = Math.round(getSelectedNativeAzimuth()) % 360;
     } else if (typeof activeCamera !== 'undefined' && activeCamera) {
       activeCamera.getWorldDirection(tmpCamDir);
       if (Math.hypot(tmpCamDir.x, tmpCamDir.z) > 0.02) {
@@ -433,26 +364,37 @@
       }
     }
 
-    const dirName = getDirectionName8(dispDeg);
-    const postureTag = sensorCompass.enabled
-      ? (sensorCompass.hasSensorData ? (sensorCompass.isVertical ? '立て持ち' : '寝かせ持ち') : '北基準セット')
-      : '指操作';
-    const warn = sensorCompass.isLowAccuracy ? ' ※8の字補正' : '';
-    hud.textContent = `🧭 方位：${dirName} ${dispDeg}°（${postureTag}）${warn}`;
-    hud.style.borderColor = sensorCompass.alignedNow ? '#f472b6' : '#38bdf8';
+    const postureTag = nativeBridge.isUpright ? '立て持ち' : '寝かせ持ち';
+
+    if (!compassActive) {
+      hud.textContent = `🔄 くるくる回転モード（指ドラッグ視点）`;
+      hud.style.borderColor = '#38bdf8';
+    } else if (!nativeBridge.connected) {
+      hud.textContent = `🧭 ブラウザ表示中（APK起動で実機センサー連動）`;
+      hud.style.borderColor = '#94a3b8';
+    } else if (nativeBridge.userPausedTracking) {
+      hud.textContent = `✋ 一時停止中（右の📱アイコンで実機連動再開）`;
+      hud.style.borderColor = '#f59e0b';
+    } else if (state.compassStyle === 'kid') {
+      const dir4 = getDirectionName4(dispDeg);
+      const snapMark = nativeBridge.kidSnapped ? '✨ぴったり！' : 'ゆらっと追従';
+      hud.textContent = `🧭 子ども向け：【${dir4}】${snapMark}（${postureTag}）`;
+      hud.style.borderColor = nativeBridge.kidSnapped ? '#22c55e' : '#f59e0b';
+    } else {
+      const dir8 = getDirectionName8(dispDeg);
+      const warn = nativeBridge.accuracy <= 1 ? ' ※8の字補正' : '';
+      hud.textContent = `🔬 高精度：${dir8} ${dispDeg}°（${postureTag}）${warn}`;
+      hud.style.borderColor = nativeBridge.alignedNow ? '#f472b6' : '#38bdf8';
+    }
     hud.style.display = 'block';
   }
 
-  // --- ③天体観察時専用：右側縦列アイコンの下へ「🧭コンパス」＆「📱センサー追従」を追加 ---
+  // --- 右側縦列アイコンの下へ「🧭ホログラム」＆「📱追従一時停止/再開」を追加 ---
   function findRightSideIconContainer() {
-    const allBtns = Array.from(document.querySelectorAll('button'));
-    const rightRoundBtns = allBtns.filter((b) => {
-      if (b.id === 'btn-side-obs-compass' || b.id === 'btn-side-obs-gyro') return false;
-      const r = b.getBoundingClientRect();
-      return r.width >= 34 && r.width <= 58 && Math.abs(r.width - r.height) <= 8 && r.left > window.innerWidth * 0.72 && r.top > 110 && r.bottom < window.innerHeight - 160;
-    });
-    if (rightRoundBtns.length >= 2) {
-      return { container: rightRoundBtns[0].parentElement, refBtn: rightRoundBtns[0] };
+    const sideCol = document.getElementById('side-icon-column');
+    if (sideCol) {
+      const refBtn = sideCol.querySelector('.side-circle-btn');
+      return { container: sideCol, refBtn };
     }
     return null;
   }
@@ -467,7 +409,7 @@
     if (found && found.container && found.refBtn) {
       const cs = window.getComputedStyle(found.refBtn);
       btn.className = found.refBtn.className;
-      btn.style.cssText = `position:relative;width:${cs.width};height:${cs.height};border-radius:${cs.borderRadius || '50%'};background:${cs.backgroundColor || '#ffffff'};box-shadow:${cs.boxShadow || '0 3px 10px rgba(0,0,0,0.22)'};border:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;padding:0;margin-top:2px;`;
+      btn.style.cssText = `position:relative;width:${cs.width};height:${cs.height};border-radius:${cs.borderRadius || '50%'};background:${cs.backgroundColor || '#ffffff'};box-shadow:${cs.boxShadow || '0 3px 10px rgba(0,0,0,0.22)'};border:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;padding:0;`;
       found.container.appendChild(btn);
     } else {
       btn.style.cssText = `position:fixed;right:12px;top:${fallbackTopPx}px;z-index:8820;width:44px;height:44px;border-radius:50%;background:#ffffff;border:2px solid #cbd5e1;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;padding:0;`;
@@ -481,7 +423,7 @@
     return btn;
   }
 
-  function syncObsSideIcons(showIcons, isCompOn, isSensorOn) {
+  function syncObsSideIcons(showIcons, isCompOn, isTrackingOn) {
     let compBtn = document.getElementById('btn-side-obs-compass');
     let gyroBtn = document.getElementById('btn-side-obs-gyro');
 
@@ -491,62 +433,49 @@
       return;
     }
 
-    // 1. コンパスアイコン（クリックで即座に北基準取得＋リング表示切替）
     if (!compBtn) {
-      compBtn = createSideRoundIcon('btn-side-obs-compass', '🧭', 'badge-side-obs-compass', 'コンパスON（北向き＆方位リング）', 372);
+      compBtn = createSideRoundIcon('btn-side-obs-compass', '🧭', 'badge-side-obs-compass', 'ホログラムコンパス表示 ON/OFF', 372);
       compBtn.onclick = () => {
         const compMod = window.CompassRingModule;
         if (compMod && typeof compMod.toggleVisible === 'function') {
           const next = compMod.toggleVisible();
-          if (next) {
-            sensorCompass.alignedNow = false;
-            startSensorCompass();
-            if (typeof showToast === 'function') {
-              showToast('🧭 北基準を取得しました（立て持ち・寝かせ持ち自動対応）');
-            }
-          } else {
-            stopSensorCompass();
-            if (typeof showToast === 'function') {
-              showToast('🧭 コンパス OFF');
-            }
+          if (typeof showToast === 'function') {
+            showToast(next ? '🧭 ホログラムコンパス ON' : '🧭 ホログラムコンパス OFF');
           }
-          updateNorthAlignmentState();
+          updateCompassAndCameraLoop();
         }
       };
     }
 
-    // 2. センサー追従アイコン（デフォルトOFF・指操作だけにしたい時の切替用）
     if (!gyroBtn) {
-      gyroBtn = createSideRoundIcon('btn-side-obs-gyro', '📱', 'badge-side-obs-gyro', '端末センサー追従 ON/OFF', 424);
+      gyroBtn = createSideRoundIcon('btn-side-obs-gyro', '📱', 'badge-side-obs-gyro', '実機コンパス追従 一時停止/再開', 424);
       gyroBtn.onclick = () => {
-        if (sensorCompass.enabled) {
-          stopSensorCompass();
-          updateNorthAlignmentState();
-          if (typeof showToast === 'function') showToast('📱 センサー追従 OFF（指ドラッグ操作）');
-        } else {
-          startSensorCompass();
-          updateNorthAlignmentState();
-          if (typeof showToast === 'function') showToast('📱 センサー追従 ON（立て持ち・寝かせ持ち自動対応）');
+        if (!isNativeCompassActive()) {
+          if (typeof showToast === 'function') showToast('⚙️ 設定の「観察・空」で実機コンパス連動を選べます');
+          return;
+        }
+        nativeBridge.userPausedTracking = !nativeBridge.userPausedTracking;
+        updateCompassAndCameraLoop();
+        if (typeof showToast === 'function') {
+          showToast(nativeBridge.userPausedTracking ? '✋ 実機コンパス追従を一時停止（指操作可）' : '📱 実機コンパス追従を再開しました');
         }
       };
     }
 
     compBtn.style.display = 'flex';
     compBtn.style.borderColor = isCompOn ? '#0284c7' : '#cbd5e1';
-    compBtn.style.opacity = isCompOn ? '1' : '0.84';
     const compBadge = document.getElementById('badge-side-obs-compass');
     if (compBadge) {
       compBadge.textContent = isCompOn ? 'ON' : 'OFF';
-      compBadge.style.background = isCompOn ? '#e11d48' : '#64748b';
+      compBadge.style.background = isCompOn ? '#0284c7' : '#64748b';
     }
 
-    gyroBtn.style.display = 'flex';
-    gyroBtn.style.borderColor = isSensorOn ? '#0284c7' : '#cbd5e1';
-    gyroBtn.style.opacity = isSensorOn ? '1' : '0.84';
+    gyroBtn.style.display = isNativeCompassActive() ? 'flex' : 'none';
+    gyroBtn.style.borderColor = isTrackingOn ? '#16a34a' : '#f59e0b';
     const gyroBadge = document.getElementById('badge-side-obs-gyro');
     if (gyroBadge) {
-      gyroBadge.textContent = isSensorOn ? 'ON' : 'OFF';
-      gyroBadge.style.background = isSensorOn ? '#0284c7' : '#64748b';
+      gyroBadge.textContent = isTrackingOn ? '連動' : '停止';
+      gyroBadge.style.background = isTrackingOn ? '#16a34a' : '#f59e0b';
     }
   }
 
@@ -642,7 +571,7 @@
 
     if (state.viewMode === 'anime') {
       const moonMood = turnPhase === 3 ? 'energetic' : 'sleepy';
-      return { date: now, phase: turnPhase, subStep, turn, times, moonMood, dayTag: 'ゲーム周期(表なし)' };
+      return { date: now, phase: turnPhase, subStep, turn, times, moonMood, dayTag: 'ゲーム周期' };
     }
 
     const refBase = new Date(skyDayBase.getTime());
@@ -679,7 +608,7 @@
       refDate = new Date(nextCal.getFullYear(), nextCal.getMonth(), nextCal.getDate(), Math.floor(th), Math.floor((th % 1) * 60), 0);
       moonMood = 'sleepy';
     }
-    return { date: refDate, phase: turnPhase, subStep, turn, times: refTimes, moonMood, dayTag: isNextDay ? '表ルール:翌日空' : '表ルール:当日空' };
+    return { date: refDate, phase: turnPhase, subStep, turn, times: refTimes, moonMood, dayTag: isNextDay ? '翌日空シミュ' : '当日空シミュ' };
   }
 
   // --- テクスチャ生成ユーティリティ ---
@@ -1050,7 +979,7 @@
     }
   }
 
-  // --- 元アプリ側の旧3D星座看板＆朝〜夕に残る薄い水色オリオン座線の完全非表示 ---
+  // --- 元アプリ側の旧3D星座看板等の非表示 ---
   const CONST_KW = ['オリオン座', '北斗七星', 'カシオペア', '夏の大三角', 'さそり座', 'こぐま座', 'はくちょう座', 'こと座', 'わし座', 'おおいぬ座', 'しし座', 'ふたご座', 'ペガスス座'];
   const tmpWorldPos = new THREE.Vector3();
 
@@ -1131,7 +1060,7 @@
 
   function updateCelestialExhibit(force = false) {
     hideLegacySkyObjects();
-    updateNorthAlignmentState();
+    updateCompassAndCameraLoop();
 
     if (typeof activeCamera !== 'undefined' && activeCamera) {
       skyRoot.position.copy(activeCamera.position);
@@ -1162,7 +1091,7 @@
 
     const isNight = isObs ? (sunPos.alt * DEG < -5.0) : (moment.phase >= 3);
 
-    // 0. スクリーン表示
+    // 0. 外側二重球体スクリーン表示
     if (isAnime) {
       const domeStyle = getStaticSkyDomeStyle('anime', moment.phase);
       innerSkyDome.visible = true;
@@ -1205,7 +1134,7 @@
       moonOrbitMat.opacity = isNight ? 0.42 : 0.22;
     }
 
-    // 2. 太陽・月の配置＆基準サイズ設定
+    // 2. 太陽・月の配置
     currentRayMode = 'off';
     if (isAnime) {
       baseSunScale = 3.1;
@@ -1281,7 +1210,7 @@
       }
     }
 
-    // 3. 星座（朝〜夕は全モード完全非表示・夜〜深夜のみ表示）
+    // 3. 星座（夜〜深夜のみ表示）
     starGroup.visible = isNight;
     baseStarSize = isAnime ? 1.25 : 0.82;
     if (isNight) {
@@ -1315,127 +1244,164 @@
 
     applyDynamicCameraScales(performance.now() * 0.001);
 
-    const mNames = { anime: '①観察アプリ', pre_obs: '②天体観察前', obs: '③天体観察時' };
+    const mNames = { anime: '①ゲーム', pre_obs: '②天体観察前', obs: '③天体観察時' };
     const turnProg = isObs ? `現在時刻(太陽高度 ${(sunPos.alt * DEG).toFixed(0)}°)` : `${moment.turn}T目・${PHASE_LABELS[moment.phase]}(${moment.subStep + 1}/5)`;
-    lastStatusText = `${mNames[state.viewMode]}｜${moment.dayTag}｜${turnProg}｜日出${formatHM(moment.times.sunriseH)}・日入${formatHM(moment.times.sunsetH)}｜${state.gpsApplied ? `GPS(${state.lat.toFixed(1)}°N)` : '日本標準'}`;
+    const gpsTag = state.gpsApplied ? `GPS(${state.lat.toFixed(2)}°N, ${state.lon.toFixed(2)}°E)` : '日本標準(35.7°N)';
+    lastStatusText = `${mNames[state.viewMode]}｜${turnProg}｜日出${formatHM(moment.times.sunriseH)}・日入${formatHM(moment.times.sunsetH)}｜${gpsTag}`;
     syncSettingsUI();
   }
 
-  // --- 自前GPS事前確認モーダル ---
-  function openGpsConsentModal() {
-    let modal = document.getElementById('sky-gps-consent-modal');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'sky-gps-consent-modal';
-      modal.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,0.58);display:flex;align-items:center;justify-content:center;padding:18px;';
-      modal.innerHTML = `
-        <div style="width:100%;max-width:320px;background:#ffffff;border-radius:16px;padding:16px;box-shadow:0 12px 32px rgba(0,0,0,0.28);text-align:left;border:2px solid #7dd3fc;">
-          <div style="font-size:14px;font-weight:900;color:#0369a1;margin-bottom:8px;">📍 位置情報の利用確認</div>
-          <div style="font-size:12px;line-height:1.6;color:#334155;margin-bottom:14px;">現在地の空（太陽・月・星座の位置）を再現するために位置情報を使いますか？<br><span style="font-size:10.5px;color:#64748b;">※「今はしない」を選んでも日本標準の空でそのまま遊べます。</span></div>
-          <div style="display:flex;gap:8px;">
-            <button type="button" id="sky-gps-btn-later" style="flex:1;padding:9px;border-radius:10px;border:1px solid #cbd5e1;background:#f8fafc;color:#475569;font-size:12px;font-weight:800;cursor:pointer;">今はしない</button>
-            <button type="button" id="sky-gps-btn-allow" style="flex:1;padding:9px;border-radius:10px;border:none;background:#0284c7;color:#ffffff;font-size:12px;font-weight:900;cursor:pointer;">使う</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-      document.getElementById('sky-gps-btn-later').onclick = () => { modal.style.display = 'none'; };
-      document.getElementById('sky-gps-btn-allow').onclick = () => { modal.style.display = 'none'; executeGpsFetch(); };
-    }
-    modal.style.display = 'flex';
-  }
-
-  function executeGpsFetch() {
-    if (!navigator.geolocation) {
-      if (typeof showToast === 'function') showToast('📍 この端末ではGPSを利用できません（日本標準で動作中）');
-      return;
-    }
-    if (typeof showToast === 'function') showToast('📍 現在地の緯度・経度を取得中...');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        state.lat = Number(pos.coords.latitude.toFixed(3));
-        state.lon = Number(pos.coords.longitude.toFixed(3));
-        state.gpsApplied = true;
-        saveState();
+  // --- 純正GPSリクエスト（Android Kotlin側へ要求） ---
+  function triggerNativeGpsRequest() {
+    const bridge = window.AndroidCompass;
+    if (bridge && typeof bridge.requestGps === 'function') {
+      bridge.requestGps();
+      if (typeof showToast === 'function') showToast('📍 Android純正GPSで現在地を取得中...');
+      setTimeout(() => {
+        pollNativeBridge();
         updateCelestialExhibit(true);
-        if (typeof showToast === 'function') showToast(`📍 現在地の空へ同期しました (${state.lat.toFixed(1)}°N, ${state.lon.toFixed(1)}°E)`);
-      },
-      (err) => {
-        if (err && err.code === 1) {
-          const guide = '📍 ブラウザで位置情報がブロックされています。URL左のアイコン → 権限 → 位置情報 を「許可」にして再読み込みしてください。';
-          lastStatusText = guide;
-          syncSettingsUI();
-          if (typeof showToast === 'function') showToast(guide);
-        } else if (typeof showToast === 'function') {
-          showToast('📍 位置情報を取得できなかったため日本標準(35.7°N)を使用します');
-        }
-      },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 }
-    );
+      }, 1200);
+    } else if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          state.lat = Number(pos.coords.latitude.toFixed(4));
+          state.lon = Number(pos.coords.longitude.toFixed(4));
+          state.gpsApplied = true;
+          saveState();
+          updateCelestialExhibit(true);
+          if (typeof showToast === 'function') showToast(`📍 現在地の空へ同期しました (${state.lat.toFixed(2)}°N)`);
+        },
+        () => {
+          if (typeof showToast === 'function') showToast('📍 APKアプリ内で実行すると純正GPSが自動連動します');
+        },
+        { enableHighAccuracy: false, timeout: 6000 }
+      );
+    }
   }
 
-  // --- 設定画面UI ---
+  // --- 設定ページ「🔭 観察・空」タブ内UI統合 ---
   function syncSettingsUI() {
-    let panel = document.getElementById('env-hologram-settings-panel');
-    if (!panel) {
-      const modals = Array.from(document.querySelectorAll('.modal-overlay'));
-      for (let i = 0; i < modals.length; i++) {
-        const idLow = (modals[i].id || '').toLowerCase();
-        const titleEl = modals[i].querySelector('.modal-title');
-        if (idLow.includes('setting') || idLow.includes('config') || (titleEl && titleEl.innerText.includes('設定'))) {
-          const content = modals[i].querySelector('.modal-content');
-          if (content) {
-            panel = document.createElement('div');
-            panel.id = 'env-hologram-settings-panel';
-            panel.style.cssText = 'margin-top:8px;padding:10px;border-radius:12px;background:#f0f9ff;border:1.5px solid #7dd3fc;display:flex;flex-direction:column;gap:8px;text-align:left;';
-            panel.innerHTML = '<div style="font-size:11.5px;font-weight:900;color:#0369a1;">🧪 観察環境・機能設定</div>';
-            content.appendChild(panel);
-          }
-          break;
-        }
-      }
-    }
-    if (!panel) return;
+    const obsPanel = document.getElementById('settings-tab-panel-obs');
+    if (!obsPanel) return;
 
-    let box = document.getElementById('env-skytime-box');
+    const placeholder = document.getElementById('settings-obs-sky-placeholder');
+    if (placeholder) placeholder.style.display = 'none';
+
+    let box = document.getElementById('env-skytime-unified-box');
     if (!box) {
       box = document.createElement('div');
-      box.id = 'env-skytime-box';
-      box.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+      box.id = 'env-skytime-unified-box';
+      box.style.cssText = 'display:flex;flex-direction:column;gap:8px;text-align:left;';
       box.innerHTML = `
-        <div style="background:#ffffff;border:1px solid #bae6fd;border-radius:9px;padding:7px 9px;display:flex;flex-direction:column;gap:6px;">
-          <div style="font-size:10.5px;font-weight:800;color:#0f172a;">🎨 観察モード（二重球体スクリーン切替）</div>
+        <!-- 1. 3モード切替 -->
+        <div style="background:#f0f9ff;border:1.5px solid #7dd3fc;border-radius:11px;padding:8px 9px;display:flex;flex-direction:column;gap:6px;">
+          <div style="font-size:11px;font-weight:900;color:#0369a1;">🔭 観察モード（二重外スクリーン＆連動切替）</div>
           <div style="display:flex;gap:4px;">
-            <button type="button" data-skymode="anime" style="flex:1;padding:7px 4px;border-radius:7px;border:1px solid #bae6fd;font-size:10.5px;font-weight:900;cursor:pointer;">①観察アプリ</button>
-            <button type="button" data-skymode="pre_obs" style="flex:1;padding:7px 4px;border-radius:7px;border:1px solid #bae6fd;font-size:10.5px;font-weight:900;cursor:pointer;">②天体観察前</button>
-            <button type="button" data-skymode="obs" style="flex:1;padding:7px 4px;border-radius:7px;border:1px solid #bae6fd;font-size:10.5px;font-weight:900;cursor:pointer;">③天体観察時</button>
+            <button type="button" data-skymode="anime" style="flex:1;padding:7px 4px;border-radius:8px;border:1px solid #bae6fd;font-size:10.5px;font-weight:900;cursor:pointer;">① ゲーム</button>
+            <button type="button" data-skymode="pre_obs" style="flex:1;padding:7px 4px;border-radius:8px;border:1px solid #bae6fd;font-size:10.5px;font-weight:900;cursor:pointer;">② 天体観察前</button>
+            <button type="button" data-skymode="obs" style="flex:1;padding:7px 4px;border-radius:8px;border:1px solid #bae6fd;font-size:10.5px;font-weight:900;cursor:pointer;">③ 天体観察時</button>
           </div>
-          <div id="row-obs-const-line" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:4px;border-top:1px dashed #e2e8f0;">
-            <span style="font-size:10px;font-weight:800;color:#334155;">✨ 観察時の星座線（夜・深夜）</span>
-            <button type="button" id="btn-toggle-obs-lines" style="padding:4px 9px;border-radius:7px;border:none;font-size:10px;font-weight:900;cursor:pointer;"></button>
+          <div id="sky-mode-rule-hint" style="font-size:9.5px;font-weight:700;color:#0369a1;line-height:1.4;"></div>
+        </div>
+
+        <!-- 2. ②天体観察前 ハイブリッド切替 -->
+        <div id="row-preobs-hybrid" style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:11px;padding:8px 9px;display:none;flex-direction:column;gap:6px;">
+          <div style="font-size:11px;font-weight:900;color:#92400e;">🔀 ②天体観察前：コンパスのハイブリッド切替</div>
+          <div style="display:flex;gap:5px;">
+            <button type="button" data-hybrid="spin" style="flex:1;padding:7px 6px;border-radius:8px;border:1px solid #fcd34d;font-size:10.5px;font-weight:900;cursor:pointer;">🔄 くるくる回転</button>
+            <button type="button" data-hybrid="native" style="flex:1;padding:7px 6px;border-radius:8px;border:1px solid #fcd34d;font-size:10.5px;font-weight:900;cursor:pointer;">🧭 実機コンパス連動</button>
           </div>
         </div>
+
+        <!-- 3. コンパス構造切替（高精度 vs 子ども向け磁石吸着） -->
+        <div style="background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:11px;padding:8px 9px;display:flex;flex-direction:column;gap:6px;">
+          <div style="font-size:11px;font-weight:900;color:#0f172a;">🧭 実機コンパスの構造切替</div>
+          <div style="display:flex;gap:5px;">
+            <button type="button" data-compstyle="precision" style="flex:1;padding:7px 5px;border-radius:8px;border:1px solid #cbd5e1;font-size:10.5px;font-weight:900;cursor:pointer;">🔬 高精度コンパス<div style="font-size:9px;font-weight:600;opacity:0.85;">1°単位の正確計測</div></button>
+            <button type="button" data-compstyle="kid" style="flex:1;padding:7px 5px;border-radius:8px;border:1px solid #cbd5e1;font-size:10.5px;font-weight:900;cursor:pointer;">🧭 子ども向けコンパス<div style="font-size:9px;font-weight:600;opacity:0.85;">東西南北に磁石吸着</div></button>
+          </div>
+
+          <div style="font-size:10px;font-weight:800;color:#475569;margin-top:2px;">📱 スマホの持ち方基準</div>
+          <div style="display:flex;gap:4px;">
+            <button type="button" data-posture="0" style="flex:1;padding:5px 4px;border-radius:7px;border:1px solid #cbd5e1;font-size:10px;font-weight:800;cursor:pointer;">🔄 自動判定</button>
+            <button type="button" data-posture="1" style="flex:1;padding:5px 4px;border-radius:7px;border:1px solid #cbd5e1;font-size:10px;font-weight:800;cursor:pointer;">🛌 寝かせ持ち</button>
+            <button type="button" data-posture="2" style="flex:1;padding:5px 4px;border-radius:7px;border:1px solid #cbd5e1;font-size:10px;font-weight:800;cursor:pointer;">📱 立て持ち</button>
+          </div>
+        </div>
+
+        <!-- 4. ホログラム輪っか & 星座線表示 -->
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:7px 9px;display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <span style="font-size:10.5px;font-weight:800;color:#0f172a;">💠 3Dホログラムコンパス表示</span>
+            <button type="button" id="btn-obs-tab-holo-toggle" style="padding:4px 10px;border-radius:7px;border:none;font-size:10px;font-weight:900;cursor:pointer;"></button>
+          </div>
+          <div id="row-obs-const-line" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:5px;border-top:1px dashed #e2e8f0;">
+            <span style="font-size:10.5px;font-weight:800;color:#334155;">✨ ③観察時の星座線（夜・深夜）</span>
+            <button type="button" id="btn-toggle-obs-lines" style="padding:4px 10px;border-radius:7px;border:none;font-size:10px;font-weight:900;cursor:pointer;"></button>
+          </div>
+        </div>
+
+        <!-- 5. GPS同期 & ステータス -->
         <div style="display:flex;align-items:center;gap:6px;">
-          <button type="button" id="btn-gps-sync-sky" style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid #38bdf8;background:#e0f2fe;color:#0369a1;font-size:10.5px;font-weight:900;cursor:pointer;">📍 GPSで現在地の空に合わせる</button>
-          <button type="button" id="btn-gps-reset-sky" style="padding:6px 8px;border-radius:8px;border:1px solid #cbd5e1;background:#ffffff;color:#475569;font-size:10px;font-weight:800;cursor:pointer;">日本標準</button>
+          <button type="button" id="btn-gps-sync-sky" style="flex:1;padding:7px 8px;border-radius:8px;border:1px solid #38bdf8;background:#e0f2fe;color:#0369a1;font-size:10.5px;font-weight:900;cursor:pointer;">📍 GPSで現在地の空に合わせる</button>
+          <button type="button" id="btn-gps-reset-sky" style="padding:7px 8px;border-radius:8px;border:1px solid #cbd5e1;background:#ffffff;color:#475569;font-size:10px;font-weight:800;cursor:pointer;">日本標準</button>
         </div>
-        <div id="env-skytime-status" style="font-size:9.5px;font-weight:700;color:#0369a1;background:#e0f2fe;border-radius:7px;padding:5px 7px;line-height:1.45;"></div>
+        <div id="env-skytime-status" style="font-size:9.5px;font-weight:700;color:#0369a1;background:#e0f2fe;border-radius:7px;padding:6px 8px;line-height:1.45;"></div>
       `;
-      panel.appendChild(box);
+      obsPanel.insertBefore(box, obsPanel.firstChild);
 
       box.querySelectorAll('[data-skymode]').forEach((btn) => {
         btn.onclick = () => {
           state.viewMode = btn.getAttribute('data-skymode');
+          nativeBridge.userPausedTracking = false;
           saveState();
           updateCelestialExhibit(true);
         };
       });
+
+      box.querySelectorAll('[data-hybrid]').forEach((btn) => {
+        btn.onclick = () => {
+          state.preObsHybrid = btn.getAttribute('data-hybrid');
+          nativeBridge.userPausedTracking = false;
+          saveState();
+          updateCelestialExhibit(true);
+        };
+      });
+
+      box.querySelectorAll('[data-compstyle]').forEach((btn) => {
+        btn.onclick = () => {
+          state.compassStyle = btn.getAttribute('data-compstyle');
+          saveState();
+          updateCelestialExhibit(true);
+        };
+      });
+
+      box.querySelectorAll('[data-posture]').forEach((btn) => {
+        btn.onclick = () => {
+          state.postureMode = Number(btn.getAttribute('data-posture'));
+          saveState();
+          if (window.AndroidCompass && typeof window.AndroidCompass.setPostureMode === 'function') {
+            window.AndroidCompass.setPostureMode(state.postureMode);
+          }
+          syncSettingsUI();
+        };
+      });
+
+      document.getElementById('btn-obs-tab-holo-toggle').onclick = () => {
+        const compMod = window.CompassRingModule;
+        if (compMod && typeof compMod.toggleVisible === 'function') {
+          compMod.toggleVisible();
+          syncSettingsUI();
+        }
+      };
+
       document.getElementById('btn-toggle-obs-lines').onclick = () => {
         state.obsConstLines = !state.obsConstLines;
         saveState();
         updateCelestialExhibit(true);
       };
-      document.getElementById('btn-gps-sync-sky').onclick = openGpsConsentModal;
+
+      document.getElementById('btn-gps-sync-sky').onclick = triggerNativeGpsRequest;
       document.getElementById('btn-gps-reset-sky').onclick = () => {
         state.lat = 35.68; state.lon = 139.77; state.gpsApplied = false;
         saveState();
@@ -1444,24 +1410,74 @@
       };
     }
 
-    const bLn  = document.getElementById('btn-toggle-obs-lines');
-    const rLn  = document.getElementById('row-obs-const-line');
-    const stEl = document.getElementById('env-skytime-status');
-
-    if (rLn) rLn.style.display = (state.viewMode === 'obs') ? 'flex' : 'none';
-    if (bLn) { bLn.innerText = state.obsConstLines ? '星座線 ON' : '星座線 OFF'; bLn.style.background = state.obsConstLines ? '#0284c7' : '#e2e8f0'; bLn.style.color = state.obsConstLines ? '#fff' : '#475569'; }
+    // 選択状態のビジュアル反映
     box.querySelectorAll('[data-skymode]').forEach((btn) => {
       const sel = (btn.getAttribute('data-skymode') === state.viewMode);
-      btn.style.background = sel ? '#0284c7' : '#f8fafc';
+      btn.style.background = sel ? '#0284c7' : '#ffffff';
       btn.style.color = sel ? '#ffffff' : '#334155';
     });
-    if (stEl) stEl.innerText = lastStatusText;
+
+    const ruleHint = document.getElementById('sky-mode-rule-hint');
+    if (ruleHint) {
+      if (state.viewMode === 'anime') {
+        ruleHint.textContent = '・①ゲーム：外スクリーンはアニメ空、コンパス輪はくるくる回転します。';
+      } else if (state.viewMode === 'pre_obs') {
+        ruleHint.textContent = '・②天体観察前：外スクリーンで軌道と天体を予習。下のハイブリッド切替でコンパス動作を選べます。';
+      } else {
+        ruleHint.textContent = '・③天体観察時：GPSと現在時刻のリアル星空／朝日／夕焼けを表示し、実機コンパス連動に固定（暗転停止）します。';
+      }
+    }
+
+    const hybridRow = document.getElementById('row-preobs-hybrid');
+    if (hybridRow) hybridRow.style.display = (state.viewMode === 'pre_obs') ? 'flex' : 'none';
+    box.querySelectorAll('[data-hybrid]').forEach((btn) => {
+      const sel = (btn.getAttribute('data-hybrid') === state.preObsHybrid);
+      btn.style.background = sel ? '#d97706' : '#ffffff';
+      btn.style.color = sel ? '#ffffff' : '#78350f';
+    });
+
+    box.querySelectorAll('[data-compstyle]').forEach((btn) => {
+      const sel = (btn.getAttribute('data-compstyle') === state.compassStyle);
+      btn.style.background = sel ? '#0f172a' : '#ffffff';
+      btn.style.color = sel ? '#ffffff' : '#1e293b';
+      btn.style.borderColor = sel ? '#0284c7' : '#cbd5e1';
+    });
+
+    box.querySelectorAll('[data-posture]').forEach((btn) => {
+      const sel = (Number(btn.getAttribute('data-posture')) === state.postureMode);
+      btn.style.background = sel ? '#0284c7' : '#ffffff';
+      btn.style.color = sel ? '#ffffff' : '#334155';
+    });
+
+    const holoBtn = document.getElementById('btn-obs-tab-holo-toggle');
+    if (holoBtn) {
+      const compMod = window.CompassRingModule;
+      const holoOn = (compMod && typeof compMod.isUserEnabled === 'function') ? compMod.isUserEnabled() : false;
+      holoBtn.textContent = holoOn ? '表示中 (ON)' : '非表示 (OFF)';
+      holoBtn.style.background = holoOn ? '#0284c7' : '#e2e8f0';
+      holoBtn.style.color = holoOn ? '#ffffff' : '#475569';
+    }
+
+    const rLn = document.getElementById('row-obs-const-line');
+    const bLn = document.getElementById('btn-toggle-obs-lines');
+    if (rLn) rLn.style.display = (state.viewMode === 'obs') ? 'flex' : 'none';
+    if (bLn) {
+      bLn.textContent = state.obsConstLines ? '星座線 ON' : '星座線 OFF';
+      bLn.style.background = state.obsConstLines ? '#0284c7' : '#e2e8f0';
+      bLn.style.color = state.obsConstLines ? '#ffffff' : '#475569';
+    }
+
+    const stEl = document.getElementById('env-skytime-status');
+    if (stEl) {
+      const connTxt = nativeBridge.connected ? '✅ Android実機センサー接続済み' : '🌐 ブラウザ表示（APKで実機連動）';
+      stEl.textContent = `${connTxt}\n${lastStatusText}`;
+    }
   }
 
   // --- 毎フレーム監視 ---
   function animateSky(now) {
     hideLegacySkyObjects();
-    updateNorthAlignmentState();
+    updateCompassAndCameraLoop();
     if (typeof activeCamera !== 'undefined' && activeCamera) {
       skyRoot.position.copy(activeCamera.position);
     }
@@ -1480,17 +1496,19 @@
   setInterval(() => {
     updateCelestialExhibit(false);
   }, 2000);
-  setTimeout(() => { updateCelestialExhibit(true); syncSettingsUI(); }, 800);
+  setTimeout(() => { updateCelestialExhibit(true); syncSettingsUI(); }, 600);
   requestAnimationFrame(animateSky);
 
   window.SkyTimeModule = {
-    setMode: (m) => { if (['anime','pre_obs','obs'].includes(m)) { state.viewMode = m; saveState(); updateCelestialExhibit(true); } },
+    setMode: (m) => { if (['anime', 'pre_obs', 'obs'].includes(m)) { state.viewMode = m; saveState(); updateCelestialExhibit(true); } },
+    getMode: () => state.viewMode,
+    isNativeCompassActive,
     setObsConstLines: (v) => { state.obsConstLines = Boolean(v); saveState(); updateCelestialExhibit(true); },
-    setGyroEnabled: (v) => { if (v && state.viewMode === 'obs') startSensorCompass(); else stopSensorCompass(); updateNorthAlignmentState(); },
     advanceTurn,
     resetTurns,
-    requestGPS: openGpsConsentModal,
+    requestGPS: triggerNativeGpsRequest,
     getPhaseIndex: () => Math.min(3, resolveSkyMoment().phase),
+    syncSettingsUI,
     refresh: () => updateCelestialExhibit(true)
   };
 
