@@ -1,14 +1,14 @@
 // ============================================================================
 // 【独立ビジュアルモジュール：sky_time.js】
 // ・Androidネイティブ(Kotlin)の高精度/子ども向けコンパス＆純正GPSへ直結
-// ・①ゲーム(アニメ空・カメラそのまま・くるくる回転)
-// ・②天体観察前(リアル風の外スクリーン＋GPS正確天体位置・カメラそのまま・くるくる回転)
-// ・③天体観察時(全5視点カメラ方位統一＋リアル空＋暗転停止＋高精度/子ども向け切替)
+// ・①ゲーム(アニメ空・カメラそのまま・キャラ思考＆移動)
+// ・②天体観察前(リアル風外スクリーン・キャラ思考＆移動・各カメラの水平方角のみコンパス連動)
+// ・③天体観察時(キャラその場に停止・全カメラ方位統一＋上下見上げ＋リアル空＋暗転停止)
 // ============================================================================
 (function initSkyTimeModule() {
   if (typeof THREE === 'undefined' || typeof scene === 'undefined') return;
 
-  const STORAGE_KEY = 'island_sky_time_v17';
+  const STORAGE_KEY = 'island_sky_time_v18';
   const RAD = Math.PI / 180;
   const DEG = 180 / Math.PI;
   const SKY_R = 22.0;
@@ -189,9 +189,10 @@
     userPausedTracking: false,
     alignedNow: false,
     postureSynced: false,
-    obsPitchRad: 0.22,
+    obsPitchRad: 0.24,      // ③天体観察時の空見上げ角度（ラジアン）
     touchStartY: 0,
-    touchStartPitch: 0.22
+    touchStartPitch: 0.24,
+    lockedRobotPos: null    // ③天体観察時にキャラがいた位置をロック
   };
 
   const tmpCamDir = new THREE.Vector3();
@@ -239,7 +240,8 @@
   }
 
   function isNativeCompassActive() {
-    return state.viewMode === 'obs';
+    if (state.viewMode === 'anime') return false;
+    return Boolean(nativeBridge.connected && !nativeBridge.userPausedTracking);
   }
 
   function getSelectedNativeAzimuth() {
@@ -281,77 +283,139 @@
     } catch (e) {}
   }
 
-  // --- ③天体観察時専用：全5視点カメラの絶対方位統一 ---
-  function applyObservationCameraPose() {
-    if (state.viewMode !== 'obs') return;
+  // --- ③天体観察時専用：キャラのマップ移動ロック（思考はそのまま・位置は固定） ---
+  function enforceObsPositionLock() {
+    if (state.viewMode !== 'obs') {
+      nativeBridge.lockedRobotPos = null;
+      return;
+    }
+    if (typeof ROBOT === 'undefined' || !ROBOT || !ROBOT.pos) return;
+
+    if (!nativeBridge.lockedRobotPos) {
+      nativeBridge.lockedRobotPos = {
+        x: ROBOT.pos.x,
+        z: ROBOT.pos.z,
+        lv: ROBOT.pos.lv,
+        sx: Number.isFinite(ROBOT.pos.sx) ? ROBOT.pos.sx : 2,
+        sz: Number.isFinite(ROBOT.pos.sz) ? ROBOT.pos.sz : 2,
+        wx: (typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.x : ROBOT.pos.x,
+        wy: (typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.y : 0,
+        wz: (typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.z : ROBOT.pos.z
+      };
+    } else {
+      const lp = nativeBridge.lockedRobotPos;
+      ROBOT.pos.x = lp.x;
+      ROBOT.pos.z = lp.z;
+      ROBOT.pos.lv = lp.lv;
+      ROBOT.pos.sx = lp.sx;
+      ROBOT.pos.sz = lp.sz;
+      if (typeof robotGroup !== 'undefined' && robotGroup) {
+        robotGroup.position.set(lp.wx, lp.wy, lp.wz);
+      }
+    }
+  }
+
+  // --- カメラ方位連動（キャラ本体の向き ROBOT.rotY は変更しない） ---
+  function applyModeCameraOrientation() {
+    if (state.viewMode === 'anime') return;
     if (!nativeBridge.connected || nativeBridge.userPausedTracking) return;
 
     const azDeg = getSelectedNativeAzimuth();
     const azRad = azDeg * RAD;
+    // 北(0°)=(0, -1), 東(90°)=(+1, 0), 南(180°)=(0, +1), 西(270°)=(-1, 0)
     const dirX = Math.sin(azRad);
     const dirZ = -Math.cos(azRad);
-    const pitch = nativeBridge.obsPitchRad;
-
-    if (typeof ROBOT !== 'undefined' && ROBOT) {
-      ROBOT.rotY = Math.PI - azRad;
-      if (typeof robotGroup !== 'undefined' && robotGroup) {
-        robotGroup.rotation.y = ROBOT.rotY;
-      }
-    }
-
     const camMode = (typeof manualCameraMode !== 'undefined') ? manualCameraMode : 'follow';
 
-    if (camMode === 'robot' && typeof innerRobotCam !== 'undefined' && innerRobotCam) {
-      const eyeX = innerRobotCam.position.x;
-      const eyeY = innerRobotCam.position.y;
-      const eyeZ = innerRobotCam.position.z;
-      const cosP = Math.cos(pitch);
-      innerRobotCam.lookAt(
-        eyeX + 20 * cosP * dirX,
-        eyeY + 20 * Math.sin(pitch),
-        eyeZ + 20 * cosP * dirZ
-      );
-      return;
-    }
+    // 【② 天体観察前】：各カメラの通常ゲームアングル（見下ろし角度・距離）を維持したまま水平方角のみ連動
+    if (state.viewMode === 'pre_obs') {
+      if (nativeBridge.userTouching) return;
 
-    if (typeof activeCamera !== 'undefined' && activeCamera) {
-      if (camMode === 'ground') {
-        const dist = 10.5;
-        const camY = 3.2;
-        activeCamera.position.set(-dirX * dist, camY, -dirZ * dist);
-        const lookDist = 22.0;
-        const lookY = camY + Math.sin(pitch) * lookDist;
-        if (typeof controls !== 'undefined' && controls && controls.target) {
-          controls.target.set(dirX * (lookDist - dist), lookY, dirZ * (lookDist - dist));
-          activeCamera.lookAt(controls.target);
-        } else {
-          activeCamera.lookAt(dirX * (lookDist - dist), lookY, dirZ * (lookDist - dist));
-        }
-      } else if (camMode === 'underground') {
-        if (typeof controls !== 'undefined' && controls && controls.target) {
-          const dx = activeCamera.position.x - controls.target.x;
-          const dz = activeCamera.position.z - controls.target.z;
-          const horizDist = Math.max(3.5, Math.hypot(dx, dz));
+      if (camMode === 'robot' && typeof innerRobotCam !== 'undefined' && innerRobotCam) {
+        const eyeX = innerRobotCam.position.x;
+        const eyeY = innerRobotCam.position.y;
+        const eyeZ = innerRobotCam.position.z;
+        const pitch = -0.13;
+        const cosP = Math.cos(pitch);
+        innerRobotCam.lookAt(
+          eyeX + 20 * cosP * dirX,
+          eyeY + 20 * Math.sin(pitch),
+          eyeZ + 20 * cosP * dirZ
+        );
+        return;
+      }
+
+      if (typeof activeCamera !== 'undefined' && activeCamera && typeof controls !== 'undefined' && controls && controls.target) {
+        const dx = activeCamera.position.x - controls.target.x;
+        const dz = activeCamera.position.z - controls.target.z;
+        const horizDist = Math.hypot(dx, dz);
+        if (horizDist > 0.05) {
           activeCamera.position.x = controls.target.x - dirX * horizDist;
           activeCamera.position.z = controls.target.z - dirZ * horizDist;
           activeCamera.lookAt(controls.target);
         }
-      } else {
-        const baseX = (typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.x : 0;
-        const baseY = (typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.y : 0;
-        const baseZ = (typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.z : 0;
-        const backDist = 4.6;
-        const eyeY = baseY + 1.35;
-        activeCamera.position.set(baseX - dirX * backDist, eyeY, baseZ - dirZ * backDist);
+      }
+      return;
+    }
 
-        const lookDist = 20.0;
-        const targetX = baseX + dirX * lookDist;
-        const targetY = eyeY + Math.sin(pitch) * lookDist;
-        const targetZ = baseZ + dirZ * lookDist;
-        if (typeof controls !== 'undefined' && controls && controls.target) {
-          controls.target.set(targetX, targetY, targetZ);
+    // 【③ 天体観察時】：キャラのいた位置基準で実機コンパス連動＋上下指スライドで見上げ
+    if (state.viewMode === 'obs') {
+      const pitch = nativeBridge.obsPitchRad;
+
+      if (camMode === 'robot' && typeof innerRobotCam !== 'undefined' && innerRobotCam) {
+        const eyeX = innerRobotCam.position.x;
+        const eyeY = innerRobotCam.position.y;
+        const eyeZ = innerRobotCam.position.z;
+        const cosP = Math.cos(pitch);
+        innerRobotCam.lookAt(
+          eyeX + 20 * cosP * dirX,
+          eyeY + 20 * Math.sin(pitch),
+          eyeZ + 20 * cosP * dirZ
+        );
+        return;
+      }
+
+      if (typeof activeCamera !== 'undefined' && activeCamera) {
+        if (camMode === 'ground') {
+          const dist = 9.5;
+          const camY = 2.8;
+          activeCamera.position.set(-dirX * dist, camY, -dirZ * dist);
+          const lookDist = 22.0;
+          const lookY = camY + Math.sin(pitch) * lookDist;
+          if (typeof controls !== 'undefined' && controls && controls.target) {
+            controls.target.set(dirX * (lookDist - dist), lookY, dirZ * (lookDist - dist));
+            activeCamera.lookAt(controls.target);
+          } else {
+            activeCamera.lookAt(dirX * (lookDist - dist), lookY, dirZ * (lookDist - dist));
+          }
+        } else if (camMode === 'underground') {
+          if (typeof controls !== 'undefined' && controls && controls.target) {
+            const dx = activeCamera.position.x - controls.target.x;
+            const dz = activeCamera.position.z - controls.target.z;
+            const horizDist = Math.max(3.5, Math.hypot(dx, dz));
+            activeCamera.position.x = controls.target.x - dirX * horizDist;
+            activeCamera.position.z = controls.target.z - dirZ * horizDist;
+            activeCamera.lookAt(controls.target);
+          }
+        } else {
+          // 追従カメラ：キャラがいた位置基準で実機コンパスの方角＆見上げ仰角を反映
+          const lp = nativeBridge.lockedRobotPos;
+          const baseX = lp ? lp.wx : ((typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.x : 0);
+          const baseY = lp ? lp.wy : ((typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.y : 0);
+          const baseZ = lp ? lp.wz : ((typeof robotGroup !== 'undefined' && robotGroup) ? robotGroup.position.z : 0);
+          const backDist = 4.2;
+          const eyeY = baseY + 1.25;
+          activeCamera.position.set(baseX - dirX * backDist, eyeY, baseZ - dirZ * backDist);
+
+          const lookDist = 20.0;
+          const targetX = baseX + dirX * lookDist;
+          const targetY = eyeY + Math.sin(pitch) * lookDist;
+          const targetZ = baseZ + dirZ * lookDist;
+          if (typeof controls !== 'undefined' && controls && controls.target) {
+            controls.target.set(targetX, targetY, targetZ);
+          }
+          activeCamera.lookAt(targetX, targetY, targetZ);
         }
-        activeCamera.lookAt(targetX, targetY, targetZ);
       }
     }
   }
@@ -363,7 +427,8 @@
       const _origUpdateAll = window.updateAllCamerasTransform;
       window.updateAllCamerasTransform = function() {
         const res = _origUpdateAll.apply(this, arguments);
-        applyObservationCameraPose();
+        enforceObsPositionLock();
+        applyModeCameraOrientation();
         return res;
       };
       cameraHookInstalled = true;
@@ -373,12 +438,16 @@
   function updateCompassAndCameraLoop() {
     ensureCameraTransformHook();
     pollNativeBridge();
+    enforceObsPositionLock();
 
+    const isPreObs = (state.viewMode === 'pre_obs');
     const isObsMode = (state.viewMode === 'obs');
+    const showObsTools = (isPreObs || isObsMode);
+
     syncScreenWakeLock(isObsMode);
 
-    if (isObsMode) {
-      applyObservationCameraPose();
+    if (showObsTools) {
+      applyModeCameraOrientation();
     }
 
     const compMod = window.CompassRingModule;
@@ -389,6 +458,7 @@
       compMod.setObsAlignmentMode(alignActive);
     }
 
+    // 北一致判定（③天体観察時）
     if (alignActive) {
       let diffDeg = 180;
       if (nativeBridge.connected && !nativeBridge.userPausedTracking) {
@@ -410,12 +480,12 @@
       nativeBridge.alignedNow = false;
     }
 
-    // ③天体観察時のみ右側の観察アイコン＆上部方位バッジを表示
-    syncObsSideIcons(isObsMode, userCompOn, isObsMode && !nativeBridge.userPausedTracking);
-    syncCompassHudBadge(isObsMode);
+    // ②天体観察前・③天体観察時の両方で右側縦並び🧭・📱アイコン＆上部方位バッジを表示
+    syncObsSideIcons(showObsTools, userCompOn, showObsTools && !nativeBridge.userPausedTracking);
+    syncCompassHudBadge(showObsTools);
   }
 
-  // --- 上部方位HUDバッジ（③天体観察時専用） ---
+  // --- 上部方位HUDバッジ（②天体観察前 ＆ ③天体観察時） ---
   function syncCompassHudBadge(showHud) {
     let hud = document.getElementById('obs-compass-hud-badge');
     if (!showHud) {
@@ -440,12 +510,13 @@
     }
 
     const postureTag = nativeBridge.isUpright ? '立て持ち' : '寝かせ持ち';
+    const modeTag = (state.viewMode === 'pre_obs') ? '観察前' : '観察中';
 
     if (!nativeBridge.connected) {
-      hud.textContent = `🧭 ブラウザ表示中（APK起動で実機センサー連動）`;
+      hud.textContent = `🧭 ${modeTag}（APK起動で実機センサー連動）`;
       hud.style.borderColor = '#94a3b8';
     } else if (nativeBridge.userPausedTracking) {
-      hud.textContent = `✋ 一時停止中（右の📱アイコンで実機連動再開）`;
+      hud.textContent = `✋ ${modeTag}・一時停止中（右の📱で連動再開）`;
       hud.style.borderColor = '#f59e0b';
     } else if (state.compassStyle === 'kid') {
       const dir4 = getDirectionName4(dispDeg);
@@ -506,13 +577,16 @@
     }
 
     if (!compBtn) {
-      compBtn = createSideRoundIcon('btn-side-obs-compass', '🧭', 'badge-side-obs-compass', 'ホログラムコンパス表示 ON/OFF', 372);
+      compBtn = createSideRoundIcon('btn-side-obs-compass', '🧭', 'badge-side-obs-compass', 'ホログラムコンパス表示 ON/OFF（北合わせ）', 372);
       compBtn.onclick = () => {
         const compMod = window.CompassRingModule;
         if (compMod && typeof compMod.toggleVisible === 'function') {
           const next = compMod.toggleVisible();
+          if (next) {
+            nativeBridge.userPausedTracking = false;
+          }
           if (typeof showToast === 'function') {
-            showToast(next ? '🧭 ホログラムコンパス ON' : '🧭 ホログラムコンパス OFF');
+            showToast(next ? '🧭 ホログラムコンパス ON（北基準）' : '🧭 ホログラムコンパス OFF');
           }
           updateCompassAndCameraLoop();
         }
@@ -1381,9 +1455,9 @@
           <div id="sky-mode-rule-hint" style="font-size:9.5px;font-weight:700;color:#0369a1;line-height:1.4;"></div>
         </div>
 
-        <!-- 2. コンパス構造切替（③天体観察時用：高精度 vs 子ども向け磁石吸着） -->
+        <!-- 2. コンパス構造切替（高精度 vs 子ども向け磁石吸着） -->
         <div style="background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:11px;padding:8px 9px;display:flex;flex-direction:column;gap:6px;">
-          <div style="font-size:11px;font-weight:900;color:#0f172a;">🧭 実機コンパスの構造切替（③天体観察時）</div>
+          <div style="font-size:11px;font-weight:900;color:#0f172a;">🧭 実機コンパスの構造切替（②観察前・③観察時）</div>
           <div style="display:flex;gap:5px;">
             <button type="button" data-compstyle="precision" style="flex:1;padding:7px 5px;border-radius:8px;border:1px solid #cbd5e1;font-size:10.5px;font-weight:900;cursor:pointer;">🔬 高精度コンパス<div style="font-size:9px;font-weight:600;opacity:0.85;">1°単位の正確計測</div></button>
             <button type="button" data-compstyle="kid" style="flex:1;padding:7px 5px;border-radius:8px;border:1px solid #cbd5e1;font-size:10.5px;font-weight:900;cursor:pointer;">🧭 子ども向けコンパス<div style="font-size:9px;font-weight:600;opacity:0.85;">東西南北に磁石吸着</div></button>
@@ -1422,6 +1496,10 @@
         btn.onclick = () => {
           state.viewMode = btn.getAttribute('data-skymode');
           nativeBridge.userPausedTracking = false;
+          if (state.viewMode === 'pre_obs' || state.viewMode === 'obs') {
+            const compMod = window.CompassRingModule;
+            if (compMod && typeof compMod.setVisible === 'function') compMod.setVisible(true);
+          }
           saveState();
           updateCelestialExhibit(true);
         };
@@ -1479,11 +1557,11 @@
     const ruleHint = document.getElementById('sky-mode-rule-hint');
     if (ruleHint) {
       if (state.viewMode === 'anime') {
-        ruleHint.textContent = '・①ゲーム：アニメ空、カメラ視点はそのまま、コンパス輪はくるくる回転します。';
+        ruleHint.textContent = '・①ゲーム：アニメ空、キャラは通常通り思考・移動、コンパス輪はくるくる回転します。';
       } else if (state.viewMode === 'pre_obs') {
-        ruleHint.textContent = '・②天体観察前：リアル風の外スクリーン（GPS連動の正確な天体位置＆軌道）、カメラ視点はそのまま、コンパス輪はくるくる回転します。';
+        ruleHint.textContent = '・②天体観察前：リアル風の外スクリーン＋正確な天体位置。キャラは通常移動し、右の🧭/📱アイコンで各カメラの水平方角を実機コンパスと連動できます。';
       } else {
-        ruleHint.textContent = '・③天体観察時：全カメラ（キャラ/追従/地上/地下/AI視点）の方位を実機コンパスと統一し、空を見渡せます。';
+        ruleHint.textContent = '・③天体観察時：キャラはその場に停止。キャラがいた位置から全カメラの方位を実機コンパスと統一し、上下指スライドで空を見上げられます。';
       }
     }
 
